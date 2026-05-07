@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using ClosedXML.Excel;
 using MevGovernanceBackend.Data;
 using MevGovernanceBackend.Models;
+using MevGovernanceBackend.Services;
+using System.Security.Claims;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -13,10 +15,12 @@ namespace MevGovernanceBackend.Controllers;
 public class MevController : BaseController
 {
     private readonly AppDbContext _db;
+    private readonly EmailService _email;
 
-    public MevController(AppDbContext db)
+    public MevController(AppDbContext db, EmailService email)
     {
         _db = db;
+        _email = email;
     }
 
     // ============================================================
@@ -38,18 +42,29 @@ public class MevController : BaseController
     // PUT /api/mev/{id}
     // ============================================================
     [HttpPut("{id}")]
-    public IActionResult UpdateMev(int id, [FromBody] UpdateMevRequest request)
+    public async Task<IActionResult> UpdateMev(int id, [FromBody] UpdateMevRequest request)
     {
         var item = _db.MevItems.FirstOrDefault(x => x.Id == id);
         if (item == null)
             return NotFound();
 
-        item.PAnno = request.PAnno;
+        item.PAnno    = request.PAnno;
         item.PRelease = request.PRelease;
         item.PImporto = request.PImporto;
-        item.PNote = request.PNote;
+        item.PNote    = request.PNote;
 
         _db.SaveChanges();
+
+        // Invia email di notifica a tutti gli Admin
+        var username = User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
+        var fullName = User.FindFirst("fullName")?.Value ?? username;
+        var adminEmails = _db.Users
+            .Where(u => u.Role == "Admin" && u.IsActive && !string.IsNullOrEmpty(u.Email))
+            .Select(u => u.Email)
+            .ToList();
+
+        _ = _email.SendMevUpdateNotificationAsync(username, fullName, item, adminEmails);
+
         return Ok(item);
     }
 
