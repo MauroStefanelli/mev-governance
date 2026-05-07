@@ -75,24 +75,56 @@ var app = builder.Build();
 app.UseCors("FrontendPolicy");
 
 // ✅ CREA DB + SEED ADMIN
+// Usa DATABASE_DIRECT_URL (connessione diretta, no pooler) per EnsureCreated
+// se non disponibile, usa DATABASE_URL normale
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    var directUrl = Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL");
+    AppDbContext db;
 
-    if (!db.Users.Any())
+    if (!string.IsNullOrEmpty(directUrl))
     {
-        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
-        db.Users.Add(new AppUser
+        // Crea un DbContext temporaneo con connessione diretta per creare lo schema
+        string directConn = directUrl;
+        if (directUrl.StartsWith("postgres://") || directUrl.StartsWith("postgresql://"))
         {
-            Username     = "MSTEFANE",
-            FullName     = "Mauro Stefanelli",
-            Email        = "mauro.stefanelli@capgemini.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-            Role         = "Admin",
-            IsActive     = true
-        });
-        db.SaveChanges();
+            var uri = new Uri(directUrl);
+            var userInfo = uri.UserInfo.Split(':');
+            var user     = userInfo[0];
+            var password = userInfo.Length > 1 ? userInfo[1] : "";
+            var host     = uri.Host;
+            var port     = uri.Port > 0 ? uri.Port : 5432;
+            var dbName   = uri.AbsolutePath.TrimStart('/');
+            directConn   = $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+        }
+        var directOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(directConn)
+            .Options;
+        db = new AppDbContext(directOptions);
+    }
+    else
+    {
+        db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    }
+
+    using (db)
+    {
+        db.Database.EnsureCreated();
+
+        if (!db.Users.Any())
+        {
+            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
+            db.Users.Add(new AppUser
+            {
+                Username     = "MSTEFANE",
+                FullName     = "Mauro Stefanelli",
+                Email        = "mauro.stefanelli@capgemini.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+                Role         = "Admin",
+                IsActive     = true
+            });
+            db.SaveChanges();
+        }
     }
 }
 
