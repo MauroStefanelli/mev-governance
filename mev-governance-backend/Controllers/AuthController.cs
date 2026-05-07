@@ -1,0 +1,199 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using MevGovernanceBackend.Data;
+using MevGovernanceBackend.Models;
+
+namespace MevGovernanceBackend.Controllers;
+
+[ApiController]
+[Route("api/auth")]
+public class AuthController : ControllerBase
+{
+    private readonly AppDbContext _db;
+    private readonly IConfiguration _config;
+
+    public AuthController(AppDbContext db, IConfiguration config)
+    {
+        _db = db;
+        _config = config;
+    }
+
+    // ============================================================
+    // POST /api/auth/login
+    // ============================================================
+    [HttpPost("login")]
+    [AllowAnonymous]
+    public IActionResult Login([FromBody] LoginRequest request)
+    {
+        var user = _db.Users.FirstOrDefault(u =>
+            u.Username == request.Username && u.IsActive);
+
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            return Unauthorized("Credenziali non valide");
+
+        var token = GenerateToken(user);
+
+        return Ok(new
+        {
+            token,
+            username = user.Username,
+            fullName = user.FullName,
+            role = user.Role
+        });
+    }
+
+    // ============================================================
+    // GET /api/auth/users  (solo Admin)
+    // ============================================================
+    [HttpGet("users")]
+    [Authorize]
+    public IActionResult GetUsers()
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var users = _db.Users
+            .Select(u => new
+            {
+                u.Id,
+                u.Username,
+                u.FullName,
+                u.Email,
+                u.Role,
+                u.IsActive
+            })
+            .ToList();
+
+        return Ok(users);
+    }
+
+    // ============================================================
+    // POST /api/auth/users  (solo Admin)
+    // ============================================================
+    [HttpPost("users")]
+    [Authorize]
+    public IActionResult CreateUser([FromBody] CreateUserRequest request)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        if (_db.Users.Any(u => u.Username == request.Username))
+            return BadRequest("Username già esistente");
+
+        var user = new AppUser
+        {
+            Username = request.Username,
+            FullName = request.FullName,
+            Email = request.Email ?? "",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = "Editor",
+            IsActive = true
+        };
+
+        _db.Users.Add(user);
+        _db.SaveChanges();
+
+        return Ok(new { user.Id, user.Username, user.FullName, user.Role });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/toggle  (solo Admin)
+    // ============================================================
+    [HttpPut("users/{id}/toggle")]
+    [Authorize]
+    public IActionResult ToggleUser(int id)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound();
+
+        if (user.Role == "Admin") return BadRequest("Non puoi disattivare l'Admin");
+
+        user.IsActive = !user.IsActive;
+        _db.SaveChanges();
+
+        return Ok(new { user.Id, user.IsActive });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/password  (solo Admin)
+    // ============================================================
+    [HttpPut("users/{id}/password")]
+    [Authorize]
+    public IActionResult ResetPassword(int id, [FromBody] ResetPasswordRequest request)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound();
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        _db.SaveChanges();
+
+        return Ok(new { message = "Password aggiornata" });
+    }
+
+    // ============================================================
+    // DELETE /api/auth/users/{id}  (solo Admin)
+    // ============================================================
+    [HttpDelete("users/{id}")]
+    [Authorize]
+    public IActionResult DeleteUser(int id)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound();
+        if (user.Role == "Admin") return BadRequest("Non puoi eliminare l'Admin");
+
+        _db.Users.Remove(user);
+        _db.SaveChanges();
+
+        return Ok(new { message = "Utente eliminato" });
+    }
+
+    // ============================================================
+    // Helpers
+    // ============================================================
+    private string GenerateToken(AppUser user)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var expires = DateTime.UtcNow.AddHours(double.Parse(_config["Jwt:ExpiresHours"]!));
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("fullName", user.FullName)
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _config["Jwt:Issuer"],
+            audience: _config["Jwt:Audience"],
+            claims: claims,
+            expires: expires,
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private bool IsAdmin()
+    {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        return role == "Admin";
+    }
+}
+
+// ============================================================
+// Request DTOs
+// ============================================================
+public record LoginRequest(string Username, string Password);
+public record CreateUserRequest(string Username, string FullName, string? Email, string Password);
+public record ResetPasswordRequest(string NewPassword);

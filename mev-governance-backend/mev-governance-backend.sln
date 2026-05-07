@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mev-governance-backend", "mev-governance-backend.csproj", "{CD57EB4B-A031-0149-B541-C8B8C20DAA54}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CD57EB4B-A031-0149-B541-C8B8C20DAA54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD57EB4B-A031-0149-B541-C8B8C20DAA54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD57EB4B-A031-0149-B541-C8B8C20DAA54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD57EB4B-A031-0149-B541-C8B8C20DAA54}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2755A348-0AFC-486F-AAB2-12FAF53D94F1}
+	EndGlobalSection
+EndGlobal
