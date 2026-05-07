@@ -3,7 +3,7 @@ import { getUsers, createUser, toggleUser, resetPassword, deleteUser } from "../
 
 function AdminPage() {
   const [users, setUsers] = useState([]);
-  const [form, setForm] = useState({ username: "", fullName: "", email: "", password: "" });
+  const [form, setForm] = useState({ username: "", fullName: "", email: "", password: "", role: "Editor" });
   const [newPasswords, setNewPasswords] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -29,7 +29,7 @@ function AdminPage() {
     setError("");
     try {
       await createUser(form);
-      setForm({ username: "", fullName: "", email: "", password: "" });
+      setForm({ username: "", fullName: "", email: "", password: "", role: "Editor" });
       notify("Utente creato");
       loadUsers();
     } catch (err) {
@@ -105,6 +105,17 @@ function AdminPage() {
               />
             </div>
           ))}
+          <div>
+            <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Ruolo</label>
+            <select
+              value={form.role}
+              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+              style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", width: "120px" }}
+            >
+              <option value="Editor">Editor</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
           <button type="submit" style={{ padding: "6px 16px", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
             Aggiungi
           </button>

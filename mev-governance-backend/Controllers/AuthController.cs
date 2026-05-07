@@ -85,12 +85,12 @@ public class AuthController : ControllerBase
 
         var user = new AppUser
         {
-            Username = request.Username,
-            FullName = request.FullName,
-            Email = request.Email ?? "",
+            Username     = request.Username,
+            FullName     = request.FullName,
+            Email        = request.Email ?? "",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = "Editor",
-            IsActive = true
+            Role         = request.Role == "Admin" ? "Admin" : "Editor",
+            IsActive     = true
         };
 
         _db.Users.Add(user);
@@ -195,5 +195,5 @@ public class AuthController : ControllerBase
 // Request DTOs
 // ============================================================
 public record LoginRequest(string Username, string Password);
-public record CreateUserRequest(string Username, string FullName, string? Email, string Password);
+public record CreateUserRequest(string Username, string FullName, string? Email, string Password, string? Role);
 public record ResetPasswordRequest(string NewPassword);
