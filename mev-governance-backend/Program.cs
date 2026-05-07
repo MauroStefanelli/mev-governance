@@ -20,9 +20,21 @@ builder.Services.AddCors(options =>
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 if (!string.IsNullOrEmpty(databaseUrl))
 {
-    // PostgreSQL (Supabase)
+    // Converti URI postgres:// in formato Npgsql key=value
+    string npgsqlConn = databaseUrl;
+    if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
+    {
+        var uri = new Uri(databaseUrl);
+        var userInfo = uri.UserInfo.Split(':');
+        var user     = userInfo[0];
+        var password = userInfo.Length > 1 ? userInfo[1] : "";
+        var host     = uri.Host;
+        var port     = uri.Port > 0 ? uri.Port : 5432;
+        var db       = uri.AbsolutePath.TrimStart('/');
+        npgsqlConn   = $"Host={host};Port={port};Database={db};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+    }
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(databaseUrl));
+        options.UseNpgsql(npgsqlConn));
 }
 else
 {
