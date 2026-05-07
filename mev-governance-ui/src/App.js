@@ -11,7 +11,7 @@ function App() {
   const [fullName, setFullName]     = useState(localStorage.getItem("fullName") || "");
   const [role, setRole]             = useState(localStorage.getItem("role") || "");
   const [page, setPage]             = useState("mev");
-  const [rows, setRows]             = useState([]);
+  const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
   const [filteredRows, setFilteredRows] = useState([]);
 
   useEffect(() => {

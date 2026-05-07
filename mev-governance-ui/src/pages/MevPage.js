@@ -75,7 +75,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
     }
   };
 
-  useEffect(() => { loadMev(); }, []);
+  useEffect(() => { loadMev(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
