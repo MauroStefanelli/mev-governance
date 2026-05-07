@@ -215,22 +215,20 @@ function AdminPage() {
                 </div>
               </td>
               <td style={{ textAlign: "center" }}>
-                {u.role !== "Admin" && (
-                  <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                    <button
-                      onClick={() => handleToggle(u.id)}
-                      style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: u.isActive ? "#ffc107" : "#28a745", color: u.isActive ? "#000" : "#fff", border: "none", borderRadius: "4px" }}
-                    >
-                      {u.isActive ? "Disattiva" : "Attiva"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(u.id, u.username)}
-                      style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#dc3545", color: "white", border: "none", borderRadius: "4px" }}
-                    >
-                      Elimina
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                  <button
+                    onClick={() => handleToggle(u.id)}
+                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: u.isActive ? "#ffc107" : "#28a745", color: u.isActive ? "#000" : "#fff", border: "none", borderRadius: "4px" }}
+                  >
+                    {u.isActive ? "Disattiva" : "Attiva"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(u.id, u.username)}
+                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#dc3545", color: "white", border: "none", borderRadius: "4px" }}
+                  >
+                    Elimina
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

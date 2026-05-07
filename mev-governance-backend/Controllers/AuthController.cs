@@ -111,8 +111,6 @@ public class AuthController : ControllerBase
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null) return NotFound();
 
-        if (user.Role == "Admin") return BadRequest("Non puoi disattivare l'Admin");
-
         user.IsActive = !user.IsActive;
         _db.SaveChanges();
 
@@ -148,8 +146,6 @@ public class AuthController : ControllerBase
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null) return NotFound();
-        if (user.Role == "Admin") return BadRequest("Non puoi eliminare l'Admin");
-
         _db.Users.Remove(user);
         _db.SaveChanges();
 
