@@ -1,10 +1,27 @@
 import { useEffect, useState } from "react";
 import { getUsers, createUser, toggleUser, resetPassword, deleteUser } from "../services/mevService";
 
+function EyeIcon({ visible }) {
+  return visible ? (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+
 function AdminPage() {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ username: "", fullName: "", email: "", password: "", role: "Editor" });
   const [newPasswords, setNewPasswords] = useState({});
+  const [showFormPassword, setShowFormPassword] = useState(false);
+  const [showRowPassword, setShowRowPassword] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -30,6 +47,7 @@ function AdminPage() {
     try {
       await createUser(form);
       setForm({ username: "", fullName: "", email: "", password: "", role: "Editor" });
+      setShowFormPassword(false);
       notify("Utente creato");
       loadUsers();
     } catch (err) {
@@ -52,6 +70,7 @@ function AdminPage() {
     try {
       await resetPassword(id, pwd);
       setNewPasswords((prev) => ({ ...prev, [id]: "" }));
+      setShowRowPassword((prev) => ({ ...prev, [id]: false }));
       notify("Password aggiornata");
     } catch (err) {
       setError(err.message);
@@ -69,8 +88,18 @@ function AdminPage() {
     }
   };
 
+  const toggleRowPassword = (id) => {
+    setShowRowPassword((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const btnStyle = {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    padding: "4px 6px", border: "1px solid #ccc", borderRadius: "4px",
+    background: "#f8f9fa", cursor: "pointer", color: "#555"
+  };
+
   return (
-    <div style={{ padding: "20px", maxWidth: "900px" }}>
+    <div style={{ padding: "20px", maxWidth: "960px" }}>
       <h3>Gestione Utenti</h3>
 
       {error && (
@@ -92,12 +121,11 @@ function AdminPage() {
             { label: "Username", key: "username", required: true },
             { label: "Nome Completo", key: "fullName", required: true },
             { label: "Email", key: "email" },
-            { label: "Password", key: "password", type: "password", required: true }
-          ].map(({ label, key, type = "text", required }) => (
+          ].map(({ label, key, required }) => (
             <div key={key}>
               <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>{label}</label>
               <input
-                type={type}
+                type="text"
                 value={form[key]}
                 onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
                 required={required}
@@ -105,6 +133,24 @@ function AdminPage() {
               />
             </div>
           ))}
+
+          {/* Campo password con toggle visibilità */}
+          <div>
+            <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Password</label>
+            <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+              <input
+                type={showFormPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                required
+                style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", width: "150px" }}
+              />
+              <button type="button" onClick={() => setShowFormPassword((v) => !v)} style={btnStyle} title={showFormPassword ? "Nascondi" : "Mostra"}>
+                <EyeIcon visible={showFormPassword} />
+              </button>
+            </div>
+          </div>
+
           <div>
             <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Ruolo</label>
             <select
@@ -131,7 +177,7 @@ function AdminPage() {
             <th>Email</th>
             <th>Ruolo</th>
             <th>Stato</th>
-            <th>Reset Password</th>
+            <th>Modifica Password</th>
             <th>Azioni</th>
           </tr>
         </thead>
@@ -152,20 +198,21 @@ function AdminPage() {
                 </span>
               </td>
               <td>
-                {u.role !== "Admin" && (
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <input
-                      type="password"
-                      placeholder="Nuova password"
-                      value={newPasswords[u.id] || ""}
-                      onChange={(e) => setNewPasswords((p) => ({ ...p, [u.id]: e.target.value }))}
-                      style={{ padding: "4px 6px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "12px", width: "130px" }}
-                    />
-                    <button onClick={() => handleResetPassword(u.id)} style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}>
-                      Reset
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <input
+                    type={showRowPassword[u.id] ? "text" : "password"}
+                    placeholder="Nuova password"
+                    value={newPasswords[u.id] || ""}
+                    onChange={(e) => setNewPasswords((p) => ({ ...p, [u.id]: e.target.value }))}
+                    style={{ padding: "4px 6px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "12px", width: "130px" }}
+                  />
+                  <button type="button" onClick={() => toggleRowPassword(u.id)} style={btnStyle} title={showRowPassword[u.id] ? "Nascondi" : "Mostra"}>
+                    <EyeIcon visible={showRowPassword[u.id]} />
+                  </button>
+                  <button onClick={() => handleResetPassword(u.id)} style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}>
+                    Salva
+                  </button>
+                </div>
               </td>
               <td style={{ textAlign: "center" }}>
                 {u.role !== "Admin" && (
