@@ -19,14 +19,15 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ✅ DB
+// ✅ DB — usa variabile d'ambiente DATABASE_PATH se disponibile (Railway)
+var dbPath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "mev.db";
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=mev.db"));
+    options.UseSqlite($"Data Source={dbPath}"));
 
-// ✅ JWT
-var jwtKey = builder.Configuration["Jwt:Key"]!;
-var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
-var jwtAudience = builder.Configuration["Jwt:Audience"]!;
+// ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
+var jwtKey     = Environment.GetEnvironmentVariable("JWT_KEY")      ?? builder.Configuration["Jwt:Key"]!;
+var jwtIssuer  = Environment.GetEnvironmentVariable("JWT_ISSUER")   ?? builder.Configuration["Jwt:Issuer"]!;
+var jwtAudience= Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"]!;
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -34,13 +35,13 @@ builder.Services
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            ValidIssuer              = jwtIssuer,
+            ValidAudience            = jwtAudience,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 
@@ -61,20 +62,20 @@ using (var scope = app.Services.CreateScope())
 
     if (!db.Users.Any())
     {
+        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
         db.Users.Add(new AppUser
         {
-            Username = "MSTEFANE",
-            FullName = "Mauro Stefanelli",
-            Email = "mauro.stefanelli@capgemini.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin2025!"),
-            Role = "Admin",
-            IsActive = true
+            Username     = "MSTEFANE",
+            FullName     = "Mauro Stefanelli",
+            Email        = "mauro.stefanelli@capgemini.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+            Role         = "Admin",
+            IsActive     = true
         });
         db.SaveChanges();
     }
 }
 
-app.UseDeveloperExceptionPage();
 app.UseSwagger();
 app.UseSwaggerUI();
 
