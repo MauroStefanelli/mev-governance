@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/mev-governance-backend.props" />
-</Project>
