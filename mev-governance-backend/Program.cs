@@ -17,22 +17,29 @@ builder.Services.AddCors(options =>
 });
 
 // ✅ DB — PostgreSQL su Render/Supabase, SQLite in locale
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-if (!string.IsNullOrEmpty(databaseUrl))
+// Usa DATABASE_DIRECT_URL per runtime (supporta Migrate), fallback su DATABASE_URL
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
+               ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+string ConvertToNpgsql(string url)
 {
-    // Converti URI postgres:// in formato Npgsql key=value
-    string npgsqlConn = databaseUrl;
-    if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
+    if (url.StartsWith("postgres://") || url.StartsWith("postgresql://"))
     {
-        var uri = new Uri(databaseUrl);
+        var uri      = new Uri(url);
         var userInfo = uri.UserInfo.Split(':');
         var user     = userInfo[0];
         var password = userInfo.Length > 1 ? userInfo[1] : "";
         var host     = uri.Host;
         var port     = uri.Port > 0 ? uri.Port : 5432;
-        var db       = uri.AbsolutePath.TrimStart('/');
-        npgsqlConn   = $"Host={host};Port={port};Database={db};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+        var dbName   = uri.AbsolutePath.TrimStart('/');
+        return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
     }
+    return url;
+}
+
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    var npgsqlConn = ConvertToNpgsql(databaseUrl);
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(npgsqlConn));
 }
@@ -43,6 +50,7 @@ else
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite($"Data Source={dbPath}"));
 }
+
 
 // ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
 var jwtKey     = Environment.GetEnvironmentVariable("JWT_KEY")      ?? builder.Configuration["Jwt:Key"]!;
@@ -74,57 +82,25 @@ var app = builder.Build();
 
 app.UseCors("FrontendPolicy");
 
-// ✅ CREA DB + SEED ADMIN
-// Usa DATABASE_DIRECT_URL (connessione diretta, no pooler) per EnsureCreated
-// se non disponibile, usa DATABASE_URL normale
+// ✅ CREA DB + SEED ADMIN tramite Migrations
 using (var scope = app.Services.CreateScope())
 {
-    var directUrl = Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL");
-    AppDbContext db;
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
 
-    if (!string.IsNullOrEmpty(directUrl))
+    if (!db.Users.Any())
     {
-        // Crea un DbContext temporaneo con connessione diretta per creare lo schema
-        string directConn = directUrl;
-        if (directUrl.StartsWith("postgres://") || directUrl.StartsWith("postgresql://"))
+        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
+        db.Users.Add(new AppUser
         {
-            var uri = new Uri(directUrl);
-            var userInfo = uri.UserInfo.Split(':');
-            var user     = userInfo[0];
-            var password = userInfo.Length > 1 ? userInfo[1] : "";
-            var host     = uri.Host;
-            var port     = uri.Port > 0 ? uri.Port : 5432;
-            var dbName   = uri.AbsolutePath.TrimStart('/');
-            directConn   = $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
-        }
-        var directOptions = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(directConn)
-            .Options;
-        db = new AppDbContext(directOptions);
-    }
-    else
-    {
-        db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    }
-
-    using (db)
-    {
-        db.Database.EnsureCreated();
-
-        if (!db.Users.Any())
-        {
-            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
-            db.Users.Add(new AppUser
-            {
-                Username     = "MSTEFANE",
-                FullName     = "Mauro Stefanelli",
-                Email        = "mauro.stefanelli@capgemini.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-                Role         = "Admin",
-                IsActive     = true
-            });
-            db.SaveChanges();
-        }
+            Username     = "MSTEFANE",
+            FullName     = "Mauro Stefanelli",
+            Email        = "mauro.stefanelli@capgemini.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+            Role         = "Admin",
+            IsActive     = true
+        });
+        db.SaveChanges();
     }
 }
 
