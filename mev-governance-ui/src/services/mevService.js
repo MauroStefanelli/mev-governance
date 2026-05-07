@@ -1,0 +1,147 @@
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${localStorage.getItem("jwt") || ""}`
+});
+
+export const login = async (username, password) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const getMevList = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/mev`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore nel recupero MEV");
+  return response.json();
+};
+
+export async function updateMev(id, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/mev/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore nel salvataggio");
+  return response.json();
+}
+
+export const exportMev = async (rows, filters = {}) => {
+  const XLSX = await import("xlsx");
+
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  // Costruisce la parte del nome con i filtri attivi
+  const filterLabels = {
+    goTo:           filters.goTo,
+    applicativo:    filters.applicativo,
+    stato:          filters.stato,
+    annoCompetenza: filters.annoCompetenza,
+    pAnno:          filters.pAnno,
+    pRelease:       filters.pRelease,
+  };
+  const filterPart = Object.values(filterLabels)
+    .filter((v) => v && v !== "")
+    .join(" - ");
+
+  const fileName = filterPart
+    ? `Logistica Mev Governance ${datePart} - ${filterPart}.xlsx`
+    : `Logistica Mev Governance ${datePart}.xlsx`;
+
+  const data = rows.map((r) => ({
+    "ID":                r.excelId,
+    "GoTo":              r.goTo,
+    "Applicativo":       r.applicativo,
+    "Descrizione":       r.descrizione,
+    "Anno Competenza":   r.annoCompetenza,
+    "Stato":             r.stato,
+    "Importo Fornitura": r.importoExcel,
+    "P Anno":            r.pAnno,
+    "P Release":         r.pRelease,
+    "P Importo":         r.pImporto,
+    "P Note":            r.pNote ?? "",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "MEV");
+  XLSX.writeFile(wb, fileName);
+};
+
+export const alignMevData = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/mev/align`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({})
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+// ---- Admin: gestione utenti ----
+
+export const getUsers = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore recupero utenti");
+  return response.json();
+};
+
+export const createUser = async (payload) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const toggleUser = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/toggle`, {
+    method: "PUT",
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore toggle utente");
+  return response.json();
+};
+
+export const resetPassword = async (id, newPassword) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/password`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ newPassword })
+  });
+  if (!response.ok) throw new Error("Errore reset password");
+  return response.json();
+};
+
+export const deleteUser = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore eliminazione utente");
+  return response.json();
+};
