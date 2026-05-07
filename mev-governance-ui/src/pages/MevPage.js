@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  getMevList, updateMev, alignMevData, exportMev
+  getMevList, updateMev, alignMevData, exportMev, uploadExcel
 } from "../services/mevService";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
@@ -55,6 +55,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
   const [savedRows, setSavedRows]           = useState({});
   const [editingImporto, setEditingImporto] = useState({});
   const [aligning, setAligning]             = useState(false);
+  const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
@@ -180,6 +181,32 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
         >
           ✕ Reset filtri
         </button>
+
+        {/* Carica Excel — solo Admin */}
+        {role === "Admin" && (
+          <>
+            <input
+              id="upload-excel"
+              type="file"
+              accept=".xlsx"
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                try {
+                  await uploadExcel(file);
+                  alert("File caricato. Clicca 'Allinea Dati' per importare.");
+                } catch (err) {
+                  alert(`Errore caricamento: ${err.message}`);
+                }
+                e.target.value = "";
+              }}
+            />
+            <label htmlFor="upload-excel" style={{ ...btn("ghost"), cursor: "pointer" }}>
+              ↑ Carica Excel
+            </label>
+          </>
+        )}
 
         {/* Totali */}
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>

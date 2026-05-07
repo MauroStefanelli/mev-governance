@@ -54,15 +54,41 @@ public class MevController : BaseController
     }
 
     // ============================================================
+    // POST /api/mev/upload  — carica il file Excel (solo Admin)
+    // ============================================================
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    public IActionResult UploadExcel(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File non valido");
+
+        var dataDir = Path.Combine(AppContext.BaseDirectory, "Data");
+        Directory.CreateDirectory(dataDir);
+        var excelPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
+
+        using (var fs = new FileStream(excelPath, FileMode.Create))
+            file.CopyTo(fs);
+
+        return Ok(new { message = "File caricato", path = excelPath });
+    }
+
+    // ============================================================
     // POST /api/mev/align
     // ============================================================
     [HttpPost("align")]
     public IActionResult Align()
     {
-        var excelPath = "/Users/MSTEFANE/Library/CloudStorage/OneDrive-Capgemini/LOGISTICA - GOVERNANCE - Documents/General/GARA 2025/ECONOMICS/Capgemini-governance.xlsx";
+        // Prima cerca il file caricato via upload
+        var uploadedPath = Path.Combine(AppContext.BaseDirectory, "Data", "MEV_LAST.xlsx");
+
+        // Fallback: path locale (sviluppo)
+        var localPath = "/Users/MSTEFANE/Library/CloudStorage/OneDrive-Capgemini/LOGISTICA - GOVERNANCE - Documents/General/GARA 2025/ECONOMICS/Capgemini-governance.xlsx";
+
+        var excelPath = System.IO.File.Exists(uploadedPath) ? uploadedPath : localPath;
 
         if (!System.IO.File.Exists(excelPath))
-            return BadRequest($"File Excel non trovato: {excelPath}");
+            return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
 
         return ImportFromExcelFile(excelPath);
     }

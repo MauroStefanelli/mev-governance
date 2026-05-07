@@ -81,6 +81,24 @@ export const exportMev = async (rows, filters = {}) => {
   XLSX.writeFile(wb, fileName);
 };
 
+export const uploadExcel = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/api/mev/upload`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${localStorage.getItem("jwt") || ""}`
+    },
+    body: formData
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const alignMevData = async () => {
   const response = await fetch(`${API_BASE_URL}/api/mev/align`, {
     method: "POST",
