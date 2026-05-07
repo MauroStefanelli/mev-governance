@@ -12,18 +12,25 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
     });
 });
 
-// ✅ DB — usa /data su Render (disco persistente), altrimenti locale
-var dbPath = Environment.GetEnvironmentVariable("DATABASE_PATH")
-    ?? (Directory.Exists("/data") ? "/data/mev.db" : "mev.db");
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+// ✅ DB — PostgreSQL su Render/Supabase, SQLite in locale
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    // PostgreSQL (Supabase)
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(databaseUrl));
+}
+else
+{
+    // SQLite locale
+    var dbPath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "mev.db";
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite($"Data Source={dbPath}"));
+}
 
 // ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
 var jwtKey     = Environment.GetEnvironmentVariable("JWT_KEY")      ?? builder.Configuration["Jwt:Key"]!;
