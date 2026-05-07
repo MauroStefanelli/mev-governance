@@ -53,6 +53,9 @@ public class MevController : BaseController
         return Ok(item);
     }
 
+    private static string GetDataDir() =>
+        Directory.Exists("/data") ? "/data" : Path.Combine(AppContext.BaseDirectory, "Data");
+
     // ============================================================
     // POST /api/mev/upload  — carica il file Excel (solo Admin)
     // ============================================================
@@ -63,7 +66,7 @@ public class MevController : BaseController
         if (file == null || file.Length == 0)
             return BadRequest("File non valido");
 
-        var dataDir = Path.Combine(AppContext.BaseDirectory, "Data");
+        var dataDir = GetDataDir();
         Directory.CreateDirectory(dataDir);
         var excelPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
 
@@ -79,10 +82,8 @@ public class MevController : BaseController
     [HttpPost("align")]
     public IActionResult Align()
     {
-        // Prima cerca il file caricato via upload
-        var uploadedPath = Path.Combine(AppContext.BaseDirectory, "Data", "MEV_LAST.xlsx");
-
-        // Fallback: path locale (sviluppo)
+        var dataDir = GetDataDir();
+        var uploadedPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
         var localPath = "/Users/MSTEFANE/Library/CloudStorage/OneDrive-Capgemini/LOGISTICA - GOVERNANCE - Documents/General/GARA 2025/ECONOMICS/Capgemini-governance.xlsx";
 
         var excelPath = System.IO.File.Exists(uploadedPath) ? uploadedPath : localPath;

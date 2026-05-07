@@ -19,8 +19,9 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ✅ DB — usa variabile d'ambiente DATABASE_PATH se disponibile (Railway)
-var dbPath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "mev.db";
+// ✅ DB — usa /data su Render (disco persistente), altrimenti locale
+var dbPath = Environment.GetEnvironmentVariable("DATABASE_PATH")
+    ?? (Directory.Exists("/data") ? "/data/mev.db" : "mev.db");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
