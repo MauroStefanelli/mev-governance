@@ -36,6 +36,14 @@ public class EmailService
             return;
         }
 
+        // In modalità test Resend, forza il destinatario all'indirizzo verificato
+        var overrideTo = Environment.GetEnvironmentVariable("RESEND_OVERRIDE_TO");
+        if (!string.IsNullOrEmpty(overrideTo))
+        {
+            _logger.LogInformation("RESEND_OVERRIDE_TO attivo — email inviata a {to} invece di {orig}", overrideTo, string.Join(", ", adminEmails));
+            adminEmails = new List<string> { overrideTo };
+        }
+
         dynamic item = mevItem;
 
         var html = $@"
