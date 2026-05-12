@@ -36,15 +36,15 @@ public class EmailService
             return;
         }
 
-        // In modalità test Resend (senza dominio verificato), mittente e destinatario
-        // devono essere lo stesso indirizzo registrato su Resend.
-        // RESEND_OVERRIDE_TO forza il destinatario a quell'indirizzo.
+        // In modalità test Resend (senza dominio verificato):
+        // - from deve essere onboarding@resend.dev
+        // - to deve essere l'indirizzo con cui ci si è registrati su Resend
         var overrideTo = Environment.GetEnvironmentVariable("RESEND_OVERRIDE_TO");
         if (!string.IsNullOrEmpty(overrideTo))
         {
             _logger.LogInformation("RESEND_OVERRIDE_TO attivo — email inviata a {to}", overrideTo);
             adminEmails = new List<string> { overrideTo };
-            from = overrideTo; // mittente = destinatario (richiesto da Resend in test mode)
+            from = "onboarding@resend.dev";
         }
 
         dynamic item = mevItem;
