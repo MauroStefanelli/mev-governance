@@ -1,5 +1,5 @@
-using SendGrid;
-using SendGrid.Helpers.Mail;
+using System.Text;
+using System.Text.Json;
 
 namespace MevGovernanceBackend.Services;
 
@@ -7,6 +7,7 @@ public class EmailService
 {
     private readonly IConfiguration _config;
     private readonly ILogger<EmailService> _logger;
+    private static readonly HttpClient _http = new();
 
     public EmailService(IConfiguration config, ILogger<EmailService> logger)
     {
@@ -20,12 +21,12 @@ public class EmailService
         object mevItem,
         List<string> adminEmails)
     {
-        var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY") ?? _config["SendGrid:ApiKey"];
-        var from   = Environment.GetEnvironmentVariable("SENDGRID_FROM")    ?? _config["SendGrid:From"] ?? "noreply@mev-governance.com";
+        var apiKey = Environment.GetEnvironmentVariable("RESEND_API_KEY") ?? _config["Resend:ApiKey"];
+        var from   = Environment.GetEnvironmentVariable("RESEND_FROM")    ?? _config["Resend:From"] ?? "onboarding@resend.dev";
 
         if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogWarning("SENDGRID_API_KEY mancante — email non inviata.");
+            _logger.LogWarning("RESEND_API_KEY mancante — email non inviata.");
             return;
         }
 
@@ -37,16 +38,13 @@ public class EmailService
 
         dynamic item = mevItem;
 
-        var body = $@"
+        var html = $@"
 <html>
 <body style='font-family: Arial, sans-serif; font-size: 14px; color: #333;'>
   <h2 style='color: #1a73e8;'>MEV Governance — Modifica riga</h2>
   <p>L'utente <strong>{updatedByFullName} ({updatedByUsername})</strong> ha salvato una modifica.</p>
   <table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%; max-width: 700px;'>
-    <tr style='background: #f0f0f0;'>
-      <th align='left'>Campo</th>
-      <th align='left'>Valore</th>
-    </tr>
+    <tr style='background: #f0f0f0;'><th align='left'>Campo</th><th align='left'>Valore</th></tr>
     <tr><td><strong>ID Excel</strong></td><td>{item.ExcelId}</td></tr>
     <tr><td><strong>GoTo</strong></td><td>{item.GoTo}</td></tr>
     <tr><td><strong>Applicativo</strong></td><td>{item.Applicativo}</td></tr>
@@ -63,29 +61,27 @@ public class EmailService
 </body>
 </html>";
 
+        var payload = new
+        {
+            from    = from,
+            to      = adminEmails,
+            subject = $"[MEV] Modifica riga {item.ExcelId} — {item.Applicativo}",
+            html    = html
+        };
+
         try
         {
-            var client   = new SendGridClient(apiKey);
-            var fromAddr = new EmailAddress(from, "MEV Governance");
-            var subject  = $"[MEV] Modifica riga {item.ExcelId} — {item.Applicativo}";
-            var msg      = new SendGridMessage();
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            msg.SetFrom(fromAddr);
-            msg.SetSubject(subject);
-            msg.AddContent(MimeType.Html, body);
-
-            foreach (var email in adminEmails)
-                msg.AddTo(new EmailAddress(email));
-
-            var response = await client.SendEmailAsync(msg);
+            var response = await _http.SendAsync(request);
+            var body     = await response.Content.ReadAsStringAsync();
 
             if (response.IsSuccessStatusCode)
                 _logger.LogInformation("Email notifica inviata a {count} admin.", adminEmails.Count);
             else
-            {
-                var respBody = await response.Body.ReadAsStringAsync();
-                _logger.LogError("SendGrid errore {status}: {body}", response.StatusCode, respBody);
-            }
+                _logger.LogError("Resend errore {status}: {body}", response.StatusCode, body);
         }
         catch (Exception ex)
         {
