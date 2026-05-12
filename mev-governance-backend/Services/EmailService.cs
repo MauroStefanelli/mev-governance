@@ -1,6 +1,5 @@
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace MevGovernanceBackend.Services;
 
@@ -21,15 +20,12 @@ public class EmailService
         object mevItem,
         List<string> adminEmails)
     {
-        var smtpHost     = Environment.GetEnvironmentVariable("SMTP_HOST")     ?? _config["Smtp:Host"];
-        var smtpPort     = int.Parse(Environment.GetEnvironmentVariable("SMTP_PORT")     ?? _config["Smtp:Port"] ?? "587");
-        var smtpUser     = Environment.GetEnvironmentVariable("SMTP_USER")     ?? _config["Smtp:User"];
-        var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD") ?? _config["Smtp:Password"];
-        var smtpFrom     = Environment.GetEnvironmentVariable("SMTP_FROM")     ?? _config["Smtp:From"] ?? smtpUser;
+        var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY") ?? _config["SendGrid:ApiKey"];
+        var from   = Environment.GetEnvironmentVariable("SENDGRID_FROM")    ?? _config["SendGrid:From"] ?? "noreply@mev-governance.com";
 
-        if (string.IsNullOrEmpty(smtpHost) || string.IsNullOrEmpty(smtpUser) || string.IsNullOrEmpty(smtpPassword))
+        if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogWarning("Configurazione SMTP mancante — email non inviata.");
+            _logger.LogWarning("SENDGRID_API_KEY mancante — email non inviata.");
             return;
         }
 
@@ -39,8 +35,8 @@ public class EmailService
             return;
         }
 
-        // Costruisci il body HTML con i dati della riga
         dynamic item = mevItem;
+
         var body = $@"
 <html>
 <body style='font-family: Arial, sans-serif; font-size: 14px; color: #333;'>
@@ -67,22 +63,29 @@ public class EmailService
 </body>
 </html>";
 
-        var message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(smtpFrom));
-        foreach (var email in adminEmails)
-            message.To.Add(MailboxAddress.Parse(email));
-
-        message.Subject = $"[MEV] Modifica riga {item.ExcelId} — {item.Applicativo}";
-        message.Body = new TextPart("html") { Text = body };
-
         try
         {
-            using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.StartTls);
-            await smtp.AuthenticateAsync(smtpUser, smtpPassword);
-            await smtp.SendAsync(message);
-            await smtp.DisconnectAsync(true);
-            _logger.LogInformation("Email notifica inviata a {count} admin.", adminEmails.Count);
+            var client   = new SendGridClient(apiKey);
+            var fromAddr = new EmailAddress(from, "MEV Governance");
+            var subject  = $"[MEV] Modifica riga {item.ExcelId} — {item.Applicativo}";
+            var msg      = new SendGridMessage();
+
+            msg.SetFrom(fromAddr);
+            msg.SetSubject(subject);
+            msg.AddContent(MimeType.Html, body);
+
+            foreach (var email in adminEmails)
+                msg.AddTo(new EmailAddress(email));
+
+            var response = await client.SendEmailAsync(msg);
+
+            if (response.IsSuccessStatusCode)
+                _logger.LogInformation("Email notifica inviata a {count} admin.", adminEmails.Count);
+            else
+            {
+                var respBody = await response.Body.ReadAsStringAsync();
+                _logger.LogError("SendGrid errore {status}: {body}", response.StatusCode, respBody);
+            }
         }
         catch (Exception ex)
         {
