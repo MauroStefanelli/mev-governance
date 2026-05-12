@@ -39,11 +39,12 @@ public class EmailService
         // In modalità test Resend (senza dominio verificato):
         // - from deve essere onboarding@resend.dev
         // - to deve essere l'indirizzo con cui ci si è registrati su Resend
+        // RESEND_OVERRIDE_TO può contenere più indirizzi separati da virgola
         var overrideTo = Environment.GetEnvironmentVariable("RESEND_OVERRIDE_TO");
         if (!string.IsNullOrEmpty(overrideTo))
         {
-            _logger.LogInformation("RESEND_OVERRIDE_TO attivo — email inviata a {to}", overrideTo);
-            adminEmails = new List<string> { overrideTo };
+            adminEmails = overrideTo.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            _logger.LogInformation("RESEND_OVERRIDE_TO attivo — email inviata a: {to}", string.Join(", ", adminEmails));
             from = "onboarding@resend.dev";
         }
 
