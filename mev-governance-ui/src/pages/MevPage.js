@@ -1,9 +1,74 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   getMevList, updateMev, alignMevData, exportMev, uploadExcel
 } from "../services/mevService";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
+
+// ── MultiSelect dropdown con checkbox ────────────────────────────────────────
+function MultiSelect({ options, selected, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (val) => {
+    if (selected.includes(val)) onChange(selected.filter((v) => v !== val));
+    else onChange([...selected, val]);
+  };
+
+  const label = selected.length === 0
+    ? placeholder
+    : selected.length === 1
+      ? String(selected[0])
+      : `${selected.length} selezionati`;
+
+  return (
+    <div ref={ref} style={{ position: "relative", width: "100%" }}>
+      <div
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          padding: "4px 6px", border: "1px solid #dadce0", borderRadius: "4px",
+          fontSize: "12px", background: "white", cursor: "pointer", color: selected.length ? "#1a73e8" : "#333",
+          fontWeight: selected.length ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          userSelect: "none",
+        }}
+      >
+        {label} ▾
+      </div>
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, zIndex: 1000,
+          background: "white", border: "1px solid #dadce0", borderRadius: "4px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.12)", minWidth: "160px", maxHeight: "220px",
+          overflowY: "auto",
+        }}>
+          {selected.length > 0 && (
+            <div
+              onClick={() => onChange([])}
+              style={{ padding: "6px 10px", fontSize: "11px", color: "#ea4335", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+            >
+              ✕ Deseleziona tutti
+            </div>
+          )}
+          {options.map((opt) => (
+            <label key={opt} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", cursor: "pointer", fontSize: "12px" }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#f8f9fa"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "white"}
+            >
+              <input type="checkbox" checked={selected.includes(String(opt))} onChange={() => toggle(String(opt))} style={{ cursor: "pointer" }} />
+              {opt}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 const formatEuro = (value) => {
@@ -59,7 +124,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : { goTo: "", applicativo: "", stato: "", annoCompetenza: "", pAnno: "", pRelease: "" };
+    return saved ? JSON.parse(saved) : { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [] };
   });
 
   // ── Data load ──────────────────────────────────────────────────────────────
@@ -80,7 +145,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: "", applicativo: "", stato: "", annoCompetenza: "", pAnno: "", pRelease: "" });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [] });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -100,17 +165,17 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   const filteredRows = rows.filter((r) =>
-    (!filters.goTo         || r.goTo === filters.goTo) &&
-    (!filters.applicativo  || r.applicativo === filters.applicativo) &&
-    (!filters.stato        || r.stato === filters.stato) &&
-    (!filters.annoCompetenza || String(r.annoCompetenza) === filters.annoCompetenza) &&
-    (!filters.pAnno        || String(r.pAnno) === filters.pAnno) &&
-    (!filters.pRelease     || r.pRelease === filters.pRelease)
+    (filters.goTo.length === 0          || filters.goTo.includes(String(r.goTo))) &&
+    (filters.applicativo.length === 0   || filters.applicativo.includes(String(r.applicativo))) &&
+    (filters.stato.length === 0         || filters.stato.includes(String(r.stato))) &&
+    (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
+    (filters.pAnno.length === 0         || filters.pAnno.includes(String(r.pAnno))) &&
+    (filters.pRelease.length === 0      || filters.pRelease.includes(String(r.pRelease)))
   );
 
   const totCap   = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
   const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto)    || 0), 0);
-  const hasActiveFilters = Object.values(filters).some((v) => v !== "");
+  const hasActiveFilters = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : v !== "");
 
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
 
@@ -252,10 +317,12 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
               ].map((col, i) => (
                 <th key={i} style={{ padding: "4px 6px" }}>
                   {col ? (
-                    <select style={selectStyle} value={filters[col.field]} onChange={(e) => handleFilterChange(col.field, e.target.value)}>
-                      <option value="">{col.placeholder}</option>
-                      {col.opts.map((v) => <option key={v} value={String(v)}>{v}</option>)}
-                    </select>
+                    <MultiSelect
+                      options={col.opts}
+                      selected={filters[col.field]}
+                      onChange={(val) => handleFilterChange(col.field, val)}
+                      placeholder={col.placeholder}
+                    />
                   ) : null}
                 </th>
               ))}
