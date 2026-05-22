@@ -7,7 +7,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:$PORT
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-ENTRYPOINT ["dotnet", "mev-governance-backend.dll"]
+CMD ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-5000} dotnet mev-governance-backend.dll"]
