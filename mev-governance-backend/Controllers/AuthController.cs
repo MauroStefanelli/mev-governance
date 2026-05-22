@@ -64,7 +64,8 @@ public class AuthController : ControllerBase
                 u.FullName,
                 u.Email,
                 u.Role,
-                u.IsActive
+                u.IsActive,
+                u.SendEmail
             })
             .ToList();
 
@@ -115,6 +116,24 @@ public class AuthController : ControllerBase
         _db.SaveChanges();
 
         return Ok(new { user.Id, user.IsActive });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/toggleemail  (solo Admin)
+    // ============================================================
+    [HttpPut("users/{id}/toggleemail")]
+    [Authorize]
+    public IActionResult ToggleEmail(int id)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound();
+
+        user.SendEmail = !user.SendEmail;
+        _db.SaveChanges();
+
+        return Ok(new { user.Id, user.SendEmail });
     }
 
     // ============================================================

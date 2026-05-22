@@ -13,7 +13,10 @@ public class AppUser
     public string PasswordHash { get; set; } = "";
 
     // Admin | Editor
-    public string Role { get; set; } = "Editor";
+    public string Role         { get; set; } = "Editor";
 
-    public bool IsActive { get; set; } = true;
+    public bool   IsActive     { get; set; } = true;
+
+    // Se true, riceve email di notifica ad ogni salvataggio MEV
+    public bool   SendEmail    { get; set; } = false;
 }

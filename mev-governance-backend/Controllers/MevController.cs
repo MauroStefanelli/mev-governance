@@ -55,15 +55,15 @@ public class MevController : BaseController
 
         _db.SaveChanges();
 
-        // Invia email di notifica a tutti gli Admin
+        // Invia email di notifica solo agli utenti con SendEmail = true
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
         var fullName = User.FindFirst("fullName")?.Value ?? username;
-        var adminEmails = _db.Users
-            .Where(u => u.Role == "Admin" && u.IsActive && !string.IsNullOrEmpty(u.Email))
+        var emailRecipients = _db.Users
+            .Where(u => u.IsActive && u.SendEmail && !string.IsNullOrEmpty(u.Email))
             .Select(u => u.Email)
             .ToList();
 
-        _ = _email.SendMevUpdateNotificationAsync(username, fullName, item, adminEmails);
+        _ = _email.SendMevUpdateNotificationAsync(username, fullName, item, emailRecipients);
 
         return Ok(item);
     }

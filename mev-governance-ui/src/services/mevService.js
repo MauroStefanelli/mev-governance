@@ -145,6 +145,15 @@ export const toggleUser = async (id) => {
   return response.json();
 };
 
+export const toggleEmailUser = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/toggleemail`, {
+    method: "PUT",
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore toggle email utente");
+  return response.json();
+};
+
 export const resetPassword = async (id, newPassword) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/password`, {
     method: "PUT",

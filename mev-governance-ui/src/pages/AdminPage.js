@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getUsers, createUser, toggleUser, resetPassword, deleteUser } from "../services/mevService";
+import { getUsers, createUser, toggleUser, toggleEmailUser, resetPassword, deleteUser } from "../services/mevService";
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -58,6 +58,15 @@ function AdminPage() {
   const handleToggle = async (id) => {
     try {
       await toggleUser(id);
+      loadUsers();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleToggleEmail = async (id) => {
+    try {
+      await toggleEmailUser(id);
       loadUsers();
     } catch (err) {
       setError(err.message);
@@ -177,6 +186,7 @@ function AdminPage() {
             <th>Email</th>
             <th>Ruolo</th>
             <th>Stato</th>
+            <th style={{ textAlign: "center" }}>Invia Email</th>
             <th>Modifica Password</th>
             <th>Azioni</th>
           </tr>
@@ -196,6 +206,20 @@ function AdminPage() {
                 }}>
                   {u.isActive ? "Attivo" : "Disattivo"}
                 </span>
+              </td>
+              <td style={{ textAlign: "center" }}>
+                <button
+                  onClick={() => handleToggleEmail(u.id)}
+                  title={u.sendEmail ? "Clicca per disabilitare l'invio email" : "Clicca per abilitare l'invio email"}
+                  style={{
+                    padding: "3px 12px", fontSize: "12px", cursor: "pointer", border: "none", borderRadius: "4px",
+                    background: u.sendEmail ? "#d4edda" : "#f8d7da",
+                    color: u.sendEmail ? "#155724" : "#721c24",
+                    fontWeight: 600
+                  }}
+                >
+                  {u.sendEmail ? "Sì" : "No"}
+                </button>
               </td>
               <td>
                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
