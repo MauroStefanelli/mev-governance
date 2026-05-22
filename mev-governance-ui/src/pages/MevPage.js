@@ -180,18 +180,26 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
 
   // ── Editing ────────────────────────────────────────────────────────────────
-  const handleChange = (index, field, value) => {
-    const updated = [...rows];
-    updated[index][field] = value;
-    setRows(updated);
+  const handleChange = (rowId, field, value) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r))
+    );
   };
 
-  const handleSave = async (row) => {
+  const rowsRef = useRef(rows);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
+
+  const handleSave = async (rowId) => {
+    const row = rowsRef.current.find((r) => r.id === rowId);
+    if (!row) return;
     try {
-      await updateMev(row.id, {
+      const updatedItem = await updateMev(row.id, {
         pAnno: Number(row.pAnno), pRelease: row.pRelease,
         pImporto: Number(row.pImporto), pNote: row.pNote,
       });
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, ...updatedItem } : r))
+      );
       setSavedRows((prev) => ({ ...prev, [row.id]: true }));
       setTimeout(() => setSavedRows((prev) => ({ ...prev, [row.id]: false })), 2000);
     } catch {
@@ -366,14 +374,14 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}
-                      onChange={(e) => handleChange(index, "pAnno", e.target.value)}
+                      onChange={(e) => handleChange(r.id, "pAnno", e.target.value)}
                       style={inputStyle({ width: "68px", textAlign: "center" })}
                     />
                   </td>
 
                   <td style={{ ...TD }}>
                     <input value={r.pRelease}
-                      onChange={(e) => handleChange(index, "pRelease", e.target.value)}
+                      onChange={(e) => handleChange(r.id, "pRelease", e.target.value)}
                       style={inputStyle({ width: "90px" })}
                     />
                   </td>
@@ -390,7 +398,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
                         else raw = raw.replace(",", ".");
                         raw = raw.replace(/[^\d.]/g, "");
                         const value = isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
-                        handleChange(index, "pImporto", value);
+                        handleChange(r.id, "pImporto", value);
                         setEditingImporto((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
                       }}
                       style={inputStyle({
@@ -403,14 +411,14 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
 
                   <td style={{ ...TD }}>
                     <input value={r.pNote ?? ""}
-                      onChange={(e) => handleChange(index, "pNote", e.target.value)}
+                      onChange={(e) => handleChange(r.id, "pNote", e.target.value)}
                       style={inputStyle({ width: "100%", minWidth: "120px" })}
                     />
                   </td>
 
                   <td style={{ ...TD, textAlign: "center" }}>
                     <button
-                      onClick={() => handleSave(r)}
+                      onClick={() => handleSave(r.id)}
                       style={{
                         ...btn("primary"),
                         padding: "5px 12px", fontSize: "13px",
