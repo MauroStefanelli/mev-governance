@@ -57,8 +57,8 @@ function AdminPage() {
 
   const handleToggle = async (id) => {
     try {
-      await toggleUser(id);
-      loadUsers();
+      const result = await toggleUser(id);
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, isActive: result.isActive } : u));
     } catch (err) {
       setError(err.message);
     }
@@ -66,8 +66,8 @@ function AdminPage() {
 
   const handleToggleEmail = async (id) => {
     try {
-      await toggleEmailUser(id);
-      loadUsers();
+      const result = await toggleEmailUser(id);
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, sendEmail: result.sendEmail } : u));
     } catch (err) {
       setError(err.message);
     }
