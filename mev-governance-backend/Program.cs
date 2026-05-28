@@ -90,6 +90,34 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
+    // Protezione contro DROP TABLE manuale: se la tabella MevItems non esiste
+    // (la migration è già segnata come applicata ma la tabella è stata eliminata),
+    // la ricrea eseguendo lo script SQL direttamente.
+    try
+    {
+        db.MevItems.Count(); // test di esistenza
+    }
+    catch
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""MevItems"" (
+                ""Id""             SERIAL        PRIMARY KEY,
+                ""ExcelId""        TEXT          NOT NULL DEFAULT '',
+                ""ExcelOrder""     INTEGER       NOT NULL DEFAULT 0,
+                ""GoTo""           TEXT          NOT NULL DEFAULT '',
+                ""Applicativo""    TEXT          NOT NULL DEFAULT '',
+                ""Descrizione""    TEXT          NOT NULL DEFAULT '',
+                ""AnnoCompetenza"" INTEGER       NOT NULL DEFAULT 0,
+                ""Stato""          TEXT          NOT NULL DEFAULT '',
+                ""ImportoExcel""   NUMERIC(18,2) NOT NULL DEFAULT 0,
+                ""PAnno""          INTEGER       NOT NULL DEFAULT 0,
+                ""PRelease""       TEXT          NOT NULL DEFAULT '',
+                ""PImporto""       NUMERIC(18,2) NOT NULL DEFAULT 0,
+                ""PNote""          TEXT
+            );
+        ");
+    }
+
     if (!db.Users.Any())
     {
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";

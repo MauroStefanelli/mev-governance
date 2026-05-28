@@ -76,19 +76,27 @@ public class MevController : BaseController
     // ============================================================
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
+    [Authorize(Roles = "Admin")]
     public IActionResult UploadExcel(IFormFile file)
     {
         if (file == null || file.Length == 0)
             return BadRequest("File non valido");
 
-        var dataDir = GetDataDir();
-        Directory.CreateDirectory(dataDir);
-        var excelPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
+        try
+        {
+            var dataDir = GetDataDir();
+            Directory.CreateDirectory(dataDir);
+            var excelPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
 
-        using (var fs = new FileStream(excelPath, FileMode.Create))
-            file.CopyTo(fs);
+            using (var fs = new FileStream(excelPath, FileMode.Create))
+                file.CopyTo(fs);
 
-        return Ok(new { message = "File caricato", path = excelPath });
+            return Ok(new { message = "File caricato", path = excelPath });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore durante il caricamento del file: {ex.Message}");
+        }
     }
 
     // ============================================================
@@ -97,16 +105,20 @@ public class MevController : BaseController
     [HttpPost("align")]
     public IActionResult Align()
     {
-        var dataDir = GetDataDir();
-        var uploadedPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
-        var localPath = "/Users/MSTEFANE/Library/CloudStorage/OneDrive-Capgemini/LOGISTICA - GOVERNANCE - Documents/General/GARA 2025/ECONOMICS/Capgemini-governance.xlsx";
+        try
+        {
+            var dataDir = GetDataDir();
+            var uploadedPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
 
-        var excelPath = System.IO.File.Exists(uploadedPath) ? uploadedPath : localPath;
+            if (!System.IO.File.Exists(uploadedPath))
+                return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
 
-        if (!System.IO.File.Exists(excelPath))
-            return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
-
-        return ImportFromExcelFile(excelPath);
+            return ImportFromExcelFile(uploadedPath);
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore durante l'allineamento: {ex.Message}");
+        }
     }
 
     // ============================================================
@@ -123,6 +135,8 @@ public class MevController : BaseController
     // ============================================================
     private IActionResult ImportFromExcelFile(string excelPath)
     {
+        try
+        {
         using var workbook = new XLWorkbook(excelPath);
 
         var ws = workbook.Worksheets
@@ -259,6 +273,11 @@ public class MevController : BaseController
             message = "Allineamento completato",
             count = _db.MevItems.Count()
         });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore durante l'importazione dal file Excel: {ex.Message}");
+        }
     }
 
     // ============================================================
