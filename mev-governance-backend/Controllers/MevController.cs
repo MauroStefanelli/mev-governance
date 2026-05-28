@@ -218,10 +218,12 @@ public class MevController : BaseController
             )
                 continue;
 
-            // SKIP righe senza GoTo, senza Importo o con Stato "Eliminato"
+            // SKIP righe senza GoTo, senza Importo, con Stato vuoto o con Stato "Eliminato"
             if (string.IsNullOrWhiteSpace(goTo))
                 continue;
             if (importo == 0)
+                continue;
+            if (string.IsNullOrWhiteSpace(stato))
                 continue;
             if (stato.Equals("Eliminato", StringComparison.OrdinalIgnoreCase))
                 continue;
