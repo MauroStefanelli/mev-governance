@@ -158,19 +158,32 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
 
   const goToOptions        = buildOptions("goTo");
   const applicativoOptions = buildOptions("applicativo");
-  const statoOptions       = buildOptions("stato");
   const annoOptions        = buildOptions("annoCompetenza");
   const pAnnoOptions       = buildOptions("pAnno");
   const pReleaseOptions    = buildOptions("pRelease");
 
+  // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
+  const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
+  const statoOptions  = [
+    ...buildOptions("stato"),
+    ...(hasEmptyStato ? ["(vuoto)"] : []),
+  ];
+
   // ── Filtering ──────────────────────────────────────────────────────────────
+  const matchStato = (r) => {
+    if (filters.stato.length === 0) return true;
+    const val = r.stato ?? "";
+    if (!val.trim() && filters.stato.includes("(vuoto)")) return true;
+    return filters.stato.includes(String(val));
+  };
+
   const filteredRows = rows.filter((r) =>
-    (filters.goTo.length === 0          || filters.goTo.includes(String(r.goTo))) &&
-    (filters.applicativo.length === 0   || filters.applicativo.includes(String(r.applicativo))) &&
-    (filters.stato.length === 0         || filters.stato.includes(String(r.stato))) &&
+    (filters.goTo.length === 0           || filters.goTo.includes(String(r.goTo))) &&
+    (filters.applicativo.length === 0    || filters.applicativo.includes(String(r.applicativo))) &&
+    matchStato(r) &&
     (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
-    (filters.pAnno.length === 0         || filters.pAnno.includes(String(r.pAnno))) &&
-    (filters.pRelease.length === 0      || filters.pRelease.includes(String(r.pRelease)))
+    (filters.pAnno.length === 0          || filters.pAnno.includes(String(r.pAnno))) &&
+    (filters.pRelease.length === 0       || filters.pRelease.includes(String(r.pRelease)))
   );
 
   const totCap   = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
@@ -368,7 +381,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
                       fontSize: "13px",
                       background: r.stato === "Approvato" ? "#e6f4ea" : r.stato === "In approvazione" ? "#fff8e1" : "#f1f3f4",
                       color:      r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
-                    }}>{r.stato}</span>
+                    }}>{r.stato || "(vuoto)"}</span>
                   </td>
                   <td style={{ ...TD, textAlign: "right" }}>{formatEuro(r.importoExcel)}</td>
 

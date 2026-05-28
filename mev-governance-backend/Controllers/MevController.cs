@@ -218,14 +218,9 @@ public class MevController : BaseController
             )
                 continue;
 
-            // SKIP righe senza GoTo, senza Importo, con Stato vuoto o con Stato "Eliminato"
-            if (string.IsNullOrWhiteSpace(goTo))
-                continue;
-            if (importo == 0)
-                continue;
-            if (string.IsNullOrWhiteSpace(stato))
-                continue;
-            if (stato.Equals("Eliminato", StringComparison.OrdinalIgnoreCase))
+            // SKIP righe completamente vuote (nessun dato significativo)
+            if (string.IsNullOrWhiteSpace(goTo) && string.IsNullOrWhiteSpace(applicativo) &&
+                string.IsNullOrWhiteSpace(descrizione) && importo == 0)
                 continue;
 
             excelIds.Add(excelId);
