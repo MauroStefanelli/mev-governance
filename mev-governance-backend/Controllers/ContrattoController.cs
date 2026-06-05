@@ -133,8 +133,12 @@ public class ContrattoController : BaseController
             var dataRows = ws.RowsUsed()
                 .Where(r => r.RowNumber() > headerRow.RowNumber());
 
-            // Svuota e ricarica (upsert su RifContratto)
-            var existing = _db.Contratti.ToDictionary(c => c.RifContratto, c => c);
+            // Upsert su RifContratto — gestisce duplicati nel DB e nell'Excel
+            // In caso di chiavi duplicate nel DB prendiamo l'ultimo record
+            var existing = _db.Contratti
+                .AsEnumerable()
+                .GroupBy(c => c.RifContratto, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
             var seenRifs = new List<string>();
 
             string GetString(IXLRow row, string col) =>
@@ -154,6 +158,23 @@ public class ContrattoController : BaseController
 
                 var rif = GetString(row, "RIF. Contratto");
                 if (string.IsNullOrWhiteSpace(rif)) continue;
+
+                // Se questo RIF è già stato visto in questa sessione (duplicato Excel),
+                // aggiorna il record già inserito/aggiornato in precedenza
+                if (seenRifs.Contains(rif, StringComparer.OrdinalIgnoreCase))
+                {
+                    if (existing.TryGetValue(rif, out var dup))
+                    {
+                        dup.ImpLordo     += GetDecimal(row, "Imp. Lordo");
+                        dup.Sconto       += GetDecimal(row, "Sconto");
+                        dup.ImportoNetto += GetDecimal(row, "Importo Netto");
+                        dup.Ordinato     += GetDecimal(row, "Ordinato");
+                        dup.DaOrdinare   += GetDecimal(row, "Da Ordinare");
+                        dup.Avanzato     += GetDecimal(row, "Avanzato");
+                        dup.DaAvanzare   += GetDecimal(row, "Da avanzare");
+                    }
+                    continue;
+                }
 
                 seenRifs.Add(rif);
 
