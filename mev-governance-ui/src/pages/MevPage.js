@@ -120,7 +120,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
   const [savedRows, setSavedRows]           = useState({});
   const [editingImporto, setEditingImporto] = useState({});
   const [aligning, setAligning]             = useState(false);
-  const [showNote, setShowNote]             = useState(false);
+  const [notePopover, setNotePopover]       = useState(null); // { id, text, x, y }
   const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
@@ -221,6 +221,17 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
     }
   };
 
+  // ── Chiudi popover cliccando fuori ────────────────────────────────────────
+  useEffect(() => {
+    if (!notePopover) return;
+    const handler = (e) => {
+      if (!e.target.closest("[data-note-popover]") && !e.target.closest("button[data-note-btn]"))
+        setNotePopover(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notePopover]);
+
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#666", fontSize: "15px" }}>
@@ -259,13 +270,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
           catch (e) { alert(`Errore export: ${e.message}`); }
         }}>
           ↓ Esporta Excel
-        </button>
-
-        <button
-          style={{ ...btn("ghost"), background: showNote ? "#e8f0fe" : "#f1f3f4", color: showNote ? "#1a73e8" : "#444", border: showNote ? "1px solid #1a73e8" : "1px solid #dadce0" }}
-          onClick={() => setShowNote((v) => !v)}
-        >
-          Note
         </button>
 
         <button
@@ -340,7 +344,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
                 { field: "annoCompetenza", opts: annoOptions,        placeholder: "Tutti" },
                 { field: "stato",          opts: statoOptions,       placeholder: "Tutti" },
                 null,
-                ...(showNote ? [null] : []),
                 { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" },
                 { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" },
                 null, null, null,
@@ -359,7 +362,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP",...(showNote ? ["Note"] : []),"P Anno","P Release","P Importo","P Note",""].map((h) => (
+              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","P Anno","P Release","P Importo","P Note",""].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -394,11 +397,26 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
                   </td>
                   <td style={{ ...TD, textAlign: "right" }}>{formatEuro(r.importoExcel)}</td>
 
-                  {showNote && (
-                    <td style={{ ...TD, maxWidth: "220px", color: "#555", fontStyle: r.noteExcel ? "normal" : "italic" }}>
-                      {r.noteExcel || ""}
-                    </td>
-                  )}
+                  <td style={{ ...TD, textAlign: "center" }}>
+                    {r.noteExcel ? (
+                      <button
+                        data-note-btn="1"
+                        onClick={(e) => {
+                          if (notePopover && notePopover.id === r.id) { setNotePopover(null); return; }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setNotePopover({ id: r.id, text: r.noteExcel, x: rect.left, y: rect.bottom + window.scrollY + 6 });
+                        }}
+                        style={{
+                          padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 600,
+                          cursor: "pointer", border: "1px solid #1a73e8",
+                          background: notePopover?.id === r.id ? "#1a73e8" : "#e8f0fe",
+                          color: notePopover?.id === r.id ? "#fff" : "#1a73e8",
+                        }}
+                      >
+                        Note
+                      </button>
+                    ) : null}
+                  </td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}
@@ -468,6 +486,35 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
           </div>
         )}
       </div>
+
+      {/* ── Popover Note ── */}
+      {notePopover && (
+        <div
+          data-note-popover="1"
+          style={{
+            position: "fixed",
+            left: Math.min(notePopover.x, window.innerWidth - 320),
+            top: notePopover.y - window.scrollY,
+            zIndex: 9999,
+            background: "#fff",
+            border: "1px solid #dadce0",
+            borderRadius: "8px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            padding: "12px 16px",
+            maxWidth: "300px",
+            minWidth: "180px",
+            fontSize: "13px",
+            color: "#333",
+            lineHeight: "1.5",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span style={{ fontWeight: 700, fontSize: "12px", color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Note</span>
+            <span onClick={() => setNotePopover(null)} style={{ cursor: "pointer", color: "#888", fontSize: "16px", lineHeight: 1 }}>×</span>
+          </div>
+          {notePopover.text}
+        </div>
+      )}
     </div>
   );
 }
