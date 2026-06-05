@@ -130,8 +130,26 @@ public class ContrattoController : BaseController
                     StringComparer.OrdinalIgnoreCase
                 );
 
-            var dataRows = ws.RowsUsed()
-                .Where(r => r.RowNumber() > headerRow.RowNumber());
+            // Legge solo le righe della tabella CONTRATTO:
+            // scorre riga per riga dopo l'intestazione e si ferma alla prima
+            // riga vuota o alla prima riga che contiene una nuova intestazione
+            // (altra tabella nel foglio)
+            int headerRowNum = headerRow.RowNumber();
+            int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
+            var dataRowNumbers = new List<int>();
+            for (int rn = headerRowNum + 1; rn <= lastRowNum; rn++)
+            {
+                var r = ws.Row(rn);
+                // Fermati se la riga è completamente vuota
+                if (!r.CellsUsed().Any()) break;
+                // Fermati se la prima cella usata contiene "RIF. Contratto"
+                // (intestazione di un'altra tabella)
+                if (r.CellsUsed().Any(c =>
+                    c.GetString().Trim().Equals("RIF. Contratto", StringComparison.OrdinalIgnoreCase)))
+                    break;
+                dataRowNumbers.Add(rn);
+            }
+            var dataRows = dataRowNumbers.Select(rn => ws.Row(rn));
 
             // Upsert su RifContratto — gestisce duplicati nel DB e nell'Excel
             // In caso di chiavi duplicate nel DB prendiamo l'ultimo record
