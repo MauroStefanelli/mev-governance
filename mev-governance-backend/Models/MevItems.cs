@@ -23,6 +23,12 @@ public class MevItem
     public decimal ImportoExcel { get; set; }
     public string? NoteExcel { get; set; }
 
+    // Dati contratto (da Excel sheet MEV)
+    public string? Bc { get; set; }
+    public string? Contratto { get; set; }
+    public string? AtId { get; set; }
+    public decimal OrdinatoBdo { get; set; }
+
 
     // Dati PMO
     public int PAnno { get; set; }

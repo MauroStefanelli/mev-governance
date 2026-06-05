@@ -210,6 +210,10 @@ public class MevController : BaseController
             decimal importo = GetDecimal("Importo Fornitura");
             string excelId = GetString("ID");
             string noteExcel = GetString("Note");
+            string bc = GetString("BC");
+            string contratto = GetString("Contratto");
+            string atId = GetString("AT ID");
+            decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
 
             // SKIP riga "TOTALE"
             if (
@@ -237,6 +241,10 @@ public class MevController : BaseController
                 existing.AnnoCompetenza = GetInt("Anno Competenza");
                 existing.ImportoExcel = importo;
                 existing.NoteExcel = noteExcel;
+                existing.Bc = bc;
+                existing.Contratto = contratto;
+                existing.AtId = atId;
+                existing.OrdinatoBdo = ordinatoBdo;
             }
             else
             {
@@ -252,6 +260,10 @@ public class MevController : BaseController
                     AnnoCompetenza = GetInt("Anno Competenza"),
                     ImportoExcel = importo,
                     NoteExcel = noteExcel,
+                    Bc = bc,
+                    Contratto = contratto,
+                    AtId = atId,
+                    OrdinatoBdo = ordinatoBdo,
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
                     PImporto = importo

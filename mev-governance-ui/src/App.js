@@ -3,6 +3,7 @@ import MevPage from "./pages/MevPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import ChartPage from "./pages/ChartPage";
+import ContrattiPage from "./pages/ContrattiPage";
 import { getMevList } from "./services/mevService";
 
 function App() {
@@ -35,8 +36,9 @@ function App() {
   if (!token) return <LoginPage onLogin={handleLogin} />;
 
   const navItems = [
-    { id: "mev",   label: "MEV" },
-    { id: "chart", label: "Grafici" },
+    { id: "mev",       label: "MEV" },
+    { id: "contratti", label: "Contratti" },
+    { id: "chart",     label: "Grafici" },
     ...(role === "Admin" ? [{ id: "admin", label: "Utenti" }] : []),
   ];
 
@@ -111,9 +113,10 @@ function App() {
       </header>
 
       <main style={{ padding: "0" }}>
-        {page === "mev"   && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} />}
-        {page === "chart" && <ChartPage rows={filteredRows} />}
-        {page === "admin" && role === "Admin" && <AdminPage />}
+        {page === "mev"       && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} />}
+        {page === "contratti" && <ContrattiPage onUnauthorized={handleLogout} />}
+        {page === "chart"     && <ChartPage rows={filteredRows} />}
+        {page === "admin"     && role === "Admin" && <AdminPage />}
       </main>
     </div>
   );

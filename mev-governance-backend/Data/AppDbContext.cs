@@ -12,4 +12,5 @@ public class AppDbContext : DbContext
 
     public DbSet<MevItem> MevItems => Set<MevItem>();
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<Contratto> Contratti => Set<Contratto>();
 }
