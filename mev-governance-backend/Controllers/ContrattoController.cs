@@ -79,7 +79,8 @@ public class ContrattoController : BaseController
         }
         catch (Exception ex)
         {
-            return Problem($"Errore nel recupero contratti: {ex.Message}");
+            var inner = ex.InnerException?.Message ?? "";
+            return Problem($"Errore nel recupero contratti: {ex.Message} | Inner: {inner}");
         }
     }
 
@@ -196,7 +197,8 @@ public class ContrattoController : BaseController
         }
         catch (Exception ex)
         {
-            return Problem($"Errore durante l'allineamento contratti: {ex.Message}");
+            var inner = ex.InnerException?.Message ?? "";
+            return Problem($"Errore durante l'allineamento contratti: {ex.Message} | Inner: {inner}");
         }
     }
 }

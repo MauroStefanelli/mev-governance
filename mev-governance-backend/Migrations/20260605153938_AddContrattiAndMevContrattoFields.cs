@@ -31,7 +31,7 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "OrdinatoBdo",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC(18,2)",
                 nullable: false,
                 defaultValue: 0m);
 
@@ -44,13 +44,13 @@ namespace mevgovernancebackend.Migrations
                     RifContratto = table.Column<string>(type: "TEXT", nullable: false),
                     TipoContratto = table.Column<string>(type: "TEXT", nullable: false),
                     Data = table.Column<string>(type: "TEXT", nullable: true),
-                    ImpLordo = table.Column<decimal>(type: "TEXT", nullable: false),
-                    Sconto = table.Column<decimal>(type: "TEXT", nullable: false),
-                    ImportoNetto = table.Column<decimal>(type: "TEXT", nullable: false),
-                    Ordinato = table.Column<decimal>(type: "TEXT", nullable: false),
-                    DaOrdinare = table.Column<decimal>(type: "TEXT", nullable: false),
-                    Avanzato = table.Column<decimal>(type: "TEXT", nullable: false),
-                    DaAvanzare = table.Column<decimal>(type: "TEXT", nullable: false)
+                    ImpLordo = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
+                    Sconto = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
+                    ImportoNetto = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
+                    Ordinato = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
+                    DaOrdinare = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
+                    Avanzato = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
+                    DaAvanzare = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false)
                 },
                 constraints: table =>
                 {
