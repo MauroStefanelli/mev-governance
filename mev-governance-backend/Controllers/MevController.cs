@@ -211,7 +211,7 @@ public class MevController : BaseController
             string excelId = GetString("ID");
             string noteExcel = GetString("Note");
             string bc = GetString("BC");
-            string contratto = GetString("Contratto");
+            string contratto = GetString("Tipo Contratto");
             string atId = GetString("AT ID");
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
 

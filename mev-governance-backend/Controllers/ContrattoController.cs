@@ -56,8 +56,8 @@ public class ContrattoController : BaseController
                 c.Avanzato,
                 c.DaAvanzare,
                 MevItems = mevItems
-                    .Where(m => m.Bc != null &&
-                                m.Bc.Equals(c.RifContratto, StringComparison.OrdinalIgnoreCase))
+                    .Where(m => m.Contratto != null &&
+                                m.Contratto.Equals(c.TipoContratto, StringComparison.OrdinalIgnoreCase))
                     .Select(m => new
                     {
                         m.Id,
