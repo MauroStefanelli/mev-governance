@@ -120,6 +120,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
   const [savedRows, setSavedRows]           = useState({});
   const [editingImporto, setEditingImporto] = useState({});
   const [aligning, setAligning]             = useState(false);
+  const [showNote, setShowNote]             = useState(false);
   const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
@@ -261,6 +262,13 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
         </button>
 
         <button
+          style={{ ...btn("ghost"), background: showNote ? "#e8f0fe" : "#f1f3f4", color: showNote ? "#1a73e8" : "#444", border: showNote ? "1px solid #1a73e8" : "1px solid #dadce0" }}
+          onClick={() => setShowNote((v) => !v)}
+        >
+          Note
+        </button>
+
+        <button
           style={{ ...btn("ghost"), opacity: hasActiveFilters ? 1 : 0.5 }}
           onClick={resetFilters}
           disabled={!hasActiveFilters}
@@ -332,6 +340,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
                 { field: "annoCompetenza", opts: annoOptions,        placeholder: "Tutti" },
                 { field: "stato",          opts: statoOptions,       placeholder: "Tutti" },
                 null,
+                ...(showNote ? [null] : []),
                 { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" },
                 { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" },
                 null, null, null,
@@ -350,7 +359,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","P Anno","P Release","P Importo","P Note",""].map((h) => (
+              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP",...(showNote ? ["Note"] : []),"P Anno","P Release","P Importo","P Note",""].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -384,6 +393,12 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
                     }}>{r.stato || "(vuoto)"}</span>
                   </td>
                   <td style={{ ...TD, textAlign: "right" }}>{formatEuro(r.importoExcel)}</td>
+
+                  {showNote && (
+                    <td style={{ ...TD, maxWidth: "220px", color: "#555", fontStyle: r.noteExcel ? "normal" : "italic" }}>
+                      {r.noteExcel || ""}
+                    </td>
+                  )}
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}

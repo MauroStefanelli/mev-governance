@@ -209,6 +209,7 @@ public class MevController : BaseController
             string stato = GetString("Stato");
             decimal importo = GetDecimal("Importo Fornitura");
             string excelId = GetString("ID");
+            string noteExcel = GetString("Note");
 
             // SKIP riga "TOTALE"
             if (
@@ -235,6 +236,7 @@ public class MevController : BaseController
                 existing.Stato = GetString("Stato");
                 existing.AnnoCompetenza = GetInt("Anno Competenza");
                 existing.ImportoExcel = importo;
+                existing.NoteExcel = noteExcel;
             }
             else
             {
@@ -249,6 +251,7 @@ public class MevController : BaseController
                     Stato = GetString("Stato"),
                     AnnoCompetenza = GetInt("Anno Competenza"),
                     ImportoExcel = importo,
+                    NoteExcel = noteExcel,
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
                     PImporto = importo
@@ -296,6 +299,7 @@ public class MevController : BaseController
         "Stato",
         "Anno Competenza",
         "Importo Fornitura",
+        "Note",
         "P Anno",
         "P Release",
         "P Importo",
@@ -323,10 +327,11 @@ public class MevController : BaseController
             ws.Cell(row, 5).Value = item.Stato;
             ws.Cell(row, 6).Value = item.AnnoCompetenza;
             ws.Cell(row, 7).Value = item.ImportoExcel;
-            ws.Cell(row, 8).Value = item.PAnno;
-            ws.Cell(row, 9).Value = item.PRelease;
-            ws.Cell(row, 10).Value = item.PImporto;
-            ws.Cell(row, 11).Value = item.PNote;
+            ws.Cell(row, 8).Value = item.NoteExcel;
+            ws.Cell(row, 9).Value = item.PAnno;
+            ws.Cell(row, 10).Value = item.PRelease;
+            ws.Cell(row, 11).Value = item.PImporto;
+            ws.Cell(row, 12).Value = item.PNote;
             row++;
         }
 

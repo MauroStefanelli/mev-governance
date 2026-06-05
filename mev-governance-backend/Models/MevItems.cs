@@ -21,6 +21,7 @@ public class MevItem
     public int AnnoCompetenza { get; set; }
     public string Stato { get; set; } = "";
     public decimal ImportoExcel { get; set; }
+    public string? NoteExcel { get; set; }
 
 
     // Dati PMO
