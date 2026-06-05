@@ -38,7 +38,8 @@ public class ContrattoController : BaseController
 
             var mevItems = _db.MevItems
                 .AsNoTracking()
-                .Where(m => m.Contratto != null && m.Contratto != "")
+                .Where(m => m.Contratto != null && m.Contratto != "" &&
+                            m.Bc != null && m.Bc != "")
                 .OrderBy(m => m.ExcelOrder)
                 .ToList();
 
