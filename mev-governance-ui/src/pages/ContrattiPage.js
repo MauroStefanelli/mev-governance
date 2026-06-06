@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getContratti, alignContratti } from "../services/mevService";
+import { getContratti } from "../services/mevService";
 
 const formatEuro = (value) => {
   if (value === null || value === undefined || value === "") return "€ 0,00";
@@ -20,14 +20,10 @@ const TD = (align = "left", extra = {}) => ({
 });
 
 function ContrattiPage({ onUnauthorized }) {
-  const [contratti, setContratti]       = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [aligning, setAligning]         = useState(false);
-  // openContratti: { [id]: bool }
+  const [contratti, setContratti]         = useState([]);
+  const [loading, setLoading]             = useState(true);
   const [openContratti, setOpenContratti] = useState({});
-  // openAnni: { [`${id}-${anno}`]: bool }
   const [openAnni, setOpenAnni]           = useState({});
-  // openBc: { [`${id}-${anno}-${bc}`]: bool }
   const [openBc, setOpenBc]               = useState({});
 
   const load = async () => {
@@ -60,39 +56,9 @@ function ContrattiPage({ onUnauthorized }) {
   return (
     <div style={{ padding: "20px 24px" }}>
 
-      {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
-        <button
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "6px",
-            padding: "7px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: 600,
-            cursor: aligning ? "not-allowed" : "pointer", border: "none",
-            background: "#1a73e8", color: "#fff", boxShadow: "0 1px 3px rgba(26,115,232,.35)",
-            opacity: aligning ? 0.7 : 1,
-          }}
-          disabled={aligning}
-          onClick={async () => {
-            if (!window.confirm("Allineare i dati Contratti dall'Excel ufficiale?")) return;
-            setAligning(true);
-            try {
-              const result = await alignContratti();
-              alert(`Allineamento completato: ${result.count} contratti caricati`);
-              await load();
-            } catch (e) {
-              alert(`Errore allineamento contratti:\n${e.message}`);
-            } finally {
-              setAligning(false);
-            }
-          }}
-        >
-          {aligning ? "Allineamento..." : "⟳ Allinea Contratti"}
-        </button>
-        <span style={{ fontSize: "12px", color: "#888" }}>{contratti.length} contratti</span>
-      </div>
-
       {contratti.length === 0 && (
         <div style={{ textAlign: "center", padding: "60px", color: "#888", fontSize: "14px" }}>
-          Nessun contratto. Carica il file Excel e clicca "Allinea Contratti".
+          Nessun contratto. Carica il file Excel e clicca "Allinea Dati" nella pagina MEV.
         </div>
       )}
 
@@ -103,6 +69,7 @@ function ContrattiPage({ onUnauthorized }) {
             <thead>
               <tr>
                 <th style={TH()} />
+                <th style={TH()}>Tipo Contratto</th>
                 <th style={TH()}>RIF. Contratto</th>
                 <th style={TH("right")}>Imp. Lordo</th>
                 <th style={TH("right")}>Importo Netto</th>
@@ -131,6 +98,7 @@ function ContrattiPage({ onUnauthorized }) {
                       <td style={TD("center", { width: "32px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
                         {isOpen ? "▲" : "▶"}
                       </td>
+                      <td style={TD("left", { color: "#555" })}>{c.tipoContratto}</td>
                       <td style={TD("left", { fontWeight: 600, color: "#1a73e8" })}>{c.rifContratto}</td>
                       <td style={TD("right")}>{formatEuro(c.impLordo)}</td>
                       <td style={TD("right")}>{formatEuro(c.importoNetto)}</td>
@@ -143,7 +111,7 @@ function ContrattiPage({ onUnauthorized }) {
                     {/* ── Livello 2: anni ── */}
                     {isOpen && (
                       <tr key={`${c.id}-anni`}>
-                        <td colSpan={8} style={{ padding: 0, borderBottom: "2px solid #1a73e8" }}>
+                        <td colSpan={9} style={{ padding: 0, borderBottom: "2px solid #1a73e8" }}>
                           <div style={{ background: "#f8fbff", padding: "10px 16px 14px 32px" }}>
                             {c.anni.length === 0 ? (
                               <div style={{ fontSize: "13px", color: "#888", fontStyle: "italic" }}>
@@ -195,6 +163,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                 <th style={TH("right")}>Imp. Fornitura</th>
                                                 <th style={TH("right")}>Ordinato (BdO)</th>
                                                 <th style={TH("right")}>Fatturato</th>
+                                                <th style={TH("right")}>Da fatturare</th>
                                               </tr>
                                             </thead>
                                             <tbody>
@@ -221,6 +190,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                       <td style={TD("right")}>{formatEuro(b.totImportoFornitura)}</td>
                                                       <td style={TD("right")}>{formatEuro(b.totOrdinatoBdo)}</td>
                                                       <td style={TD("right")}>{formatEuro(b.totFatturato)}</td>
+                                                      <td style={TD("right")}>{formatEuro(b.totImportoFornitura - b.totFatturato)}</td>
                                                     </tr>
 
                                                     {/* ── Livello 4: dettaglio GoTo ── */}
@@ -237,6 +207,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura Scontato</th>
                                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Ordinato (BdO)</th>
                                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Fatturato</th>
+                                                                  <th style={{ ...TH("right"), fontSize: "11px" }}>Da fatturare</th>
                                                                 </tr>
                                                               </thead>
                                                               <tbody>
@@ -251,6 +222,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato)}</td>
                                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.ordinatoBdo)}</td>
                                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.fatturato)}</td>
+                                                                    <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato - g.fatturato)}</td>
                                                                   </tr>
                                                                 ))}
                                                               </tbody>
@@ -268,6 +240,9 @@ function ContrattiPage({ onUnauthorized }) {
                                                                   </td>
                                                                   <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
                                                                     {formatEuro(b.totFatturato)}
+                                                                  </td>
+                                                                  <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
+                                                                    {formatEuro(b.totImportoFornitura - b.totFatturato)}
                                                                   </td>
                                                                 </tr>
                                                               </tfoot>
@@ -287,6 +262,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totImportoFornitura)}</td>
                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totOrdinatoBdo)}</td>
                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totFatturato)}</td>
+                                                <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totImportoFornitura - a.totFatturato)}</td>
                                               </tr>
                                             </tfoot>
                                           </table>

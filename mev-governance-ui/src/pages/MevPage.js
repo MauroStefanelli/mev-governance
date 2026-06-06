@@ -252,7 +252,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
             setAligning(true);
             try {
               const result = await alignMevData({});
-              alert(`Allineamento completato: ${result.count} record caricati`);
+              const msg = result.countContratti !== undefined
+                ? `Allineamento completato: ${result.count} record MEV, ${result.countContratti} contratti`
+                : `Allineamento completato: ${result.count} record caricati`;
+              alert(msg);
               await loadMev();
             } catch (e) {
               alert(`Errore allineamento:\n${e.message}`);

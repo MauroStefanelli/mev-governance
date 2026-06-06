@@ -6,7 +6,6 @@ using MevGovernanceBackend.Data;
 using MevGovernanceBackend.Models;
 using MevGovernanceBackend.Services;
 using System.Security.Claims;
-
 namespace MevGovernanceBackend.Controllers;
 
 [ApiController]
@@ -16,11 +15,13 @@ public class MevController : BaseController
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private readonly ContrattoController _contrattoCtrl;
 
     public MevController(AppDbContext db, EmailService email)
     {
         _db = db;
         _email = email;
+        _contrattoCtrl = new ContrattoController(db);
     }
 
     // ============================================================
@@ -113,7 +114,26 @@ public class MevController : BaseController
             if (!System.IO.File.Exists(uploadedPath))
                 return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
 
-            return ImportFromExcelFile(uploadedPath);
+            var mevResult = ImportFromExcelFile(uploadedPath);
+
+            // Allinea anche i contratti dallo stesso file
+            var contrattoResult = _contrattoCtrl.Align();
+
+            // Restituisce il conteggio MEV + contratti
+            if (mevResult is OkObjectResult mevOk && contrattoResult is OkObjectResult contrattoOk)
+            {
+                dynamic mevData       = mevOk.Value!;
+                dynamic contrattoData = contrattoOk.Value!;
+                return Ok(new
+                {
+                    message          = "Allineamento completato",
+                    count            = mevData.count,
+                    countContratti   = contrattoData.count,
+                });
+            }
+
+            // Se l'allineamento contratti fallisce, restituisce comunque il risultato MEV
+            return mevResult;
         }
         catch (Exception ex)
         {
