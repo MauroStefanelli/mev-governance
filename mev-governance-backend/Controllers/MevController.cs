@@ -214,6 +214,8 @@ public class MevController : BaseController
             string contratto = GetString("Tipo Contratto");
             string atId = GetString("AT ID");
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
+            decimal fatturato = GetDecimal("Fatturato");
+            string releaseExcel = GetString("Release");
 
             // SKIP riga "TOTALE"
             if (
@@ -245,6 +247,8 @@ public class MevController : BaseController
                 existing.Contratto = contratto;
                 existing.AtId = atId;
                 existing.OrdinatoBdo = ordinatoBdo;
+                existing.Fatturato = fatturato;
+                existing.ReleaseExcel = releaseExcel;
             }
             else
             {
@@ -264,6 +268,8 @@ public class MevController : BaseController
                     Contratto = contratto,
                     AtId = atId,
                     OrdinatoBdo = ordinatoBdo,
+                    Fatturato = fatturato,
+                    ReleaseExcel = releaseExcel,
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
                     PImporto = importo

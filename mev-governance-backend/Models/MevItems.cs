@@ -28,6 +28,8 @@ public class MevItem
     public string? Contratto { get; set; }
     public string? AtId { get; set; }
     public decimal OrdinatoBdo { get; set; }
+    public decimal Fatturato { get; set; }
+    public string? ReleaseExcel { get; set; }
 
 
     // Dati PMO

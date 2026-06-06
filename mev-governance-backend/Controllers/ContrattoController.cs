@@ -24,7 +24,7 @@ public class ContrattoController : BaseController
 
     // ============================================================
     // GET /api/contratti
-    // Restituisce tutti i contratti con le righe MEV collegate
+    // Struttura: Contratto → Anni → BC (sommati) → GoTo (dettaglio)
     // ============================================================
     [HttpGet]
     public IActionResult GetContratti()
@@ -40,7 +40,7 @@ public class ContrattoController : BaseController
                 .AsNoTracking()
                 .Where(m => m.Contratto != null && m.Contratto != "" &&
                             m.Bc != null && m.Bc != "")
-                .OrderBy(m => m.ExcelOrder)
+                .OrderBy(m => m.AnnoCompetenza).ThenBy(m => m.Bc).ThenBy(m => m.ExcelOrder)
                 .ToList();
 
             var result = contratti.Select(c => new
@@ -56,22 +56,46 @@ public class ContrattoController : BaseController
                 c.DaOrdinare,
                 c.Avanzato,
                 c.DaAvanzare,
-                MevItems = mevItems
+                // Anni → per ogni anno, lista BC con somme + dettaglio GoTo
+                Anni = mevItems
                     .Where(m => m.Contratto != null &&
                                 m.Contratto.Equals(c.TipoContratto, StringComparison.OrdinalIgnoreCase))
-                    .Select(m => new
+                    .GroupBy(m => m.AnnoCompetenza)
+                    .OrderBy(g => g.Key)
+                    .Select(gAnno => new
                     {
-                        m.Id,
-                        m.ExcelId,
-                        m.Bc,
-                        m.Contratto,
-                        m.AtId,
-                        m.OrdinatoBdo,
-                        m.AnnoCompetenza,
-                        m.Applicativo,
-                        m.Descrizione,
-                        m.Stato,
-                        m.ImportoExcel,
+                        Anno = gAnno.Key,
+                        TotImportoFornitura = gAnno.Sum(m => m.ImportoExcel),
+                        TotOrdinatoBdo      = gAnno.Sum(m => m.OrdinatoBdo),
+                        TotFatturato        = gAnno.Sum(m => m.Fatturato),
+                        // BC sommati per anno
+                        BcList = gAnno
+                            .GroupBy(m => m.Bc)
+                            .OrderBy(g => g.Key)
+                            .Select(gBc => new
+                            {
+                                Bc = gBc.Key,
+                                TotImportoFornitura = gBc.Sum(m => m.ImportoExcel),
+                                TotOrdinatoBdo      = gBc.Sum(m => m.OrdinatoBdo),
+                                TotFatturato        = gBc.Sum(m => m.Fatturato),
+                                // Dettaglio GoTo per BC
+                                GoToList = gBc
+                                    .OrderBy(m => m.GoTo)
+                                    .Select(m => new
+                                    {
+                                        m.GoTo,
+                                        m.AnnoCompetenza,
+                                        m.ReleaseExcel,
+                                        // Importo Fornitura scontato = ImportoExcel * (1 - Sconto/100)
+                                        ImportoForniturascontato = c.Sconto > 0
+                                            ? m.ImportoExcel * (1 - c.Sconto / 100m)
+                                            : m.ImportoExcel,
+                                        m.OrdinatoBdo,
+                                        m.Fatturato,
+                                    })
+                                    .ToList()
+                            })
+                            .ToList()
                     })
                     .ToList()
             }).ToList();
