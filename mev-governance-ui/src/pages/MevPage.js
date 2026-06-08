@@ -125,7 +125,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [] };
+    return saved ? JSON.parse(saved) : { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [] };
   });
 
   // ── Data load ──────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [] });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [] });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -162,6 +162,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const annoOptions        = buildOptions("annoCompetenza");
   const pAnnoOptions       = buildOptions("pAnno");
   const pReleaseOptions    = buildOptions("pRelease");
+  const rdaOptions         = buildOptions("rda");
 
   // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
   const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
@@ -183,6 +184,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     (filters.applicativo.length === 0    || filters.applicativo.includes(String(r.applicativo))) &&
     matchStato(r) &&
     (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
+    (filters.rda.length === 0            || filters.rda.includes(String(r.rda ?? ""))) &&
     (filters.pAnno.length === 0          || filters.pAnno.includes(String(r.pAnno))) &&
     (filters.pRelease.length === 0       || filters.pRelease.includes(String(r.pRelease)))
   );
@@ -338,7 +340,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            {/* Filtri */}
+            {/* Filtri - una cella per ogni colonna intestazione */}
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
               <th style={{ padding: "4px 6px" }} />
               {[
@@ -349,12 +351,15 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                 { field: "stato",          opts: statoOptions,       placeholder: "Tutti" },
                 null,
                 null,
+                { field: "rda",            opts: rdaOptions,         placeholder: "Tutti" },
                 { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" },
                 { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" },
-                null, null, null,
+                null,
+                null,
+                null,
               ].map((col, i) => (
                 <th key={i} style={{ padding: "4px 6px" }}>
-                  {col ? (
+                  {col && col.field ? (
                     <MultiSelect
                       options={col.opts}
                       selected={filters[col.field]}
