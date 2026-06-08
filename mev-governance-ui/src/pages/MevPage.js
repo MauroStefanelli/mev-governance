@@ -103,10 +103,6 @@ const btn = (variant = "default") => {
   return variants[variant] || variants.default;
 };
 
-const selectStyle = {
-  padding: "4px 6px", border: "1px solid #dadce0", borderRadius: "4px",
-  fontSize: "12px", background: "white", width: "100%", color: "#333",
-};
 
 const inputStyle = (extra = {}) => ({
   padding: "5px 8px", border: "1px solid #dadce0", borderRadius: "4px",
@@ -377,7 +373,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","P Anno","P Release","P Importo","P Note",""].map((h) => (
+              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
