@@ -122,6 +122,15 @@ export const getContratti = async () => {
   return response.json();
 };
 
+export const getContrattiPubblico = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/contratti/pubblico`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore nel recupero contratti");
+  return response.json();
+};
+
 export const alignContratti = async () => {
   const response = await fetch(`${API_BASE_URL}/api/contratti/align`, {
     method: "POST",
