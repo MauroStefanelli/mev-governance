@@ -348,6 +348,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                 { field: "annoCompetenza", opts: annoOptions,        placeholder: "Tutti" },
                 { field: "stato",          opts: statoOptions,       placeholder: "Tutti" },
                 null,
+                null,
                 { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" },
                 { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" },
                 null, null, null,
@@ -366,7 +367,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","P Anno","P Release","P Importo","P Note",""].map((h) => (
+              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","P Anno","P Release","P Importo","P Note",""].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -421,6 +422,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                       </button>
                     ) : null}
                   </td>
+
+                  <td style={{ ...TD, color: "#555", fontSize: "12px" }}>{r.rda ?? ""}</td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}

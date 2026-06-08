@@ -416,7 +416,7 @@ public class ContrattoController : BaseController
     private void ImportConsumoTow(IXLWorksheet ws, IXLRangeRow headerRow)
     {
         var columnMap = BuildColumnMap(headerRow);
-        var dataRows  = ReadTableRows(ws, headerRow, "Valore Totale");
+        var dataRows  = ReadTableRows(ws, headerRow); // nessuno stopKey: legge fino a riga vuota
 
         decimal Dec(IXLRow row, string col)
         {
@@ -460,7 +460,7 @@ public class ContrattoController : BaseController
                           StringComparer.OrdinalIgnoreCase);
 
     // ── Helper: legge righe dati fino a riga vuota o nuova intestazione ────────
-    private static IEnumerable<IXLRow> ReadTableRows(IXLWorksheet ws, IXLRangeRow headerRow, string stopKey)
+    private static IEnumerable<IXLRow> ReadTableRows(IXLWorksheet ws, IXLRangeRow headerRow, string? stopKey = null)
     {
         int headerRowNum = headerRow.RowNumber();
         int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
@@ -469,7 +469,7 @@ public class ContrattoController : BaseController
         {
             var r = ws.Row(rn);
             if (!r.CellsUsed().Any()) break;
-            if (r.CellsUsed().Any(c =>
+            if (stopKey != null && r.CellsUsed().Any(c =>
                 c.GetString().Trim().Equals(stopKey, StringComparison.OrdinalIgnoreCase)))
                 break;
             rows.Add(r);
