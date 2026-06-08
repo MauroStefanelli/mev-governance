@@ -248,7 +248,14 @@ public class ContrattoController : BaseController
                     r.Cells().Any(c => c.GetString().Trim().Equals("Impegnato",    StringComparison.OrdinalIgnoreCase)));
 
             if (towHeaderRow != null)
+            {
                 ImportConsumoTow(ws, towHeaderRow);
+                Console.WriteLine($"[TOW] Header trovato a riga {towHeaderRow.RowNumber()}, righe importate: {_db.ConsumoTow.Local.Count}");
+            }
+            else
+            {
+                Console.WriteLine("[TOW] Header NON trovato nel foglio CONTRATTO");
+            }
 
             _db.SaveChanges();
 
@@ -463,7 +470,7 @@ public class ContrattoController : BaseController
     private void ImportConsumoTow(IXLWorksheet ws, IXLRangeRow headerRow)
     {
         var columnMap = BuildColumnMap(headerRow);
-        var dataRows  = ReadTableRows(ws, headerRow); // nessuno stopKey: legge fino a riga vuota
+        Console.WriteLine($"[TOW] ColumnMap keys: {string.Join(", ", columnMap.Keys)}");
 
         string Str(IXLRow row, string col) =>
             columnMap.ContainsKey(col) ? row.Cell(columnMap[col]).GetString().Trim() : "";
@@ -473,12 +480,21 @@ public class ContrattoController : BaseController
             row.Cell(columnMap[col]).TryGetValue(out decimal v); return v;
         }
 
+        int headerRowNum = headerRow.RowNumber();
+        int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
+        int towColNum    = columnMap.ContainsKey("TOW") ? columnMap["TOW"] : 0;
+        Console.WriteLine($"[TOW] Header a riga {headerRowNum}, lastRow={lastRowNum}, towCol={towColNum}");
+
+        if (towColNum == 0) { Console.WriteLine("[TOW] Colonna TOW non trovata, import saltato"); return; }
+
         // Svuota e ricarica sempre
         _db.ConsumoTow.RemoveRange(_db.ConsumoTow.ToList());
 
-        foreach (var row in dataRows)
+        int count = 0;
+        for (int rn = headerRowNum + 1; rn <= lastRowNum; rn++)
         {
-            var tow = Str(row, "TOW");
+            var row = ws.Row(rn);
+            var tow = row.Cell(towColNum).GetString().Trim();
             if (string.IsNullOrWhiteSpace(tow)) continue;
 
             _db.ConsumoTow.Add(new ConsumoTow
@@ -492,7 +508,9 @@ public class ContrattoController : BaseController
                 Impegnato      = Dec(row, "Impegnato"),
                 Residuo        = Dec(row, "Residuo"),
             });
+            count++;
         }
+        Console.WriteLine($"[TOW] Righe importate: {count}");
     }
 
     // ── Helper: costruisce mappa colonne da riga intestazione ─────────────────
