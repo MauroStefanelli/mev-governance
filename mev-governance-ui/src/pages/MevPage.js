@@ -125,7 +125,11 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [] };
+    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [] };
+    if (!saved) return defaults;
+    const parsed = JSON.parse(saved);
+    // merge con defaults per gestire chiavi mancanti da versioni precedenti
+    return { ...defaults, ...parsed };
   });
 
   // ── Data load ──────────────────────────────────────────────────────────────
