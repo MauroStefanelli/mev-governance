@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getContrattiPubblico } from "../services/mevService";
+import { getContrattiPubblico, getConsumoTow } from "../services/mevService";
 
 const formatEuro = (value) => {
   if (value === null || value === undefined || value === "") return "€ 0,00";
@@ -20,16 +20,18 @@ const TD = (align = "left", extra = {}) => ({
 });
 
 function ContrattiPage({ onUnauthorized }) {
-  const [contratti, setContratti] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [contratti, setContratti]         = useState([]);
+  const [towRows, setTowRows]             = useState([]);
+  const [loading, setLoading]             = useState(true);
   const [openContratti, setOpenContratti] = useState({});
-  const [openAnni, setOpenAnni] = useState({});
+  const [openAnni, setOpenAnni]           = useState({});
 
   const load = async () => {
     setLoading(true);
     try {
-      const data = await getContrattiPubblico();
+      const [data, tow] = await Promise.all([getContrattiPubblico(), getConsumoTow()]);
       setContratti(data);
+      setTowRows(tow);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
     } finally {
@@ -52,6 +54,56 @@ function ContrattiPage({ onUnauthorized }) {
 
   return (
     <div style={{ padding: "20px 24px" }}>
+
+      {/* ── Sezione ConsumoTOW ── */}
+      {towRows.length > 0 && (() => {
+        const TOW_TASK = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.6"];
+        const TOW_5    = ["TOW02.5"];
+        const group = (keys) => towRows.filter(r => keys.some(k => r.voce?.toUpperCase().includes(k)));
+        const sum   = (rows, field) => rows.reduce((s, r) => s + (r[field] || 0), 0);
+        const servTask = group(TOW_TASK);
+        const tow5     = group(TOW_5);
+        const sections = [
+          { label: "Servizi a TASK", rows: servTask },
+          { label: "TOW02.5",        rows: tow5 },
+        ].filter(s => s.rows.length > 0);
+        return (
+          <div style={{ marginBottom: "24px" }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a73e8", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+              Consumo TOW
+            </div>
+            <div style={{ borderRadius: "10px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th style={TH()}>Voce</th>
+                    <th style={TH("right")}>Valore Totale</th>
+                    <th style={TH("right")}>Approvato</th>
+                    <th style={TH("right")}>Ordinati (RDA)</th>
+                    <th style={TH("right")}>Impegnato</th>
+                    <th style={TH("right")}>Residuo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sections.map((sec, si) => (
+                    <>
+                      {/* Riga totale sezione */}
+                      <tr key={`sec-${si}`} style={{ background: "#e8f0fe", borderBottom: "2px solid #1a73e8" }}>
+                        <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                      </tr>
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {contratti.length === 0 && (
         <div style={{ textAlign: "center", padding: "60px", color: "#888", fontSize: "14px" }}>

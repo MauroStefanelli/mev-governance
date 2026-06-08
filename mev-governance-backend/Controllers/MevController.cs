@@ -119,6 +119,12 @@ public class MevController : BaseController
             // Allinea anche i contratti dallo stesso file
             var contrattoResult = _contrattoCtrl.Align();
 
+            // Salva timestamp ultimo align
+            var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
+            if (settings == null) { settings = new Models.AppSettings { Id = 1 }; _db.AppSettings.Add(settings); }
+            settings.LastAlignAt = DateTime.UtcNow;
+            _db.SaveChanges();
+
             // Restituisce il conteggio MEV + contratti
             if (mevResult is OkObjectResult mevOk && contrattoResult is OkObjectResult contrattoOk)
             {
@@ -139,6 +145,16 @@ public class MevController : BaseController
         {
             return Problem($"Errore durante l'allineamento: {ex.Message}");
         }
+    }
+
+    // ============================================================
+    // GET /api/mev/last-align
+    // ============================================================
+    [HttpGet("last-align")]
+    public IActionResult GetLastAlign()
+    {
+        var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
+        return Ok(new { lastAlignAt = settings?.LastAlignAt });
     }
 
     // ============================================================
@@ -236,6 +252,7 @@ public class MevController : BaseController
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
             decimal fatturato = GetDecimal("Fatturato");
             string releaseExcel = GetString("Release");
+            string rda = GetString("RDA");
 
             // SKIP riga "TOTALE"
             if (
@@ -269,6 +286,7 @@ public class MevController : BaseController
                 existing.OrdinatoBdo = ordinatoBdo;
                 existing.Fatturato = fatturato;
                 existing.ReleaseExcel = releaseExcel;
+                existing.Rda = rda;
             }
             else
             {
@@ -290,6 +308,7 @@ public class MevController : BaseController
                     OrdinatoBdo = ordinatoBdo,
                     Fatturato = fatturato,
                     ReleaseExcel = releaseExcel,
+                    Rda = rda,
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
                     PImporto = importo

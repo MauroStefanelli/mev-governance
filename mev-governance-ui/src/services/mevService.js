@@ -131,6 +131,24 @@ export const getContrattiPubblico = async () => {
   return response.json();
 };
 
+export const getConsumoTow = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/contratti/consumo-tow`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore nel recupero ConsumoTOW");
+  return response.json();
+};
+
+export const getLastAlign = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/mev/last-align`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore recupero data allineamento");
+  return response.json();
+};
+
 export const alignContratti = async () => {
   const response = await fetch(`${API_BASE_URL}/api/contratti/align`, {
     method: "POST",

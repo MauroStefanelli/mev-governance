@@ -5,7 +5,7 @@ import AdminPage from "./pages/AdminPage";
 import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
-import { getMevList } from "./services/mevService";
+import { getMevList, getLastAlign } from "./services/mevService";
 
 function App() {
   const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
@@ -15,9 +15,13 @@ function App() {
   const [page, setPage]             = useState("mev");
   const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
   const [filteredRows, setFilteredRows] = useState([]);
+  const [lastAlign, setLastAlign]   = useState(null);
 
   useEffect(() => {
-    if (token) getMevList().then(setRows).catch(() => {});
+    if (token) {
+      getMevList().then(setRows).catch(() => {});
+      getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
+    }
   }, [token]);
 
   const handleLogin = (data) => {
@@ -31,7 +35,7 @@ function App() {
   const handleLogout = () => {
     ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole("");
-    setRows([]); setFilteredRows([]); setPage("mev");
+    setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
   };
 
   if (!token) return <LoginPage onLogin={handleLogin} />;
@@ -57,14 +61,26 @@ function App() {
       }}>
         {/* Logo + titolo */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{
-            width: "32px", height: "32px", background: "rgba(255,255,255,0.2)",
-            borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "16px", fontWeight: 800, color: "white"
-          }}>M</div>
+          <img
+            src="https://www.posteitaliane.it/assets/img/logo-poste.svg"
+            alt="Poste Italiane"
+            style={{ height: "28px", width: "auto", filter: "brightness(0) invert(1)" }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
             MEV Governance
           </span>
+          {lastAlign && (
+            <span style={{
+              color: "rgba(255,255,255,0.75)", fontSize: "11px", fontWeight: 400,
+              borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px"
+            }}>
+              Aggiornato: {new Date(lastAlign).toLocaleString("it-IT", {
+                day: "2-digit", month: "2-digit", year: "numeric",
+                hour: "2-digit", minute: "2-digit"
+              })}
+            </span>
+          )}
         </div>
 
         {/* Nav */}
@@ -117,7 +133,7 @@ function App() {
       </header>
 
       <main style={{ padding: "0" }}>
-        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} />}
+        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} />}
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && role === "Admin" && <ContrattiInterniPage onUnauthorized={handleLogout} />}

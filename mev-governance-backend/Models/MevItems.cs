@@ -30,6 +30,7 @@ public class MevItem
     public decimal OrdinatoBdo { get; set; }
     public decimal Fatturato { get; set; }
     public string? ReleaseExcel { get; set; }
+    public string? Rda { get; set; }
 
 
     // Dati PMO

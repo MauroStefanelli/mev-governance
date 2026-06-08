@@ -114,7 +114,7 @@ const inputStyle = (extra = {}) => ({
 });
 
 // ── Componente ───────────────────────────────────────────────────────────────
-function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
+function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned }) {
   const [rows, setRows]                     = useState([]);
   const [loading, setLoading]               = useState(true);
   const [savedRows, setSavedRows]           = useState({});
@@ -253,9 +253,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange }) {
             try {
               const result = await alignMevData({});
               const msg = result.countContratti !== undefined
-                ? `Allineamento completato: ${result.count} record MEV, ${result.countContratti} contratti`
-                : `Allineamento completato: ${result.count} record caricati`;
+                  ? `Allineamento completato: ${result.count} record MEV, ${result.countContratti} contratti`
+                  : `Allineamento completato: ${result.count} record caricati`;
               alert(msg);
+              onAligned?.();
               await loadMev();
             } catch (e) {
               alert(`Errore allineamento:\n${e.message}`);

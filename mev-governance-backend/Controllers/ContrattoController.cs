@@ -79,17 +79,19 @@ public class ContrattoController : BaseController
                                 TotFatturato        = gBc.Sum(m => m.Fatturato),
                                 GoToList = gBc
                                     .OrderBy(m => m.GoTo)
-                                    .Select(m => new
-                                    {
-                                        m.GoTo,
-                                        m.AnnoCompetenza,
-                                        m.ReleaseExcel,
-                                        ImportoForniturascontato = c.Sconto > 0
-                                            ? m.ImportoExcel * (1 - c.Sconto / 100m)
-                                            : m.ImportoExcel,
-                                        m.OrdinatoBdo,
-                                        m.Fatturato,
-                                    })
+                                .Select(m => new
+                                {
+                                    m.GoTo,
+                                    m.AnnoCompetenza,
+                                    m.ReleaseExcel,
+                                    m.Rda,
+                                    m.AtId,
+                                    ImportoForniturascontato = c.Sconto > 0
+                                        ? m.ImportoExcel * (1 - c.Sconto / 100m)
+                                        : m.ImportoExcel,
+                                    m.OrdinatoBdo,
+                                    m.Fatturato,
+                                })
                                     .ToList()
                             })
                             .ToList()
@@ -237,6 +239,16 @@ public class ContrattoController : BaseController
             if (buoniHeaderRow != null)
                 ImportBuoniConsegna(ws, buoniHeaderRow);
 
+            // ── Import tabella ConsumoTOW ─────────────────────────────────────
+            var towHeaderRow = range.RowsUsed()
+                .FirstOrDefault(r =>
+                    r.Cells().Any(c =>
+                        c.GetString().Trim()
+                            .Equals("Valore Totale", StringComparison.OrdinalIgnoreCase)));
+
+            if (towHeaderRow != null)
+                ImportConsumoTow(ws, towHeaderRow);
+
             _db.SaveChanges();
 
             return Ok(new
@@ -244,6 +256,7 @@ public class ContrattoController : BaseController
                 message          = "Contratti allineati",
                 count            = _db.Contratti.Count(),
                 countBuoni       = _db.BuoniConsegna.Count(),
+                countTow         = _db.ConsumoTow.Count(),
             });
         }
         catch (Exception ex)
@@ -379,6 +392,63 @@ public class ContrattoController : BaseController
 
         var toRemove = existing.Values.Where(b => !seenOda.Contains(b.Oda)).ToList();
         _db.BuoniConsegna.RemoveRange(toRemove);
+    }
+
+    // ============================================================
+    // GET /api/contratti/consumo-tow
+    // Tutti gli utenti autenticati
+    // ============================================================
+    [HttpGet("consumo-tow")]
+    public IActionResult GetConsumoTow()
+    {
+        try
+        {
+            var rows = _db.ConsumoTow.AsNoTracking().OrderBy(t => t.Voce).ToList();
+            return Ok(rows);
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore recupero ConsumoTOW: {ex.Message}");
+        }
+    }
+
+    // ── Metodo privato: import tabella ConsumoTOW ─────────────────────────────
+    private void ImportConsumoTow(IXLWorksheet ws, IXLRangeRow headerRow)
+    {
+        var columnMap = BuildColumnMap(headerRow);
+        var dataRows  = ReadTableRows(ws, headerRow, "Valore Totale");
+
+        decimal Dec(IXLRow row, string col)
+        {
+            if (!columnMap.ContainsKey(col)) return 0;
+            row.Cell(columnMap[col]).TryGetValue(out decimal v); return v;
+        }
+
+        // Cerca la colonna che identifica la voce TOW (prima colonna non vuota nell'header)
+        int voceCol = headerRow.Cells()
+            .Where(c => !string.IsNullOrWhiteSpace(c.GetString()))
+            .OrderBy(c => c.Address.ColumnNumber)
+            .Select(c => c.Address.ColumnNumber)
+            .FirstOrDefault();
+
+        // Svuota e ricarica sempre
+        _db.ConsumoTow.RemoveRange(_db.ConsumoTow.ToList());
+
+        foreach (var row in dataRows)
+        {
+            var voce = voceCol > 0 ? row.Cell(voceCol).GetString().Trim() : "";
+            if (string.IsNullOrWhiteSpace(voce)) continue;
+
+            _db.ConsumoTow.Add(new ConsumoTow
+            {
+                Voce         = voce,
+                ValoreTotale = Dec(row, "Valore Totale"),
+                Approvato    = Dec(row, "Approvato"),
+                OrdinatiRda  = Dec(row, "Ordinati (RDA)"),
+                Impegnato    = Dec(row, "Impegnato"),
+                Residuo      = Dec(row, "Residuo"),
+            });
+        }
     }
 
     // ── Helper: costruisce mappa colonne da riga intestazione ─────────────────
