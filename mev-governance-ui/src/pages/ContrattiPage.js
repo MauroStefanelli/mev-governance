@@ -57,9 +57,9 @@ function ContrattiPage({ onUnauthorized }) {
 
       {/* ── Sezione ConsumoTOW ── */}
       {towRows.length > 0 && (() => {
-        const TOW_TASK = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.6"];
+        const TOW_TASK   = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.6"];
         const TOW_CANONE = ["TOW02.5"];
-        const group = (keys) => towRows.filter(r => keys.some(k => r.contratto?.toUpperCase().includes(k.toUpperCase())));
+        const group = (keys) => towRows.filter(r => keys.some(k => r.tow?.toUpperCase().includes(k.toUpperCase())));
         const sum   = (rows, field) => rows.reduce((s, r) => s + (r[field] || 0), 0);
         const servTask   = group(TOW_TASK);
         const servCanone = group(TOW_CANONE);

@@ -240,12 +240,12 @@ public class ContrattoController : BaseController
                 ImportBuoniConsegna(ws, buoniHeaderRow);
 
             // ── Import tabella ConsumoTOW ─────────────────────────────────────
-            // Cerca la riga che ha "Contratto" + "Valore Totale" + "Impegnato" (intestazione univoca ConsumoTOW)
+            // Cerca la riga intestazione con "TOW" + "Valore Totale" + "Impegnato"
             var towHeaderRow = range.RowsUsed()
                 .FirstOrDefault(r =>
-                    r.Cells().Any(c => c.GetString().Trim().Equals("Valore Totale", StringComparison.OrdinalIgnoreCase)) &&
-                    r.Cells().Any(c => c.GetString().Trim().Equals("Impegnato",     StringComparison.OrdinalIgnoreCase)) &&
-                    r.Cells().Any(c => c.GetString().Trim().Equals("Contratto",     StringComparison.OrdinalIgnoreCase)));
+                    r.Cells().Any(c => c.GetString().Trim().Equals("TOW",          StringComparison.OrdinalIgnoreCase)) &&
+                    r.Cells().Any(c => c.GetString().Trim().Equals("Valore Totale",StringComparison.OrdinalIgnoreCase)) &&
+                    r.Cells().Any(c => c.GetString().Trim().Equals("Impegnato",    StringComparison.OrdinalIgnoreCase)));
 
             if (towHeaderRow != null)
                 ImportConsumoTow(ws, towHeaderRow);
@@ -450,7 +450,7 @@ public class ContrattoController : BaseController
     {
         try
         {
-            var rows = _db.ConsumoTow.AsNoTracking().OrderBy(t => t.Contratto).ToList();
+            var rows = _db.ConsumoTow.AsNoTracking().OrderBy(t => t.Tow).ToList();
             return Ok(rows);
         }
         catch (Exception ex)
@@ -478,17 +478,19 @@ public class ContrattoController : BaseController
 
         foreach (var row in dataRows)
         {
-            var contratto = Str(row, "Contratto");
-            if (string.IsNullOrWhiteSpace(contratto)) continue;
+            var tow = Str(row, "TOW");
+            if (string.IsNullOrWhiteSpace(tow)) continue;
 
             _db.ConsumoTow.Add(new ConsumoTow
             {
-                Contratto    = contratto,
-                ValoreTotale = Dec(row, "Valore Totale"),
-                Approvato    = Dec(row, "Approvato"),
-                OrdinatiRda  = Dec(row, "Ordinati (RDA)"),
-                Impegnato    = Dec(row, "Impegnato"),
-                Residuo      = Dec(row, "Residuo"),
+                Tow            = tow,
+                TowContratto   = Str(row, "TOW Contratto"),
+                ValoreUnitario = Dec(row, "Valore Unitario"),
+                ValoreTotale   = Dec(row, "Valore Totale"),
+                Approvato      = Dec(row, "Approvato"),
+                OrdinatiRda    = Dec(row, "Ordinati(RDA)"),
+                Impegnato      = Dec(row, "Impegnato"),
+                Residuo        = Dec(row, "Residuo"),
             });
         }
     }
