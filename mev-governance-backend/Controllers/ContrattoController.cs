@@ -240,11 +240,12 @@ public class ContrattoController : BaseController
                 ImportBuoniConsegna(ws, buoniHeaderRow);
 
             // ── Import tabella ConsumoTOW ─────────────────────────────────────
+            // Cerca la riga che ha "Contratto" + "Valore Totale" + "Impegnato" (intestazione univoca ConsumoTOW)
             var towHeaderRow = range.RowsUsed()
                 .FirstOrDefault(r =>
-                    r.Cells().Any(c =>
-                        c.GetString().Trim()
-                            .Equals("Valore Totale", StringComparison.OrdinalIgnoreCase)));
+                    r.Cells().Any(c => c.GetString().Trim().Equals("Valore Totale", StringComparison.OrdinalIgnoreCase)) &&
+                    r.Cells().Any(c => c.GetString().Trim().Equals("Impegnato",     StringComparison.OrdinalIgnoreCase)) &&
+                    r.Cells().Any(c => c.GetString().Trim().Equals("Contratto",     StringComparison.OrdinalIgnoreCase)));
 
             if (towHeaderRow != null)
                 ImportConsumoTow(ws, towHeaderRow);
@@ -392,6 +393,52 @@ public class ContrattoController : BaseController
 
         var toRemove = existing.Values.Where(b => !seenOda.Contains(b.Oda)).ToList();
         _db.BuoniConsegna.RemoveRange(toRemove);
+    }
+
+    // ============================================================
+    // GET /api/contratti/debug-tow   — diagnostica temporanea
+    // ============================================================
+    [HttpGet("debug-tow")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult DebugTow()
+    {
+        try
+        {
+            var dataDir   = GetDataDir();
+            var excelPath = Path.Combine(dataDir, "MEV_LAST.xlsx");
+            if (!System.IO.File.Exists(excelPath))
+                return BadRequest("File Excel non trovato");
+
+            using var workbook = new XLWorkbook(excelPath);
+            var ws = workbook.Worksheets
+                .FirstOrDefault(w => w.Name.Trim().Equals("CONTRATTO", StringComparison.OrdinalIgnoreCase));
+            if (ws == null) return BadRequest("Foglio CONTRATTO non trovato");
+
+            var range = ws.RangeUsed();
+            if (range == null) return BadRequest("Foglio vuoto");
+
+            // Elenca tutte le intestazioni trovate (righe con almeno 3 celle non vuote)
+            var headers = range.RowsUsed()
+                .Select(r => new {
+                    RowNum = r.RowNumber(),
+                    Cells  = r.Cells()
+                                .Where(c => !string.IsNullOrWhiteSpace(c.GetString()))
+                                .Select(c => c.GetString().Trim())
+                                .ToList()
+                })
+                .Where(r => r.Cells.Count >= 3)
+                .Take(30)
+                .ToList();
+
+            var dbCount = _db.ConsumoTow.Count();
+            var dbRows  = _db.ConsumoTow.AsNoTracking().Take(10).ToList();
+
+            return Ok(new { dbCount, dbRows, excelHeaders = headers });
+        }
+        catch (Exception ex)
+        {
+            return Problem(ex.Message);
+        }
     }
 
     // ============================================================
