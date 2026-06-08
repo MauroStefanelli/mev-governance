@@ -149,7 +149,6 @@ function ContrattiPage({ onUnauthorized }) {
                                               <thead>
                                                 <tr>
                                                   <th style={TH()}>ODA</th>
-                                                 /* <th style={TH("right")}>Totale</th> */
                                                   <th style={TH("right")}>Ordinato (BdO)</th>
                                                   <th style={TH("right")}>Fatturato</th>
                                                   <th style={TH("right")}>Da fatturare</th>
@@ -162,7 +161,6 @@ function ContrattiPage({ onUnauthorized }) {
                                                     borderBottom: "1px solid #f0f0f0",
                                                   }}>
                                                     <td style={TD("left", { fontWeight: 600, color: "#1a73e8" })}>{o.oda}</td>
-                                                   /* <td style={TD("right")}>{formatEuro(o.totale)}</td> */
                                                     <td style={TD("right")}>{formatEuro(o.ordinatoBdo)}</td>
                                                     <td style={TD("right")}>{formatEuro(o.fatturato)}</td>
                                                     <td style={TD("right")}>{formatEuro(o.daFatturare)}</td>
