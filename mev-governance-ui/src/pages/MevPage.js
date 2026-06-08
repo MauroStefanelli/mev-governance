@@ -340,35 +340,22 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            {/* Filtri - una cella per ogni colonna */}
+            {/* Filtri */}
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-              {[
-                null,                                                                         /* ID          */
-                { field: "goTo",           opts: goToOptions,        placeholder: "Tutti" }, /* GoTo        */
-                { field: "applicativo",    opts: applicativoOptions, placeholder: "Tutti" }, /* Applicativo */
-                null,                                                                         /* Descrizione */
-                { field: "annoCompetenza", opts: annoOptions,        placeholder: "Tutti" }, /* Anno        */
-                { field: "stato",          opts: statoOptions,       placeholder: "Tutti" }, /* Stato       */
-                null,                                                                         /* Importo CAP */
-                null,                                                                         /* Note        */
-                { field: "rda",            opts: rdaOptions,         placeholder: "Tutti" }, /* RDA         */
-                { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" }, /* P Anno      */
-                { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" }, /* P Release   */
-                null,                                                                         /* P Importo   */
-                null,                                                                         /* P Note      */
-                null,                                                                         /* Azioni      */
-              ].map((col, i) => (
-                <th key={i} style={{ padding: "4px 6px" }}>
-                  {col && col.field ? (
-                    <MultiSelect
-                      options={col.opts}
-                      selected={filters[col.field]}
-                      onChange={(val) => handleFilterChange(col.field, val)}
-                      placeholder={col.placeholder}
-                    />
-                  ) : null}
-                </th>
-              ))}
+              <th style={{ padding: "4px 6px" }}>{/* ID */}</th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={goToOptions}        selected={filters.goTo}           onChange={(v) => handleFilterChange("goTo", v)}           placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={applicativoOptions} selected={filters.applicativo}    onChange={(v) => handleFilterChange("applicativo", v)}    placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}>{/* Descrizione */}</th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions}        selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions}       selected={filters.stato}          onChange={(v) => handleFilterChange("stato", v)}          placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}>{/* Importo CAP */}</th>
+              <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions}         selected={filters.rda}            onChange={(v) => handleFilterChange("rda", v)}            placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions}       selected={filters.pAnno}          onChange={(v) => handleFilterChange("pAnno", v)}          placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions}    selected={filters.pRelease}       onChange={(v) => handleFilterChange("pRelease", v)}       placeholder="Tutte" /></th>
+              <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
+              <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
+              <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
