@@ -344,19 +344,20 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
               <th style={{ padding: "4px 6px" }} />
               {[
-                { field: "goTo",           opts: goToOptions,        placeholder: "Tutti" },
-                { field: "applicativo",    opts: applicativoOptions, placeholder: "Tutti" },
-                null,
-                { field: "annoCompetenza", opts: annoOptions,        placeholder: "Tutti" },
-                { field: "stato",          opts: statoOptions,       placeholder: "Tutti" },
-                null,
-                null,
-                { field: "rda",            opts: rdaOptions,         placeholder: "Tutti" },
-                { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" },
-                { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" },
-                null,
-                null,
-                null,
+                null,                                                                         /* ID          */
+                { field: "goTo",           opts: goToOptions,        placeholder: "Tutti" }, /* GoTo        */
+                { field: "applicativo",    opts: applicativoOptions, placeholder: "Tutti" }, /* Applicativo */
+                null,                                                                         /* Descrizione */
+                { field: "annoCompetenza", opts: annoOptions,        placeholder: "Tutti" }, /* Anno        */
+                { field: "stato",          opts: statoOptions,       placeholder: "Tutti" }, /* Stato       */
+                null,                                                                         /* Importo CAP */
+                null,                                                                         /* Note        */
+                { field: "rda",            opts: rdaOptions,         placeholder: "Tutti" }, /* RDA         */
+                { field: "pAnno",          opts: pAnnoOptions,       placeholder: "Tutti" }, /* P Anno      */
+                { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" }, /* P Release   */
+                null,                                                                         /* P Importo   */
+                null,                                                                         /* P Note      */
+                null,                                                                         /* Salva       */
               ].map((col, i) => (
                 <th key={i} style={{ padding: "4px 6px" }}>
                   {col && col.field ? (
