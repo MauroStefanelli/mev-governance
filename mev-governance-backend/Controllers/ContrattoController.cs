@@ -403,7 +403,7 @@ public class ContrattoController : BaseController
     {
         try
         {
-            var rows = _db.ConsumoTow.AsNoTracking().OrderBy(t => t.Voce).ToList();
+            var rows = _db.ConsumoTow.AsNoTracking().OrderBy(t => t.Contratto).ToList();
             return Ok(rows);
         }
         catch (Exception ex)
@@ -418,30 +418,25 @@ public class ContrattoController : BaseController
         var columnMap = BuildColumnMap(headerRow);
         var dataRows  = ReadTableRows(ws, headerRow); // nessuno stopKey: legge fino a riga vuota
 
+        string Str(IXLRow row, string col) =>
+            columnMap.ContainsKey(col) ? row.Cell(columnMap[col]).GetString().Trim() : "";
         decimal Dec(IXLRow row, string col)
         {
             if (!columnMap.ContainsKey(col)) return 0;
             row.Cell(columnMap[col]).TryGetValue(out decimal v); return v;
         }
 
-        // Cerca la colonna che identifica la voce TOW (prima colonna non vuota nell'header)
-        int voceCol = headerRow.Cells()
-            .Where(c => !string.IsNullOrWhiteSpace(c.GetString()))
-            .OrderBy(c => c.Address.ColumnNumber)
-            .Select(c => c.Address.ColumnNumber)
-            .FirstOrDefault();
-
         // Svuota e ricarica sempre
         _db.ConsumoTow.RemoveRange(_db.ConsumoTow.ToList());
 
         foreach (var row in dataRows)
         {
-            var voce = voceCol > 0 ? row.Cell(voceCol).GetString().Trim() : "";
-            if (string.IsNullOrWhiteSpace(voce)) continue;
+            var contratto = Str(row, "Contratto");
+            if (string.IsNullOrWhiteSpace(contratto)) continue;
 
             _db.ConsumoTow.Add(new ConsumoTow
             {
-                Voce         = voce,
+                Contratto    = contratto,
                 ValoreTotale = Dec(row, "Valore Totale"),
                 Approvato    = Dec(row, "Approvato"),
                 OrdinatiRda  = Dec(row, "Ordinati (RDA)"),

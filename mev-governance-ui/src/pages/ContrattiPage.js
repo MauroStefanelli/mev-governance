@@ -58,14 +58,14 @@ function ContrattiPage({ onUnauthorized }) {
       {/* ── Sezione ConsumoTOW ── */}
       {towRows.length > 0 && (() => {
         const TOW_TASK = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.6"];
-        const TOW_5    = ["TOW02.5"];
-        const group = (keys) => towRows.filter(r => keys.some(k => r.voce?.toUpperCase().includes(k)));
+        const TOW_CANONE = ["TOW02.5"];
+        const group = (keys) => towRows.filter(r => keys.some(k => r.contratto?.toUpperCase().includes(k.toUpperCase())));
         const sum   = (rows, field) => rows.reduce((s, r) => s + (r[field] || 0), 0);
-        const servTask = group(TOW_TASK);
-        const tow5     = group(TOW_5);
+        const servTask   = group(TOW_TASK);
+        const servCanone = group(TOW_CANONE);
         const sections = [
-          { label: "Servizi a TASK", rows: servTask },
-          { label: "TOW02.5",        rows: tow5 },
+          { label: "Servizi a Task",   rows: servTask },
+          { label: "Servizi a Canone", rows: servCanone },
         ].filter(s => s.rows.length > 0);
         return (
           <div style={{ marginBottom: "24px" }}>
@@ -76,7 +76,7 @@ function ContrattiPage({ onUnauthorized }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
                   <tr>
-                    <th style={TH()}>Voce</th>
+                    <th style={TH()}>Servizi</th>
                     <th style={TH("right")}>Valore Totale</th>
                     <th style={TH("right")}>Approvato</th>
                     <th style={TH("right")}>Ordinati (RDA)</th>
@@ -86,17 +86,14 @@ function ContrattiPage({ onUnauthorized }) {
                 </thead>
                 <tbody>
                   {sections.map((sec, si) => (
-                    <>
-                      {/* Riga totale sezione */}
-                      <tr key={`sec-${si}`} style={{ background: "#e8f0fe", borderBottom: "2px solid #1a73e8" }}>
-                        <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
-                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
-                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
-                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
-                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
-                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
-                      </tr>
-                    </>
+                    <tr key={`sec-${si}`} style={{ background: si % 2 === 0 ? "#e8f0fe" : "#f0f4ff", borderBottom: "1px solid #dadce0" }}>
+                      <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
