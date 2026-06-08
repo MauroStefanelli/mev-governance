@@ -340,9 +340,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            {/* Filtri - una cella per ogni colonna intestazione */}
+            {/* Filtri - una cella per ogni colonna */}
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-              <th style={{ padding: "4px 6px" }} />
               {[
                 null,                                                                         /* ID          */
                 { field: "goTo",           opts: goToOptions,        placeholder: "Tutti" }, /* GoTo        */
@@ -357,7 +356,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                 { field: "pRelease",       opts: pReleaseOptions,    placeholder: "Tutte" }, /* P Release   */
                 null,                                                                         /* P Importo   */
                 null,                                                                         /* P Note      */
-                null,                                                                         /* Salva       */
+                null,                                                                         /* Azioni      */
               ].map((col, i) => (
                 <th key={i} style={{ padding: "4px 6px" }}>
                   {col && col.field ? (
