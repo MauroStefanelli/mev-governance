@@ -182,7 +182,7 @@ function AdminPage() {
         <thead style={{ background: "#f0f0f0" }}>
           <tr>
             <th>Username</th>
-            <th>Nome</th>
+            <th>Nome Cognome</th>
             <th>Email</th>
             <th>Ruolo</th>
             <th>Stato</th>
