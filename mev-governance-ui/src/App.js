@@ -66,10 +66,10 @@ function App() {
   const navItems = [
     { id: "mev",               label: "MEV" },
     { id: "contratti",         label: "Contratti" },
+    { id: "contratti_interni", label: "Ordini" },
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
-      { id: "contratti_interni", label: "Ordini" },
-      { id: "admin",             label: "Utenti" },
+      { id: "admin", label: "Utenti" },
     ] : []),
   ];
 
@@ -217,7 +217,7 @@ function App() {
         {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} />}
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
-        {page === "contratti_interni" && role === "Admin" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
+        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
         {page === "admin"             && role === "Admin" && <AdminPage />}
       </main>
     </div>

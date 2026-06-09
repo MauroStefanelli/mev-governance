@@ -24,10 +24,10 @@ public class ContrattoController : BaseController
 
     // ============================================================
     // GET /api/contratti
-    // Solo Admin — Struttura: Contratto → Anni → BC → GoTo
+    // Tutti gli utenti autenticati — Struttura: Contratto → Anni → BC → GoTo
     // ============================================================
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public IActionResult GetContratti()
     {
         try
