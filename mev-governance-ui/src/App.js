@@ -90,7 +90,7 @@ function App() {
             style={{ height: "40px", width: "auto" }}
           />
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
-            MEV Governance
+            MEV Governance1
           </span>
           {lastAlign && (
             <span style={{
