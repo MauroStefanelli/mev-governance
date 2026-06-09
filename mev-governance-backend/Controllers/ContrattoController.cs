@@ -472,34 +472,29 @@ public class ContrattoController : BaseController
         var columnMap = BuildColumnMap(headerRow);
         Console.WriteLine($"[TOW] ColumnMap keys: {string.Join(", ", columnMap.Keys)}");
 
-        string Str(IXLRow row, string col) =>
-            columnMap.ContainsKey(col) ? row.Cell(columnMap[col]).GetString().Trim() : "";
-        // Cerca la prima colonna trovata tra le alternative fornite
-        string StrAlt(IXLRow row, params string[] cols)
+        // Risolvi i numeri di colonna una volta sola usando FindCol (match normalizzato)
+        int colTow            = FindCol(columnMap, "TOW");
+        int colContratto      = FindCol(columnMap, "TOW Contratto", "Contratto", "Tipo Contratto", "TowContratto");
+        int colValoreUnitario = FindCol(columnMap, "Valore Unitario", "ValoreUnitario");
+        int colValoreTotale   = FindCol(columnMap, "Valore Totale", "ValoreTotale");
+        int colApprovato      = FindCol(columnMap, "Approvato");
+        int colOrdinatiRda    = FindCol(columnMap, "Ordinati(RDA)", "Ordinati (RDA)", "Ordinati RDA", "OrdinatiRDA", "OrdinatiRda");
+        int colImpegnato      = FindCol(columnMap, "Impegnato");
+        int colResiduo        = FindCol(columnMap, "Residuo");
+
+        Console.WriteLine($"[TOW] Colonne: TOW={colTow}, Contratto={colContratto}, OrdinatiRDA={colOrdinatiRda}, Impegnato={colImpegnato}");
+
+        if (colTow == 0) { Console.WriteLine("[TOW] Colonna TOW non trovata, import saltato"); return; }
+
+        string GetStr(IXLRow row, int col) => col > 0 ? row.Cell(col).GetString().Trim() : "";
+        decimal GetDec(IXLRow row, int col)
         {
-            foreach (var col in cols)
-                if (columnMap.ContainsKey(col)) return row.Cell(columnMap[col]).GetString().Trim();
-            return "";
-        }
-        decimal Dec(IXLRow row, string col)
-        {
-            if (!columnMap.ContainsKey(col)) return 0;
-            row.Cell(columnMap[col]).TryGetValue(out decimal v); return v;
-        }
-        decimal DecAlt(IXLRow row, params string[] cols)
-        {
-            foreach (var col in cols)
-                if (columnMap.ContainsKey(col)) { row.Cell(columnMap[col]).TryGetValue(out decimal v); return v; }
-            return 0;
+            if (col == 0) return 0;
+            row.Cell(col).TryGetValue(out decimal v); return v;
         }
 
         int headerRowNum = headerRow.RowNumber();
         int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
-        int towColNum    = columnMap.ContainsKey("TOW") ? columnMap["TOW"] : 0;
-        Console.WriteLine($"[TOW] Header a riga {headerRowNum}, lastRow={lastRowNum}, towCol={towColNum}");
-        Console.WriteLine($"[TOW] ColumnMap keys: {string.Join(", ", columnMap.Keys)}");
-
-        if (towColNum == 0) { Console.WriteLine("[TOW] Colonna TOW non trovata, import saltato"); return; }
 
         // Svuota e ricarica sempre
         _db.ConsumoTow.RemoveRange(_db.ConsumoTow.ToList());
@@ -508,19 +503,19 @@ public class ContrattoController : BaseController
         for (int rn = headerRowNum + 1; rn <= lastRowNum; rn++)
         {
             var row = ws.Row(rn);
-            var tow = row.Cell(towColNum).GetString().Trim();
+            var tow = row.Cell(colTow).GetString().Trim();
             if (string.IsNullOrWhiteSpace(tow)) continue;
 
             _db.ConsumoTow.Add(new ConsumoTow
             {
                 Tow            = tow,
-                TowContratto   = StrAlt(row, "TOW Contratto", "Contratto", "Tipo Contratto", "TowContratto"),
-                ValoreUnitario = Dec(row, "Valore Unitario"),
-                ValoreTotale   = Dec(row, "Valore Totale"),
-                Approvato      = Dec(row, "Approvato"),
-                OrdinatiRda    = DecAlt(row, "Ordinati(RDA)", "Ordinati (RDA)", "Ordinati RDA", "OrdinatiRda", "Ordinati"),
-                Impegnato      = Dec(row, "Impegnato"),
-                Residuo        = Dec(row, "Residuo"),
+                TowContratto   = GetStr(row, colContratto),
+                ValoreUnitario = GetDec(row, colValoreUnitario),
+                ValoreTotale   = GetDec(row, colValoreTotale),
+                Approvato      = GetDec(row, colApprovato),
+                OrdinatiRda    = GetDec(row, colOrdinatiRda),
+                Impegnato      = GetDec(row, colImpegnato),
+                Residuo        = GetDec(row, colResiduo),
             });
             count++;
         }
@@ -528,12 +523,33 @@ public class ContrattoController : BaseController
     }
 
     // ── Helper: costruisce mappa colonne da riga intestazione ─────────────────
+    // La mappa contiene SIA il nome originale SIA la versione normalizzata (solo lettere/cifre, lowercase)
     private static Dictionary<string, int> BuildColumnMap(IXLRangeRow headerRow) =>
         headerRow.Cells()
             .Where(c => !string.IsNullOrWhiteSpace(c.GetString()))
             .GroupBy(c => c.GetString().Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().Address.ColumnNumber,
                           StringComparer.OrdinalIgnoreCase);
+
+    // Normalizza: minuscolo, rimuove spazi e caratteri non alfanumerici
+    private static string NormalizeKey(string s) =>
+        new string(s.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+
+    // Cerca colonna con matching normalizzato
+    private static int FindCol(Dictionary<string, int> map, params string[] candidates)
+    {
+        // Prima prova match esatto (già case-insensitive nel dizionario)
+        foreach (var c in candidates)
+            if (map.TryGetValue(c, out var col)) return col;
+        // Poi prova match normalizzato
+        var normMap = map.ToDictionary(kv => NormalizeKey(kv.Key), kv => kv.Value);
+        foreach (var c in candidates)
+        {
+            var norm = NormalizeKey(c);
+            if (normMap.TryGetValue(norm, out var col)) return col;
+        }
+        return 0;
+    }
 
     // ── Helper: legge righe dati fino a riga vuota o nuova intestazione ────────
     private static IEnumerable<IXLRow> ReadTableRows(IXLWorksheet ws, IXLRangeRow headerRow, string? stopKey = null)

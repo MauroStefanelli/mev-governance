@@ -21,8 +21,21 @@ const TD = (align = "left", extra = {}) => ({
 
 const TOW_TASK   = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5"];
 const TOW_CANONE = ["TOW02.6"];
+
+function TotaleCard({ label, value }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      background: "white", border: "1px solid #dadce0", borderRadius: "8px",
+      padding: "8px 18px", minWidth: "140px",
+    }}>
+      <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "2px" }}>{label}</div>
+      <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8" }}>{value}</div>
+    </div>
+  );
+}
+
 function ConsumoTowSection({ towRows }) {
-  // Estrai tipi contratto distinti (TowContratto)
   const tipiContratto = [...new Set(
     towRows.map(r => r.towContratto).filter(Boolean)
   )].sort();
@@ -49,12 +62,22 @@ function ConsumoTowSection({ towRows }) {
     { key: "canone", label: "Servizi a Canone", rows: group(TOW_CANONE) },
   ].filter(s => s.rows.length > 0);
 
+  // Totali complessivi (tutte le sezioni filtrate)
+  const allRows = sections.flatMap(s => s.rows);
+  const totali = {
+    valoreTotale: sum(allRows, "valoreTotale"),
+    approvato:    sum(allRows, "approvato"),
+    ordinatiRda:  sum(allRows, "ordinatiRda"),
+    impegnato:    sum(allRows, "impegnato"),
+    residuo:      sum(allRows, "residuo"),
+  };
+
   if (towRows.length === 0) return null;
 
   return (
     <div style={{ marginBottom: "24px" }}>
-      {/* Titolo + filtro tipo contratto */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "10px" }}>
+      {/* Titolo + dropdown */}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "12px" }}>
         <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.4px" }}>
           Consumo TOW
         </div>
@@ -76,6 +99,17 @@ function ConsumoTowSection({ towRows }) {
           <span style={{ fontSize: "12px", color: "#555", background: "#f0f4ff", padding: "2px 10px", borderRadius: "12px", border: "1px solid #dadce0" }}>
             {tipiContratto[0]}
           </span>
+        )}
+
+        {/* Totali in linea — visibili solo quando c'è una selezione */}
+        {selectedTipo && allRows.length > 0 && (
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginLeft: "8px" }}>
+            <TotaleCard label="Valore Totale"  value={formatEuro(totali.valoreTotale)} />
+            <TotaleCard label="Approvato"       value={formatEuro(totali.approvato)} />
+            <TotaleCard label="Ordinati (RDA)"  value={formatEuro(totali.ordinatiRda)} />
+            <TotaleCard label="Impegnato"       value={formatEuro(totali.impegnato)} />
+            <TotaleCard label="Residuo"         value={formatEuro(totali.residuo)} />
+          </div>
         )}
       </div>
 
