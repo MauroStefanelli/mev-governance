@@ -166,7 +166,7 @@ function TowPieChart({ title, rows, sum }) {
     </div>
   );
 }
-/*
+
 // ── Grafico a barre ───────────────────────────────────────────────────────────
 function TowChart({ title, rows, sum }) {
   // Un unico "gruppo" con tutte le 5 voci come barre separate
@@ -193,7 +193,7 @@ function TowChart({ title, rows, sum }) {
         {title}
       </div>
 
-      {/* Valori numerici in cima 
+      {/* Valori numerici in cima */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
         {FIELDS.map(f => (
           <div key={f} style={{
@@ -211,7 +211,7 @@ function TowChart({ title, rows, sum }) {
         ))}
       </div>
 
-      {/* Grafico a barre raggruppate 
+      {/* Grafico a barre raggruppate */}
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
           barCategoryGap="30%" barGap={3}>
@@ -232,8 +232,6 @@ function TowChart({ title, rows, sum }) {
     </div>
   );
 }
-*/
-
 
 // ── Sezione principale ────────────────────────────────────────────────────────
 function ConsumoTowSection({ towRows }) {
@@ -409,7 +407,18 @@ function ConsumoTowSection({ towRows }) {
             )}
           </div>
 
-
+          {/* ── 3 Grafici a barre: Totale → Task → Canone ── */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            {allRows.length > 0 && (
+              <TowChart title="Totale Servizi"   rows={allRows}    sum={sum} />
+            )}
+            {taskRows.length > 0 && (
+              <TowChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
+            )}
+            {canoneRows.length > 0 && (
+              <TowChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
+            )}
+          </div>
         </>
       )}
     </div>
