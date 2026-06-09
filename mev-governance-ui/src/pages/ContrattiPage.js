@@ -21,7 +21,6 @@ const TD = (align = "left", extra = {}) => ({
 
 const TOW_TASK   = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5"];
 const TOW_CANONE = ["TOW02.6"];
-
 function ConsumoTowSection({ towRows }) {
   // Estrai tipi contratto distinti (TowContratto)
   const tipiContratto = [...new Set(
@@ -38,7 +37,7 @@ function ConsumoTowSection({ towRows }) {
 
   const filtered = selectedTipo
     ? towRows.filter(r => r.towContratto === selectedTipo)
-    : towRows;
+    : [];
 
   const group = (keys) => filtered.filter(r => keys.some(k => r.tow?.toUpperCase().includes(k.toUpperCase())));
   const sum   = (rows, field) => rows.reduce((s, r) => s + (r[field] || 0), 0);
@@ -60,13 +59,14 @@ function ConsumoTowSection({ towRows }) {
         {tipiContratto.length > 1 && (
           <select
             value={selectedTipo}
-            onChange={e => setSelectedTipo(e.target.value)}
+            onChange={e => { setSelectedTipo(e.target.value); setOpenDetail({}); }}
             style={{
               padding: "4px 10px", border: "1px solid #dadce0", borderRadius: "6px",
-              fontSize: "12px", background: "white", color: "#333", cursor: "pointer",
+              fontSize: "12px", background: "white", color: selectedTipo ? "#333" : "#888",
+              cursor: "pointer",
             }}
           >
-            <option value="">Tutti i contratti</option>
+            <option value="">-- Seleziona tipo contratto --</option>
             {tipiContratto.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         )}
@@ -77,61 +77,75 @@ function ConsumoTowSection({ towRows }) {
         )}
       </div>
 
-      <div style={{ borderRadius: "10px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-          <thead>
-            <tr>
-              <th style={TH()} />
-              <th style={TH()}>Servizi</th>
-              <th style={TH("right")}>Valore Totale</th>
-              <th style={TH("right")}>Approvato</th>
-              <th style={TH("right")}>Ordinati (RDA)</th>
-              <th style={TH("right")}>Impegnato</th>
-              <th style={TH("right")}>Residuo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sections.map((sec) => {
-              const isOpen = !!openDetail[sec.key];
-              return (
-                <>
-                  {/* Riga aggregata cliccabile */}
-                  <tr
-                    key={sec.key}
-                    onClick={() => setOpenDetail(p => ({ ...p, [sec.key]: !p[sec.key] }))}
-                    style={{ background: isOpen ? "#e8f0fe" : "#f0f4ff", borderBottom: "1px solid #dadce0", cursor: "pointer" }}
-                    onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#e4edff"; }}
-                    onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f0f4ff"; }}
-                  >
-                    <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
-                      {isOpen ? "▲" : "▶"}
-                    </td>
-                    <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
-                    <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
-                    <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
-                    <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
-                    <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
-                    <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
-                  </tr>
+      {/* Placeholder finché non è selezionato un tipo */}
+      {!selectedTipo && tipiContratto.length > 1 && (
+        <div style={{
+          padding: "24px", textAlign: "center", color: "#888", fontSize: "13px",
+          borderRadius: "10px", border: "1px dashed #dadce0", background: "#fafafa",
+        }}>
+          Seleziona un tipo di contratto per visualizzare i dati
+        </div>
+      )}
 
-                  {/* Dettaglio righe TOW */}
-                  {isOpen && sec.rows.map((row, ri) => (
-                    <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
-                      <td />
-                      <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
-                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
-                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.approvato)}</td>
-                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.ordinatiRda)}</td>
-                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.impegnato)}</td>
-                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.residuo)}</td>
+      {/* Tabella dati — solo se tipo selezionato */}
+      {selectedTipo && (
+        <div style={{ borderRadius: "10px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr>
+                <th style={TH()} />
+                <th style={TH()}>Servizi</th>
+                <th style={TH("right")}>Valore Totale</th>
+                <th style={TH("right")}>Approvato</th>
+                <th style={TH("right")}>Ordinati (RDA)</th>
+                <th style={TH("right")}>Impegnato</th>
+                <th style={TH("right")}>Residuo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sections.length === 0 ? (
+                <tr><td colSpan={7} style={{ padding: "16px", textAlign: "center", color: "#888", fontSize: "13px" }}>
+                  Nessun dato per questo tipo di contratto.
+                </td></tr>
+              ) : sections.map((sec) => {
+                const isOpen = !!openDetail[sec.key];
+                return (
+                  <>
+                    <tr
+                      key={sec.key}
+                      onClick={() => setOpenDetail(p => ({ ...p, [sec.key]: !p[sec.key] }))}
+                      style={{ background: isOpen ? "#e8f0fe" : "#f0f4ff", borderBottom: "1px solid #dadce0", cursor: "pointer" }}
+                      onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#e4edff"; }}
+                      onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f0f4ff"; }}
+                    >
+                      <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
+                        {isOpen ? "▲" : "▶"}
+                      </td>
+                      <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
                     </tr>
-                  ))}
-                </>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    {isOpen && sec.rows.map((row, ri) => (
+                      <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                        <td />
+                        <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
+                        <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
+                        <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.approvato)}</td>
+                        <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.ordinatiRda)}</td>
+                        <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.impegnato)}</td>
+                        <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.residuo)}</td>
+                      </tr>
+                    ))}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
