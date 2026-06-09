@@ -90,33 +90,87 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
-    // Protezione contro DROP TABLE manuale: se la tabella MevItems non esiste
-    // (la migration è già segnata come applicata ma la tabella è stata eliminata),
-    // la ricrea eseguendo lo script SQL direttamente.
-    try
-    {
-        db.MevItems.Count(); // test di esistenza
-    }
-    catch
-    {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""MevItems"" (
-                ""Id""             SERIAL        PRIMARY KEY,
-                ""ExcelId""        TEXT          NOT NULL DEFAULT '',
-                ""ExcelOrder""     INTEGER       NOT NULL DEFAULT 0,
-                ""GoTo""           TEXT          NOT NULL DEFAULT '',
-                ""Applicativo""    TEXT          NOT NULL DEFAULT '',
-                ""Descrizione""    TEXT          NOT NULL DEFAULT '',
-                ""AnnoCompetenza"" INTEGER       NOT NULL DEFAULT 0,
-                ""Stato""          TEXT          NOT NULL DEFAULT '',
-                ""ImportoExcel""   NUMERIC(18,2) NOT NULL DEFAULT 0,
-                ""PAnno""          INTEGER       NOT NULL DEFAULT 0,
-                ""PRelease""       TEXT          NOT NULL DEFAULT '',
-                ""PImporto""       NUMERIC(18,2) NOT NULL DEFAULT 0,
-                ""PNote""          TEXT
-            );
-        ");
-    }
+    // ── Protezione contro DROP TABLE manuale ──────────────────────────────────
+    // Se le tabelle sono state cancellate manualmente ma __EFMigrationsHistory
+    // esiste ancora, EF non le ricrea. Le verifichiamo e le ricreamo se mancanti.
+
+    db.Database.ExecuteSqlRaw(@"
+        CREATE TABLE IF NOT EXISTS ""Users"" (
+            ""Id""           SERIAL  PRIMARY KEY,
+            ""Username""     TEXT    NOT NULL DEFAULT '',
+            ""FullName""     TEXT    NOT NULL DEFAULT '',
+            ""Email""        TEXT    NOT NULL DEFAULT '',
+            ""PasswordHash"" TEXT    NOT NULL DEFAULT '',
+            ""Role""         TEXT    NOT NULL DEFAULT 'Editor',
+            ""IsActive""     BOOLEAN NOT NULL DEFAULT TRUE,
+            ""SendEmail""    BOOLEAN NOT NULL DEFAULT FALSE
+        );
+
+        CREATE TABLE IF NOT EXISTS ""MevItems"" (
+            ""Id""             SERIAL        PRIMARY KEY,
+            ""ExcelOrder""     INTEGER       NOT NULL DEFAULT 0,
+            ""ExcelId""        TEXT          NOT NULL DEFAULT '',
+            ""GoTo""           TEXT          NOT NULL DEFAULT '',
+            ""Applicativo""    TEXT          NOT NULL DEFAULT '',
+            ""Descrizione""    TEXT          NOT NULL DEFAULT '',
+            ""AnnoCompetenza"" INTEGER       NOT NULL DEFAULT 0,
+            ""Stato""          TEXT          NOT NULL DEFAULT '',
+            ""ImportoExcel""   NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""NoteExcel""      TEXT,
+            ""Bc""             TEXT,
+            ""Contratto""      TEXT,
+            ""AtId""           TEXT,
+            ""OrdinatoBdo""    NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Fatturato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""ReleaseExcel""   TEXT,
+            ""Rda""            TEXT,
+            ""PAnno""          INTEGER       NOT NULL DEFAULT 0,
+            ""PRelease""       TEXT          NOT NULL DEFAULT '',
+            ""PImporto""       NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""PNote""          TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS ""Contratti"" (
+            ""Id""            SERIAL        PRIMARY KEY,
+            ""RifContratto""  TEXT          NOT NULL DEFAULT '',
+            ""TipoContratto"" TEXT          NOT NULL DEFAULT '',
+            ""Data""          TEXT,
+            ""ImpLordo""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Sconto""        NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""ImportoNetto""  NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Ordinato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""DaOrdinare""    NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Avanzato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""DaAvanzare""    NUMERIC(18,2) NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS ""BuoniConsegna"" (
+            ""Id""           SERIAL        PRIMARY KEY,
+            ""Oda""          TEXT          NOT NULL DEFAULT '',
+            ""Contratto""    TEXT,
+            ""RifContratto"" TEXT,
+            ""Importo""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Avanzato""     NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""DaAvanzare""   NUMERIC(18,2) NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS ""ConsumoTow"" (
+            ""Id""             SERIAL        PRIMARY KEY,
+            ""Tow""            TEXT          NOT NULL DEFAULT '',
+            ""TowContratto""   TEXT,
+            ""ValoreUnitario"" NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""ValoreTotale""   NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Approvato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""OrdinatiRda""    NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Impegnato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""Residuo""        NUMERIC(18,2) NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS ""AppSettings"" (
+            ""Id""          SERIAL    PRIMARY KEY,
+            ""LastAlignAt"" TIMESTAMP
+        );
+    ");
 
     if (!db.Users.Any())
     {

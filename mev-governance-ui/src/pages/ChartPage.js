@@ -193,7 +193,7 @@ function ChartPage({ rows }) {
 
       {activeTab === "release" && (
         <BarChartSection
-          title="Importi CAP per Release suddivisi per Stato"
+          title="Importi per Release suddivisi per Stato"
           groupKey="pRelease"
           groupLabel="Release"
           seriesKey="stato"
@@ -203,7 +203,7 @@ function ChartPage({ rows }) {
 
       {activeTab === "applicativo" && (
         <BarChartSection
-          title="Importi CAP per Applicativo suddivisi per Stato"
+          title="Importi per Applicativo suddivisi per Stato"
           groupKey="applicativo"
           groupLabel="Applicativo"
           seriesKey="stato"
@@ -213,7 +213,7 @@ function ChartPage({ rows }) {
 
       {activeTab === "anno" && (
         <BarChartSection
-          title="Importi CAP per Anno suddivisi per Stato"
+          title="Importi per Anno suddivisi per Stato"
           groupKey="annoCompetenza"
           groupLabel="Anno"
           seriesKey="stato"
