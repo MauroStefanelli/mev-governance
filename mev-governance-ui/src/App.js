@@ -45,7 +45,7 @@ function App() {
     { id: "contratti",         label: "Contratti" },
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
-      { id: "contratti_interni", label: "Contratti Interni" },
+      { id: "contratti_interni", label: "Ordini" },
       { id: "admin",             label: "Utenti" },
     ] : []),
   ];
