@@ -486,6 +486,12 @@ public class ContrattoController : BaseController
             if (!columnMap.ContainsKey(col)) return 0;
             row.Cell(columnMap[col]).TryGetValue(out decimal v); return v;
         }
+        decimal DecAlt(IXLRow row, params string[] cols)
+        {
+            foreach (var col in cols)
+                if (columnMap.ContainsKey(col)) { row.Cell(columnMap[col]).TryGetValue(out decimal v); return v; }
+            return 0;
+        }
 
         int headerRowNum = headerRow.RowNumber();
         int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
@@ -512,7 +518,7 @@ public class ContrattoController : BaseController
                 ValoreUnitario = Dec(row, "Valore Unitario"),
                 ValoreTotale   = Dec(row, "Valore Totale"),
                 Approvato      = Dec(row, "Approvato"),
-                OrdinatiRda    = Dec(row, "Ordinati(RDA)"),
+                OrdinatiRda    = DecAlt(row, "Ordinati(RDA)", "Ordinati (RDA)", "Ordinati RDA", "OrdinatiRda", "Ordinati"),
                 Impegnato      = Dec(row, "Impegnato"),
                 Residuo        = Dec(row, "Residuo"),
             });

@@ -30,9 +30,11 @@ function ConsumoTowSection({ towRows }) {
   const [selectedTipo, setSelectedTipo] = useState("");
   const [openDetail, setOpenDetail]     = useState({});
 
-  // Se c'è solo un tipo lo seleziona automaticamente
+  // Seleziona automaticamente BASE, altrimenti il primo tipo disponibile
   useEffect(() => {
-    if (tipiContratto.length === 1) setSelectedTipo(tipiContratto[0]);
+    if (tipiContratto.length === 0) return;
+    const base = tipiContratto.find(t => t.toUpperCase() === "BASE") || tipiContratto[0];
+    setSelectedTipo(base);
   }, [tipiContratto.length]); // eslint-disable-line
 
   const filtered = selectedTipo
