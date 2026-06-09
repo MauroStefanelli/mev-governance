@@ -163,6 +163,20 @@ export const alignContratti = async () => {
   return response.json();
 };
 
+export const changeMyPassword = async (oldPassword, newPassword) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me/password`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ oldPassword, newPassword })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 // ---- Admin: gestione utenti ----
 
 export const getUsers = async () => {

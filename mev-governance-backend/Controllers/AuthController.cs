@@ -101,6 +101,28 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
+    // PUT /api/auth/me/password  — utente corrente cambia la propria password
+    // ============================================================
+    [HttpPut("me/password")]
+    [Authorize]
+    public IActionResult ChangeMyPassword([FromBody] ChangePasswordRequest request)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == int.Parse(userId));
+        if (user == null) return NotFound();
+
+        if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
+            return BadRequest("Password attuale non corretta");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        _db.SaveChanges();
+
+        return Ok(new { message = "Password aggiornata" });
+    }
+
+    // ============================================================
     // PUT /api/auth/users/{id}/toggle  (solo Admin)
     // ============================================================
     [HttpPut("users/{id}/toggle")]
@@ -212,3 +234,4 @@ public class AuthController : ControllerBase
 public record LoginRequest(string Username, string Password);
 public record CreateUserRequest(string Username, string FullName, string? Email, string Password, string? Role);
 public record ResetPasswordRequest(string NewPassword);
+public record ChangePasswordRequest(string OldPassword, string NewPassword);
