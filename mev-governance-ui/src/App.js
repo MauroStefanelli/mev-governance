@@ -6,7 +6,6 @@ import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import { getMevList, getLastAlign, changeMyPassword } from "./services/mevService";
-import logoPoste from "./logo_poste.svg";
 
 function App() {
   const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
@@ -86,9 +85,9 @@ function App() {
         {/* Logo + titolo */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <img
-            src={logoPoste}
+            src="/logo_poste.svg"
             alt="Poste Italiane"
-            style={{ height: "36px", width: "auto" }}
+            style={{ height: "40px", width: "auto" }}
           />
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
             MEV Governance
