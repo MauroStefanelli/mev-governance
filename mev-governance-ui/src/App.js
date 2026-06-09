@@ -90,11 +90,11 @@ function App() {
             style={{ height: "40px", width: "auto" }}
           />
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
-            MEV Governance1
+            MEV Governance
           </span>
           {lastAlign && (
             <span style={{
-              color: "rgba(255,255,255,0.75)", fontSize: "11px", fontWeight: 400,
+              color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: 400,
               borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px"
             }}>
               Aggiornato: {new Date(lastAlign).toLocaleString("it-IT", {
