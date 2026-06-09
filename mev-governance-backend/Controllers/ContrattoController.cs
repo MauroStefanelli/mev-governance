@@ -474,6 +474,13 @@ public class ContrattoController : BaseController
 
         string Str(IXLRow row, string col) =>
             columnMap.ContainsKey(col) ? row.Cell(columnMap[col]).GetString().Trim() : "";
+        // Cerca la prima colonna trovata tra le alternative fornite
+        string StrAlt(IXLRow row, params string[] cols)
+        {
+            foreach (var col in cols)
+                if (columnMap.ContainsKey(col)) return row.Cell(columnMap[col]).GetString().Trim();
+            return "";
+        }
         decimal Dec(IXLRow row, string col)
         {
             if (!columnMap.ContainsKey(col)) return 0;
@@ -484,6 +491,7 @@ public class ContrattoController : BaseController
         int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
         int towColNum    = columnMap.ContainsKey("TOW") ? columnMap["TOW"] : 0;
         Console.WriteLine($"[TOW] Header a riga {headerRowNum}, lastRow={lastRowNum}, towCol={towColNum}");
+        Console.WriteLine($"[TOW] ColumnMap keys: {string.Join(", ", columnMap.Keys)}");
 
         if (towColNum == 0) { Console.WriteLine("[TOW] Colonna TOW non trovata, import saltato"); return; }
 
@@ -500,7 +508,7 @@ public class ContrattoController : BaseController
             _db.ConsumoTow.Add(new ConsumoTow
             {
                 Tow            = tow,
-                TowContratto   = Str(row, "TOW Contratto"),
+                TowContratto   = StrAlt(row, "TOW Contratto", "Contratto", "Tipo Contratto", "TowContratto"),
                 ValoreUnitario = Dec(row, "Valore Unitario"),
                 ValoreTotale   = Dec(row, "Valore Totale"),
                 Approvato      = Dec(row, "Approvato"),
