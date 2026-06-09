@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { getConsumoTow } from "../services/mevService";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+
+const TH = (align = "left") => ({
+  padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#444",
+  whiteSpace: "nowrap", background: "#f8f9fa", textAlign: align,
+  borderBottom: "2px solid #dadce0",
+});
+const TD = (align = "left", extra = {}) => ({
+  padding: "6px 12px", fontSize: "13px", color: "#333",
+  verticalAlign: "middle", whiteSpace: "nowrap", textAlign: align, ...extra,
+});
 
 // ── Formattazione ─────────────────────────────────────────────────────────────
 const formatEuro = (value) => {
@@ -138,6 +148,7 @@ function ConsumoTowSection({ towRows }) {
   )].sort();
 
   const [selectedTipo, setSelectedTipo] = useState("");
+  const [openDetail, setOpenDetail]     = useState({});
 
   useEffect(() => {
     if (tipiContratto.length === 0) return;
@@ -158,7 +169,11 @@ function ConsumoTowSection({ towRows }) {
   const canoneRows = group(TOW_CANONE);
   const allRows    = [...taskRows, ...canoneRows];
 
-  // Totali per le card in header
+  const sections = [
+    { key: "task",   label: "Servizi a Task",   rows: taskRows },
+    { key: "canone", label: "Servizi a Canone", rows: canoneRows },
+  ].filter(s => s.rows.length > 0);
+
   const totali = {
     valoreTotale: sum(allRows, "valoreTotale"),
     approvato:    sum(allRows, "approvato"),
@@ -180,7 +195,7 @@ function ConsumoTowSection({ towRows }) {
         {tipiContratto.length > 1 && (
           <select
             value={selectedTipo}
-            onChange={e => setSelectedTipo(e.target.value)}
+            onChange={e => { setSelectedTipo(e.target.value); setOpenDetail({}); }}
             style={{
               padding: "4px 10px", border: "1px solid #dadce0", borderRadius: "6px",
               fontSize: "12px", background: "white", color: selectedTipo ? "#333" : "#888",
@@ -192,15 +207,11 @@ function ConsumoTowSection({ towRows }) {
           </select>
         )}
         {tipiContratto.length === 1 && (
-          <span style={{
-            fontSize: "12px", color: "#555", background: "#f0f4ff",
-            padding: "2px 10px", borderRadius: "12px", border: "1px solid #dadce0",
-          }}>
+          <span style={{ fontSize: "12px", color: "#555", background: "#f0f4ff", padding: "2px 10px", borderRadius: "12px", border: "1px solid #dadce0" }}>
             {tipiContratto[0]}
           </span>
         )}
 
-        {/* Totali complessivi */}
         {selectedTipo && allRows.length > 0 && (
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginLeft: "4px" }}>
             {FIELDS.map(f => (
@@ -227,23 +238,83 @@ function ConsumoTowSection({ towRows }) {
           padding: "32px", textAlign: "center", color: "#888", fontSize: "13px",
           borderRadius: "10px", border: "1px dashed #dadce0", background: "#fafafa",
         }}>
-          Seleziona un tipo di contratto per visualizzare i grafici
+          Seleziona un tipo di contratto per visualizzare i dati
         </div>
       )}
 
-      {/* ── 3 Grafici affiancati ── */}
       {selectedTipo && (
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-          {taskRows.length > 0 && (
-            <TowChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
-          )}
-          {canoneRows.length > 0 && (
-            <TowChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
-          )}
-          {allRows.length > 0 && (
-            <TowChart title="Totale Servizi"   rows={allRows}    sum={sum} />
-          )}
-        </div>
+        <>
+          {/* ── Tabella Servizi a Task / Canone espandibile ── */}
+          <div style={{ borderRadius: "10px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "20px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr>
+                  <th style={TH()} />
+                  <th style={TH()}>Servizi</th>
+                  <th style={TH("right")}>Valore Totale</th>
+                  <th style={TH("right")}>Approvato</th>
+                  <th style={TH("right")}>Ordinati (RDA)</th>
+                  <th style={TH("right")}>Impegnato</th>
+                  <th style={TH("right")}>Residuo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sections.length === 0 ? (
+                  <tr><td colSpan={7} style={{ padding: "16px", textAlign: "center", color: "#888", fontSize: "13px" }}>
+                    Nessun dato per questo tipo di contratto.
+                  </td></tr>
+                ) : sections.map((sec) => {
+                  const isOpen = !!openDetail[sec.key];
+                  return (
+                    <>
+                      <tr
+                        key={sec.key}
+                        onClick={() => setOpenDetail(p => ({ ...p, [sec.key]: !p[sec.key] }))}
+                        style={{ background: isOpen ? "#e8f0fe" : "#f0f4ff", borderBottom: "1px solid #dadce0", cursor: "pointer" }}
+                        onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#e4edff"; }}
+                        onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f0f4ff"; }}
+                      >
+                        <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
+                          {isOpen ? "▲" : "▶"}
+                        </td>
+                        <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                        <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                      </tr>
+                      {isOpen && sec.rows.map((row, ri) => (
+                        <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                          <td />
+                          <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.approvato)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.ordinatiRda)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.impegnato)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.residuo)}</td>
+                        </tr>
+                      ))}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── 3 Grafici affiancati ── */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            {taskRows.length > 0 && (
+              <TowChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
+            )}
+            {canoneRows.length > 0 && (
+              <TowChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
+            )}
+            {allRows.length > 0 && (
+              <TowChart title="Totale Servizi"   rows={allRows}    sum={sum} />
+            )}
+          </div>
+        </>
       )}
     </div>
   );
