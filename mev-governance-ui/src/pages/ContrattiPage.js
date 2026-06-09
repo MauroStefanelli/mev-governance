@@ -96,13 +96,32 @@ function PieTooltip({ active, payload }) {
 
 // ── Grafico a torta ───────────────────────────────────────────────────────────
 function TowPieChart({ title, rows, sum }) {
-  const data = FIELDS.map(f => ({
+  const valoreTotale = sum(rows, "valoreTotale");
+
+  // Le 4 fette sono le voci interne al valore totale
+  const PIE_FIELDS = ["approvato", "ordinatiRda", "impegnato", "residuo"];
+  const data = PIE_FIELDS.map(f => ({
     name:  LABELS[f],
     value: sum(rows, f),
     fill:  COLORS[f],
   })).filter(d => d.value > 0);
 
-  const total = data.reduce((s, d) => s + d.value, 0);
+  // Label SVG al centro del donut
+  const renderCenterLabel = ({ viewBox }) => {
+    const { cx, cy } = viewBox;
+    return (
+      <g>
+        <text x={cx} y={cy - 7} textAnchor="middle" dominantBaseline="middle"
+          fill="#888" fontSize={9} fontWeight={600} textDecoration="none">
+          VAL. TOTALE
+        </text>
+        <text x={cx} y={cy + 9} textAnchor="middle" dominantBaseline="middle"
+          fill="#1a73e8" fontSize={11} fontWeight={700}>
+          {formatEuroK(valoreTotale)}
+        </text>
+      </g>
+    );
+  };
 
   return (
     <div style={{
@@ -113,31 +132,42 @@ function TowPieChart({ title, rows, sum }) {
     }}>
       <div style={{
         fontSize: "13px", fontWeight: 700, color: "#1a73e8",
-        textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "4px",
+        textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "12px",
       }}>
         {title}
       </div>
-      <div style={{ fontSize: "11px", color: "#888", marginBottom: "12px" }}>
-        Totale: {formatEuro(total)}
-      </div>
 
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={210}>
         <PieChart>
           <Pie
             data={data}
-            cx="50%" cy="50%"
-            innerRadius={45} outerRadius={75}
+            cx="50%" cy="45%"
+            innerRadius={52} outerRadius={80}
             paddingAngle={2}
             dataKey="value"
+            labelLine={false}
           >
             {data.map((entry, i) => (
               <Cell key={i} fill={entry.fill} />
             ))}
           </Pie>
+          {/* Label centrale tramite secondo <Pie> invisibile con customized label */}
+          <Pie
+            data={[{ value: 1 }]}
+            cx="50%" cy="45%"
+            innerRadius={0} outerRadius={0}
+            dataKey="value"
+            label={renderCenterLabel}
+            labelLine={false}
+            isAnimationActive={false}
+          >
+            <Cell fill="transparent" stroke="none" />
+          </Pie>
           <Tooltip content={<PieTooltip />} />
           <Legend
             iconType="circle"
             iconSize={8}
+            wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }}
             formatter={(value) => (
               <span style={{ fontSize: "11px", color: "#555" }}>{value}</span>
             )}
