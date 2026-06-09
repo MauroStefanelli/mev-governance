@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getConsumoTow } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell,
 } from "recharts";
 
 const TH = (align = "left") => ({
@@ -48,7 +49,7 @@ const COLORS = {
 const LABELS = {
   valoreTotale: "Valore Totale",
   approvato:    "Approvato",
-  ordinatiRda:  "Ordinati (RDA)",
+  ordinatiRda:  "Ordinato (MEV)",
   impegnato:    "Impegnato",
   residuo:      "Residuo",
 };
@@ -75,7 +76,79 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-// ── Grafico singolo ───────────────────────────────────────────────────────────
+// ── Tooltip torta personalizzato ─────────────────────────────────────────────
+function PieTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0];
+  return (
+    <div style={{
+      background: "white", border: "1px solid #dadce0", borderRadius: "8px",
+      padding: "8px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", fontSize: "12px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: p.payload.fill, display: "inline-block" }} />
+        <span style={{ color: "#555" }}>{p.name}:</span>
+        <span style={{ fontWeight: 600, color: "#333" }}>{formatEuro(p.value)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Grafico a torta ───────────────────────────────────────────────────────────
+function TowPieChart({ title, rows, sum }) {
+  const data = FIELDS.map(f => ({
+    name:  LABELS[f],
+    value: sum(rows, f),
+    fill:  COLORS[f],
+  })).filter(d => d.value > 0);
+
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  return (
+    <div style={{
+      flex: "1 1 280px", minWidth: 0,
+      background: "white", border: "1px solid #dadce0",
+      borderRadius: "12px", padding: "16px 20px",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    }}>
+      <div style={{
+        fontSize: "13px", fontWeight: 700, color: "#1a73e8",
+        textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "4px",
+      }}>
+        {title}
+      </div>
+      <div style={{ fontSize: "11px", color: "#888", marginBottom: "12px" }}>
+        Totale: {formatEuro(total)}
+      </div>
+
+      <ResponsiveContainer width="100%" height={180}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%" cy="50%"
+            innerRadius={45} outerRadius={75}
+            paddingAngle={2}
+            dataKey="value"
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.fill} />
+            ))}
+          </Pie>
+          <Tooltip content={<PieTooltip />} />
+          <Legend
+            iconType="circle"
+            iconSize={8}
+            formatter={(value) => (
+              <span style={{ fontSize: "11px", color: "#555" }}>{value}</span>
+            )}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ── Grafico a barre ───────────────────────────────────────────────────────────
 function TowChart({ title, rows, sum }) {
   // Un unico "gruppo" con tutte le 5 voci come barre separate
   const data = [{
@@ -253,7 +326,7 @@ function ConsumoTowSection({ towRows }) {
                   <th style={TH()}>Servizi</th>
                   <th style={TH("right")}>Valore Totale</th>
                   <th style={TH("right")}>Approvato</th>
-                  <th style={TH("right")}>Ordinati (RDA)</th>
+                  <th style={TH("right")}>Ordinato (MEV)</th>
                   <th style={TH("right")}>Impegnato</th>
                   <th style={TH("right")}>Residuo</th>
                 </tr>
@@ -302,16 +375,29 @@ function ConsumoTowSection({ towRows }) {
             </table>
           </div>
 
-          {/* ── 3 Grafici affiancati ── */}
+          {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
+            {allRows.length > 0 && (
+              <TowPieChart title="Totale Servizi"   rows={allRows}    sum={sum} />
+            )}
+            {taskRows.length > 0 && (
+              <TowPieChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
+            )}
+            {canoneRows.length > 0 && (
+              <TowPieChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
+            )}
+          </div>
+
+          {/* ── 3 Grafici a barre: Totale → Task → Canone ── */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            {allRows.length > 0 && (
+              <TowChart title="Totale Servizi"   rows={allRows}    sum={sum} />
+            )}
             {taskRows.length > 0 && (
               <TowChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
             )}
             {canoneRows.length > 0 && (
               <TowChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
-            )}
-            {allRows.length > 0 && (
-              <TowChart title="Totale Servizi"   rows={allRows}    sum={sum} />
             )}
           </div>
         </>
