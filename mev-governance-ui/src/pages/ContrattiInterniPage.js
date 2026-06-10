@@ -211,7 +211,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                    <th style={{ ...TH(), fontSize: "11px" }}>GoTo</th>
                                                    <th style={{ ...TH("center"), fontSize: "11px" }}>Anno</th>
                                                    <th style={{ ...TH(), fontSize: "11px" }}>Release</th>
-                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura Scontato</th>
+                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Ordinato (BdO)</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Fatturato</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Da fatturare</th>
