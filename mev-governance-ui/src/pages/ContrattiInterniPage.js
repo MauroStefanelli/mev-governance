@@ -225,7 +225,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                      borderBottom: "1px solid #f0f0f0",
                                                    }}>
                                                      <td style={TD("left", { fontSize: "12px" })}>{g.goTo}</td>
-                                                     <td style={TD("left", { fontSize: "12px" })}>{g.applicativo}</td>
+                                                     <td style={TD("left", { fontSize: "12px" })}>CICCIO</td>
                                                      <td style={TD("left", { fontSize: "12px" })}>{g.annoCompetenza}</td>
                                                      <td style={TD("left", { fontSize: "12px" })}>{g.releaseExcel}</td>
                                                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato)}</td>
