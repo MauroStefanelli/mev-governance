@@ -98,7 +98,7 @@ function PieTooltip({ active, payload }) {
 function TowPieChart({ title, rows, sum }) {
   const valoreTotale = sum(rows, "valoreTotale");
 
-  const PIE_FIELDS = ["approvato", "ordinatiRda", "impegnato", "residuo"];
+  const PIE_FIELDS = ["ordinatiRda", "impegnato", "residuo"];
   const data = PIE_FIELDS.map(f => ({
     name:  LABELS[f],
     value: sum(rows, f),
@@ -407,18 +407,7 @@ function ConsumoTowSection({ towRows }) {
             )}
           </div>
 
-          {/* ── 3 Grafici a barre: Totale → Task → Canone ── */}
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-            {allRows.length > 0 && (
-              <TowChart title="Totale Servizi"   rows={allRows}    sum={sum} />
-            )}
-            {taskRows.length > 0 && (
-              <TowChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
-            )}
-            {canoneRows.length > 0 && (
-              <TowChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
-            )}
-          </div>
+
         </>
       )}
     </div>
