@@ -36,6 +36,10 @@ public class AuthController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Unauthorized("Credenziali non valide");
 
+        user.LastLogin  = DateTime.UtcNow;
+        user.LastLogout = null;
+        _db.SaveChanges();
+
         var token = GenerateToken(user);
 
         return Ok(new
@@ -45,6 +49,56 @@ public class AuthController : ControllerBase
             fullName = user.FullName,
             role = user.Role
         });
+    }
+
+    // ============================================================
+    // POST /api/auth/logout  — registra data/ora uscita
+    // ============================================================
+    [HttpPost("logout")]
+    [Authorize]
+    public IActionResult Logout()
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == int.Parse(userId));
+        if (user != null)
+        {
+            user.LastLogout = DateTime.UtcNow;
+            _db.SaveChanges();
+        }
+
+        return Ok(new { message = "Logout registrato" });
+    }
+
+    // ============================================================
+    // GET /api/auth/editor-logins  — ultimi login Editor (solo Admin)
+    // Restituisce gli Editor che hanno fatto login dopo il timestamp
+    // passato come query-param ?since=<ISO8601>, oppure tutti se omesso.
+    // ============================================================
+    [HttpGet("editor-logins")]
+    [Authorize]
+    public IActionResult GetEditorLogins([FromQuery] DateTime? since)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var query = _db.Users.Where(u => u.Role == "Editor" && u.LastLogin != null);
+
+        if (since.HasValue)
+            query = query.Where(u => u.LastLogin > since.Value);
+
+        var result = query
+            .Select(u => new
+            {
+                u.Id,
+                u.Username,
+                u.FullName,
+                u.LastLogin,
+                u.LastLogout
+            })
+            .ToList();
+
+        return Ok(result);
     }
 
     // ============================================================
@@ -65,7 +119,9 @@ public class AuthController : ControllerBase
                 u.Email,
                 u.Role,
                 u.IsActive,
-                u.SendEmail
+                u.SendEmail,
+                u.LastLogin,
+                u.LastLogout
             })
             .ToList();
 

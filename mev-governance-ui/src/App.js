@@ -5,7 +5,7 @@ import AdminPage from "./pages/AdminPage";
 import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
-import { getMevList, getLastAlign, changeMyPassword } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins } from "./services/mevService";
 
 function App() {
   const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
@@ -23,12 +23,40 @@ function App() {
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
 
+  // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
+  const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
+  const lastPollRef = React.useRef(null); // timestamp ISO dell'ultimo poll
+
   useEffect(() => {
     if (token) {
       getMevList().then(setRows).catch(() => {});
       getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
     }
   }, [token]);
+
+  // ── Polling accessi Editor ogni 30s (solo Admin) ───────────────────────────
+  useEffect(() => {
+    if (!token || role !== "Admin") return;
+
+    // Inizializza il riferimento temporale al login dell'Admin
+    lastPollRef.current = new Date().toISOString();
+
+    const poll = async () => {
+      try {
+        const since = lastPollRef.current;
+        lastPollRef.current = new Date().toISOString();
+        const newLogins = await getEditorLogins(since);
+        if (newLogins.length > 0) {
+          setEditorAlerts(prev => [...prev, ...newLogins]);
+        }
+      } catch {
+        // ignora errori di rete nel polling
+      }
+    };
+
+    const interval = setInterval(poll, 30000);
+    return () => clearInterval(interval);
+  }, [token, role]); // eslint-disable-line
 
   const handleLogin = (data) => {
     setToken(data.token);
@@ -38,10 +66,12 @@ function App() {
     setPage("mev");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole("");
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
+    setEditorAlerts([]);
   };
 
   const handleChangePassword = async () => {
@@ -219,6 +249,72 @@ function App() {
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
         {page === "admin"             && role === "Admin" && <AdminPage />}
       </main>
+
+      {/* ── Popup notifiche accesso Editor (solo Admin) ── */}
+      {editorAlerts.length > 0 && (
+        <div style={{
+          position: "fixed", bottom: "24px", right: "24px",
+          zIndex: 9998, display: "flex", flexDirection: "column", gap: "10px",
+          maxWidth: "340px",
+        }}>
+          {editorAlerts.map((alert, idx) => (
+            <div key={`${alert.id}-${alert.lastLogin}-${idx}`} style={{
+              background: "white",
+              border: "1px solid #dadce0",
+              borderLeft: "4px solid #fbbc04",
+              borderRadius: "10px",
+              padding: "14px 16px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.14)",
+              display: "flex", alignItems: "flex-start", gap: "12px",
+              animation: "slideIn 0.25s ease",
+            }}>
+              <div style={{
+                width: "36px", height: "36px", borderRadius: "50%",
+                background: "#fff3cd", display: "flex", alignItems: "center",
+                justifyContent: "center", flexShrink: 0, fontSize: "18px",
+              }}>
+                👤
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#333", marginBottom: "2px" }}>
+                  Accesso Editor
+                </div>
+                <div style={{ fontSize: "13px", color: "#555" }}>
+                  <strong>{alert.fullName || alert.username}</strong> ha effettuato l'accesso
+                </div>
+                <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>
+                  {new Date(alert.lastLogin).toLocaleString("it-IT", {
+                    day: "2-digit", month: "2-digit", year: "numeric",
+                    hour: "2-digit", minute: "2-digit", second: "2-digit"
+                  })}
+                </div>
+              </div>
+              <button
+                onClick={() => setEditorAlerts(prev => prev.filter((_, i) => i !== idx))}
+                style={{
+                  border: "none", background: "none", cursor: "pointer",
+                  color: "#888", fontSize: "18px", lineHeight: 1, padding: "0",
+                  flexShrink: 0,
+                }}
+                title="Chiudi"
+              >×</button>
+            </div>
+          ))}
+          {editorAlerts.length > 1 && (
+            <button
+              onClick={() => setEditorAlerts([])}
+              style={{
+                alignSelf: "flex-end",
+                padding: "4px 14px", fontSize: "12px",
+                background: "#f1f3f4", border: "1px solid #dadce0",
+                borderRadius: "6px", cursor: "pointer", color: "#555",
+              }}
+            >
+              Chiudi tutte ({editorAlerts.length})
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

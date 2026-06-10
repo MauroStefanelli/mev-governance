@@ -25,6 +25,14 @@ function AdminPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const formatDateTime = (iso) => {
+    if (!iso) return <span style={{ color: "#bbb", fontSize: "11px" }}>—</span>;
+    return new Date(iso).toLocaleString("it-IT", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+  };
+
   const loadUsers = async () => {
     try {
       const data = await getUsers();
@@ -189,6 +197,8 @@ function AdminPage() {
             <th style={{ textAlign: "center" }}>Invia Email</th>
             <th>Modifica Password</th>
             <th>Azioni</th>
+            <th style={{ whiteSpace: "nowrap" }}>Ultimo Accesso</th>
+            <th style={{ whiteSpace: "nowrap" }}>Ultima Uscita</th>
           </tr>
         </thead>
         <tbody>
@@ -253,6 +263,12 @@ function AdminPage() {
                     Elimina
                   </button>
                 </div>
+              </td>
+              <td style={{ fontSize: "12px", whiteSpace: "nowrap", color: "#555" }}>
+                {formatDateTime(u.lastLogin)}
+              </td>
+              <td style={{ fontSize: "12px", whiteSpace: "nowrap", color: "#555" }}>
+                {formatDateTime(u.lastLogout)}
               </td>
             </tr>
           ))}

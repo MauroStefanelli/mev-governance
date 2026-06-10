@@ -19,4 +19,8 @@ public class AppUser
 
     // Se true, riceve email di notifica ad ogni salvataggio MEV
     public bool   SendEmail    { get; set; } = false;
+
+    // Tracciamento accessi
+    public DateTime? LastLogin  { get; set; }
+    public DateTime? LastLogout { get; set; }
 }

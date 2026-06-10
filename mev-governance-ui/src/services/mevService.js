@@ -179,6 +179,26 @@ export const changeMyPassword = async (oldPassword, newPassword) => {
 
 // ---- Admin: gestione utenti ----
 
+export const logout = async () => {
+  try {
+    await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: authHeaders()
+    });
+  } catch {
+    // fire-and-forget: ignora errori di rete al logout
+  }
+};
+
+export const getEditorLogins = async (since) => {
+  const url = since
+    ? `${API_BASE_URL}/api/auth/editor-logins?since=${encodeURIComponent(since)}`
+    : `${API_BASE_URL}/api/auth/editor-logins`;
+  const response = await fetch(url, { headers: authHeaders() });
+  if (!response.ok) throw new Error("Errore recupero editor logins");
+  return response.json();
+};
+
 export const getUsers = async () => {
   const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
     headers: authHeaders()

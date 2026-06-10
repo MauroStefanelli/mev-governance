@@ -103,7 +103,9 @@ using (var scope = app.Services.CreateScope())
             ""PasswordHash"" TEXT    NOT NULL DEFAULT '',
             ""Role""         TEXT    NOT NULL DEFAULT 'Editor',
             ""IsActive""     BOOLEAN NOT NULL DEFAULT TRUE,
-            ""SendEmail""    BOOLEAN NOT NULL DEFAULT FALSE
+            ""SendEmail""    BOOLEAN NOT NULL DEFAULT FALSE,
+            ""LastLogin""    TIMESTAMP,
+            ""LastLogout""   TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS ""MevItems"" (
@@ -170,6 +172,12 @@ using (var scope = app.Services.CreateScope())
             ""Id""          SERIAL    PRIMARY KEY,
             ""LastAlignAt"" TIMESTAMP
         );
+    ");
+
+    // Aggiunge colonne LastLogin/LastLogout se non esistono (per DB già esistenti)
+    db.Database.ExecuteSqlRaw(@"
+        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastLogin""  TIMESTAMP;
+        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastLogout"" TIMESTAMP;
     ");
 
     if (!db.Users.Any())
