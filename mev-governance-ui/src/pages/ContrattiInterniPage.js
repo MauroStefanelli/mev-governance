@@ -210,6 +210,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                  <tr>
                                                    <th style={{ ...TH(), fontSize: "11px" }}>GoTo</th>
                                                    <th style={{ ...TH("center"), fontSize: "11px" }}>Anno</th>
+                                                   <th style={{ ...TH("center"), fontSize: "11px" }}>Applicativo</th>
                                                    <th style={{ ...TH(), fontSize: "11px" }}>Release</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Ordinato (BdO)</th>
@@ -225,6 +226,7 @@ function ContrattiPage({ onUnauthorized }) {
                                                    }}>
                                                      <td style={TD("left", { fontSize: "12px" })}>{g.goTo}</td>
                                                      <td style={TD("center", { fontSize: "12px" })}>{g.annoCompetenza}</td>
+                                                     <td style={TD("center", { fontSize: "12px" })}>{g.Applicativo}</td>
                                                      <td style={TD("left", { fontSize: "12px" })}>{g.releaseExcel}</td>
                                                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato)}</td>
                                                      <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.ordinatoBdo)}</td>
