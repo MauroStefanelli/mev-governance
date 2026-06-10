@@ -27,7 +27,7 @@ function AdminPage() {
 
   const formatDateTime = (iso) => {
     if (!iso) return <span style={{ color: "#bbb", fontSize: "11px" }}>—</span>;
-    return new Date(iso).toLocaleString("it-IT", {
+    return new Date(iso).toLocaleString("it-IT", { timeZone: "Europe/Rome",
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit", second: "2-digit"
     });
