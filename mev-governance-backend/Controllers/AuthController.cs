@@ -38,6 +38,17 @@ public class AuthController : ControllerBase
 
         user.LastLogin  = DateTime.UtcNow;
         user.LastLogout = null;
+
+        // Crea voce nello storico accessi
+        var logEntry = new UserAccessLog
+        {
+            UserId   = user.Id,
+            Username = user.Username,
+            FullName = user.FullName,
+            Role     = user.Role,
+            LoginAt  = DateTime.UtcNow,
+        };
+        _db.UserAccessLogs.Add(logEntry);
         _db.SaveChanges();
 
         var token = GenerateToken(user);
@@ -65,6 +76,15 @@ public class AuthController : ControllerBase
         if (user != null)
         {
             user.LastLogout = DateTime.UtcNow;
+
+            // Aggiorna l'ultima voce nello storico (quella senza LogoutAt)
+            var lastLog = _db.UserAccessLogs
+                .Where(l => l.UserId == user.Id && l.LogoutAt == null)
+                .OrderByDescending(l => l.LoginAt)
+                .FirstOrDefault();
+            if (lastLog != null)
+                lastLog.LogoutAt = DateTime.UtcNow;
+
             _db.SaveChanges();
         }
 
@@ -99,6 +119,30 @@ public class AuthController : ControllerBase
             .ToList();
 
         return Ok(result);
+    }
+
+    // ============================================================
+    // GET /api/auth/users/{id}/access-log  (solo Admin)
+    // Storico completo di login/logout per un utente
+    // ============================================================
+    [HttpGet("users/{id}/access-log")]
+    [Authorize]
+    public IActionResult GetAccessLog(int id)
+    {
+        if (!IsAdmin()) return Forbid();
+
+        var logs = _db.UserAccessLogs
+            .Where(l => l.UserId == id)
+            .OrderByDescending(l => l.LoginAt)
+            .Select(l => new
+            {
+                l.Id,
+                l.LoginAt,
+                l.LogoutAt,
+            })
+            .ToList();
+
+        return Ok(logs);
     }
 
     // ============================================================

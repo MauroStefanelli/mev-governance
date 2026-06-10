@@ -34,11 +34,10 @@ function App() {
     }
   }, [token]);
 
-  // ── Polling accessi Editor ogni 30s (solo Admin) ───────────────────────────
+  // ── Polling accessi Editor ogni 10s (solo Admin) ──────────────────────────
   useEffect(() => {
     if (!token || role !== "Admin") return;
 
-    // Inizializza il riferimento temporale al login dell'Admin
     lastPollRef.current = new Date().toISOString();
 
     const poll = async () => {
@@ -54,7 +53,8 @@ function App() {
       }
     };
 
-    const interval = setInterval(poll, 30000);
+    poll(); // esegue subito al mount
+    const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
   }, [token, role]); // eslint-disable-line
 
@@ -283,9 +283,14 @@ function App() {
                   <strong>{alert.fullName || alert.username}</strong> ha effettuato l'accesso
                 </div>
                 <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>
-                  {new Date(alert.lastLogin).toLocaleString("it-IT", {
+                  {new Date(
+                    alert.lastLogin.endsWith("Z") || alert.lastLogin.includes("+")
+                      ? alert.lastLogin : alert.lastLogin + "Z"
+                  ).toLocaleString("it-IT", {
+                    timeZone: "Europe/Rome",
                     day: "2-digit", month: "2-digit", year: "numeric",
-                    hour: "2-digit", minute: "2-digit", second: "2-digit"
+                    hour: "2-digit", minute: "2-digit", second: "2-digit",
+                    hour12: false
                   })}
                 </div>
               </div>

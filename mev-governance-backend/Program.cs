@@ -172,6 +172,16 @@ using (var scope = app.Services.CreateScope())
             ""Id""          SERIAL    PRIMARY KEY,
             ""LastAlignAt"" TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS ""UserAccessLogs"" (
+            ""Id""       SERIAL    PRIMARY KEY,
+            ""UserId""   INTEGER   NOT NULL DEFAULT 0,
+            ""Username"" TEXT      NOT NULL DEFAULT '',
+            ""FullName"" TEXT      NOT NULL DEFAULT '',
+            ""Role""     TEXT      NOT NULL DEFAULT '',
+            ""LoginAt""  TIMESTAMP NOT NULL DEFAULT NOW(),
+            ""LogoutAt"" TIMESTAMP
+        );
     ");
 
     // Aggiunge colonne LastLogin/LastLogout se non esistono (per DB già esistenti)

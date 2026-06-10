@@ -77,21 +77,22 @@ public class ContrattoController : BaseController
                                 TotImportoFornitura = gBc.Sum(m => m.ImportoExcel),
                                 TotOrdinatoBdo      = gBc.Sum(m => m.OrdinatoBdo),
                                 TotFatturato        = gBc.Sum(m => m.Fatturato),
-                                GoToList = gBc
-                                    .OrderBy(m => m.GoTo)
-                                .Select(m => new
-                                {
-                                    m.GoTo,
-                                    m.AnnoCompetenza,
-                                    m.ReleaseExcel,
-                                    m.Rda,
-                                    m.AtId,
-                                    ImportoForniturascontato = c.Sconto > 0
-                                        ? m.ImportoExcel * (1 - c.Sconto / 100m)
-                                        : m.ImportoExcel,
-                                    m.OrdinatoBdo,
-                                    m.Fatturato,
-                                })
+                                 GoToList = gBc
+                                     .OrderBy(m => m.GoTo)
+                                 .Select(m => new
+                                 {
+                                     m.GoTo,
+                                     m.Applicativo,
+                                     m.AnnoCompetenza,
+                                     m.ReleaseExcel,
+                                     m.Rda,
+                                     m.AtId,
+                                     ImportoForniturascontato = c.Sconto > 0
+                                         ? m.ImportoExcel * (1 - c.Sconto / 100m)
+                                         : m.ImportoExcel,
+                                     m.OrdinatoBdo,
+                                     m.Fatturato,
+                                 })
                                     .ToList()
                             })
                             .ToList()

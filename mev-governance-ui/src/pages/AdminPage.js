@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getUsers, createUser, toggleUser, toggleEmailUser, resetPassword, deleteUser } from "../services/mevService";
+import { getUsers, createUser, toggleUser, toggleEmailUser, resetPassword, deleteUser, getUserAccessLog } from "../services/mevService";
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -24,6 +24,8 @@ function AdminPage() {
   const [showRowPassword, setShowRowPassword] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [accessLogModal, setAccessLogModal] = useState(null); // { userId, username, fullName, logs: [] }
+  const [accessLogLoading, setAccessLogLoading] = useState(false);
 
   const formatDateTime = (iso) => {
 
@@ -35,7 +37,9 @@ function AdminPage() {
       );
     }
 
-    return new Date(iso).toLocaleString("it-IT", { 
+    // Il backend restituisce UTC senza "Z": lo aggiungiamo per la corretta conversione
+    const normalized = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+    return new Date(normalized).toLocaleString("it-IT", { 
       timeZone: "Europe/Rome",
       day: "2-digit", 
       month: "2-digit", 
@@ -121,6 +125,20 @@ function AdminPage() {
 
   const toggleRowPassword = (id) => {
     setShowRowPassword((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleOpenAccessLog = async (u) => {
+    setAccessLogModal({ userId: u.id, username: u.username, fullName: u.fullName, logs: [] });
+    setAccessLogLoading(true);
+    try {
+      const logs = await getUserAccessLog(u.id);
+      setAccessLogModal(prev => prev ? { ...prev, logs } : null);
+    } catch (err) {
+      setError(err.message);
+      setAccessLogModal(null);
+    } finally {
+      setAccessLogLoading(false);
+    }
   };
 
   const btnStyle = {
@@ -271,6 +289,13 @@ function AdminPage() {
                     {u.isActive ? "Disattiva" : "Attiva"}
                   </button>
                   <button
+                    onClick={() => handleOpenAccessLog(u)}
+                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px" }}
+                    title="Storico accessi"
+                  >
+                    📋 Storico
+                  </button>
+                  <button
                     onClick={() => handleDelete(u.id, u.username)}
                     style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#dc3545", color: "white", border: "none", borderRadius: "4px" }}
                   >
@@ -288,6 +313,94 @@ function AdminPage() {
           ))}
         </tbody>
       </table>
+
+      {/* ── Modale storico accessi ── */}
+      {accessLogModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAccessLogModal(null); }}
+        >
+          <div style={{
+            background: "white", borderRadius: "12px", padding: "24px 28px",
+            width: "600px", maxWidth: "95vw", maxHeight: "80vh",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+              <div>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a73e8" }}>
+                  Storico Accessi
+                </div>
+                <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
+                  {accessLogModal.fullName || accessLogModal.username} ({accessLogModal.username})
+                </div>
+              </div>
+              <button
+                onClick={() => setAccessLogModal(null)}
+                style={{ border: "none", background: "none", cursor: "pointer", fontSize: "20px", color: "#888" }}
+              >×</button>
+            </div>
+
+            {/* Corpo */}
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {accessLogLoading ? (
+                <div style={{ textAlign: "center", padding: "32px", color: "#888" }}>Caricamento...</div>
+              ) : accessLogModal.logs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "32px", color: "#888", fontSize: "13px" }}>
+                  Nessun accesso registrato.
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ background: "#f8f9fa" }}>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: "#444", borderBottom: "2px solid #dadce0", whiteSpace: "nowrap" }}>#</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: "#444", borderBottom: "2px solid #dadce0", whiteSpace: "nowrap" }}>Accesso</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: "#444", borderBottom: "2px solid #dadce0", whiteSpace: "nowrap" }}>Uscita</th>
+                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: "#444", borderBottom: "2px solid #dadce0", whiteSpace: "nowrap" }}>Durata</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accessLogModal.logs.map((log, idx) => {
+                      const loginDate  = new Date((log.loginAt.endsWith("Z") || log.loginAt.includes("+")) ? log.loginAt : log.loginAt + "Z");
+                      const logoutDate = log.logoutAt
+                        ? new Date((log.logoutAt.endsWith("Z") || log.logoutAt.includes("+")) ? log.logoutAt : log.logoutAt + "Z")
+                        : null;
+                      const durataSec  = logoutDate ? Math.round((logoutDate - loginDate) / 1000) : null;
+                      const durataStr  = durataSec != null
+                        ? durataSec < 60
+                          ? `${durataSec}s`
+                          : durataSec < 3600
+                            ? `${Math.floor(durataSec / 60)}m ${durataSec % 60}s`
+                            : `${Math.floor(durataSec / 3600)}h ${Math.floor((durataSec % 3600) / 60)}m`
+                        : "—";
+                      const fmtOpts = { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+                      return (
+                        <tr key={log.id} style={{ background: idx % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                          <td style={{ padding: "6px 12px", color: "#999", fontSize: "11px" }}>{accessLogModal.logs.length - idx}</td>
+                          <td style={{ padding: "6px 12px", color: "#333", whiteSpace: "nowrap" }}>{loginDate.toLocaleString("it-IT", fmtOpts)}</td>
+                          <td style={{ padding: "6px 12px", color: log.logoutAt ? "#333" : "#bbb", whiteSpace: "nowrap" }}>
+                            {logoutDate ? logoutDate.toLocaleString("it-IT", fmtOpts) : <span style={{ color: "#bbb" }}>—</span>}
+                          </td>
+                          <td style={{ padding: "6px 12px", textAlign: "right", color: "#555", whiteSpace: "nowrap" }}>{durataStr}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ marginTop: "16px", textAlign: "right" }}>
+              <button
+                onClick={() => setAccessLogModal(null)}
+                style={{ padding: "8px 20px", borderRadius: "6px", border: "1px solid #dadce0", background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}
+              >Chiudi</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
