@@ -80,27 +80,35 @@ function CustomTooltip({ active, payload, label }) {
 
 
 const renderCustomizedLabel = (props) => {
-  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
+  const {
+    cx, cy, midAngle, outerRadius, percent, value, name, index
+  } = props;
 
+  // ✅ mostra sempre tutto (come tooltip)
   const RADIAN = Math.PI / 180;
-  const radius = outerRadius + 20;
+
+  // ✅ distanza leggermente maggiore per evitare overlap
+  const radius = outerRadius + 25;
+
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  // ✅ FIX IMPORTANTE: evita che quello in alto sparisca
+  const safeY = y < cy - outerRadius ? y - 10 : y;
 
   return (
     <text
       x={x}
-      y={y}
+      y={safeY}
       fill="#333"
       textAnchor={x > cx ? "start" : "end"}
       dominantBaseline="central"
-      style={{ fontSize: "11px" }}
+      style={{ fontSize: "11px", fontWeight: 500 }}
     >
-      {`${name} ${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`}
+      {`${name} ${formatEuro(value)} (${(percent * 100).toFixed(0)}%)`}
     </text>
   );
 };
-
 
 
 function PieTooltip({ active, payload }) {
@@ -194,13 +202,13 @@ function TowPieChart({ title, rows, sum }) {
 
       <div style={{ position: "relative" }}>
         <ResponsiveContainer width="100%" height={230}>
-          <PieChart>
+          <PieChart>          
             <Pie
-              data={data}
+              data={pieData}
               cx="50%"
               cy="50%"
-              startAngle={90}
-              endAngle={-270}
+              startAngle={90}     // ✅ parte dall'alto
+              endAngle={-270}     // ✅ ordine in senso orario
               innerRadius={60}
               outerRadius={95}
               paddingAngle={3}
@@ -208,11 +216,21 @@ function TowPieChart({ title, rows, sum }) {
               activeIndex={activeIndex}
               onMouseEnter={(_, index) => setActiveIndex(index)}
               onMouseLeave={() => setActiveIndex(null)}
-              labelLine={{ stroke: "#999", strokeWidth: 1 }}   // ✅ QUI
-              label={renderCustomizedLabel} // ✅ LABEL CUSTOM
+
+              // ✅ FRECCIA
+              labelLine={{ stroke: "#999", strokeWidth: 1 }}
+
+              // ✅ LABEL SEMPRE VISIBILE
+              label={renderCustomizedLabel}
+
               stroke="#fff"
               strokeWidth={2}
             >
+              {data.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} />
+              ))}
+            </Pie>
+
 
               {data.map((entry, i) => (
                 <Cell key={i} fill={entry.fill} />
@@ -270,6 +288,23 @@ function TowChart({ title, rows, sum }) {
     impegnato:    sum(rows, "impegnato"),
     residuo:      sum(rows, "residuo"),
   }];
+  const pieData = [
+    {
+      name: "Ordinato",
+      value: data[0].ordinatiRda,
+      fill: "#00B853", // verde
+    },
+    {
+      name: "Impegnato",
+      value: data[0].impegnato,
+      fill: "#E49506", // giallo
+    },
+    {
+      name: "Residuo",
+      value: data[0].residuo,
+      fill: "#2E75B6", // blu
+    },
+  ].filter(d => d.value > 0);
 
   return (
     <div style={{
