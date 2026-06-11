@@ -114,7 +114,6 @@ function PieTooltip({ active, payload }) {
   );
 }
 
-import { useState } from "react";
 
 function TowPieChart({ title, rows, sum }) {
   const [activeIndex, setActiveIndex] = useState(null);
