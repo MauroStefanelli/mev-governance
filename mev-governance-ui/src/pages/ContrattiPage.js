@@ -156,13 +156,12 @@ function TowPieChart({ title, rows, sum }) {
 
       <div style={{ position: "relative" }}>
         <ResponsiveContainer width="100%" height={210}>
-          <PieChart>
-            
+          <PieChart>            
             <Pie
               data={data}
               cx="50%"
               cy="50%"           // centrato perfettamente
-              outerRadius={90}   // un po’ più grande
+              outerRadius={95}   // un po’ più grande
               paddingAngle={4}
               dataKey="value"
               activeIndex={activeIndex}
@@ -188,15 +187,7 @@ function TowPieChart({ title, rows, sum }) {
           </PieChart>
         </ResponsiveContainer>
 
-        {/* KPI centrale */}
-        <div style={{
-          position: "absolute",
-          top: "42%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          textAlign: "center",
-          pointerEvents: "none",
-        }}>
+       
           <div style={{
             fontSize: "9px",
             color: "#888",
