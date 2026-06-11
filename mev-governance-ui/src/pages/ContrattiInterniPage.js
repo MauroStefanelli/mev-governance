@@ -209,9 +209,9 @@ function ContrattiPage({ onUnauthorized }) {
                                                <thead>
                                                  <tr>
                                                    <th style={{ ...TH(), fontSize: "11px" }}>GoTo</th>
-                                                   <th style={{ ...TH("center"), fontSize: "11px" }}>Applicativo</th>
-                                                   <th style={{ ...TH("center"), fontSize: "11px" }}>Anno</th>
-                                                   <th style={{ ...TH(), fontSize: "11px" }}>Release</th>
+                                                   <th style={{ ...TH("left"), fontSize: "11px" }}>Applicativo</th>
+                                                   <th style={{ ...TH("left"), fontSize: "11px" }}>Anno</th>
+                                                   <th style={{ ...TH("left"), fontSize: "11px" }}>Release</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Ordinato (BdO)</th>
                                                    <th style={{ ...TH("right"), fontSize: "11px" }}>Fatturato</th>
