@@ -87,17 +87,17 @@ function TowPieChart({ title, rows, sum }) {
     {
       name: "Ordinato",
       value: sum(rows, "ordinatiRda"),
-      fill: "#00B853"
+      fill: "#2E75B6"
     },
     {
       name: "Impegnato",
       value: sum(rows, "impegnato"),
-      fill: "#E49506"
+      fill: "#B4C7E7"
     },
     {
       name: "Residuo",
       value: sum(rows, "residuo"),
-      fill: "#2E75B6"
+      fill: "#D6DCE5"
     }
   ].filter(d => d.value > 0);
 
@@ -184,7 +184,7 @@ function TowPieChart({ title, rows, sum }) {
           </div>
           <div style={{
             fontSize: "14px",
-            color: "#1a73e8",
+            color: "#262626",
             fontWeight: 700,
           }}>
             {formatEuroK(valoreTotale)}
