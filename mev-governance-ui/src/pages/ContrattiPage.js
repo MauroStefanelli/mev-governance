@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
+import { useState } from "react";
+
 
 const TH = (align = "left") => ({
   padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#444",
@@ -75,7 +77,7 @@ function CustomTooltip({ active, payload, label }) {
     </div>
   );
 }
-
+/* ORIGINALE
 // ── Tooltip torta personalizzato ─────────────────────────────────────────────
 function PieTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
@@ -93,7 +95,44 @@ function PieTooltip({ active, payload }) {
     </div>
   );
 }
+  */
 
+function PieTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+
+  const p = payload[0];
+  const total = p.payload.allData.reduce((s, d) => s + d.value, 0);
+  const perc = ((p.value / total) * 100).toFixed(1);
+
+  return (
+    <div style={{
+      background: "white",
+      border: "1px solid #dadce0",
+      borderRadius: "8px",
+      padding: "8px 12px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+      fontSize: "12px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: p.payload.fill,
+          display: "inline-block"
+        }} />
+        <span style={{ color: "#555" }}>{p.name}:</span>
+        <span style={{ fontWeight: 600, color: "#333" }}>
+          {formatEuro(p.value)}
+        </span>
+        <span style={{ color: "#888" }}>
+          ({perc}%)
+        </span>
+      </div>
+    </div>
+  );
+}
+/* ORIGINALE
 // ── Grafico a torta ───────────────────────────────────────────────────────────
 function TowPieChart({ title, rows, sum }) {
   const valoreTotale = sum(rows, "valoreTotale");
@@ -119,7 +158,7 @@ function TowPieChart({ title, rows, sum }) {
         {title}
       </div>
 
-      {/* Wrapper con posizione relativa per il label centrale */}
+      /* {/* Wrapper con posizione relativa per il label centrale 
       <div style={{ position: "relative" }}>
         <ResponsiveContainer width="100%" height={210}>
           <PieChart>
@@ -147,7 +186,7 @@ function TowPieChart({ title, rows, sum }) {
           </PieChart>
         </ResponsiveContainer>
 
-        {/* Label centrale sovrapposta via CSS */}
+        /* Label centrale sovrapposta via CSS 
         <div style={{
           position: "absolute",
           top: "42%", left: "50%",
@@ -159,6 +198,109 @@ function TowPieChart({ title, rows, sum }) {
             Val. Totale
           </div>
           <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, whiteSpace: "nowrap" }}>
+            {formatEuroK(valoreTotale)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+*/
+
+
+function TowPieChart({ title, rows, sum }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  const valoreTotale = sum(rows, "valoreTotale");
+
+  const PIE_FIELDS = ["ordinatiRda", "impegnato", "residuo"];
+
+  let data = PIE_FIELDS.map(f => ({
+    name: LABELS[f],
+    value: sum(rows, f),
+    fill: COLORS[f],
+  }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  // riferimento per calcolo percentuali
+  data = data.map(d => ({ ...d, allData: data }));
+
+  return (
+    <div style={{
+      flex: "1 1 280px",
+      minWidth: 0,
+      background: "white",
+      border: "1px solid #dadce0",
+      borderRadius: "12px",
+      padding: "16px 20px",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    }}>
+      <div style={{
+        fontSize: "13px",
+        fontWeight: 700,
+        color: "#1a73e8",
+        textTransform: "uppercase",
+        marginBottom: "12px",
+      }}>
+        {title}
+      </div>
+
+      <div style={{ position: "relative" }}>
+        <ResponsiveContainer width="100%" height={210}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="42%"
+              innerRadius={55}
+              outerRadius={85}
+              paddingAngle={4}
+              dataKey="value"
+              activeIndex={activeIndex}
+              onMouseEnter={(_, index) => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+              label={({ percent }) =>
+                percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""
+              }
+            >
+              {data.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} />
+              ))}
+            </Pie>
+
+            <Tooltip content={<PieTooltip />} />
+
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+
+        {/* KPI centrale */}
+        <div style={{
+          position: "absolute",
+          top: "42%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          textAlign: "center",
+          pointerEvents: "none",
+        }}>
+          <div style={{
+            fontSize: "9px",
+            color: "#888",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}>
+            Val Totale
+          </div>
+          <div style={{
+            fontSize: "12px",
+            color: "#1a73e8",
+            fontWeight: 700,
+          }}>
             {formatEuroK(valoreTotale)}
           </div>
         </div>

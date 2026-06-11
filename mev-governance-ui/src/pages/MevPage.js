@@ -415,7 +415,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                     ) : null}
                   </td>
 
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "14px" }}>{r.rda ?? ""}</td>
+                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.rda ?? ""}</td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}
