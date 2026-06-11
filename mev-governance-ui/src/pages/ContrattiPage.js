@@ -22,10 +22,13 @@ const formatEuroK = (value) => {
 };
 
 // ── LABEL ESTERNA (FIX DEFINITIVO) ───────────────────────
+
 const renderCustomizedLabel = ({
   cx, cy, midAngle, outerRadius, percent, value, name
 }) => {
   const RADIAN = Math.PI / 180;
+
+  // ✅ più spazio → evita che la label alta sparisca
   const radius = outerRadius + 30;
 
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -45,11 +48,15 @@ const renderCustomizedLabel = ({
   );
 };
 
+
 // ── TOOLTIP ───────────────────────────────────────────────
+
 function PieTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
 
   const p = payload[0];
+
+  // ✅ FIX fondamentale
   const total = p.payload.allData.reduce((s, d) => s + d.value, 0);
   const perc = ((p.value / total) * 100).toFixed(1);
 
@@ -62,24 +69,42 @@ function PieTooltip({ active, payload }) {
       boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
       fontSize: "12px",
     }}>
-      {p.name} <b>{formatEuro(p.value)}</b> ({perc}%)
+      {p.name}: <b>{formatEuro(p.value)}</b> ({perc}%)
     </div>
   );
 }
 
+
 // ── PIE COMPONENT ─────────────────────────────────────────
+
 function TowPieChart({ title, rows, sum }) {
   const [activeIndex, setActiveIndex] = useState(null);
 
   const valoreTotale = sum(rows, "valoreTotale");
 
+  // ✅ ORDINE + COLORI CORRETTI
   const baseData = [
-    { name: "Ordinato",  value: sum(rows, "ordinatiRda"), fill: "#00B853" },
-    { name: "Impegnato", value: sum(rows, "impegnato"),   fill: "#E49506" },
-    { name: "Residuo",   value: sum(rows, "residuo"),     fill: "#2E75B6" }
+    {
+      name: "Ordinato",
+      value: sum(rows, "ordinatiRda"),
+      fill: "#00B853"
+    },
+    {
+      name: "Impegnato",
+      value: sum(rows, "impegnato"),
+      fill: "#E49506"
+    },
+    {
+      name: "Residuo",
+      value: sum(rows, "residuo"),
+      fill: "#2E75B6"
+    }
   ].filter(d => d.value > 0);
 
-  const data = baseData.map(d => ({ ...d, allData: baseData }));
+  const data = baseData.map(d => ({
+    ...d,
+    allData: baseData
+  }));
 
   return (
     <div style={{
@@ -88,11 +113,14 @@ function TowPieChart({ title, rows, sum }) {
       border: "1px solid #dadce0",
       borderRadius: "12px",
       padding: "16px 20px",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
     }}>
       <div style={{
+        fontSize: "13px",
         fontWeight: 700,
         color: "#1a73e8",
-        marginBottom: 12
+        textTransform: "uppercase",
+        marginBottom: "12px",
       }}>
         {title}
       </div>
@@ -108,16 +136,19 @@ function TowPieChart({ title, rows, sum }) {
               endAngle={-270}
               innerRadius={60}
               outerRadius={95}
-              dataKey="value"
               paddingAngle={3}
+              dataKey="value"
               activeIndex={activeIndex}
               onMouseEnter={(_, i) => setActiveIndex(i)}
               onMouseLeave={() => setActiveIndex(null)}
+
+              // ✅ fondamentali
               labelLine={{ stroke: "#999" }}
               label={renderCustomizedLabel}
+              isAnimationActive={false}
+
               stroke="#fff"
               strokeWidth={2}
-              isAnimationActive={false}
             >
               {data.map((entry, i) => (
                 <Cell key={i} fill={entry.fill} />
@@ -125,20 +156,37 @@ function TowPieChart({ title, rows, sum }) {
             </Pie>
 
             <Tooltip content={<PieTooltip />} />
-            <Legend />
+
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: "11px", paddingTop: "6px" }}
+            />
           </PieChart>
         </ResponsiveContainer>
 
-        {/* totale centrale */}
+        {/* ✅ CENTRO */}
         <div style={{
           position: "absolute",
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          textAlign: "center"
+          textAlign: "center",
+          pointerEvents: "none",
         }}>
-          <div style={{ fontSize: 10, color: "#888" }}>Totale</div>
-          <div style={{ fontWeight: 700, color: "#1a73e8" }}>
+          <div style={{
+            fontSize: "10px",
+            color: "#888",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}>
+            Totale
+          </div>
+          <div style={{
+            fontSize: "14px",
+            color: "#1a73e8",
+            fontWeight: 700,
+          }}>
             {formatEuroK(valoreTotale)}
           </div>
         </div>
@@ -146,6 +194,7 @@ function TowPieChart({ title, rows, sum }) {
     </div>
   );
 }
+
 
 // ── MAIN SECTION ─────────────────────────────────────────
 function ConsumoTowSection({ towRows }) {
