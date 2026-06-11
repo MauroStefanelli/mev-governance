@@ -78,6 +78,31 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 
+
+const renderCustomizedLabel = (props) => {
+  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
+
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 20;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#333"
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      style={{ fontSize: "11px" }}
+    >
+      {`${name} ${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`}
+    </text>
+  );
+};
+
+
+
 function PieTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
 
@@ -99,13 +124,10 @@ function PieTooltip({ active, payload }) {
           width: 10,
           height: 10,
           borderRadius: "50%",
-          background: p.payload.fill,
-          display: "inline-block"
+          background: p.payload.fill
         }} />
-        <span style={{ color: "#555" }}>{p.name}:</span>
-        <span style={{ fontWeight: 600, color: "#333" }}>
-          {formatEuro(p.value)}
-        </span>
+        <span>{p.name}:</span>
+        <b>{formatEuro(p.value)}</b>
         <span style={{ color: "#888" }}>
           ({perc}%)
         </span>
@@ -115,26 +137,45 @@ function PieTooltip({ active, payload }) {
 }
 
 
+
 function TowPieChart({ title, rows, sum }) {
   const [activeIndex, setActiveIndex] = useState(null);
 
-  const PIE_FIELDS = ["ordinatiRda", "impegnato", "residuo"];
+  // ✅ Totale centrale
+  const valoreTotale = sum(rows, "valoreTotale");
 
-  let data = PIE_FIELDS.map(f => ({
-    name: LABELS[f],
-    value: sum(rows, f),
-    fill: COLORS[f],
-  }))
-    .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value);
+  // ✅ ORDINE FORZATO (quello che vuoi tu)
+  const orderedData = [
+    {
+      key: "ordinatiRda",
+      name: "Ordinato",
+      value: sum(rows, "ordinatiRda"),
+      fill: "#00B853", // VERDE
+    },
+    {
+      key: "impegnato",
+      name: "Impegnato",
+      value: sum(rows, "impegnato"),
+      fill: "#E49506", // GIALLO
+    },
+    {
+      key: "residuo",
+      name: "Residuo",
+      value: sum(rows, "residuo"),
+      fill: "#2E75B6", // BLU
+    },
+  ]
+  .filter(d => d.value > 0);
 
-  // necessario per tooltip
-  data = data.map(d => ({ ...d, allData: data }));
+  // ✅ necessario per percentuali tooltip
+  const data = orderedData.map(d => ({
+    ...d,
+    allData: orderedData,
+  }));
 
   return (
     <div style={{
       flex: "1 1 280px",
-      minWidth: 0,
       background: "white",
       border: "1px solid #dadce0",
       borderRadius: "12px",
@@ -151,41 +192,73 @@ function TowPieChart({ title, rows, sum }) {
         {title}
       </div>
 
-      <ResponsiveContainer width="100%" height={230}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            outerRadius={95}
-            paddingAngle={4}
-            dataKey="value"
-            activeIndex={activeIndex}
-            onMouseEnter={(_, index) => setActiveIndex(index)}
-            onMouseLeave={() => setActiveIndex(null)}
-            label={({ percent }) =>
-              percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""
-            }
-            stroke="#fff"
-            strokeWidth={2}
-          >
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.fill} />
-            ))}
-          </Pie>
+      <div style={{ position: "relative" }}>
+        <ResponsiveContainer width="100%" height={230}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              startAngle={90}
+              endAngle={-270}
+              innerRadius={60}
+              outerRadius={95}
+              paddingAngle={3}
+              dataKey="value"
+              activeIndex={activeIndex}
+              onMouseEnter={(_, index) => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+              labelLine={{ stroke: "#999", strokeWidth: 1 }}   // ✅ QUI
+              label={renderCustomizedLabel} // ✅ LABEL CUSTOM
+              stroke="#fff"
+              strokeWidth={2}
+            >
 
-          <Tooltip content={<PieTooltip />} />
+              {data.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} />
+              ))}
+            </Pie>
 
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            wrapperStyle={{ fontSize: "11px", paddingTop: "6px" }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+            <Tooltip content={<PieTooltip />} />
+
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: "11px", paddingTop: "6px" }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+
+        {/* ✅ VALORE CENTRALE */}
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          textAlign: "center",
+          pointerEvents: "none",
+        }}>
+          <div style={{
+            fontSize: "10px",
+            color: "#888",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}>
+            Totale
+          </div>
+          <div style={{
+            fontSize: "14px",
+            color: "#1a73e8",
+            fontWeight: 700,
+          }}>
+            {formatEuroK(valoreTotale)}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
 // ── Grafico a barre ───────────────────────────────────────────────────────────
 function TowChart({ title, rows, sum }) {
   // Un unico "gruppo" con tutte le 5 voci come barre separate
