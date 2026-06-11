@@ -157,12 +157,12 @@ function TowPieChart({ title, rows, sum }) {
       <div style={{ position: "relative" }}>
         <ResponsiveContainer width="100%" height={210}>
           <PieChart>
+            
             <Pie
               data={data}
               cx="50%"
-              cy="42%"
-              innerRadius={55}
-              outerRadius={85}
+              cy="50%"           // centrato perfettamente
+              outerRadius={90}   // un po’ più grande
               paddingAngle={4}
               dataKey="value"
               activeIndex={activeIndex}
@@ -172,6 +172,7 @@ function TowPieChart({ title, rows, sum }) {
                 percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""
               }
             >
+
               {data.map((entry, i) => (
                 <Cell key={i} fill={entry.fill} />
               ))}
