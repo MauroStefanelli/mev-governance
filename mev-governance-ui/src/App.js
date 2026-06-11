@@ -115,7 +115,7 @@ function App() {
         {/* Logo + titolo */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <img
-            src="/LogoPosteIT.svg"
+            src="/logo_poste.svg"
             alt="Poste Italiane"
             style={{ height: "40px", width: "auto" }}
           />
