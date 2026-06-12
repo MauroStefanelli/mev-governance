@@ -43,13 +43,13 @@ const COLORS = {
   valoreTotale: "#262626",
   approvato:    "#00B853",
   ordinatiRda:  "#2E75B6",
-  impegnato:    "#ea4335",
+  impegnato:    "#9DC3E6",
   residuo:      "#D6DCE5",
 };
 
 const LABELS = {
   valoreTotale: "Valore Totale",
-  approvato:    "Approvato",
+  approvato:    "Approvato", 
   ordinatiRda:  "Ordinato",
   impegnato:    "Impegnato",
   residuo:      "Residuo",
@@ -76,25 +76,7 @@ function CustomTooltip({ active, payload, label }) {
     </div>
   );
 }
-/* ORIGINALE
-// ── Tooltip torta personalizzato ─────────────────────────────────────────────
-function PieTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const p = payload[0];
-  return (
-    <div style={{
-      background: "white", border: "1px solid #dadce0", borderRadius: "8px",
-      padding: "8px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", fontSize: "12px",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: p.payload.fill, display: "inline-block" }} />
-        <span style={{ color: "#555" }}>{p.name}:</span>
-        <span style={{ fontWeight: 600, color: "#333" }}>{formatEuro(p.value)}</span>
-      </div>
-    </div>
-  );
-}
-  */
+
 
 function PieTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
@@ -158,7 +140,7 @@ function TowPieChart({ title, rows, sum }) {
       </div>
 
       /* {/* Wrapper con posizione relativa per il label centrale 
-      <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", overflow: "visible" }}>
         <ResponsiveContainer width="100%" height={240}>       
           <Pie
             data={data}
@@ -191,7 +173,7 @@ function TowPieChart({ title, rows, sum }) {
             onMouseLeave={() => setActiveIndex(null)}
 
             label={renderOutsideLabel}
-            labelLine={true}
+            labelLine={false}
           >
             {data.map((entry, i) => (
               <Cell key={i} fill={entry.fill} />
@@ -272,13 +254,13 @@ function TowPieChart({ title, rows, sum }) {
       </div>
 
       <div style={{ position: "relative" }}>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={340}>
           <PieChart>
 
           <Pie
             data={data}
             cx="50%"
-            cy="55%"
+            cy="60%"
             innerRadius={50}
             outerRadius={80}
             paddingAngle={4}
@@ -631,6 +613,70 @@ function ConsumoTowSection({ towRows }) {
     </div>
   );
 }
+
+
+const renderCalloutLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
+  if (value === 0) return null;
+
+  const RADIAN = Math.PI / 180;
+
+  // punto sulla torta
+  const x1 = cx + outerRadius * Math.cos(-midAngle * RADIAN);
+  const y1 = cy + outerRadius * Math.sin(-midAngle * RADIAN);
+
+  // punto intermedio
+  const x2 = cx + (outerRadius + 15) * Math.cos(-midAngle * RADIAN);
+  const y2 = cy + (outerRadius + 15) * Math.sin(-midAngle * RADIAN);
+
+  // posizione finale
+  const x3 = cx + (outerRadius + 45) * Math.cos(-midAngle * RADIAN);
+  const y3 = cy + (outerRadius + 45) * Math.sin(-midAngle * RADIAN);
+
+  const textAnchor = x3 > cx ? "start" : "end";
+
+  // posizione box (dipende se sei a dx o sx)
+  const boxWidth = 95;
+  const boxHeight = 22;
+
+  const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
+  const rectY = y3 - boxHeight / 2;
+
+  return (
+    <g>
+      {/* linea */}
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#999" strokeWidth={1} />
+      <line x1={x2} y1={y2} x2={x3} y2={y3} stroke="#999" strokeWidth={1} />
+
+      {/* pallino */}
+      <circle cx={x2} cy={y2} r={2} fill="#999" />
+
+      {/* ✅ BOX tipo tooltip */}
+      <rect
+        x={rectX}
+        y={rectY}
+        width={boxWidth}
+        height={boxHeight}
+        fill="white"
+        stroke="#ddd"
+        rx={6}
+        style={{ filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.18))" }}
+      />
+
+      {/* ✅ TESTO sopra il box */}
+      <text
+        x={x3}
+        y={y3}
+        textAnchor={textAnchor}
+        dominantBaseline="central"
+        fontSize={11}
+        fontWeight={600}
+        fill="#333"
+      >
+        {`${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`}
+      </text>
+    </g>
+  );
+};
 
 // ── Pagina ────────────────────────────────────────────────────────────────────
 function ContrattiPage({ onUnauthorized }) {
