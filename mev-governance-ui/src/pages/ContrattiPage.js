@@ -297,6 +297,7 @@ function TowChart({ title, rows, sum }) {
     </div>
   );
 }
+
 const renderCalloutLabel = (props) => {
   const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
 
@@ -361,8 +362,6 @@ const renderCalloutLabel = (props) => {
     </g>
   );
 };
-
-
 
 // ── Sezione principale ────────────────────────────────────────────────────────
 function ConsumoTowSection({ towRows }) {
@@ -545,83 +544,6 @@ function ConsumoTowSection({ towRows }) {
   );
 }
 
-
-
-const renderCalloutLabel = (props) => {
-  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
-
-  if (value === 0) return null;
-
-  const RADIAN = Math.PI / 180;
-
-  // punto sulla torta
-  const x1 = cx + outerRadius * Math.cos(-midAngle * RADIAN);
-  const y1 = cy + outerRadius * Math.sin(-midAngle * RADIAN);
-
-  // punto intermedio
-  const x2 = cx + (outerRadius + 15) * Math.cos(-midAngle * RADIAN);
-  const y2 = cy + (outerRadius + 15) * Math.sin(-midAngle * RADIAN);
-
-  // posizione finale
-  const x3 = cx + (outerRadius + 45) * Math.cos(-midAngle * RADIAN);
-  const y3 = cy + (outerRadius + 45) * Math.sin(-midAngle * RADIAN);
-
-  const textAnchor = x3 > cx ? "start" : "end";
-
-  // posizione box (dipende se sei a dx o sx)
-  const boxWidth = 95;
-  const boxHeight = 22;
-
-  const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
-  const rectY = y3 - boxHeight / 2;
-
-  return (
-    <g>
-      {/* linea */}
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#999" strokeWidth={1} />
-      <line x1={x2} y1={y2} x2={x3} y2={y3} stroke="#999" strokeWidth={1} />
-
-      {/* pallino */}
-      <circle cx={x2} cy={y2} r={2} fill="#999" />
-
-      {/* ✅ BOX tipo tooltip */}
-      <rect
-        x={rectX}
-        y={rectY}
-        width={boxWidth}
-        height={boxHeight}
-        fill="white"
-        stroke="#ddd"
-        rx={6}
-        style={{ filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.18))" }}
-      />
-
-      {/* ✅ TESTO sopra il box */}
-
-      <text
-        x={x3}
-        y={y3 - 8}
-        textAnchor={textAnchor}
-        fontSize={10}
-        fill="#555"
-      >
-        {name}
-      </text>
-
-      <text
-        x={x3}
-        y={y3 + 8}
-        textAnchor={textAnchor}
-        fontSize={11}
-        fontWeight={700}
-        fill="#222"
-      >
-        {formatEuro(value)} ({(percent * 100).toFixed(1)}%)
-      </text>
-
-    </g>
-  );
-};
 
 // ── Pagina ────────────────────────────────────────────────────────────────────
 function ContrattiPage({ onUnauthorized }) {
