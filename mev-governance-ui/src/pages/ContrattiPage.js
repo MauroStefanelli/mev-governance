@@ -214,7 +214,7 @@ function TowPieChart({ title, rows, sum }) {
         /* Label centrale sovrapposta via CSS 
         <div style={{
           position: "absolute",
-          top: "42%", left: "50%",
+          top: "58%", left: "50%",
           transform: "translate(-50%, -50%)",
           textAlign: "center",
           pointerEvents: "none",
@@ -319,6 +319,11 @@ function TowPieChart({ title, rows, sum }) {
               iconType="circle"
               iconSize={8}
               wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }}
+              payload={data.map(d => ({
+                  value: d.name,
+                  type: "circle",
+                  color: d.fill,
+                }))}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -421,7 +426,7 @@ function TowChart({ title, rows, sum }) {
 
 
 const renderOutsideLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
-  if (percent < 0.04) return null;
+  if (value === 0) return null;
 
   const RADIAN = Math.PI / 180;
 
