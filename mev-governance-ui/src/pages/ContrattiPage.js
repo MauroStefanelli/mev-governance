@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getConsumoTow } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, Sector
 } from "recharts";
 
 
@@ -40,11 +40,11 @@ const TOW_CANONE = ["TOW02.6"];
 
 // Palette colori per le 5 voci
 const COLORS = {
-  valoreTotale: "#4e8ef7",
-  approvato:    "#34a853",
-  ordinatiRda:  "#fbbc04",
+  valoreTotale: "#262626",
+  approvato:    "#00B853",
+  ordinatiRda:  "#2E75B6",
   impegnato:    "#ea4335",
-  residuo:      "#9c27b0",
+  residuo:      "#D6DCE5",
 };
 
 const LABELS = {
@@ -159,21 +159,47 @@ function TowPieChart({ title, rows, sum }) {
 
       /* {/* Wrapper con posizione relativa per il label centrale 
       <div style={{ position: "relative" }}>
-        <ResponsiveContainer width="100%" height={210}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%" cy="42%"
-              innerRadius={52} outerRadius={80}
-              paddingAngle={2}
-              dataKey="value"
-              labelLine={false}
-            >
-              {data.map((entry, i) => (
-                <Cell key={i} fill={entry.fill} />
-              ))}
-            </Pie>
-            <Tooltip content={<PieTooltip />} />
+        <ResponsiveContainer width="100%" height={240}>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={55}
+          outerRadius={85}
+          paddingAngle={4}
+          dataKey="value"
+          
+          // 👇 ANIMAZIONE
+          isAnimationActive={true}
+          animationBegin={200}
+          animationDuration={1200}
+          animationEasing="ease-out"
+
+          activeIndex={activeIndex}
+          activeShape={(props) => (
+            <Sector
+              {...props}
+              outerRadius={props.outerRadius + 8}
+              stroke="#fff"
+              strokeWidth={2}
+            />
+          )}
+
+          onMouseEnter={(_, index) => setActiveIndex(index)}
+          onMouseLeave={() => setActiveIndex(null)}
+
+          labelLine={false}
+          label={({ value, percent }) => {
+            if (percent < 0.05) return "";
+            return `${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`;
+          }}
+        >
+          {data.map((entry, i) => (
+            <Cell key={i} fill={entry.fill} />
+          ))}
+        </Pie>
+
+        <Tooltip content={<PieTooltip />} />
             <Legend
               iconType="circle"
               iconSize={8}
@@ -220,7 +246,7 @@ function TowPieChart({ title, rows, sum }) {
     fill: COLORS[f],
   }))
     .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value);
+   // .sort((a, b) => b.value - a.value);
 
   // riferimento per calcolo percentuali
   data = data.map(d => ({ ...d, allData: data }));
@@ -256,6 +282,18 @@ function TowPieChart({ title, rows, sum }) {
               outerRadius={85}
               paddingAngle={4}
               dataKey="value"
+
+              // ✅ DIREZIONE E PARTENZA
+              startAngle={90}
+              endAngle={-270}
+
+              // ✅ ANIMAZIONE
+              isAnimationActive={true}
+              animationBegin={200}
+              animationDuration={1200}
+              animationEasing="ease-out"
+
+
               activeIndex={activeIndex}
               onMouseEnter={(_, index) => setActiveIndex(index)}
               onMouseLeave={() => setActiveIndex(null)}
