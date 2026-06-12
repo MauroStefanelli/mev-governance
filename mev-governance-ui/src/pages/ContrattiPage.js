@@ -30,29 +30,29 @@ const formatEuroK = (value) => {
   const num = parseFloat(value);
   if (isNaN(num)) return "€ 0";
   if (Math.abs(num) >= 1_000_000) return `€ ${(num / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(num) >= 1_000)     return `€ ${(num / 1_000).toFixed(0)}K`;
+  if (Math.abs(num) >= 1_000) return `€ ${(num / 1_000).toFixed(0)}K`;
   return `€ ${num.toFixed(0)}`;
 };
 
 // ── Costanti TOW ──────────────────────────────────────────────────────────────
-const TOW_TASK   = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5"];
+const TOW_TASK = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5"];
 const TOW_CANONE = ["TOW02.6"];
 
 // Palette colori per le 5 voci
 const COLORS = {
   valoreTotale: "#262626",
-  approvato:    "#00B853",
-  ordinatiRda:  "#2E75B6",
-  impegnato:    "#9DC3E6",
-  residuo:      "#D6DCE5",
+  approvato: "#00B853",
+  ordinatiRda: "#2E75B6",
+  impegnato: "#9DC3E6",
+  residuo: "#D6DCE5",
 };
 
 const LABELS = {
   valoreTotale: "Valore Totale",
-  approvato:    "Approvato", 
-  ordinatiRda:  "Ordinato",
-  impegnato:    "Impegnato",
-  residuo:      "Residuo",
+  approvato: "Approvato",
+  ordinatiRda: "Ordinato",
+  impegnato: "Impegnato",
+  residuo: "Residuo",
 };
 
 const FIELDS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
@@ -225,10 +225,10 @@ function TowChart({ title, rows, sum }) {
   const data = [{
     name: title,
     valoreTotale: sum(rows, "valoreTotale"),
-    approvato:    sum(rows, "approvato"),
-    ordinatiRda:  sum(rows, "ordinatiRda"),
-    impegnato:    sum(rows, "impegnato"),
-    residuo:      sum(rows, "residuo"),
+    approvato: sum(rows, "approvato"),
+    ordinatiRda: sum(rows, "ordinatiRda"),
+    impegnato: sum(rows, "impegnato"),
+    residuo: sum(rows, "residuo"),
   }];
 
   return (
@@ -303,7 +303,10 @@ const renderCalloutLabel = (props) => {
 
   const textAnchor = x3 > cx ? "start" : "end";
 
-  const boxWidth = 140;
+
+  const labelText = `${name}: ${formatEuro(value)} (${(percent * 100).toFixed(1)}%)`;
+  const padding = 16; // 👈 questo è il padding laterale
+  const boxWidth = Math.max(120, labelText.length * 6.5 + padding); // larghezza minima + spazio per testo
   const boxHeight = 22;
 
   const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
@@ -340,14 +343,14 @@ const renderCalloutLabel = (props) => {
 
       {/* ✅ TESTO TOOLTIP STYLE */}
       <text
-        x={textAnchor === "start" ? x3 + 10 : x3 - 10}
+        x={textAnchor === "start" ? x3 + 12 : x3 - 12}
         y={y3}
         textAnchor={textAnchor}
         dominantBaseline="middle"
         fontSize={11}
         fill="#333"
       >
-        {`${name}: ${formatEuro(value)} (${(percent * 100).toFixed(1)}%)`}
+        {labelText}
       </text>
     </g>
   );
@@ -360,7 +363,7 @@ function ConsumoTowSection({ towRows }) {
   )].sort();
 
   const [selectedTipo, setSelectedTipo] = useState("");
-  const [openDetail, setOpenDetail]     = useState({});
+  const [openDetail, setOpenDetail] = useState({});
 
   useEffect(() => {
     if (tipiContratto.length === 0) return;
@@ -377,21 +380,21 @@ function ConsumoTowSection({ towRows }) {
   const sum = (rows, field) =>
     rows.reduce((s, r) => s + (r[field] || 0), 0);
 
-  const taskRows   = group(TOW_TASK);
+  const taskRows = group(TOW_TASK);
   const canoneRows = group(TOW_CANONE);
-  const allRows    = [...taskRows, ...canoneRows];
+  const allRows = [...taskRows, ...canoneRows];
 
   const sections = [
-    { key: "task",   label: "Servizi a Task",   rows: taskRows },
+    { key: "task", label: "Servizi a Task", rows: taskRows },
     { key: "canone", label: "Servizi a Canone", rows: canoneRows },
   ].filter(s => s.rows.length > 0);
 
   const totali = {
     valoreTotale: sum(allRows, "valoreTotale"),
-    approvato:    sum(allRows, "approvato"),
-    ordinatiRda:  sum(allRows, "ordinatiRda"),
-    impegnato:    sum(allRows, "impegnato"),
-    residuo:      sum(allRows, "residuo"),
+    approvato: sum(allRows, "approvato"),
+    ordinatiRda: sum(allRows, "ordinatiRda"),
+    impegnato: sum(allRows, "impegnato"),
+    residuo: sum(allRows, "residuo"),
   };
 
   if (towRows.length === 0) return null;
@@ -517,10 +520,10 @@ function ConsumoTowSection({ towRows }) {
           {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
             {allRows.length > 0 && (
-              <TowPieChart title="Totale Servizi"   rows={allRows}    sum={sum} />
+              <TowPieChart title="Totale Servizi" rows={allRows} sum={sum} />
             )}
             {taskRows.length > 0 && (
-              <TowPieChart title="Servizi a Task"   rows={taskRows}   sum={sum} />
+              <TowPieChart title="Servizi a Task" rows={taskRows} sum={sum} />
             )}
             {canoneRows.length > 0 && (
               <TowPieChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
