@@ -1,0 +1,14 @@
+# ── .DS_Store ────────────────────────────────
+.DS_Store
+
+# ── Backend .NET ─────────────────────────────
+mev-governance-backend/bin/
+mev-governance-backend/obj/
+mev-governance-backend/mev.db
+mev-governance-backend/mev.db-shm
+mev-governance-backend/mev.db-wal
+
+# ── Frontend React ────────────────────────────
+mev-governance-ui/node_modules/
+mev-governance-ui/build/
+mev-governance-ui/.env.production
