@@ -113,106 +113,7 @@ function PieTooltip({ active, payload }) {
     </div>
   );
 }
-/* ORIGINALE
-// ── Grafico a torta ───────────────────────────────────────────────────────────
-function TowPieChart({ title, rows, sum }) {
-  const valoreTotale = sum(rows, "valoreTotale");
 
-  const PIE_FIELDS = ["ordinatiRda", "impegnato", "residuo"];
-  const data = PIE_FIELDS.map(f => ({
-    name:  LABELS[f],
-    value: sum(rows, f),
-    fill:  COLORS[f],
-  })).filter(d => d.value > 0);
-
-  return (
-    <div style={{
-      flex: "1 1 280px", minWidth: 0,
-      background: "white", border: "1px solid #dadce0",
-      borderRadius: "12px", padding: "16px 20px",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    }}>
-      <div style={{
-        fontSize: "13px", fontWeight: 700, color: "#1a73e8",
-        textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "12px",
-      }}>
-        {title}
-      </div>
-
-      /* {/* Wrapper con posizione relativa per il label centrale 
-        <div style={{ position: "relative", overflow: "visible" }}>
-        <ResponsiveContainer width="100%" height={240}>       
-          <Pie
-            data={data}
-            cx="50%"
-            cy="58%"
-            innerRadius={50}
-            outerRadius={80}
-            paddingAngle={4}
-            dataKey="value"
-
-            startAngle={90}
-            endAngle={-270}
-
-            isAnimationActive={true}
-            animationBegin={200}
-            animationDuration={1200}
-            animationEasing="ease-out"
-
-            activeIndex={activeIndex}
-            activeShape={(props) => (
-              <Sector
-                {...props}
-                outerRadius={props.outerRadius + 6}
-                stroke="#fff"
-                strokeWidth={2}
-              />
-            )}
-
-            onMouseEnter={(_, index) => setActiveIndex(index)}
-            onMouseLeave={() => setActiveIndex(null)}
-
-            label={renderOutsideLabel}
-            labelLine={false}
-          >
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.fill} />
-            ))}
-          </Pie>
-
-
-        <Tooltip content={<PieTooltip />} />
-            <Legend
-              iconType="circle"
-              iconSize={8}
-              wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }}
-              formatter={(value) => (
-                <span style={{ fontSize: "11px", color: "#555" }}>{value}</span>
-              )}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-
-        /* Label centrale sovrapposta via CSS 
-        <div style={{
-          position: "absolute",
-          top: "58%", left: "50%",
-          transform: "translate(-50%, -50%)",
-          textAlign: "center",
-          pointerEvents: "none",
-        }}>
-          <div style={{ fontSize: "9px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>
-            Val. Totale
-          </div>
-          <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, whiteSpace: "nowrap" }}>
-            {formatEuroK(valoreTotale)}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-*/
 
 
 function TowPieChart({ title, rows, sum }) {
@@ -226,11 +127,8 @@ function TowPieChart({ title, rows, sum }) {
     name: LABELS[f],
     value: sum(rows, f),
     fill: COLORS[f],
-  }))
-    .filter(d => d.value > 0)
-   // .sort((a, b) => b.value - a.value);
+  })).filter(d => d.value > 0);
 
-  // riferimento per calcolo percentuali
   data = data.map(d => ({ ...d, allData: data }));
 
   return (
@@ -253,88 +151,82 @@ function TowPieChart({ title, rows, sum }) {
         {title}
       </div>
 
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", overflow: "visible" }}>
         <ResponsiveContainer width="100%" height={340}>
           <PieChart>
 
-          <Pie
-            data={data}
-            cx="50%"
-            cy="60%"
-            innerRadius={50}
-            outerRadius={80}
-            paddingAngle={4}
-            dataKey="value"
+            <Pie
+              data={data}
+              cx="50%"
+              cy="60%"
+              innerRadius={50}
+              outerRadius={80}
+              paddingAngle={4}
+              dataKey="value"
 
-            startAngle={90}
-            endAngle={-270}
+              startAngle={90}
+              endAngle={-270}
 
-            isAnimationActive={true}
-            animationBegin={200}
-            animationDuration={1200}
-            animationEasing="ease-out"
+              isAnimationActive
+              animationDuration={1200}
 
-            activeIndex={activeIndex}
-            activeShape={(props) => (
-              <Sector
-                {...props}
-                outerRadius={props.outerRadius + 6}
-                stroke="#fff"
-                strokeWidth={2}
-              />
-            )}
+              activeIndex={activeIndex}
+              activeShape={(props) => (
+                <Sector
+                  {...props}
+                  outerRadius={props.outerRadius + 6}
+                  stroke="#fff"
+                  strokeWidth={2}
+                />
+              )}
 
-            onMouseEnter={(_, index) => setActiveIndex(index)}
-            onMouseLeave={() => setActiveIndex(null)}
+              onMouseEnter={(_, index) => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
 
-            label={renderOutsideLabel}
-            labelLine={false}
-          >
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.fill} />
-            ))}
-          </Pie>
+              label={renderCalloutLabel}
+              labelLine={false}
+            >
+              {data.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} />
+              ))}
+            </Pie>
 
-            <Tooltip content={<PieTooltip />} />
+            {/* ✅ ✅ KPI CENTRALE (FIX DEFINITIVO) */}
+            <text
+              x="50%"
+              y="60%"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={10}
+              fill="#888"
+            >
+              Val Totale
+            </text>
+
+            <text
+              x="50%"
+              y="66%"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={13}
+              fontWeight="700"
+              fill="#1a73e8"
+            >
+              {formatEuroK(valoreTotale)}
+            </text>
 
             <Legend
-              iconType="circle"
+              payload={[
+                { value: "Ordinato", type: "circle", color: COLORS.ordinatiRda },
+                { value: "Impegnato", type: "circle", color: COLORS.impegnato },
+                { value: "Residuo", type: "circle", color: COLORS.residuo },
+              ]}
               iconSize={8}
               wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }}
-              payload={data.map(d => ({
-                  value: d.name,
-                  type: "circle",
-                  color: d.fill,
-                }))}
             />
+
           </PieChart>
         </ResponsiveContainer>
-
-        {/* KPI centrale */}
-        <div style={{
-          position: "absolute",
-          top: "42%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          textAlign: "center",
-          pointerEvents: "none",
-        }}>
-          <div style={{
-            fontSize: "9px",
-            color: "#888",
-            fontWeight: 600,
-            textTransform: "uppercase",
-          }}>
-            Val Totale
-          </div>
-          <div style={{
-            fontSize: "12px",
-            color: "#1a73e8",
-            fontWeight: 700,
-          }}>
-            {formatEuroK(valoreTotale)}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -405,32 +297,71 @@ function TowChart({ title, rows, sum }) {
     </div>
   );
 }
+const renderCalloutLabel = (props) => {
+  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
 
-
-const renderOutsideLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
   if (value === 0) return null;
 
   const RADIAN = Math.PI / 180;
 
-  // punto fuori dalla torta
-  const radius = outerRadius + 18;
+  const x1 = cx + outerRadius * Math.cos(-midAngle * RADIAN);
+  const y1 = cy + outerRadius * Math.sin(-midAngle * RADIAN);
 
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const x2 = cx + (outerRadius + 15) * Math.cos(-midAngle * RADIAN);
+  const y2 = cy + (outerRadius + 15) * Math.sin(-midAngle * RADIAN);
+
+  const x3 = cx + (outerRadius + 45) * Math.cos(-midAngle * RADIAN);
+  const y3 = cy + (outerRadius + 45) * Math.sin(-midAngle * RADIAN);
+
+  const textAnchor = x3 > cx ? "start" : "end";
+
+  const boxWidth = 110;
+  const boxHeight = 30;
+
+  const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
+  const rectY = y3 - boxHeight / 2;
 
   return (
-    <text
-      x={x}
-      y={y}
-      fill="#333"
-      fontSize={11}
-      textAnchor={x > cx ? "start" : "end"}
-      dominantBaseline="central"
-    >
-      {`${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`}
-    </text>
+    <g>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#999" />
+      <line x1={x2} y1={y2} x2={x3} y2={y3} stroke="#999" />
+      <circle cx={x2} cy={y2} r={2} fill="#999" />
+
+      <rect
+        x={rectX}
+        y={rectY}
+        width={boxWidth}
+        height={boxHeight}
+        fill="white"
+        stroke="#ddd"
+        rx={6}
+        style={{ filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.18))" }}
+      />
+
+      <text
+        x={x3}
+        y={y3 - 6}
+        textAnchor={textAnchor}
+        fontSize={10}
+        fill="#555"
+      >
+        {name}
+      </text>
+
+      <text
+        x={x3}
+        y={y3 + 10}
+        textAnchor={textAnchor}
+        fontSize={11}
+        fontWeight={700}
+        fill="#222"
+      >
+        {formatEuro(value)} ({(percent * 100).toFixed(1)}%)
+      </text>
+    </g>
   );
 };
+
 
 
 // ── Sezione principale ────────────────────────────────────────────────────────
@@ -615,7 +546,10 @@ function ConsumoTowSection({ towRows }) {
 }
 
 
-const renderCalloutLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
+
+const renderCalloutLabel = (props) => {
+  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
+
   if (value === 0) return null;
 
   const RADIAN = Math.PI / 180;
@@ -663,17 +597,28 @@ const renderCalloutLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) =
       />
 
       {/* ✅ TESTO sopra il box */}
+
       <text
         x={x3}
-        y={y3}
+        y={y3 - 8}
         textAnchor={textAnchor}
-        dominantBaseline="central"
-        fontSize={11}
-        fontWeight={600}
-        fill="#333"
+        fontSize={10}
+        fill="#555"
       >
-        {`${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`}
+        {name}
       </text>
+
+      <text
+        x={x3}
+        y={y3 + 8}
+        textAnchor={textAnchor}
+        fontSize={11}
+        fontWeight={700}
+        fill="#222"
+      >
+        {formatEuro(value)} ({(percent * 100).toFixed(1)}%)
+      </text>
+
     </g>
   );
 };
