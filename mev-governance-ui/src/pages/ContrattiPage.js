@@ -152,13 +152,13 @@ function TowPieChart({ title, rows, sum }) {
       </div>
 
       <div style={{ position: "relative", overflow: "visible" }}>
-        <ResponsiveContainer width="100%" height={340}>
+        <ResponsiveContainer width="100%" height={260}>
           <PieChart>
 
             <Pie
               data={data}
               cx="50%"
-              cy="60%"
+              cy="55%"
               innerRadius={50}
               outerRadius={80}
               paddingAngle={4}
@@ -180,9 +180,6 @@ function TowPieChart({ title, rows, sum }) {
                 />
               )}
 
-              onMouseEnter={(_, index) => setActiveIndex(index)}
-              onMouseLeave={() => setActiveIndex(null)}
-
               label={renderCalloutLabel}
               labelLine={false}
             >
@@ -194,7 +191,7 @@ function TowPieChart({ title, rows, sum }) {
             {/* ✅ ✅ KPI CENTRALE (FIX DEFINITIVO) */}
             <text
               x="50%"
-              y="60%"
+              y="58%"
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={10}
@@ -205,25 +202,15 @@ function TowPieChart({ title, rows, sum }) {
 
             <text
               x="50%"
-              y="66%"
+              y="64%"
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={13}
-              fontWeight="700"
+              fontWeight={700}
               fill="#1a73e8"
             >
               {formatEuroK(valoreTotale)}
             </text>
-
-            <Legend
-              payload={[
-                { value: "Ordinato", type: "circle", color: COLORS.ordinatiRda },
-                { value: "Impegnato", type: "circle", color: COLORS.impegnato },
-                { value: "Residuo", type: "circle", color: COLORS.residuo },
-              ]}
-              iconSize={8}
-              wrapperStyle={{ fontSize: "11px", paddingTop: "4px" }}
-            />
 
           </PieChart>
         </ResponsiveContainer>
@@ -248,7 +235,7 @@ function TowChart({ title, rows, sum }) {
     <div style={{
       flex: "1 1 300px", minWidth: 0,
       background: "white", border: "1px solid #dadce0",
-      borderRadius: "12px", padding: "16px 20px",
+      borderRadius: "12px", padding: "12px 16px",
       boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
     }}>
       <div style={{
@@ -299,7 +286,7 @@ function TowChart({ title, rows, sum }) {
 }
 
 const renderCalloutLabel = (props) => {
-  const { cx, cy, midAngle, outerRadius, percent, value, name } = props;
+  const { cx, cy, midAngle, outerRadius, percent, value, name, fill } = props;
 
   if (value === 0) return null;
 
@@ -311,23 +298,27 @@ const renderCalloutLabel = (props) => {
   const x2 = cx + (outerRadius + 15) * Math.cos(-midAngle * RADIAN);
   const y2 = cy + (outerRadius + 15) * Math.sin(-midAngle * RADIAN);
 
-  const x3 = cx + (outerRadius + 45) * Math.cos(-midAngle * RADIAN);
-  const y3 = cy + (outerRadius + 45) * Math.sin(-midAngle * RADIAN);
+  const x3 = cx + (outerRadius + 35) * Math.cos(-midAngle * RADIAN);
+  const y3 = cy + (outerRadius + 35) * Math.sin(-midAngle * RADIAN);
 
   const textAnchor = x3 > cx ? "start" : "end";
 
-  const boxWidth = 110;
-  const boxHeight = 30;
+  const boxWidth = 140;
+  const boxHeight = 22;
 
   const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
   const rectY = y3 - boxHeight / 2;
 
   return (
     <g>
+      {/* linea */}
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#999" />
       <line x1={x2} y1={y2} x2={x3} y2={y3} stroke="#999" />
+
+      {/* pallino */}
       <circle cx={x2} cy={y2} r={2} fill="#999" />
 
+      {/* ✅ BOX */}
       <rect
         x={rectX}
         y={rectY}
@@ -339,25 +330,24 @@ const renderCalloutLabel = (props) => {
         style={{ filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.18))" }}
       />
 
-      <text
-        x={x3}
-        y={y3 - 6}
-        textAnchor={textAnchor}
-        fontSize={10}
-        fill="#555"
-      >
-        {name}
-      </text>
+      {/* ✅ ICONA COLORE (come tooltip) */}
+      <circle
+        cx={textAnchor === "start" ? rectX + 10 : rectX + boxWidth - 10}
+        cy={y3}
+        r={4}
+        fill={fill}
+      />
 
+      {/* ✅ TESTO TOOLTIP STYLE */}
       <text
-        x={x3}
-        y={y3 + 10}
+        x={textAnchor === "start" ? x3 + 10 : x3 - 10}
+        y={y3}
         textAnchor={textAnchor}
+        dominantBaseline="middle"
         fontSize={11}
-        fontWeight={700}
-        fill="#222"
+        fill="#333"
       >
-        {formatEuro(value)} ({(percent * 100).toFixed(1)}%)
+        {`${name}: ${formatEuro(value)} (${(percent * 100).toFixed(1)}%)`}
       </text>
     </g>
   );
