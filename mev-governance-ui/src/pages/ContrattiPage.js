@@ -159,45 +159,45 @@ function TowPieChart({ title, rows, sum }) {
 
       /* {/* Wrapper con posizione relativa per il label centrale 
       <div style={{ position: "relative" }}>
-        <ResponsiveContainer width="100%" height={240}>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={55}
-          outerRadius={85}
-          paddingAngle={4}
-          dataKey="value"
-          
-          // 👇 ANIMAZIONE
-          isAnimationActive={true}
-          animationBegin={200}
-          animationDuration={1200}
-          animationEasing="ease-out"
+        <ResponsiveContainer width="100%" height={240}>       
+          <Pie
+            data={data}
+            cx="50%"
+            cy="58%"
+            innerRadius={50}
+            outerRadius={80}
+            paddingAngle={4}
+            dataKey="value"
 
-          activeIndex={activeIndex}
-          activeShape={(props) => (
-            <Sector
-              {...props}
-              outerRadius={props.outerRadius + 8}
-              stroke="#fff"
-              strokeWidth={2}
-            />
-          )}
+            startAngle={90}
+            endAngle={-270}
 
-          onMouseEnter={(_, index) => setActiveIndex(index)}
-          onMouseLeave={() => setActiveIndex(null)}
+            isAnimationActive={true}
+            animationBegin={200}
+            animationDuration={1200}
+            animationEasing="ease-out"
 
-          labelLine={false}
-          label={({ value, percent }) => {
-            if (percent < 0.05) return "";
-            return `${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`;
-          }}
-        >
-          {data.map((entry, i) => (
-            <Cell key={i} fill={entry.fill} />
-          ))}
-        </Pie>
+            activeIndex={activeIndex}
+            activeShape={(props) => (
+              <Sector
+                {...props}
+                outerRadius={props.outerRadius + 6}
+                stroke="#fff"
+                strokeWidth={2}
+              />
+            )}
+
+            onMouseEnter={(_, index) => setActiveIndex(index)}
+            onMouseLeave={() => setActiveIndex(null)}
+
+            label={renderOutsideLabel}
+            labelLine={true}
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.fill} />
+            ))}
+          </Pie>
+
 
         <Tooltip content={<PieTooltip />} />
             <Legend
@@ -272,39 +272,46 @@ function TowPieChart({ title, rows, sum }) {
       </div>
 
       <div style={{ position: "relative" }}>
-        <ResponsiveContainer width="100%" height={210}>
+        <ResponsiveContainer width="100%" height={260}>
           <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="42%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={4}
-              dataKey="value"
 
-              // ✅ DIREZIONE E PARTENZA
-              startAngle={90}
-              endAngle={-270}
+          <Pie
+            data={data}
+            cx="50%"
+            cy="55%"
+            innerRadius={50}
+            outerRadius={80}
+            paddingAngle={4}
+            dataKey="value"
 
-              // ✅ ANIMAZIONE
-              isAnimationActive={true}
-              animationBegin={200}
-              animationDuration={1200}
-              animationEasing="ease-out"
+            startAngle={90}
+            endAngle={-270}
 
+            isAnimationActive={true}
+            animationBegin={200}
+            animationDuration={1200}
+            animationEasing="ease-out"
 
-              activeIndex={activeIndex}
-              onMouseEnter={(_, index) => setActiveIndex(index)}
-              onMouseLeave={() => setActiveIndex(null)}
-              label={({ percent }) =>
-                percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""
-              }
-            >
-              {data.map((entry, i) => (
-                <Cell key={i} fill={entry.fill} />
-              ))}
-            </Pie>
+            activeIndex={activeIndex}
+            activeShape={(props) => (
+              <Sector
+                {...props}
+                outerRadius={props.outerRadius + 6}
+                stroke="#fff"
+                strokeWidth={2}
+              />
+            )}
+
+            onMouseEnter={(_, index) => setActiveIndex(index)}
+            onMouseLeave={() => setActiveIndex(null)}
+
+            label={renderOutsideLabel}
+            labelLine={false}
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.fill} />
+            ))}
+          </Pie>
 
             <Tooltip content={<PieTooltip />} />
 
@@ -391,7 +398,7 @@ function TowChart({ title, rows, sum }) {
       </div>
 
       {/* Grafico a barre raggruppate */}
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
           barCategoryGap="30%" barGap={3}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -411,6 +418,33 @@ function TowChart({ title, rows, sum }) {
     </div>
   );
 }
+
+
+const renderOutsideLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
+  if (percent < 0.04) return null;
+
+  const RADIAN = Math.PI / 180;
+
+  // punto fuori dalla torta
+  const radius = outerRadius + 18;
+
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#333"
+      fontSize={11}
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+    >
+      {`${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`}
+    </text>
+  );
+};
+
 
 // ── Sezione principale ────────────────────────────────────────────────────────
 function ConsumoTowSection({ towRows }) {
