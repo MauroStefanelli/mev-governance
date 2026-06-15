@@ -393,6 +393,19 @@ function ConsumoTowSection({ towRows }) {
     ? towRows.filter(r => r.towContratto === selectedTipo)
     : [];
 
+
+  // ✅ CALCOLO PERCENTUALI PER TOW
+  const percentData = filtered.map(t => {
+    const totale = t.valoreTotale || 1;
+
+    return {
+      tow: t.tow,
+      ordinatoPerc: (t.ordinatiRda / totale) * 100,
+      impegnatoPerc: (t.impegnato / totale) * 100,
+      residuoPerc: (t.residuo / totale) * 100
+    };
+  });
+
   const group = (keys) =>
     filtered.filter(r => keys.some(k => r.tow?.toUpperCase().includes(k.toUpperCase())));
   const sum = (rows, field) =>
@@ -551,18 +564,67 @@ function ConsumoTowSection({ towRows }) {
 
           {/* ── Grafico TOW contratto selezionato ── */}
           {selectedTipo && filtered.length > 0 && (
+            
+          <div style={{
+            background: "white",
+            border: "1px solid #dadce0",
+            borderRadius: "12px",
+            padding: "16px",
+            marginTop: "12px"
+          }}>
             <div style={{
-              display: "flex",
-              gap: "16px",
-              flexWrap: "wrap",
-              marginTop: "8px"
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#1a73e8",
+              marginBottom: "10px"
             }}>
-              <TowChart
-                title={`TOW - ${selectedTipo}`}
-                rows={filtered}
-                sum={sum}
-              />
+              Percentuale Consumo TOW
             </div>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={percentData}>
+
+                <CartesianGrid strokeDasharray="3 3" />
+
+                <XAxis dataKey="tow" />
+
+                <YAxis
+                  domain={[0, 100]}
+                  tickFormatter={(v) => `${v}%`}
+                />
+
+                <Tooltip formatter={(v) => `${v.toFixed(1)}%`} />
+
+                <Legend />
+
+                <Bar
+                  dataKey="ordinatoPerc"
+                  stackId="a"
+                  fill="#2E75B6"
+                  name="Ordinati (RDA)"
+                  label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
+                />
+
+                <Bar
+                  dataKey="impegnatoPerc"
+                  stackId="a"
+                  fill="#00B853"
+                  name="Impegnato"
+                  label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
+                />
+
+                <Bar
+                  dataKey="residuoPerc"
+                  stackId="a"
+                  fill="#D6DCE5"
+                  name="Residuo"
+                  label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
+                />
+
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
           )}
 
 
@@ -605,5 +667,6 @@ function ContrattiPage({ onUnauthorized }) {
     </div>
   );
 }
+
 
 export default ContrattiPage;
