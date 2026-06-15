@@ -545,6 +545,24 @@ function ConsumoTowSection({ towRows }) {
           </div>
 
 
+          {/* ── Grafico TOW contratto selezionato ── */}
+          {selectedTipo && filtered.length > 0 && (
+            <div style={{
+              display: "flex",
+              gap: "16px",
+              flexWrap: "wrap",
+              marginTop: "8px"
+            }}>
+              <TowChart
+                title={`TOW - ${selectedTipo}`}
+                rows={filtered}
+                sum={sum}
+              />
+            </div>
+          )}
+
+
+
         </>
       )}
     </div>
