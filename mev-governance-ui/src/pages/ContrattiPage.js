@@ -133,7 +133,7 @@ function TowPieChart({ title, rows, sum }) {
 
   return (
     <div style={{
-      flex: "1 1 280px",
+      flex: "1 1 220px",
       minWidth: 0,
       background: "white",
       border: "1px solid #dadce0",
@@ -152,7 +152,7 @@ function TowPieChart({ title, rows, sum }) {
       </div>
 
       <div style={{ position: "relative", overflow: "visible" }}>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={220}>
           <PieChart>
 
             <Pie
@@ -202,7 +202,7 @@ function TowPieChart({ title, rows, sum }) {
 
             <text
               x="50%"
-              y="64%"
+              y="55%"
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={13}
@@ -233,7 +233,7 @@ function TowChart({ title, rows, sum }) {
 
   return (
     <div style={{
-      flex: "1 1 300px", minWidth: 0,
+      flex: "1 1 240px", padding: "12px 14px", minWidth: 0,
       background: "white", border: "1px solid #dadce0",
       borderRadius: "12px", padding: "12px 16px",
       boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
@@ -301,10 +301,10 @@ const renderCalloutLabel = (props) => {
   const x1 = cx + outerRadius * Math.cos(-midAngle * RADIAN);
   const y1 = cy + outerRadius * Math.sin(-midAngle * RADIAN);
 
-  const x2 = cx + (outerRadius + 15) * Math.cos(-midAngle * RADIAN);
+  const x2 = cx + (outerRadius + 10) * Math.cos(-midAngle * RADIAN);
   const y2 = cy + (outerRadius + 15) * Math.sin(-midAngle * RADIAN);
 
-  const x3 = cx + (outerRadius + 35) * Math.cos(-midAngle * RADIAN);
+  const x3 = cx + (outerRadius + 25) * Math.cos(-midAngle * RADIAN);
   const y3 = cy + (outerRadius + 35) * Math.sin(-midAngle * RADIAN);
 
   const textAnchor = x3 > cx ? "start" : "end";
@@ -345,10 +345,6 @@ const renderCalloutLabel = (props) => {
 
       {/* ✅ ICONA COLORE (come tooltip) */}
 
-      const circleX = textAnchor === "start"
-        ? rectX + 10
-        : rectX + 10; // 👈 sempre a sinistra del box
-
       <circle
         cx={circleX}
         cy={y3}
@@ -359,11 +355,6 @@ const renderCalloutLabel = (props) => {
 
 
       {/* ✅ TESTO TOOLTIP STYLE */}
-
-      const textX = textAnchor === "start"
-        ? rectX + 18
-        : rectX + 18;
-
 
       <text
         x={textX}
@@ -600,17 +591,21 @@ function ConsumoTowSection({ towRows }) {
                 color: "#1e293b",
                 letterSpacing: "0.3px",
               }}>
-                Percentuale Consumo TOW
+                Consumo TOW
               </div>
-              <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                 {["ordinatiRda", "impegnato", "residuo"].map(key => (
-                  <div key={key} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <div key={key} style={{
+                    display: "flex", alignItems: "center", gap: "7px",
+                    background: "#f8fafc", borderRadius: "8px",
+                    padding: "5px 12px 5px 10px",
+                  }}>
                     <span style={{
-                      width: 8, height: 8, borderRadius: "50%",
+                      width: 12, height: 12, borderRadius: "4px",
                       background: COLORS[key], display: "inline-block",
                       flexShrink: 0,
                     }} />
-                    <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>
+                    <span style={{ fontSize: "13px", color: "#1e293b", fontWeight: 600 }}>
                       {LABELS[key]}
                     </span>
                   </div>
@@ -660,7 +655,7 @@ function ConsumoTowSection({ towRows }) {
                         <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: "6px", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
                           {label}
                         </div>
-                        {payload.map(p => {
+                        {payload.filter(p => p.value > 0).map(p => {
                           const euroKey = EURO_KEY[p.dataKey];
                           const euroVal = p.payload?.[euroKey];
                           return (
