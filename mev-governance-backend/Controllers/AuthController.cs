@@ -23,9 +23,6 @@ public class AuthController : ControllerBase
         _config = config;
     }
 
-    // ============================================================
-    // LOGIN
-    // ============================================================
     [HttpPost("login")]
     [AllowAnonymous]
     public IActionResult Login([FromBody] LoginRequest request)
@@ -66,8 +63,117 @@ public class AuthController : ControllerBase
         });
     }
 
-    // ============================================================
-    // REFRESH TOKEN
-    // ============================================================
     [HttpPost("refresh")]
     [AllowAnonymous]
+    public IActionResult Refresh([FromBody] RefreshRequest request)
+    {
+        var user = _db.Users.FirstOrDefault(u =>
+            u.RefreshToken == request.RefreshToken);
+
+        if (user == null || user.RefreshTokenExpiry == null || user.RefreshTokenExpiry < DateTime.UtcNow)
+            return Unauthorized("Refresh token non valido");
+
+        var newJwt = GenerateToken(user);
+        var newRefresh = GenerateRefreshToken();
+
+        user.RefreshToken = newRefresh;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+
+        _db.SaveChanges();
+
+        return Ok(new
+        {
+            token = newJwt,
+            refreshToken = newRefresh
+        });
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public IActionResult Logout()
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == int.Parse(userId));
+        if (user != null)
+        {
+            user.LastLogout = DateTime.UtcNow;
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+
+            var lastLog = _db.UserAccessLogs
+                .Where(l => l.UserId == user.Id && l.LogoutAt == null)
+                .OrderByDescending(l => l.LoginAt)
+                .FirstOrDefault();
+
+            if (lastLog != null)
+                lastLog.LogoutAt = DateTime.UtcNow;
+
+            _db.SaveChanges();
+        }
+
+        return Ok(new { message = "Logout registrato (ok)" });
+    }
+
+    [HttpGet("editor-logins")]
+    [Authorize]
+    public IActionResult GetEditorLogins([FromQuery] DateTime? since)
+    {
+        if (!User.IsInRole("Admin"))
+            return Forbid();
+
+        var query = _db.Users
+            .Where(u => u.Role == "Editor" && u.LastLogin != null);
+
+        if (since.HasValue)
+            query = query.Where(u => u.LastLogin > since.Value);
+
+        var result = query
+            .Select(u => new
+            {
+                u.Id,
+                u.Username,
+                u.FullName,
+                u.LastLogin,
+                u.LastLogout
+            })
+            .ToList();
+
+        return Ok(result);
+    }
+
+    private string GenerateToken(AppUser user)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var expires = DateTime.UtcNow.AddMinutes(15);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("fullName", user.FullName)
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _config["Jwt:Issuer"],
+            audience: _config["Jwt:Audience"],
+            claims: claims,
+            expires: expires,
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private string GenerateRefreshToken()
+    {
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+    }
+}
+
+public record LoginRequest(string Username, string Password);
+public record RefreshRequest(string RefreshToken);
