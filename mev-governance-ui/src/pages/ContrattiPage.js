@@ -152,7 +152,7 @@ function TowPieChart({ title, rows, sum }) {
       </div>
 
       <div style={{ position: "relative", overflow: "visible" }}>
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={280}>
           <PieChart>
 
             <Pie
@@ -297,76 +297,51 @@ const renderCalloutLabel = (props) => {
   if (value === 0) return null;
 
   const RADIAN = Math.PI / 180;
+  const off = 14;
 
   const x1 = cx + outerRadius * Math.cos(-midAngle * RADIAN);
   const y1 = cy + outerRadius * Math.sin(-midAngle * RADIAN);
 
-  const x2 = cx + (outerRadius + 10) * Math.cos(-midAngle * RADIAN);
-  const y2 = cy + (outerRadius + 15) * Math.sin(-midAngle * RADIAN);
+  const x2 = cx + (outerRadius + off) * Math.cos(-midAngle * RADIAN);
+  const y2 = cy + (outerRadius + off) * Math.sin(-midAngle * RADIAN);
 
-  const x3 = cx + (outerRadius + 25) * Math.cos(-midAngle * RADIAN);
-  const y3 = cy + (outerRadius + 35) * Math.sin(-midAngle * RADIAN);
+  const x3 = cx + (outerRadius + off + 20) * Math.cos(-midAngle * RADIAN);
+  const y3 = cy + (outerRadius + off + 20) * Math.sin(-midAngle * RADIAN);
 
   const textAnchor = x3 > cx ? "start" : "end";
 
+  const labelText = `${name}: ${formatEuroK(value)} (${(percent * 100).toFixed(0)}%)`;
+  const boxWidth = Math.min(155, labelText.length * 6.8 + 16);
+  const boxHeight = 20;
 
-  const labelText = `${name}: ${formatEuro(value)} (${(percent * 100).toFixed(1)}%)`;
-  const padding = 16; // 👈 questo è il padding laterale
-  const boxWidth = Math.max(120, labelText.length * 6.5 + padding); // larghezza minima + spazio per testo
-  const boxHeight = 22;
-
-  const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
+  const rectX = textAnchor === "start" ? x3 - 4 : x3 - boxWidth + 4;
   const rectY = y3 - boxHeight / 2;
 
-  const circleX = rectX + 10;
-  const textX = rectX + 18;
-
+  const dotX = textAnchor === "start" ? rectX + 9 : rectX + boxWidth - 9;
+  const textX = textAnchor === "start" ? dotX + 9 : dotX - 9;
 
   return (
     <g>
-      {/* linea */}
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#999" />
-      <line x1={x2} y1={y2} x2={x3} y2={y3} stroke="#999" />
-
-      {/* pallino */}
-      <circle cx={x2} cy={y2} r={2} fill="#999" />
-
-      {/* ✅ BOX */}
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1.5} />
+      <line x1={x2} y1={y2} x2={x3} y2={y3} stroke="#94a3b8" strokeWidth={1.5} />
+      <circle cx={x2} cy={y2} r={2} fill="#94a3b8" />
       <rect
-        x={rectX}
-        y={rectY}
-        width={boxWidth}
-        height={boxHeight}
-        fill="white"
-        stroke="#ddd"
-        rx={6}
-        style={{ filter: "drop-shadow(0px 2px 6px rgba(0,0,0,0.18))" }}
+        x={rectX} y={rectY} width={boxWidth} height={boxHeight}
+        fill="white" stroke="#e2e8f0" rx={4}
+        style={{ filter: "drop-shadow(0px 1px 4px rgba(0,0,0,0.08))" }}
       />
-
-      {/* ✅ ICONA COLORE (come tooltip) */}
-
-      <circle
-        cx={circleX}
-        cy={y3}
-        r={4}
-        fill={fill}
-      />
-
-
-
-      {/* ✅ TESTO TOOLTIP STYLE */}
-
+      <circle cx={dotX} cy={y3} r={4} fill={fill} />
       <text
         x={textX}
         y={y3}
-        textAnchor="start"
+        textAnchor={textAnchor}
         dominantBaseline="middle"
         fontSize={11}
-        fill="#333"
+        fill="#334155"
+        fontWeight={500}
       >
         {labelText}
       </text>
-
     </g>
   );
 };
@@ -615,7 +590,7 @@ function ConsumoTowSection({ towRows }) {
 
             <ResponsiveContainer width="100%" height={Math.max(200, percentData.length * 50)}>
               <BarChart data={percentData} layout="vertical"
-                margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+                margin={{ top: 0, right: 36, left: 0, bottom: 0 }}
                 barCategoryGap={10}
               >
                 <XAxis
@@ -692,12 +667,12 @@ function ConsumoTowSection({ towRows }) {
                   stackId="a"
                   fill={COLORS.ordinatiRda}
                   name="Ordinato"
-                  minPointSize={5}
+                  minPointSize={8}
                   radius={[4, 0, 0, 4]}
                   background={{ fill: "#f1f5f9", radius: 4 }}
                   label={{
                     position: "insideLeft",
-                    formatter: (v) => v > 6 ? `${Number(v).toFixed(0)}%` : "",
+                    formatter: (v) => v > 2 ? `${Number(v).toFixed(0)}%` : "",
                     fontSize: 11,
                     fontWeight: 600,
                     fill: "#fff",
@@ -711,7 +686,7 @@ function ConsumoTowSection({ towRows }) {
                   minPointSize={5}
                   label={{
                     position: "inside",
-                    formatter: (v) => v > 8 ? `${Number(v).toFixed(0)}%` : "",
+                    formatter: (v) => v > 4 ? `${Number(v).toFixed(0)}%` : "",
                     fontSize: 11,
                     fontWeight: 600,
                     fill: "#1e293b",
@@ -724,8 +699,8 @@ function ConsumoTowSection({ towRows }) {
                   name="Residuo"
                   radius={[0, 4, 4, 0]}
                   label={{
-                    position: "insideRight",
-                    formatter: (v) => v > 8 ? `${Number(v).toFixed(0)}%` : "",
+                    position: "right",
+                    formatter: (v) => v > 0 ? `${Number(v).toFixed(0)}%` : "",
                     fontSize: 11,
                     fill: "#64748b",
                     offset: 4,
