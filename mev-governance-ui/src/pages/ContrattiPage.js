@@ -576,36 +576,96 @@ function ConsumoTowSection({ towRows }) {
 
           {/* ── Grafico TOW contratto selezionato ── */}
           {selectedTipo && filtered.length > 0 && (
-            
           <div style={{
             background: "white",
-            border: "1px solid #dadce0",
+            border: "1px solid #e5e7eb",
             borderRadius: "12px",
-            padding: "16px",
-            marginTop: "12px"
+            padding: "20px 20px 12px",
+            marginTop: "12px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
           }}>
             <div style={{
-              fontSize: "13px",
-              fontWeight: 700,
-              color: "#1a73e8",
-              marginBottom: "10px"
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "16px",
             }}>
-              Percentuale Consumo TOW
+              <div style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "#1e293b",
+                letterSpacing: "0.3px",
+              }}>
+                Percentuale Consumo TOW
+              </div>
+              <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+                {["ordinatiRda", "impegnato", "residuo"].map(key => (
+                  <div key={key} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: COLORS[key], display: "inline-block",
+                      flexShrink: 0,
+                    }} />
+                    <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>
+                      {LABELS[key]}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={percentData} layout="vertical">
-
-                <CartesianGrid strokeDasharray="3 3" />
-
-  
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="tow" type="category" />
-
-
-                <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
-
-                <Legend />
+            <ResponsiveContainer width="100%" height={Math.max(200, percentData.length * 50)}>
+              <BarChart data={percentData} layout="vertical"
+                margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+                barCategoryGap={10}
+              >
+                <XAxis
+                  type="number"
+                  domain={[0, 100]}
+                  tick={{ fontSize: 10, fill: "#94a3b8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={v => `${v}%`}
+                />
+                <YAxis
+                  dataKey="tow"
+                  type="category"
+                  tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={150}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    return (
+                      <div style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                        fontSize: "12px",
+                      }}>
+                        <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: "4px" }}>
+                          {label}
+                        </div>
+                        {payload.map(p => (
+                          <div key={p.dataKey} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{
+                              width: 8, height: 8, borderRadius: "50%",
+                              background: p.color, display: "inline-block", flexShrink: 0,
+                            }} />
+                            <span style={{ color: "#64748b" }}>{p.name}:</span>
+                            <span style={{ fontWeight: 600, color: "#1e293b" }}>
+                              {`${Number(p.value).toFixed(1)}%`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }}
+                />
 
                 <Bar
                   dataKey="ordinatoPerc"
@@ -613,41 +673,46 @@ function ConsumoTowSection({ towRows }) {
                   fill={COLORS.ordinatiRda}
                   name="Ordinato"
                   minPointSize={5}
-
+                  radius={[4, 0, 0, 4]}
+                  background={{ fill: "#f1f5f9", radius: 4 }}
                   label={{
-                    position: "inside",
-                    formatter: (v) => `${Number(v).toFixed(0)}%`
+                    position: "insideLeft",
+                    formatter: (v) => v > 6 ? `${Number(v).toFixed(0)}%` : "",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fill: "#fff",
                   }}
-
                 />
-
                 <Bar
                   dataKey="impegnatoPerc"
                   stackId="a"
                   fill={COLORS.impegnato}
                   name="Impegnato"
                   minPointSize={5}
-                  
-                  label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
+                  label={{
+                    position: "inside",
+                    formatter: (v) => v > 8 ? `${Number(v).toFixed(0)}%` : "",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fill: "#1e293b",
+                  }}
                 />
-
                 <Bar
                   dataKey="residuoPerc"
                   stackId="a"
                   fill={COLORS.residuo}
                   name="Residuo"
-                  
-                  label={({ value }) =>
-                    value > 10 ? `${value.toFixed(0)}%` : ""
-                  }
-
-
+                  radius={[0, 4, 4, 0]}
+                  label={{
+                    position: "inside",
+                    formatter: (v) => v > 8 ? `${Number(v).toFixed(0)}%` : "",
+                    fontSize: 11,
+                    fill: "#64748b",
+                  }}
                 />
-
               </BarChart>
             </ResponsiveContainer>
           </div>
-
           )}
 
 
