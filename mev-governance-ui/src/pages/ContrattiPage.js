@@ -312,6 +312,10 @@ const renderCalloutLabel = (props) => {
   const rectX = textAnchor === "start" ? x3 - 5 : x3 - boxWidth;
   const rectY = y3 - boxHeight / 2;
 
+  const circleX = rectX + 10;
+  const textX = rectX + 18;
+
+
   return (
     <g>
       {/* linea */}
