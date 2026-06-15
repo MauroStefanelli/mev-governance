@@ -165,7 +165,9 @@ using (var scope = app.Services.CreateScope())
             ""Approvato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
             ""OrdinatiRda""    NUMERIC(18,2) NOT NULL DEFAULT 0,
             ""Impegnato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
-            ""Residuo""        NUMERIC(18,2) NOT NULL DEFAULT 0
+            ""Residuo""        NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""TOW Approvati""  NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""TOW Residui""    NUMERIC(18,2) NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS ""AppSettings"" (

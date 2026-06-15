@@ -334,24 +334,38 @@ const renderCalloutLabel = (props) => {
       />
 
       {/* ✅ ICONA COLORE (come tooltip) */}
+
+      const circleX = textAnchor === "start"
+        ? rectX + 10
+        : rectX + 10; // 👈 sempre a sinistra del box
+
       <circle
-        cx={textAnchor === "start" ? rectX + 10 : rectX + boxWidth - 10}
+        cx={circleX}
         cy={y3}
         r={4}
         fill={fill}
       />
 
+
+
       {/* ✅ TESTO TOOLTIP STYLE */}
+
+      const textX = textAnchor === "start"
+        ? rectX + 18
+        : rectX + 18;
+
+
       <text
-        x={textAnchor === "start" ? x3 + 12 : x3 - 12}
+        x={textX}
         y={y3}
-        textAnchor={textAnchor}
+        textAnchor="start"
         dominantBaseline="middle"
         fontSize={11}
         fill="#333"
       >
         {labelText}
       </text>
+
     </g>
   );
 };

@@ -15,4 +15,12 @@ public class ConsumoTow
     public decimal OrdinatiRda { get; set; }         // colonna "Ordinati(RDA)"
     public decimal Impegnato { get; set; }
     public decimal Residuo { get; set; }
+    public decimal TowApprovati { get; set; }
+    public decimal TowImpegnati { get; set; }
+    public decimal TowResidui { get; set; } 
+
 }
+
+
+
+

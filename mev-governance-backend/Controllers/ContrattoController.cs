@@ -482,8 +482,12 @@ public class ContrattoController : BaseController
         int colOrdinatiRda    = FindCol(columnMap, "Ordinati(RDA)", "Ordinati (RDA)", "Ordinati RDA", "OrdinatiRDA", "OrdinatiRda");
         int colImpegnato      = FindCol(columnMap, "Impegnato");
         int colResiduo        = FindCol(columnMap, "Residuo");
+        int colTowApprovati   = FindCol(columnMap, "TOW Approvati");
+        int colTowImpegnati   = FindCol(columnMap, "TOW Impegnati");
+        int colTowResidui     = FindCol(columnMap, "TOW Residui");
+        
 
-        Console.WriteLine($"[TOW] Colonne: TOW={colTow}, Contratto={colContratto}, OrdinatiRDA={colOrdinatiRda}, Impegnato={colImpegnato}");
+        Console.WriteLine($"[TOW] Colonne: TOW={colTow}, Contratto={colContratto}, OrdinatiRDA={colOrdinatiRda}, Impegnato={colImpegnato}, TOW_Approvati={colTowApprovati}, TOW_Impegnati={colTowImpegnati}, TOW_Residui={colTowResidui}");
 
         if (colTow == 0) { Console.WriteLine("[TOW] Colonna TOW non trovata, import saltato"); return; }
 
@@ -517,6 +521,9 @@ public class ContrattoController : BaseController
                 OrdinatiRda    = GetDec(row, colOrdinatiRda),
                 Impegnato      = GetDec(row, colImpegnato),
                 Residuo        = GetDec(row, colResiduo),
+                TowApprovati   = GetDec(row, colTowApprovati),
+                TowImpegnati   = GetDec(row, colTowImpegnati),
+                TowResidui     = GetDec(row, colTowResidui),
             });
             count++;
         }
