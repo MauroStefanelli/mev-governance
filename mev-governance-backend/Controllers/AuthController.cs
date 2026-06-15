@@ -24,7 +24,7 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
-    // POST /api/auth/login
+    // LOGIN
     // ============================================================
     [HttpPost("login")]
     [AllowAnonymous]
@@ -39,7 +39,6 @@ public class AuthController : ControllerBase
         user.LastLogin  = DateTime.UtcNow;
         user.LastLogout = null;
 
-        // Crea voce nello storico accessi
         var logEntry = new UserAccessLog
         {
             UserId   = user.Id,
@@ -49,13 +48,21 @@ public class AuthController : ControllerBase
             LoginAt  = DateTime.UtcNow,
         };
         _db.UserAccessLogs.Add(logEntry);
-        _db.SaveChanges();
 
+        // ✅ JWT
         var token = GenerateToken(user);
+
+        // ✅ REFRESH TOKEN
+        var refreshToken = GenerateRefreshToken();
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+
+        _db.SaveChanges();
 
         return Ok(new
         {
             token,
+            refreshToken,
             username = user.Username,
             fullName = user.FullName,
             role = user.Role
@@ -63,7 +70,35 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
-    // POST /api/auth/logout  — registra data/ora uscita
+    // REFRESH TOKEN
+    // ============================================================
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public IActionResult Refresh([FromBody] RefreshRequest request)
+    {
+        var user = _db.Users.FirstOrDefault(u =>
+            u.RefreshToken == request.RefreshToken);
+
+        if (user == null || user.RefreshTokenExpiry < DateTime.UtcNow)
+            return Unauthorized("Refresh token non valido");
+
+        var newJwt = GenerateToken(user);
+        var newRefresh = GenerateRefreshToken();
+
+        user.RefreshToken = newRefresh;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+
+        _db.SaveChanges();
+
+        return Ok(new
+        {
+            token = newJwt,
+            refreshToken = newRefresh
+        });
+    }
+
+    // ============================================================
+    // LOGOUT
     // ============================================================
     [HttpPost("logout")]
     [Authorize]
@@ -77,11 +112,15 @@ public class AuthController : ControllerBase
         {
             user.LastLogout = DateTime.UtcNow;
 
-            // Aggiorna l'ultima voce nello storico (quella senza LogoutAt)
+            // ✅ invalida refresh token
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+
             var lastLog = _db.UserAccessLogs
                 .Where(l => l.UserId == user.Id && l.LogoutAt == null)
                 .OrderByDescending(l => l.LoginAt)
                 .FirstOrDefault();
+
             if (lastLog != null)
                 lastLog.LogoutAt = DateTime.UtcNow;
 
@@ -92,215 +131,14 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
-    // GET /api/auth/editor-logins  — ultimi login Editor (solo Admin)
-    // Restituisce gli Editor che hanno fatto login dopo il timestamp
-    // passato come query-param ?since=<ISO8601>, oppure tutti se omesso.
-    // ============================================================
-    [HttpGet("editor-logins")]
-    [Authorize]
-    public IActionResult GetEditorLogins([FromQuery] DateTime? since)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var query = _db.Users.Where(u => u.Role == "Editor" && u.LastLogin != null);
-
-        if (since.HasValue)
-            query = query.Where(u => u.LastLogin > since.Value);
-
-        var result = query
-            .Select(u => new
-            {
-                u.Id,
-                u.Username,
-                u.FullName,
-                u.LastLogin,
-                u.LastLogout
-            })
-            .ToList();
-
-        return Ok(result);
-    }
-
-    // ============================================================
-    // GET /api/auth/users/{id}/access-log  (solo Admin)
-    // Storico completo di login/logout per un utente
-    // ============================================================
-    [HttpGet("users/{id}/access-log")]
-    [Authorize]
-    public IActionResult GetAccessLog(int id)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var logs = _db.UserAccessLogs
-            .Where(l => l.UserId == id)
-            .OrderByDescending(l => l.LoginAt)
-            .Select(l => new
-            {
-                l.Id,
-                l.LoginAt,
-                l.LogoutAt,
-            })
-            .ToList();
-
-        return Ok(logs);
-    }
-
-    // ============================================================
-    // GET /api/auth/users  (solo Admin)
-    // ============================================================
-    [HttpGet("users")]
-    [Authorize]
-    public IActionResult GetUsers()
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var users = _db.Users
-            .Select(u => new
-            {
-                u.Id,
-                u.Username,
-                u.FullName,
-                u.Email,
-                u.Role,
-                u.IsActive,
-                u.SendEmail,
-                u.LastLogin,
-                u.LastLogout
-            })
-            .ToList();
-
-        return Ok(users);
-    }
-
-    // ============================================================
-    // POST /api/auth/users  (solo Admin)
-    // ============================================================
-    [HttpPost("users")]
-    [Authorize]
-    public IActionResult CreateUser([FromBody] CreateUserRequest request)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        if (_db.Users.Any(u => u.Username == request.Username))
-            return BadRequest("Username già esistente");
-
-        var user = new AppUser
-        {
-            Username     = request.Username,
-            FullName     = request.FullName,
-            Email        = request.Email ?? "",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role         = request.Role == "Admin" ? "Admin" : "Editor",
-            IsActive     = true
-        };
-
-        _db.Users.Add(user);
-        _db.SaveChanges();
-
-        return Ok(new { user.Id, user.Username, user.FullName, user.Role });
-    }
-
-    // ============================================================
-    // PUT /api/auth/me/password  — utente corrente cambia la propria password
-    // ============================================================
-    [HttpPut("me/password")]
-    [Authorize]
-    public IActionResult ChangeMyPassword([FromBody] ChangePasswordRequest request)
-    {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
-
-        var user = _db.Users.FirstOrDefault(u => u.Id == int.Parse(userId));
-        if (user == null) return NotFound();
-
-        if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
-            return BadRequest("Password attuale non corretta");
-
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        _db.SaveChanges();
-
-        return Ok(new { message = "Password aggiornata" });
-    }
-
-    // ============================================================
-    // PUT /api/auth/users/{id}/toggle  (solo Admin)
-    // ============================================================
-    [HttpPut("users/{id}/toggle")]
-    [Authorize]
-    public IActionResult ToggleUser(int id)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var user = _db.Users.FirstOrDefault(u => u.Id == id);
-        if (user == null) return NotFound();
-
-        user.IsActive = !user.IsActive;
-        _db.SaveChanges();
-
-        return Ok(new { user.Id, user.IsActive });
-    }
-
-    // ============================================================
-    // PUT /api/auth/users/{id}/toggleemail  (solo Admin)
-    // ============================================================
-    [HttpPut("users/{id}/toggleemail")]
-    [Authorize]
-    public IActionResult ToggleEmail(int id)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var user = _db.Users.FirstOrDefault(u => u.Id == id);
-        if (user == null) return NotFound();
-
-        user.SendEmail = !user.SendEmail;
-        _db.SaveChanges();
-
-        return Ok(new { user.Id, user.SendEmail });
-    }
-
-    // ============================================================
-    // PUT /api/auth/users/{id}/password  (solo Admin)
-    // ============================================================
-    [HttpPut("users/{id}/password")]
-    [Authorize]
-    public IActionResult ResetPassword(int id, [FromBody] ResetPasswordRequest request)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var user = _db.Users.FirstOrDefault(u => u.Id == id);
-        if (user == null) return NotFound();
-
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        _db.SaveChanges();
-
-        return Ok(new { message = "Password aggiornata" });
-    }
-
-    // ============================================================
-    // DELETE /api/auth/users/{id}  (solo Admin)
-    // ============================================================
-    [HttpDelete("users/{id}")]
-    [Authorize]
-    public IActionResult DeleteUser(int id)
-    {
-        if (!IsAdmin()) return Forbid();
-
-        var user = _db.Users.FirstOrDefault(u => u.Id == id);
-        if (user == null) return NotFound();
-        _db.Users.Remove(user);
-        _db.SaveChanges();
-
-        return Ok(new { message = "Utente eliminato" });
-    }
-
-    // ============================================================
-    // Helpers
+    // GENERATE JWT
     // ============================================================
     private string GenerateToken(AppUser user)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expires = DateTime.UtcNow.AddHours(double.Parse(_config["Jwt:ExpiresHours"]!));
+
+        var expires = DateTime.UtcNow.AddMinutes(15); // ✅ breve durata
 
         var claims = new[]
         {
@@ -321,17 +159,17 @@ public class AuthController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private bool IsAdmin()
+    // ============================================================
+    // GENERATE REFRESH TOKEN
+    // ============================================================
+    private string GenerateRefreshToken()
     {
-        var role = User.FindFirst(ClaimTypes.Role)?.Value;
-        return role == "Admin";
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
     }
 }
 
 // ============================================================
-// Request DTOs
+// DTO
 // ============================================================
 public record LoginRequest(string Username, string Password);
-public record CreateUserRequest(string Username, string FullName, string? Email, string Password, string? Role);
-public record ResetPasswordRequest(string NewPassword);
-public record ChangePasswordRequest(string OldPassword, string NewPassword);
+public record RefreshRequest(string RefreshToken);

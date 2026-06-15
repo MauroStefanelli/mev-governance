@@ -23,4 +23,7 @@ public class AppUser
     // Tracciamento accessi
     public DateTime? LastLogin  { get; set; }
     public DateTime? LastLogout { get; set; }
+
+    public string? RefreshToken { get; set; }
+    public DateTime? RefreshTokenExpiry { get; set; }
 }

@@ -13,7 +13,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        policy.WithOrigins(
+            "https://mev-governance-frontend.onrender.com"
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod();
     });
 });
 
@@ -67,6 +71,7 @@ builder.Services
             ValidateIssuer           = true,
             ValidateAudience         = true,
             ValidateLifetime         = true,
+            ClockSkew                = TimeSpan.Zero, 
             ValidateIssuerSigningKey = true,
             ValidIssuer              = jwtIssuer,
             ValidAudience            = jwtAudience,
@@ -105,7 +110,11 @@ using (var scope = app.Services.CreateScope())
             ""IsActive""     BOOLEAN NOT NULL DEFAULT TRUE,
             ""SendEmail""    BOOLEAN NOT NULL DEFAULT FALSE,
             ""LastLogin""    TIMESTAMP,
-            ""LastLogout""   TIMESTAMP
+            ""LastLogout""   TIMESTAMP,
+            ""RefreshToken""      TEXT,
+            ""RefreshTokenExpiry"" TIMESTAMP
+
+
         );
 
         CREATE TABLE IF NOT EXISTS ""MevItems"" (
@@ -166,8 +175,9 @@ using (var scope = app.Services.CreateScope())
             ""OrdinatiRda""    NUMERIC(18,2) NOT NULL DEFAULT 0,
             ""Impegnato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
             ""Residuo""        NUMERIC(18,2) NOT NULL DEFAULT 0,
-            ""TOW Approvati""  NUMERIC(18,2) NOT NULL DEFAULT 0,
-            ""TOW Residui""    NUMERIC(18,2) NOT NULL DEFAULT 0
+            ""TOWApprovati""   NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""TOWImpegnati""   NUMERIC(18,2) NOT NULL DEFAULT 0,
+            ""TOWResidui""     NUMERIC(18,2) NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS ""AppSettings"" (
@@ -190,6 +200,10 @@ using (var scope = app.Services.CreateScope())
     db.Database.ExecuteSqlRaw(@"
         ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastLogin""  TIMESTAMP;
         ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastLogout"" TIMESTAMP;
+
+        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""RefreshToken"" TEXT;
+        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""RefreshTokenExpiry"" TIMESTAMP;
+
     ");
 
     if (!db.Users.Any())
