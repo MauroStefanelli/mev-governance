@@ -191,7 +191,7 @@ function TowPieChart({ title, rows, sum }) {
             {/* ✅ ✅ KPI CENTRALE (FIX DEFINITIVO) */}
             <text
               x="50%"
-              y="58%"
+              y="47%"
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={10}
@@ -401,15 +401,13 @@ function ConsumoTowSection({ towRows }) {
 
 
   // ✅ CALCOLO PERCENTUALI PER TOW
+
   const percentData = filtered.map(t => {
     const totale = t.valoreTotale || 1;
 
     const ordinato = (t.ordinatiRda / totale) * 100;
     const impegnato = (t.impegnato / totale) * 100;
-
-    // ✅ residuo calcolato per differenza (IMPORTANTE)
-    const residuo = 100 - ordinato - impegnato;
-
+    const residuo = (t.residuo / totale) * 100;
 
     return {
       tow: t.tow,
@@ -417,8 +415,8 @@ function ConsumoTowSection({ towRows }) {
       impegnatoPerc: Number(impegnato.toFixed(1)),
       residuoPerc: Number(residuo.toFixed(1))
     };
-
   });
+
 
   const group = (keys) =>
     filtered.filter(r => keys.some(k => r.tow?.toUpperCase().includes(k.toUpperCase())));
@@ -596,16 +594,14 @@ function ConsumoTowSection({ towRows }) {
             </div>
 
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={percentData}>
+              <BarChart data={percentData} layout="vertical">
 
                 <CartesianGrid strokeDasharray="3 3" />
 
-                <XAxis dataKey="tow" />
+  
+                <XAxis type="number" domain={[0, 100]} />
+                <YAxis dataKey="tow" type="category" />
 
-                <YAxis
-                  domain={[0, 100]}
-                  tickFormatter={(v) => `${v.toFixed(0)}%`}
-                />
 
                 <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
 
@@ -614,7 +610,7 @@ function ConsumoTowSection({ towRows }) {
                 <Bar
                   dataKey="ordinatoPerc"
                   stackId="a"
-                  fill="#2E75B6"
+                  fill={COLORS.ordinatiRda}
                   name="Ordinato"
                   minPointSize={5}
 
@@ -628,7 +624,7 @@ function ConsumoTowSection({ towRows }) {
                 <Bar
                   dataKey="impegnatoPerc"
                   stackId="a"
-                  fill="#9DC3E6"
+                  fill={COLORS.impegnato}
                   name="Impegnato"
                   minPointSize={5}
                   
@@ -638,10 +634,13 @@ function ConsumoTowSection({ towRows }) {
                 <Bar
                   dataKey="residuoPerc"
                   stackId="a"
-                  fill="#D6DCE5"
+                  fill={COLORS.residuo}
                   name="Residuo"
-                  label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
-                  minPointSize={5}
+                  
+                  label={({ value }) =>
+                    value > 10 ? `${value.toFixed(0)}%` : ""
+                  }
+
 
                 />
 
