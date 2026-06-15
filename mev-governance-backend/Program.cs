@@ -206,6 +206,13 @@ using (var scope = app.Services.CreateScope())
 
     ");
 
+    db.Database.ExecuteSqlRaw(@"
+        ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""TowApprovati"" NUMERIC(18,2) DEFAULT 0;
+        ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""TowImpegnati"" NUMERIC(18,2) DEFAULT 0;
+        ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""TowResidui"" NUMERIC(18,2) DEFAULT 0;
+    ");
+
+
     if (!db.Users.Any())
     {
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
@@ -228,7 +235,7 @@ app.UseSwaggerUI();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok("MEV Backend is running"));
+app.MapGet("/", () => Results.Ok("MEV Backend is running....."));
 app.MapControllers();
 
 app.Run();
