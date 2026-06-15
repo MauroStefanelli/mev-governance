@@ -413,7 +413,11 @@ function ConsumoTowSection({ towRows }) {
       tow: t.tow,
       ordinatoPerc: Number(ordinato.toFixed(1)),
       impegnatoPerc: Number(impegnato.toFixed(1)),
-      residuoPerc: Number(residuo.toFixed(1))
+      residuoPerc: Number(residuo.toFixed(1)),
+      ordinatoEuro: t.ordinatiRda || 0,
+      impegnatoEuro: t.impegnato || 0,
+      residuoEuro: t.residuo || 0,
+      totaleEuro: totale,
     };
   });
 
@@ -638,30 +642,51 @@ function ConsumoTowSection({ towRows }) {
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
+                    const EURO_KEY = {
+                      ordinatoPerc: "ordinatoEuro",
+                      impegnatoPerc: "impegnatoEuro",
+                      residuoPerc: "residuoEuro",
+                    };
                     return (
                       <div style={{
                         background: "white",
                         border: "1px solid #e5e7eb",
                         borderRadius: "8px",
-                        padding: "8px 12px",
+                        padding: "10px 14px",
                         boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                         fontSize: "12px",
+                        minWidth: 180,
                       }}>
-                        <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: "4px" }}>
+                        <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: "6px", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
                           {label}
                         </div>
-                        {payload.map(p => (
-                          <div key={p.dataKey} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{
-                              width: 8, height: 8, borderRadius: "50%",
-                              background: p.color, display: "inline-block", flexShrink: 0,
-                            }} />
-                            <span style={{ color: "#64748b" }}>{p.name}:</span>
-                            <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                              {`${Number(p.value).toFixed(1)}%`}
-                            </span>
+                        {payload.map(p => {
+                          const euroKey = EURO_KEY[p.dataKey];
+                          const euroVal = p.payload?.[euroKey];
+                          return (
+                            <div key={p.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{
+                                  width: 8, height: 8, borderRadius: "50%",
+                                  background: p.color, display: "inline-block", flexShrink: 0,
+                                }} />
+                                <span style={{ color: "#64748b" }}>{p.name}</span>
+                              </div>
+                              <span style={{ fontWeight: 600, color: "#1e293b", textAlign: "right", whiteSpace: "nowrap" }}>
+                                {formatEuro(euroVal)}
+                                <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: "4px" }}>
+                                  ({Number(p.value).toFixed(1)}%)
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {payload[0]?.payload?.totaleEuro > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "6px", borderTop: "1px solid #f1f5f9", paddingTop: "6px" }}>
+                            <span style={{ color: "#64748b", fontWeight: 500 }}>Totale</span>
+                            <span style={{ fontWeight: 700, color: "#1e293b" }}>{formatEuro(payload[0].payload.totaleEuro)}</span>
                           </div>
-                        ))}
+                        )}
                       </div>
                     );
                   }}
@@ -704,10 +729,11 @@ function ConsumoTowSection({ towRows }) {
                   name="Residuo"
                   radius={[0, 4, 4, 0]}
                   label={{
-                    position: "inside",
+                    position: "insideRight",
                     formatter: (v) => v > 8 ? `${Number(v).toFixed(0)}%` : "",
                     fontSize: 11,
                     fill: "#64748b",
+                    offset: 4,
                   }}
                 />
               </BarChart>
