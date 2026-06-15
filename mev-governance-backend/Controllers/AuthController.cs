@@ -23,6 +23,9 @@ public class AuthController : ControllerBase
         _config = config;
     }
 
+    // ============================================================
+    // LOGIN
+    // ============================================================
     [HttpPost("login")]
     [AllowAnonymous]
     public IActionResult Login([FromBody] LoginRequest request)
@@ -63,6 +66,9 @@ public class AuthController : ControllerBase
         });
     }
 
+    // ============================================================
+    // REFRESH TOKEN
+    // ============================================================
     [HttpPost("refresh")]
     [AllowAnonymous]
     public IActionResult Refresh([FromBody] RefreshRequest request)
@@ -88,6 +94,9 @@ public class AuthController : ControllerBase
         });
     }
 
+    // ============================================================
+    // LOGOUT
+    // ============================================================
     [HttpPost("logout")]
     [Authorize]
     public IActionResult Logout()
@@ -113,9 +122,40 @@ public class AuthController : ControllerBase
             _db.SaveChanges();
         }
 
-        return Ok(new { message = "Logout registrato (ok)" });
+        return Ok(new { message = "Logout registrato" });
     }
 
+    // ============================================================
+    // GET USERS (pagina Utenti ✅)
+    // ============================================================
+    [HttpGet("users")]
+    [Authorize]
+    public IActionResult GetUsers()
+    {
+        if (!User.IsInRole("Admin"))
+            return Forbid();
+
+        var users = _db.Users
+            .Select(u => new
+            {
+                u.Id,
+                u.Username,
+                u.FullName,
+                u.Email,
+                u.Role,
+                u.IsActive,
+                u.SendEmail,
+                u.LastLogin,
+                u.LastLogout
+            })
+            .ToList();
+
+        return Ok(users);
+    }
+
+    // ============================================================
+    // EDITOR LOGINS
+    // ============================================================
     [HttpGet("editor-logins")]
     [Authorize]
     public IActionResult GetEditorLogins([FromQuery] DateTime? since)
@@ -143,6 +183,9 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
+    // ============================================================
+    // GENERATE JWT
+    // ============================================================
     private string GenerateToken(AppUser user)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
@@ -169,11 +212,17 @@ public class AuthController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    // ============================================================
+    // GENERATE REFRESH TOKEN
+    // ============================================================
     private string GenerateRefreshToken()
     {
         return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
     }
 }
 
+// ============================================================
+// DTO
+// ============================================================
 public record LoginRequest(string Username, string Password);
 public record RefreshRequest(string RefreshToken);
