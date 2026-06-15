@@ -264,18 +264,24 @@ function TowChart({ title, rows, sum }) {
       </div>
 
       {/* Grafico a barre raggruppate */}
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={500}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
           barCategoryGap="30%" barGap={3}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
           <XAxis dataKey="name" hide />
           <YAxis tickFormatter={formatEuroK} tick={{ fontSize: 10, fill: "#888" }} width={60} />
           <Tooltip content={<CustomTooltip />} />
+
           <Legend
-            formatter={(value) => (
-              <span style={{ fontSize: "11px", color: "#555" }}>{LABELS[value] || value}</span>
-            )}
+            wrapperStyle={{ fontSize: "12px" }}
+            iconType="square"
+            payload={[
+              { value: "Ordinato", type: "square", color: "#2E75B6" },
+              { value: "Impegnato", type: "square", color: "#9DC3E6" },
+              { value: "Residuo", type: "square", color: "#D6DCE5" }
+            ]}
           />
+
           {FIELDS.map(f => (
             <Bar key={f} dataKey={f} name={f} fill={COLORS[f]} radius={[4, 4, 0, 0]} maxBarSize={40} />
           ))}
@@ -398,12 +404,20 @@ function ConsumoTowSection({ towRows }) {
   const percentData = filtered.map(t => {
     const totale = t.valoreTotale || 1;
 
+    const ordinato = (t.ordinatiRda / totale) * 100;
+    const impegnato = (t.impegnato / totale) * 100;
+
+    // ✅ residuo calcolato per differenza (IMPORTANTE)
+    const residuo = 100 - ordinato - impegnato;
+
+
     return {
       tow: t.tow,
-      ordinatoPerc: (t.ordinatiRda / totale) * 100,
-      impegnatoPerc: (t.impegnato / totale) * 100,
-      residuoPerc: (t.residuo / totale) * 100
+      ordinatoPerc: Number(ordinato.toFixed(1)),
+      impegnatoPerc: Number(impegnato.toFixed(1)),
+      residuoPerc: Number(residuo.toFixed(1))
     };
+
   });
 
   const group = (keys) =>
@@ -590,10 +604,10 @@ function ConsumoTowSection({ towRows }) {
 
                 <YAxis
                   domain={[0, 100]}
-                  tickFormatter={(v) => `${v}%`}
+                  tickFormatter={(v) => `${v.toFixed(0)}%`}
                 />
 
-                <Tooltip formatter={(v) => `${v.toFixed(1)}%`} />
+                <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
 
                 <Legend />
 
@@ -601,15 +615,23 @@ function ConsumoTowSection({ towRows }) {
                   dataKey="ordinatoPerc"
                   stackId="a"
                   fill="#2E75B6"
-                  name="Ordinati (RDA)"
-                  label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
+                  name="Ordinato"
+                  minPointSize={5}
+
+                  label={{
+                    position: "inside",
+                    formatter: (v) => `${Number(v).toFixed(0)}%`
+                  }}
+
                 />
 
                 <Bar
                   dataKey="impegnatoPerc"
                   stackId="a"
-                  fill="#00B853"
+                  fill="#9DC3E6"
                   name="Impegnato"
+                  minPointSize={5}
+                  
                   label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
                 />
 
@@ -619,6 +641,8 @@ function ConsumoTowSection({ towRows }) {
                   fill="#D6DCE5"
                   name="Residuo"
                   label={{ position: "inside", formatter: (v) => `${v.toFixed(0)}%` }}
+                  minPointSize={5}
+
                 />
 
               </BarChart>
