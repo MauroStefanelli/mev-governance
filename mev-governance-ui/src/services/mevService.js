@@ -248,6 +248,23 @@ export const resetPassword = async (id, newPassword) => {
   return response.json();
 };
 
+
+export const getUserAccessLog = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/access-log`, {
+    headers: authHeaders()
+  });
+
+  console.log("URL:", `${API_BASE_URL}/api/auth/users/${id}/access-log`);
+  console.log("STATUS:", response.status);
+
+  const text = await response.text();
+  console.log("RESPONSE:", text);
+
+  if (!response.ok) throw new Error(`Errore storico (${response.status})`);
+
+  return JSON.parse(text);
+};
+/*
 export const getUserAccessLog = async (id) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/access-log`, {
     headers: authHeaders()
@@ -255,7 +272,7 @@ export const getUserAccessLog = async (id) => {
   if (!response.ok) throw new Error("Errore recupero storico accessi");
   return response.json();
 };
-
+*/
 export const deleteUser = async (id) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
     method: "DELETE",
