@@ -253,26 +253,16 @@ export const getUserAccessLog = async (id) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/access-log`, {
     headers: authHeaders()
   });
-
-  console.log("URL:", `${API_BASE_URL}/api/auth/users/${id}/access-log`);
-  console.log("STATUS:", response.status);
-
-  const text = await response.text();
-  console.log("RESPONSE:", text);
-
+  if (response.status === 401) throw new Error("401");
   if (!response.ok) throw new Error(`Errore storico (${response.status})`);
 
-  return JSON.parse(text);
+  const logs = await response.json();
+  return (logs || []).map((log, idx) => ({
+    id: log.id || idx,
+    loginAt: log.loginAt || log.login || log.accessTime || log.timestamp || null,
+    logoutAt: log.logoutAt || log.logout || log.logoutTime || null,
+  }));
 };
-/*
-export const getUserAccessLog = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/access-log`, {
-    headers: authHeaders()
-  });
-  if (!response.ok) throw new Error("Errore recupero storico accessi");
-  return response.json();
-};
-*/
 export const deleteUser = async (id) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
     method: "DELETE",

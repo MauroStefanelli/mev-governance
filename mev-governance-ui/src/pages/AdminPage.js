@@ -7,7 +7,7 @@ import {
   toggleEmailUser, 
   resetPassword, 
   deleteUser, 
-  getUserAccessLogSafe 
+  getUserAccessLog 
 } from "../services/mevService";
 
 
@@ -141,7 +141,7 @@ function AdminPage() {
     setAccessLogModal({ userId: u.id, username: u.username, fullName: u.fullName, logs: [] });
     setAccessLogLoading(true);
     try {
-      const logs = await getUserAccessLogSafe(u.username);      
+      const logs = await getUserAccessLog(u.id);      
       setAccessLogModal(prev => prev ? { ...prev, logs } : null);
     } catch (err) {
       setError(err.message);
