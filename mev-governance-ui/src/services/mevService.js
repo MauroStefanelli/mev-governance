@@ -281,3 +281,33 @@ export const deleteUser = async (id) => {
   if (!response.ok) throw new Error("Errore eliminazione utente");
   return response.json();
 };
+
+export const getUserAccessLogSafe = async (username) => {
+  const url = `${API_BASE_URL}/api/auth/editor-logins`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  if (response.status === 401) throw new Error("401");
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("Errore API editor-logins:", text);
+    throw new Error("Errore recupero storico accessi");
+  }
+
+  const allLogs = await response.json();
+
+  // ✅ filtra per utente
+  const userLogs = allLogs.filter(l => 
+    l.username?.toLowerCase() === username?.toLowerCase()
+  );
+
+  // ✅ normalizza struttura per la tua modale
+  return userLogs.map((log, idx) => ({
+    id: log.id || idx,
+    loginAt: log.loginAt || log.login || log.accessTime,
+    logoutAt: log.logoutAt || log.logout || log.exitTime || null
+  }));
+};

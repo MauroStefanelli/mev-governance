@@ -131,7 +131,7 @@ function AdminPage() {
     setAccessLogModal({ userId: u.id, username: u.username, fullName: u.fullName, logs: [] });
     setAccessLogLoading(true);
     try {
-      const logs = await getUserAccessLog(u.id);
+      const logs = await getUserAccessLogSafe(u.username);      
       setAccessLogModal(prev => prev ? { ...prev, logs } : null);
     } catch (err) {
       setError(err.message);
