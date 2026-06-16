@@ -295,6 +295,7 @@ export const getUserAccessLogSafe = async (username) => {
 
   const allLogs = await response.json();
   console.log("ESEMPIO LOG:", allLogs[0]);
+  console.log("LOG REALI:", allLogs);
 
   // ✅ filtra utente
   const userLogs = allLogs
