@@ -58,6 +58,22 @@ function App() {
     return () => clearInterval(interval);
   }, [token, role]); // eslint-disable-line
 
+  const handleLogin = (data) => {
+    setToken(data.token);
+    setUsername(data.username);
+    setFullName(data.fullName);
+    setRole(data.role);
+    setPage("mev");
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
+    setToken(""); setUsername(""); setFullName(""); setRole("");
+    setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
+    setEditorAlerts([]);
+  };
+
   // ── Logout automatico dopo 10 minuti di inattività ──────────────────────────
   const IDLE_TIMEOUT = 10 * 60 * 1000;
   const idleLogoutRef = useRef(handleLogout);
@@ -82,22 +98,6 @@ function App() {
       events.forEach(e => window.removeEventListener(e, resetTimer));
     };
   }, [token]);
-
-  const handleLogin = (data) => {
-    setToken(data.token);
-    setUsername(data.username);
-    setFullName(data.fullName);
-    setRole(data.role);
-    setPage("mev");
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
-    setToken(""); setUsername(""); setFullName(""); setRole("");
-    setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
-    setEditorAlerts([]);
-  };
 
   const handleChangePassword = async () => {
     setPwdError("");
