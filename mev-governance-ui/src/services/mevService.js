@@ -282,6 +282,7 @@ export const deleteUser = async (id) => {
   return response.json();
 };
 
+
 export const getUserAccessLogSafe = async (username) => {
   const url = `${API_BASE_URL}/api/auth/editor-logins`;
 
@@ -290,24 +291,44 @@ export const getUserAccessLogSafe = async (username) => {
   });
 
   if (response.status === 401) throw new Error("401");
-
-  if (!response.ok) {
-    const text = await response.text();
-    console.error("Errore API editor-logins:", text);
-    throw new Error("Errore recupero storico accessi");
-  }
+  if (!response.ok) throw new Error("Errore recupero storico accessi");
 
   const allLogs = await response.json();
 
-  // ✅ filtra per utente
-  const userLogs = allLogs.filter(l => 
-    l.username?.toLowerCase() === username?.toLowerCase()
-  );
+  // ✅ filtra utente
+  const userLogs = allLogs
+    .filter(l => l.username?.toLowerCase() === username?.toLowerCase())
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // ✅ normalizza struttura per la tua modale
-  return userLogs.map((log, idx) => ({
-    id: log.id || idx,
-    loginAt: log.loginAt || log.login || log.accessTime,
-    logoutAt: log.logoutAt || log.logout || log.exitTime || null
-  }));
+  // ✅ costruisce sessioni LOGIN / LOGOUT
+  const sessions = [];
+  let currentLogin = null;
+
+  for (const log of userLogs) {
+    const ts = log.timestamp || log.loginAt || log.date;
+
+    if (log.type === "LOGIN") {
+      currentLogin = ts;
+    }
+
+    if (log.type === "LOGOUT" && currentLogin) {
+      sessions.push({
+        id: sessions.length + 1,
+        loginAt: currentLogin,
+        logoutAt: ts
+      });
+      currentLogin = null;
+    }
+  }
+
+  // ✅ se utente è ancora loggato
+  if (currentLogin) {
+    sessions.push({
+      id: sessions.length + 1,
+      loginAt: currentLogin,
+      logoutAt: null
+    });
+  }
+
+  return sessions.reverse(); // più recente sopra
 };
