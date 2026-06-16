@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import MevPage from "./pages/MevPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
@@ -57,6 +57,31 @@ function App() {
     const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
   }, [token, role]); // eslint-disable-line
+
+  // ── Logout automatico dopo 10 minuti di inattività ──────────────────────────
+  const IDLE_TIMEOUT = 10 * 60 * 1000;
+  const idleLogoutRef = useRef(handleLogout);
+  idleLogoutRef.current = handleLogout;
+
+  useEffect(() => {
+    if (!token) return;
+
+    let timer;
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => idleLogoutRef.current(), IDLE_TIMEOUT);
+    };
+
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "wheel"];
+    events.forEach(e => window.addEventListener(e, resetTimer));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+    };
+  }, [token]);
 
   const handleLogin = (data) => {
     setToken(data.token);

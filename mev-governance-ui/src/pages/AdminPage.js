@@ -373,11 +373,14 @@ function AdminPage() {
                   </thead>
                   <tbody>
                     {accessLogModal.logs.map((log, idx) => {
-                      const loginDate  = new Date((log.loginAt.endsWith("Z") || log.loginAt.includes("+")) ? log.loginAt : log.loginAt + "Z");
-                      const logoutDate = log.logoutAt
-                        ? new Date((log.logoutAt.endsWith("Z") || log.logoutAt.includes("+")) ? log.logoutAt : log.logoutAt + "Z")
-                        : null;
-                      const durataSec  = logoutDate ? Math.round((logoutDate - loginDate) / 1000) : null;
+                      const parseDate = (iso) => {
+                        if (!iso) return null;
+                        const n = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+                        return new Date(n);
+                      };
+                      const loginDate  = parseDate(log.loginAt);
+                      const logoutDate = parseDate(log.logoutAt);
+                      const durataSec  = loginDate && logoutDate ? Math.round((logoutDate - loginDate) / 1000) : null;
                       const durataStr  = durataSec != null
                         ? durataSec < 60
                           ? `${durataSec}s`
@@ -389,7 +392,7 @@ function AdminPage() {
                       return (
                         <tr key={log.id} style={{ background: idx % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
                           <td style={{ padding: "6px 12px", color: "#999", fontSize: "11px" }}>{accessLogModal.logs.length - idx}</td>
-                          <td style={{ padding: "6px 12px", color: "#333", whiteSpace: "nowrap" }}>{loginDate.toLocaleString("it-IT", fmtOpts)}</td>
+                          <td style={{ padding: "6px 12px", color: "#333", whiteSpace: "nowrap" }}>{loginDate ? loginDate.toLocaleString("it-IT", fmtOpts) : <span style={{ color: "#bbb" }}>—</span>}</td>
                           <td style={{ padding: "6px 12px", color: log.logoutAt ? "#333" : "#bbb", whiteSpace: "nowrap" }}>
                             {logoutDate ? logoutDate.toLocaleString("it-IT", fmtOpts) : <span style={{ color: "#bbb" }}>—</span>}
                           </td>
