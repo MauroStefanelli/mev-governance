@@ -283,10 +283,9 @@ export const deleteUser = async (id) => {
 };
 
 
-export const getUserAccessLogSafe = async (username) => {
-  const url = `${API_BASE_URL}/api/auth/editor-logins`;
 
-  const response = await fetch(url, {
+export const getUserAccessLogSafe = async (username) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/editor-logins`, {
     headers: authHeaders()
   });
 
@@ -294,43 +293,35 @@ export const getUserAccessLogSafe = async (username) => {
   if (!response.ok) throw new Error("Errore recupero storico accessi");
 
   const allLogs = await response.json();
-  console.log("ESEMPIO LOG:", allLogs[0]);
+
   console.log("LOG REALI:", allLogs);
 
-  // ✅ filtra utente
-  const userLogs = allLogs
-    .filter(l => l.username?.toLowerCase() === username?.toLowerCase())
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  // ✅ filtro utente (robusto)
+  const userLogs = allLogs.filter(l => {
+    const user =
+      l.username ||
+      l.userName ||
+      l.user ||
+      l.email ||
+      "";
 
-  // ✅ costruisce sessioni LOGIN / LOGOUT
-  const sessions = [];
-  let currentLogin = null;
+    return user.toLowerCase() === username.toLowerCase();
+  });
 
-  for (const log of userLogs) {
-    const ts = log.timestamp || log.loginAt || log.date;
-
-    if (log.type === "LOGIN") {
-      currentLogin = ts;
-    }
-
-    if (log.type === "LOGOUT" && currentLogin) {
-      sessions.push({
-        id: sessions.length + 1,
-        loginAt: currentLogin,
-        logoutAt: ts
-      });
-      currentLogin = null;
-    }
-  }
-
-  // ✅ se utente è ancora loggato
-  if (currentLogin) {
-    sessions.push({
-      id: sessions.length + 1,
-      loginAt: currentLogin,
-      logoutAt: null
-    });
-  }
-
-  return sessions.reverse(); // più recente sopra
+  // ✅ mapping diretto se hai login/logout
+  return userLogs.map((log, idx) => ({
+    id: log.id || idx,
+    loginAt:
+      log.loginAt ||
+      log.login ||
+      log.accessTime ||
+      log.timestamp ||
+      null,
+    logoutAt:
+      log.logoutAt ||
+      log.logout ||
+      log.logoutTime ||
+      null
+  }));
 };
+
