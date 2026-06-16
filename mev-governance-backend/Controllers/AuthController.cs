@@ -184,6 +184,30 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
+    // ACCESS LOG UTENTE (storico login/logout)
+    // ============================================================
+    [HttpGet("users/{id}/access-log")]
+    [Authorize]
+    public IActionResult GetUserAccessLog(int id)
+    {
+        if (!User.IsInRole("Admin"))
+            return Forbid();
+
+        var logs = _db.UserAccessLogs
+            .Where(l => l.UserId == id)
+            .OrderByDescending(l => l.LoginAt)
+            .Select(l => new
+            {
+                l.Id,
+                l.LoginAt,
+                l.LogoutAt,
+            })
+            .ToList();
+
+        return Ok(logs);
+    }
+
+    // ============================================================
     // GENERATE JWT
     // ============================================================
     private string GenerateToken(AppUser user)
