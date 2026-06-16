@@ -294,6 +294,7 @@ export const getUserAccessLogSafe = async (username) => {
   if (!response.ok) throw new Error("Errore recupero storico accessi");
 
   const allLogs = await response.json();
+  console.log("ESEMPIO LOG:", allLogs[0]);
 
   // ✅ filtra utente
   const userLogs = allLogs
