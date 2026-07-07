@@ -363,7 +363,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
               {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","Capgemini","IET","Subco","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
-                <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
+                <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
           </thead>
