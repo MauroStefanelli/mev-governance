@@ -77,32 +77,18 @@ else if (DbConfigConnectionString != null)
 }
 else if (!string.IsNullOrEmpty(databaseUrl))
 {
-    var npgsqlConn = ConvertToNpgsql(databaseUrl);
+    // Npgsql accetta direttamente le URL postgresql:// senza parsing manuale
+    var connStr = databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://")
+        ? $"{databaseUrl}{(databaseUrl.Contains('?') ? "&" : "?")}sslmode=require&Trust Server Certificate=true"
+        : databaseUrl;
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(npgsqlConn));
+        options.UseNpgsql(connStr));
 }
 else
 {
     var dbPath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "mev.db";
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite($"Data Source={dbPath}"));
-}
-
-
-string ConvertToNpgsql(string url)
-{
-    if (url.StartsWith("postgres://") || url.StartsWith("postgresql://"))
-    {
-        var uri      = new Uri(url);
-        var userInfo = uri.UserInfo.Split(':', 2);
-        var user     = Uri.UnescapeDataString(userInfo[0]);
-        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-        var host     = uri.Host;
-        var port     = uri.Port > 0 ? uri.Port : 5432;
-        var dbName   = uri.AbsolutePath.TrimStart('/');
-        return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
-    }
-    return url;
 }
 
 
