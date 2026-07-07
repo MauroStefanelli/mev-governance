@@ -16,34 +16,66 @@ public class SettingsController : ControllerBase
     [HttpGet("db-config")]
     public IActionResult GetDbConfig()
     {
-        if (!System.IO.File.Exists(ConfigFile))
+        // Priorità 1: file db-config.json (configurazione manuale salvata)
+        if (System.IO.File.Exists(ConfigFile))
         {
-            return Ok(new
-            {
-                provider = "sqlite",
-                sqlitePath = "/data/mev.db",
-                host = (string?)null,
-                port = (int?)null,
-                database = (string?)null,
-                username = (string?)null,
-                passwordSet = false
-            });
+            var json = System.IO.File.ReadAllText(ConfigFile);
+            var config = JsonSerializer.Deserialize<DbConfigDto>(json);
+            if (config != null)
+                return Ok(new
+                {
+                    provider     = config.Provider,
+                    sqlitePath   = config.SqlitePath,
+                    host         = config.Host,
+                    port         = config.Port,
+                    database     = config.Database,
+                    username     = config.Username,
+                    passwordSet  = !string.IsNullOrEmpty(config.Password),
+                    readonlyEnv  = false
+                });
         }
 
-        var json = System.IO.File.ReadAllText(ConfigFile);
-        var config = JsonSerializer.Deserialize<DbConfigDto>(json);
-        if (config == null)
-            return Ok(new { provider = "sqlite" });
+        // Priorità 2: variabile d'ambiente DATABASE_DIRECT_URL o DATABASE_URL
+        var dbUrl = Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
+                 ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 
+        if (!string.IsNullOrEmpty(dbUrl))
+        {
+            try
+            {
+                var uri      = new Uri(dbUrl);
+                var userInfo = uri.UserInfo.Split(':', 2);
+                var user     = Uri.UnescapeDataString(userInfo[0]);
+                var host     = uri.Host;
+                var port     = uri.Port > 0 ? uri.Port : 5432;
+                var dbName   = uri.AbsolutePath.TrimStart('/');
+
+                return Ok(new
+                {
+                    provider    = "postgresql",
+                    sqlitePath  = (string?)null,
+                    host,
+                    port        = (int?)port,
+                    database    = dbName,
+                    username    = user,
+                    passwordSet = userInfo.Length > 1 && !string.IsNullOrEmpty(userInfo[1]),
+                    readonlyEnv = true   // indica che viene da env var, non modificabile via UI
+                });
+            }
+            catch { /* fallback sotto */ }
+        }
+
+        // Nessuna configurazione trovata: default SQLite
         return Ok(new
         {
-            config.Provider,
-            config.SqlitePath,
-            config.Host,
-            config.Port,
-            config.Database,
-            config.Username,
-            passwordSet = !string.IsNullOrEmpty(config.Password)
+            provider    = "sqlite",
+            sqlitePath  = "/data/mev.db",
+            host        = (string?)null,
+            port        = (int?)null,
+            database    = (string?)null,
+            username    = (string?)null,
+            passwordSet = false,
+            readonlyEnv = false
         });
     }
 

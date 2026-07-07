@@ -30,6 +30,7 @@ export default function DbConfigPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [passwordSet, setPasswordSet] = useState(false);
+  const [readonlyEnv, setReadonlyEnv] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -48,6 +49,7 @@ export default function DbConfigPage() {
         setDatabase(cfg.database || "");
         setUsername(cfg.username || "");
         setPasswordSet(cfg.passwordSet || false);
+        setReadonlyEnv(cfg.readonlyEnv || false);
       })
       .catch(() => {});
   }, []);
@@ -132,6 +134,19 @@ export default function DbConfigPage() {
         Configurazione Database
       </h2>
 
+      {/* Banner: configurazione da variabile d'ambiente */}
+      {readonlyEnv && (
+        <div style={{
+          padding: "12px 16px", borderRadius: "8px", marginBottom: "20px",
+          background: "#e8f0fe", color: "#1a73e8", fontSize: "13px",
+          border: "1px solid #c5d9fb", lineHeight: "1.5"
+        }}>
+          <strong>Database configurato tramite variabile d'ambiente</strong><br />
+          I dati mostrati sono in sola lettura. Per modificare la connessione,
+          aggiorna la variabile <code>DATABASE_DIRECT_URL</code> su Render.
+        </div>
+      )}
+
       {message && (
         <div style={{
           padding: "10px 14px", borderRadius: "8px", marginBottom: "16px",
@@ -157,18 +172,18 @@ export default function DbConfigPage() {
 
         <div style={{ display: "flex", gap: "12px" }}>
           <div
-            onClick={() => setProvider("sqlite")}
-            style={{ ...radioStyle, flex: 1, borderColor: provider === "sqlite" ? "#1a73e8" : "#dadce0", background: provider === "sqlite" ? "#f0f6ff" : "#fff" }}
+            onClick={() => !readonlyEnv && setProvider("sqlite")}
+            style={{ ...radioStyle, flex: 1, borderColor: provider === "sqlite" ? "#1a73e8" : "#dadce0", background: provider === "sqlite" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}
           >
-            <input type="radio" checked={provider === "sqlite"} onChange={() => {}} />
+            <input type="radio" checked={provider === "sqlite"} onChange={() => {}} readOnly />
             <span style={{ fontWeight: provider === "sqlite" ? 600 : 400 }}>SQLite</span>
             <span style={{ fontSize: "11px", color: "#888" }}>(locale)</span>
           </div>
           <div
-            onClick={() => setProvider("postgresql")}
-            style={{ ...radioStyle, flex: 1, borderColor: provider === "postgresql" ? "#1a73e8" : "#dadce0", background: provider === "postgresql" ? "#f0f6ff" : "#fff" }}
+            onClick={() => !readonlyEnv && setProvider("postgresql")}
+            style={{ ...radioStyle, flex: 1, borderColor: provider === "postgresql" ? "#1a73e8" : "#dadce0", background: provider === "postgresql" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}
           >
-            <input type="radio" checked={provider === "postgresql"} onChange={() => {}} />
+            <input type="radio" checked={provider === "postgresql"} onChange={() => {}} readOnly />
             <span style={{ fontWeight: provider === "postgresql" ? 600 : 400 }}>PostgreSQL</span>
             <span style={{ fontSize: "11px", color: "#888" }}>(remoto)</span>
           </div>
@@ -177,7 +192,7 @@ export default function DbConfigPage() {
         {provider === "sqlite" && (
           <div style={fieldStyle}>
             <label style={labelStyle}>Percorso file database</label>
-            <input style={inputStyle} value={sqlitePath} onChange={e => setSqlitePath(e.target.value)} />
+            <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={sqlitePath} onChange={e => setSqlitePath(e.target.value)} readOnly={readonlyEnv} />
           </div>
         )}
 
@@ -186,38 +201,48 @@ export default function DbConfigPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: "12px" }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Host</label>
-                <input style={inputStyle} value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.x o dominio" />
+                <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.x o dominio" readOnly={readonlyEnv} />
               </div>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Porta</label>
-                <input style={inputStyle} value={port} onChange={e => setPort(e.target.value)} />
+                <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={port} onChange={e => setPort(e.target.value)} readOnly={readonlyEnv} />
               </div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Nome database</label>
-              <input style={inputStyle} value={database} onChange={e => setDatabase(e.target.value)} />
+              <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={database} onChange={e => setDatabase(e.target.value)} readOnly={readonlyEnv} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Utente</label>
-              <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} />
+              <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={username} onChange={e => setUsername(e.target.value)} readOnly={readonlyEnv} />
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>
-                Password {passwordSet ? <span style={{ fontWeight: 400, color: "#888", textTransform: "none" }}>(lasciare vuoto per non cambiare)</span> : ""}
-              </label>
-              <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={passwordSet ? "••••••••" : "Password"} />
-            </div>
+            {!readonlyEnv && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>
+                  Password {passwordSet ? <span style={{ fontWeight: 400, color: "#888", textTransform: "none" }}>(lasciare vuoto per non cambiare)</span> : ""}
+                </label>
+                <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={passwordSet ? "••••••••" : "Password"} />
+              </div>
+            )}
+            {readonlyEnv && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Password</label>
+                <input style={{ ...inputStyle, background: "#f8f9fa" }} type="password" value="••••••••" readOnly />
+              </div>
+            )}
           </>
         )}
 
         <div style={{ display: "flex", gap: "12px", alignItems: "center", paddingTop: "8px", flexWrap: "wrap" }}>
-          <button type="submit" disabled={saving} style={{
-            background: "#1a73e8", color: "white", border: "none", padding: "10px 24px",
-            borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
-            opacity: saving ? 0.6 : 1
-          }}>
-            {saving ? "Salvataggio..." : "Salva configurazione"}
-          </button>
+          {!readonlyEnv && (
+            <button type="submit" disabled={saving} style={{
+              background: "#1a73e8", color: "white", border: "none", padding: "10px 24px",
+              borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+              opacity: saving ? 0.6 : 1
+            }}>
+              {saving ? "Salvataggio..." : "Salva configurazione"}
+            </button>
+          )}
           <button type="button" onClick={handleTest} disabled={testing} style={{
             background: testing ? "#e0e0e0" : "#f5f5f5", color: "#333", border: "1px solid #dadce0",
             padding: "10px 24px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
@@ -225,9 +250,11 @@ export default function DbConfigPage() {
           }}>
             {testing ? "Test in corso..." : "Test connessione"}
           </button>
-          <span style={{ fontSize: "12px", color: "#999" }}>
-            Il backend va riavviato per applicare le modifiche
-          </span>
+          {!readonlyEnv && (
+            <span style={{ fontSize: "12px", color: "#999" }}>
+              Il backend va riavviato per applicare le modifiche
+            </span>
+          )}
           <button type="button" onClick={handleRestart} disabled={restarting} style={{
             background: confirmRestart ? "#d32f2f" : restarting ? "#e0e0e0" : "#f5f5f5",
             color: confirmRestart ? "white" : "#333",
