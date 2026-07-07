@@ -420,9 +420,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.rda ?? ""}</td>
 
-                  <td style={{ ...TD }}>{r.capgemini ?? ""}</td>
-                  <td style={{ ...TD }}>{r.iet ?? ""}</td>
-                  <td style={{ ...TD }}>{r.subco ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "center" }}>{r.capgemini?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.capgemini ?? "")}</td>
+                  <td style={{ ...TD, textAlign: "center" }}>{r.iet?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.iet ?? "")}</td>
+                  <td style={{ ...TD, textAlign: "center" }}>{r.subco?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.subco ?? "")}</td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}
