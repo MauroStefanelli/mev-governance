@@ -256,7 +256,7 @@ function TowChart({ title, rows, sum }) {
             <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }}>
               {LABELS[f]}
             </div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: "#121111", marginTop: "2px", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "#888", marginTop: "2px", whiteSpace: "nowrap" }}>
               {formatEuro(data[0][f])}
             </div>
           </div>
