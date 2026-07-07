@@ -170,7 +170,15 @@ app.UseCors("FrontendPolicy");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    try
+    {
+        db.Database.Migrate(); // applica tutte le migration pendenti
+    }
+    catch
+    {
+        // Se Migrate() fallisce (es. DB nuovo senza tabella migrations), usa EnsureCreated
+        db.Database.EnsureCreated();
+    }
 
     if (!db.Users.Any())
     {
