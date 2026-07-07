@@ -77,12 +77,19 @@ else if (DbConfigConnectionString != null)
 }
 else if (!string.IsNullOrEmpty(databaseUrl))
 {
-    // Npgsql accetta direttamente le URL postgresql:// senza parsing manuale
-    var connStr = databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://")
-        ? $"{databaseUrl}{(databaseUrl.Contains('?') ? "&" : "?")}sslmode=require&Trust Server Certificate=true"
-        : databaseUrl;
+    // Npgsql accetta direttamente le URL postgresql:// — aggiungiamo solo sslmode
+    string connStr;
+    if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
+    {
+        var sep = databaseUrl.Contains('?') ? "&" : "?";
+        connStr = $"{databaseUrl}{sep}sslmode=require";
+    }
+    else
+    {
+        connStr = databaseUrl;
+    }
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(connStr));
+        options.UseNpgsql(connStr, o => o.RemoteCertificateValidationCallback((_, _, _, _) => true)));
 }
 else
 {
