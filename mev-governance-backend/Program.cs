@@ -62,8 +62,9 @@ builder.Services.AddCors(options =>
 });
 
 // ✅ DB
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
-               ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+var databaseUrl = (Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
+               ?? Environment.GetEnvironmentVariable("DATABASE_URL"))
+               ?.Trim(); // rimuove spazi, newline e altri caratteri invisibili
 
 if (DbConfigConnectionString != null && DbConfigIsPostgres)
 {
