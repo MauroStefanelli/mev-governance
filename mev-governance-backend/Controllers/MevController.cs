@@ -258,13 +258,14 @@ public class MevController : BaseController
             string iet = GetString("IET");
             string subco = GetString("Subco");
 
-            // SKIP riga "TOTALE"
+            // SKIP / STOP riga "TOTALE" — ferma l'import
             if (
                 descrizione.Contains("totale", StringComparison.OrdinalIgnoreCase) ||
                 applicativo.Contains("totale", StringComparison.OrdinalIgnoreCase) ||
-                goTo.Contains("totale", StringComparison.OrdinalIgnoreCase)
+                goTo.Contains("totale", StringComparison.OrdinalIgnoreCase) ||
+                excelId.Contains("totale", StringComparison.OrdinalIgnoreCase)
             )
-                continue;
+                break; // interrompe completamente il loop, non solo salta la riga
 
             // SKIP righe completamente vuote (nessun dato significativo)
             if (string.IsNullOrWhiteSpace(goTo) && string.IsNullOrWhiteSpace(applicativo) &&

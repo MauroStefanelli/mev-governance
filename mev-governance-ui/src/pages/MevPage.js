@@ -121,10 +121,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [] };
+    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [] };
     if (!saved) return defaults;
     const parsed = JSON.parse(saved);
-    // merge con defaults per gestire chiavi mancanti da versioni precedenti
     return { ...defaults, ...parsed };
   });
 
@@ -146,7 +145,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [] });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [] });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -163,6 +162,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const pAnnoOptions       = buildOptions("pAnno");
   const pReleaseOptions    = buildOptions("pRelease");
   const rdaOptions         = buildOptions("rda");
+  const capgeminiOptions   = buildOptions("capgemini");
+  const ietOptions         = buildOptions("iet");
+  const subcoOptions       = buildOptions("subco");
 
   // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
   const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
@@ -186,7 +188,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
     (filters.rda.length === 0            || filters.rda.includes(String(r.rda ?? ""))) &&
     (filters.pAnno.length === 0          || filters.pAnno.includes(String(r.pAnno))) &&
-    (filters.pRelease.length === 0       || filters.pRelease.includes(String(r.pRelease)))
+    (filters.pRelease.length === 0       || filters.pRelease.includes(String(r.pRelease))) &&
+    (filters.capgemini.length === 0      || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
+    (filters.iet.length === 0            || filters.iet.includes(String(r.iet ?? ""))) &&
+    (filters.subco.length === 0          || filters.subco.includes(String(r.subco ?? "")))
   );
 
   const totCap   = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
@@ -351,9 +356,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <th style={{ padding: "4px 6px" }}>{/* Importo CAP */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions}         selected={filters.rda}            onChange={(v) => handleFilterChange("rda", v)}            placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Cap */}</th>
-              <th style={{ padding: "4px 6px" }}>{/* IET */}</th>
-              <th style={{ padding: "4px 6px" }}>{/* Subco */}</th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions}    selected={filters.capgemini}      onChange={(v) => handleFilterChange("capgemini", v)}      placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions}          selected={filters.iet}            onChange={(v) => handleFilterChange("iet", v)}            placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions}        selected={filters.subco}          onChange={(v) => handleFilterChange("subco", v)}          placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions}       selected={filters.pAnno}          onChange={(v) => handleFilterChange("pAnno", v)}          placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions}    selected={filters.pRelease}       onChange={(v) => handleFilterChange("pRelease", v)}       placeholder="Tutte" /></th>
               <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
