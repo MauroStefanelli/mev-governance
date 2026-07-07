@@ -1,0 +1,6 @@
+bin
+obj
+.git
+*.md
+._*
+.DS_Store

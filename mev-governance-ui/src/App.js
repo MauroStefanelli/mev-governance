@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import MevPage from "./pages/MevPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
+import DbConfigPage from "./pages/DbConfigPage";
 import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
@@ -125,6 +126,7 @@ function App() {
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
       { id: "admin", label: "Utenti" },
+      { id: "dbconfig", label: "Configurazione DB" },
     ] : []),
   ];
 
@@ -273,6 +275,7 @@ function App() {
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
         {page === "admin"             && role === "Admin" && <AdminPage />}
+        {page === "dbconfig"          && role === "Admin" && <DbConfigPage />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}

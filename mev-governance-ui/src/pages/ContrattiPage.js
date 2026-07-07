@@ -41,10 +41,10 @@ const TOW_CANONE = ["TOW02.6"];
 // Palette colori per le 5 voci
 const COLORS = {
   valoreTotale: "#262626",
-  approvato: "#00B853",
-  ordinatiRda: "#2E75B6",
-  impegnato: "#9DC3E6",
-  residuo: "#D6DCE5",
+  approvato: "#2E75B6",
+  ordinatiRda: "#00B853",
+  impegnato: "#FFFF00",
+  residuo: "#FFC000",
 };
 
 const LABELS = {

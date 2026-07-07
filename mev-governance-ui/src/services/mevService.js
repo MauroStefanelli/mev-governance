@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
@@ -313,5 +313,51 @@ export const getUserAccessLogSafe = async (username) => {
       log.logoutTime ||
       null
   }));
+};
+
+export const getDbConfig = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/db-config`, {
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore lettura configurazione DB");
+  return response.json();
+};
+
+export const setDbConfig = async (config) => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/db-config`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(config)
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const testDbConnection = async (config) => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/test-db`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(config)
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const restartBackend = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/restart`, {
+    method: "POST",
+    headers: authHeaders()
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
 };
 

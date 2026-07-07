@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: ./mev-governance-backend
+      dockerfile: Dockerfile
+    image: mev-backend:latest
+    container_name: mev-backend
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - JWT_KEY=MEV-Governance-SuperSecretKey-2025-Capgemini!
+      - JWT_ISSUER=mev-governance
+      - JWT_AUDIENCE=mev-governance-ui
+      - DATABASE_PATH=/data/mev.db
+    volumes:
+      - /share/Public/mev-data:/data
+    ports:
+      - "8081:5000"
+
+  frontend:
+    build:
+      context: ./mev-governance-ui
+      dockerfile: Dockerfile
+    image: mev-frontend:latest
+    container_name: mev-frontend
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    depends_on:
+      - backend
