@@ -97,6 +97,22 @@ public class SettingsController : ControllerBase
     {
         try
         {
+            // Se readonlyEnv, ignora i dati del form e usa direttamente la variabile d'ambiente
+            if (dto.ReadonlyEnv == true)
+            {
+                var dbUrl = (Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
+                          ?? Environment.GetEnvironmentVariable("DATABASE_URL"))?.Trim();
+
+                if (string.IsNullOrEmpty(dbUrl))
+                    return Ok(new { success = false, message = "Variabile DATABASE_DIRECT_URL non trovata" });
+
+                var connStr = ParsePostgresUrl(dbUrl);
+                using var conn = new NpgsqlConnection(connStr);
+                await conn.OpenAsync();
+                await conn.CloseAsync();
+                return Ok(new { success = true, message = "Connessione PostgreSQL (env var) riuscita" });
+            }
+
             if (dto.Provider == "sqlite")
             {
                 var path = dto.SqlitePath ?? "/data/mev.db";
@@ -128,6 +144,34 @@ public class SettingsController : ControllerBase
         }
     }
 
+    private static string ParsePostgresUrl(string url)
+    {
+        var s = url;
+        if (s.StartsWith("postgresql://")) s = s.Substring("postgresql://".Length);
+        else if (s.StartsWith("postgres://"))  s = s.Substring("postgres://".Length);
+
+        var atIndex  = s.LastIndexOf('@');
+        var userInfo = s.Substring(0, atIndex);
+        var hostPart = s.Substring(atIndex + 1);
+
+        var colonIdx = userInfo.IndexOf(':');
+        var user     = colonIdx >= 0 ? userInfo.Substring(0, colonIdx) : userInfo;
+        var password = colonIdx >= 0 ? userInfo.Substring(colonIdx + 1) : "";
+
+        var slashIdx = hostPart.IndexOf('/');
+        var hostPort = slashIdx >= 0 ? hostPart.Substring(0, slashIdx) : hostPart;
+        var dbName   = slashIdx >= 0 ? hostPart.Substring(slashIdx + 1) : "postgres";
+
+        var qIdx = dbName.IndexOf('?');
+        if (qIdx >= 0) dbName = dbName.Substring(0, qIdx);
+
+        var portIdx = hostPort.LastIndexOf(':');
+        var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
+        var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
+
+        return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+    }
+
     [HttpPost("restart")]
     public IActionResult Restart()
     {
@@ -149,4 +193,5 @@ public class DbConfigDto
     public string? Database { get; set; }
     public string? Username { get; set; }
     public string? Password { get; set; }
+    public bool? ReadonlyEnv { get; set; }
 }

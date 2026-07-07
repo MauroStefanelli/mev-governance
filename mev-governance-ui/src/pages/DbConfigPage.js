@@ -62,6 +62,7 @@ export default function DbConfigPage() {
     database: provider === "postgresql" ? database : null,
     username: provider === "postgresql" ? username : null,
     password: provider === "postgresql" ? password : null,
+    readonlyEnv: readonlyEnv,
   });
 
   const handleSave = async (e) => {
