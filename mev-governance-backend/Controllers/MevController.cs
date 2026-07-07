@@ -195,13 +195,14 @@ public class MevController : BaseController
         if (headerRow == null)
             return BadRequest("Intestazioni MEV non trovate");
 
-        var columnMap = headerRow.Cells()
-            .Where(c => !string.IsNullOrWhiteSpace(c.GetString()))
-            .ToDictionary(
-                c => c.GetString().Trim(),
-                c => c.Address.ColumnNumber,
-                StringComparer.OrdinalIgnoreCase
-            );
+        // Costruisce la mappa colonne: in caso di intestazioni duplicate prende la prima occorrenza
+        var columnMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cell in headerRow.Cells().Where(c => !string.IsNullOrWhiteSpace(c.GetString())))
+        {
+            var key = cell.GetString().Trim();
+            if (!columnMap.ContainsKey(key))
+                columnMap[key] = cell.Address.ColumnNumber;
+        }
 
         var dataRows = ws.RowsUsed()
             .Where(r => r.RowNumber() > headerRow.RowNumber());
