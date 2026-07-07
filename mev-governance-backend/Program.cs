@@ -26,7 +26,7 @@ if (File.Exists(dbConfigFile))
             if (cfg.Provider == "postgresql" && !string.IsNullOrEmpty(cfg.Host) && !string.IsNullOrEmpty(cfg.Database))
             {
                 var port = cfg.Port ?? 5432;
-                DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Prefer;Trust Server Certificate=true";
+                DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Require;Trust Server Certificate=true";
                 DbConfigIsPostgres = true;
             }
             else if (cfg.Provider == "sqlite")
@@ -39,13 +39,23 @@ if (File.Exists(dbConfigFile))
 }
 
 // ✅ CORS
+var allowedOrigins = new List<string>
+{
+    "https://mev-governance-frontend.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:8082",
+};
+
+// Permette di aggiungere origini aggiuntive via variabile d'ambiente
+var extraOrigins = Environment.GetEnvironmentVariable("CORS_ORIGINS");
+if (!string.IsNullOrEmpty(extraOrigins))
+    allowedOrigins.AddRange(extraOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins(
-            "https://mev-governance-frontend.onrender.com"
-        )
+        policy.WithOrigins(allowedOrigins.ToArray())
         .AllowAnyHeader()
         .AllowAnyMethod();
     });

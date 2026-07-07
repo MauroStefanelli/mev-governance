@@ -80,7 +80,7 @@ public class SettingsController : ControllerBase
             else if (dto.Provider == "postgresql")
             {
                 var port = dto.Port ?? 5432;
-                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Prefer;Trust Server Certificate=true";
+                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Require;Trust Server Certificate=true";
 
                 using var conn = new NpgsqlConnection(connStr);
                 await conn.OpenAsync();

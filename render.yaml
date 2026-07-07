@@ -1,0 +1,35 @@
+services:
+
+  # ── Backend ASP.NET Core ──────────────────────────────────────────────────────
+  - type: web
+    name: mev-governance-backend
+    runtime: docker
+    dockerfilePath: ./mev-governance-backend/Dockerfile
+    dockerContext: ./mev-governance-backend
+    plan: free
+    envVars:
+      - key: JWT_KEY
+        generateValue: true
+      - key: JWT_ISSUER
+        value: mev-governance
+      - key: JWT_AUDIENCE
+        value: mev-governance-ui
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      # Imposta DATABASE_DIRECT_URL con la connection string Supabase (Session Pooler)
+      # formato: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+      - key: DATABASE_DIRECT_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://mev-governance-frontend.onrender.com
+
+  # ── Frontend React (nginx) ────────────────────────────────────────────────────
+  - type: web
+    name: mev-governance-frontend
+    runtime: docker
+    dockerfilePath: ./mev-governance-ui/Dockerfile
+    dockerContext: ./mev-governance-ui
+    plan: free
+    buildArgs:
+      - key: REACT_APP_API_URL
+        value: https://mev-governance-backend.onrender.com

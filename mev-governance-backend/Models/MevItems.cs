@@ -33,6 +33,11 @@ public class MevItem
     public string? Rda { get; set; }
 
 
+    // Colonne aggiuntive da Excel sheet MEV
+    public string? Cap { get; set; }
+    public string? Iet { get; set; }
+    public string? Subco { get; set; }
+
     // Dati PMO
     public int PAnno { get; set; }
     public string PRelease { get; set; } = "";

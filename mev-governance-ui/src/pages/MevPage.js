@@ -351,6 +351,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <th style={{ padding: "4px 6px" }}>{/* Importo CAP */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions}         selected={filters.rda}            onChange={(v) => handleFilterChange("rda", v)}            placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}>{/* Cap */}</th>
+              <th style={{ padding: "4px 6px" }}>{/* IET */}</th>
+              <th style={{ padding: "4px 6px" }}>{/* Subco */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions}       selected={filters.pAnno}          onChange={(v) => handleFilterChange("pAnno", v)}          placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions}    selected={filters.pRelease}       onChange={(v) => handleFilterChange("pRelease", v)}       placeholder="Tutte" /></th>
               <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
@@ -359,7 +362,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
+              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","Cap","IET","Subco","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -416,6 +419,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   </td>
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.rda ?? ""}</td>
+
+                  <td style={{ ...TD }}>{r.cap ?? ""}</td>
+                  <td style={{ ...TD }}>{r.iet ?? ""}</td>
+                  <td style={{ ...TD }}>{r.subco ?? ""}</td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}

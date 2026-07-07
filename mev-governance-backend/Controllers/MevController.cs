@@ -253,6 +253,9 @@ public class MevController : BaseController
             decimal fatturato = GetDecimal("Fatturato");
             string releaseExcel = GetString("Release");
             string rda = GetString("RDA");
+            string cap = GetString("Cap");
+            string iet = GetString("IET");
+            string subco = GetString("Subco");
 
             // SKIP riga "TOTALE"
             if (
@@ -287,6 +290,9 @@ public class MevController : BaseController
                 existing.Fatturato = fatturato;
                 existing.ReleaseExcel = releaseExcel;
                 existing.Rda = rda;
+                existing.Cap = cap;
+                existing.Iet = iet;
+                existing.Subco = subco;
             }
             else
             {
@@ -309,6 +315,9 @@ public class MevController : BaseController
                     Fatturato = fatturato,
                     ReleaseExcel = releaseExcel,
                     Rda = rda,
+                    Cap = cap,
+                    Iet = iet,
+                    Subco = subco,
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
                     PImporto = importo
