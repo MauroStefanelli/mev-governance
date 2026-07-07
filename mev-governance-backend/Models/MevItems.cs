@@ -34,7 +34,7 @@ public class MevItem
 
 
     // Colonne aggiuntive da Excel sheet MEV
-    public string? Cap { get; set; }
+    public string? Capgemini { get; set; }
     public string? Iet { get; set; }
     public string? Subco { get; set; }
 

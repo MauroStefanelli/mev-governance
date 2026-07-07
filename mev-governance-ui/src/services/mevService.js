@@ -70,7 +70,7 @@ export const exportMev = async (rows, filters = {}) => {
     "Stato":             r.stato,
     "Importo Fornitura": r.importoExcel,
     "RDA":               r.rda ?? "",
-    "Cap":               r.cap ?? "",
+    "Cap":               r.capgemini ?? "",
     "IET":               r.iet ?? "",
     "Subco":             r.subco ?? "",
     "P Anno":            r.pAnno,

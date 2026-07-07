@@ -362,7 +362,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","Cap","IET","Subco","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
+              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","Capgemini","IET","Subco","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: h === "Importo CAP" || h === "P Importo" ? "right" : "left", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -420,7 +420,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.rda ?? ""}</td>
 
-                  <td style={{ ...TD }}>{r.cap ?? ""}</td>
+                  <td style={{ ...TD }}>{r.capgemini ?? ""}</td>
                   <td style={{ ...TD }}>{r.iet ?? ""}</td>
                   <td style={{ ...TD }}>{r.subco ?? ""}</td>
 

@@ -254,7 +254,7 @@ public class MevController : BaseController
             decimal fatturato = GetDecimal("Fatturato");
             string releaseExcel = GetString("Release");
             string rda = GetString("RDA");
-            string cap = GetString("Cap");
+            string cap = GetString("Capgemini");
             string iet = GetString("IET");
             string subco = GetString("Subco");
 
@@ -291,7 +291,7 @@ public class MevController : BaseController
                 existing.Fatturato = fatturato;
                 existing.ReleaseExcel = releaseExcel;
                 existing.Rda = rda;
-                existing.Cap = cap;
+                existing.Capgemini = cap;
                 existing.Iet = iet;
                 existing.Subco = subco;
             }
@@ -316,7 +316,7 @@ public class MevController : BaseController
                     Fatturato = fatturato,
                     ReleaseExcel = releaseExcel,
                     Rda = rda,
-                    Cap = cap,
+                    Capgemini = cap,
                     Iet = iet,
                     Subco = subco,
                     PAnno = GetInt("Anno Competenza"),
