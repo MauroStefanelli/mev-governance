@@ -81,15 +81,7 @@ else if (!string.IsNullOrEmpty(databaseUrl))
     string connStr;
     if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
     {
-        // Npgsql NON accetta URL postgresql:// direttamente — va parsata in key=value
-        var uri      = new Uri(databaseUrl);
-        var userInfo = uri.UserInfo.Split(':', 2);
-        var user     = Uri.UnescapeDataString(userInfo[0]);
-        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-        var host     = uri.Host;
-        var port     = uri.Port > 0 ? uri.Port : 5432;
-        var dbName   = uri.AbsolutePath.TrimStart('/');
-        connStr = $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+        connStr = ParsePostgresUrl(databaseUrl);
     }
     else
     {
@@ -105,6 +97,42 @@ else
         options.UseSqlite($"Data Source={dbPath}"));
 }
 
+
+// Parsing manuale della URL postgresql:// senza usare System.Uri
+// (Uri.UserInfo può perdere la password in certi casi)
+static string ParsePostgresUrl(string url)
+{
+    // Rimuove il prefisso postgres:// o postgresql://
+    var s = url;
+    if (s.StartsWith("postgresql://")) s = s.Substring("postgresql://".Length);
+    else if (s.StartsWith("postgres://"))  s = s.Substring("postgres://".Length);
+
+    // Separa userinfo@host dalla parte host
+    // formato: user:password@host:port/dbname
+    var atIndex = s.LastIndexOf('@');
+    var userInfo = s.Substring(0, atIndex);         // user:password
+    var hostPart = s.Substring(atIndex + 1);        // host:port/dbname
+
+    // Estrae user e password — usa LastIndexOf per sicurezza
+    var colonIdx = userInfo.IndexOf(':');
+    var user     = colonIdx >= 0 ? userInfo.Substring(0, colonIdx) : userInfo;
+    var password = colonIdx >= 0 ? userInfo.Substring(colonIdx + 1) : "";
+
+    // Estrae host, port e dbname
+    var slashIdx = hostPart.IndexOf('/');
+    var hostPort = slashIdx >= 0 ? hostPart.Substring(0, slashIdx) : hostPart;
+    var dbName   = slashIdx >= 0 ? hostPart.Substring(slashIdx + 1) : "postgres";
+
+    // Rimuove eventuali query string dal dbName
+    var qIdx = dbName.IndexOf('?');
+    if (qIdx >= 0) dbName = dbName.Substring(0, qIdx);
+
+    var portIdx = hostPort.LastIndexOf(':');
+    var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
+    var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
+
+    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+}
 
 // ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
 var jwtKey     = Environment.GetEnvironmentVariable("JWT_KEY")      ?? builder.Configuration["Jwt:Key"]!;
