@@ -153,6 +153,27 @@ public class AuthController : ControllerBase
         return Ok(users);
     }
 
+    // ============================================================
+    // Delete USERS (pagina Utenti ✅)
+    // ============================================================
+    [HttpDelete("users/{id}")]
+    [Authorize]
+    public IActionResult DeleteUser(int id)
+    {
+        if (!User.IsInRole("Admin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+
+        if (user == null)
+            return NotFound("Utente non trovato");
+
+        _db.Users.Remove(user);
+        _db.SaveChanges();
+
+        return Ok(new { message = "Utente eliminato" });
+    }
+
     [HttpPost("users")]
     [Authorize]
     public IActionResult CreateUser([FromBody] CreateUserRequest request)
