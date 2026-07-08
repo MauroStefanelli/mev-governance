@@ -14,6 +14,7 @@ function LoginPage({ onLogin }) {
     try {
       const data = await login(username, password);
       localStorage.setItem("jwt", data.token);
+      localStorage.setItem("refreshToken", data.refreshToken);
       localStorage.setItem("XUSER", data.username);
       localStorage.setItem("fullName", data.fullName);
       localStorage.setItem("role", data.role);

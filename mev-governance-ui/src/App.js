@@ -75,8 +75,8 @@ function App() {
     setEditorAlerts([]);
   };
 
-  // ── Logout automatico dopo 10 minuti di inattività ──────────────────────────
-  const IDLE_TIMEOUT = 10 * 60 * 1000;
+  // ── Logout automatico dopo 30 minuti di inattività ──────────────────────────
+  const IDLE_TIMEOUT = 30 * 60 * 1000;
   const idleLogoutRef = useRef(handleLogout);
   idleLogoutRef.current = handleLogout;
 
