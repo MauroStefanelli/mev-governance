@@ -153,6 +153,36 @@ public class AuthController : ControllerBase
         return Ok(users);
     }
 
+    [HttpPost("users")]
+    [Authorize]
+    public IActionResult CreateUser([FromBody] CreateUserRequest request)
+    {
+        if (!User.IsInRole("Admin"))
+            return Forbid();
+
+        if (_db.Users.Any(u => u.Username == request.Username))
+            return BadRequest("Username già esistente");
+
+        var user = new AppUser
+        {
+            Username = request.Username,
+            FullName = request.FullName,
+            Email = request.Email,
+            Role = request.Role,
+            IsActive = true,
+            SendEmail = true,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
+        };
+
+        _db.Users.Add(user);
+        _db.SaveChanges();
+
+        return Ok(new
+        {
+            user.Id,
+            user.Username
+        });
+    }
     // ============================================================
     // EDITOR LOGINS
     // ============================================================
@@ -244,6 +274,15 @@ public class AuthController : ControllerBase
         return Convert.ToBase64String(Guid.NewGuid().ToByteArray());
     }
 }
+
+
+public record CreateUserRequest(
+    string Username,
+    string FullName,
+    string Email,
+    string Password,
+    string Role
+);
 
 // ============================================================
 // DTO
