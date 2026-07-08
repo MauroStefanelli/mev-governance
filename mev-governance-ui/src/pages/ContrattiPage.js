@@ -451,7 +451,7 @@ function ConsumoTowSection({ towRows }) {
                 <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>
                   {LABELS[f]}
                 </div>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: COLORS[f] }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: COLORS.valoreTotale}}>
                   {formatEuro(totali[f])}
                 </div>
               </div>
