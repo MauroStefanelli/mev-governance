@@ -161,7 +161,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const annoOptions        = buildOptions("annoCompetenza");
   const pAnnoOptions       = buildOptions("pAnno");
   const pReleaseOptions    = buildOptions("pRelease");
-  const rdaOptions         = buildOptions("rda");
+  // const rdaOptions         = buildOptions("rda");
   const capgeminiOptions   = buildOptions("capgemini");
   const ietOptions         = buildOptions("iet");
   const subcoOptions       = buildOptions("subco");
@@ -173,6 +173,17 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     ...(hasEmptyStato ? ["(vuoto)"] : []),
   ];
 
+// RDA: include "(vuoto)" se esistono righe con RDA vuoto/null
+const hasEmptyRda = rows.some(
+  (r) => !r.rda || String(r.rda).trim() === ""
+);
+
+const rdaOptions = [
+  ...buildOptions("rda"),
+  ...(hasEmptyRda ? ["(vuoto)"] : []),
+];
+
+
   // ── Filtering ──────────────────────────────────────────────────────────────
   const matchStato = (r) => {
     if (filters.stato.length === 0) return true;
@@ -181,12 +192,25 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     return filters.stato.includes(String(val));
   };
 
+  const matchRda = (r) => {
+    if (filters.rda.length === 0) return true;
+
+    const val = r.rda ?? "";
+
+    if (!String(val).trim() && filters.rda.includes("(vuoto)")) {
+      return true;
+    }
+
+    return filters.rda.includes(String(val));
+  };
+
+
   const filteredRows = rows.filter((r) =>
     (filters.goTo.length === 0           || filters.goTo.includes(String(r.goTo))) &&
     (filters.applicativo.length === 0    || filters.applicativo.includes(String(r.applicativo))) &&
     matchStato(r) &&
     (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
-    (filters.rda.length === 0            || filters.rda.includes(String(r.rda ?? ""))) &&
+    matchRda(r) &&
     (filters.pAnno.length === 0          || filters.pAnno.includes(String(r.pAnno))) &&
     (filters.pRelease.length === 0       || filters.pRelease.includes(String(r.pRelease))) &&
     (filters.capgemini.length === 0      || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
