@@ -101,10 +101,13 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
             <label
               key={opt}
               style={{
-                display: "block",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
                 padding: "6px 10px",
                 fontSize: "12px",
-                cursor: "pointer"
+                cursor: "pointer",
+                textAlign: "left"
               }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.background = "#f8f9fa")
@@ -117,10 +120,9 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
                 type="checkbox"
                 checked={selected.includes(String(opt))}
                 onChange={() => toggle(String(opt))}
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", margin: 0 }}
               />
-              {" "}
-              {opt}
+              <span style={{ textAlign: "left" }}>{opt}</span>
             </label>
           ))}
         </div>
