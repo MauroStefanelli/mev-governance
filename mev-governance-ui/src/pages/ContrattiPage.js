@@ -7,12 +7,12 @@ import {
 
 
 const TH = (align = "left") => ({
-  padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#444",
-  whiteSpace: "nowrap", background: "#f8f9fa", textAlign: align,
-  borderBottom: "2px solid #dadce0",
+  padding: "10px 14px", fontSize: "11px", fontWeight: 700, color: "#fff",
+  whiteSpace: "nowrap", background: "#1e293b", textAlign: align,
+  borderBottom: "none", textTransform: "uppercase", letterSpacing: "0.5px",
 });
 const TD = (align = "left", extra = {}) => ({
-  padding: "6px 12px", fontSize: "13px", color: "#333",
+  padding: "8px 14px", fontSize: "13px", color: "#334155",
   verticalAlign: "middle", whiteSpace: "nowrap", textAlign: align, ...extra,
 });
 
@@ -40,11 +40,11 @@ const TOW_CANONE = ["TOW02.6"];
 
 // Palette colori per le 5 voci
 const COLORS = {
-  valoreTotale: "#262626",
-  approvato: "#2E75B6",
-  ordinatiRda: "#00B853",
-  impegnato: "#FFFF00",
-  residuo: "#FFC000",
+  valoreTotale: "#1e293b",
+  approvato:    "#3b82f6",
+  ordinatiRda:  "#10b981",
+  impegnato:    "#f59e0b",
+  residuo:      "#f97316",
 };
 
 const LABELS = {
@@ -136,18 +136,23 @@ function TowPieChart({ title, rows, sum }) {
       flex: "1 1 220px",
       minWidth: 0,
       background: "white",
-      border: "1px solid #dadce0",
-      borderRadius: "12px",
-      padding: "16px 20px",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      border: "1px solid #e2e8f0",
+      borderRadius: "14px",
+      padding: "20px 24px",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.07)",
     }}>
       <div style={{
-        fontSize: "13px",
+        fontSize: "11px",
         fontWeight: 700,
-        color: "#1a73e8",
+        color: "#64748b",
         textTransform: "uppercase",
-        marginBottom: "12px",
+        letterSpacing: "0.6px",
+        marginBottom: "14px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
       }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6", display: "inline-block" }} />
         {title}
       </div>
 
@@ -429,59 +434,82 @@ function ConsumoTowSection({ towRows }) {
   if (towRows.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: "24px" }}>
-      {/* ── Header: titolo + dropdown + totali ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
-        <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-          Consumo TOW
+    <div style={{ marginBottom: "32px" }}>
+      {/* ── Header pagina ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "12px",
+        marginBottom: "24px", paddingBottom: "16px",
+        borderBottom: "2px solid #f1f5f9",
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: "10px",
+          background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(59,130,246,0.4)",
+        }}>📊</div>
+        <div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Consumo TOW</div>
+          <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "1px" }}>Monitoraggio consumi per tipo di contratto</div>
         </div>
-
         {tipiContratto.length > 1 && (
           <select
             value={selectedTipo}
             onChange={e => { setSelectedTipo(e.target.value); setOpenDetail({}); }}
             style={{
-              padding: "4px 10px", border: "1px solid #dadce0", borderRadius: "6px",
-              fontSize: "12px", background: "white", color: selectedTipo ? "#333" : "#888",
-              cursor: "pointer",
+              marginLeft: "auto",
+              padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: "8px",
+              fontSize: "13px", background: "white", color: selectedTipo ? "#1e293b" : "#94a3b8",
+              cursor: "pointer", fontWeight: 500, outline: "none",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             }}
           >
-            <option value="">-- Seleziona tipo contratto --</option>
+            <option value="">— Seleziona contratto —</option>
             {tipiContratto.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         )}
         {tipiContratto.length === 1 && (
-          <span style={{ fontSize: "12px", color: "#555", background: "#f0f4ff", padding: "2px 10px", borderRadius: "12px", border: "1px solid #dadce0" }}>
+          <span style={{
+            marginLeft: "auto",
+            fontSize: "12px", fontWeight: 600, color: "#3b82f6",
+            background: "#eff6ff", padding: "4px 14px", borderRadius: "20px",
+            border: "1px solid #bfdbfe",
+          }}>
             {tipiContratto[0]}
           </span>
         )}
-
-        {selectedTipo && allRows.length > 0 && (
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginLeft: "4px" }}>
-            {FIELDS.map(f => (
-              <div key={f} style={{
-                display: "flex", flexDirection: "column", alignItems: "center",
-                background: "white", border: "1px solid #dadce0", borderRadius: "8px",
-                padding: "5px 14px", borderTop: `3px solid ${COLORS[f]}`,
-              }}>
-                <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>
-                  {LABELS[f]}
-                </div>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: COLORS.valoreTotale }}>
-                  {formatEuro(totali[f])}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* ── KPI cards totali ── */}
+      {selectedTipo && allRows.length > 0 && (
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "24px" }}>
+          {FIELDS.map(f => (
+            <div key={f} style={{
+              flex: "1 1 140px", minWidth: 0,
+              background: "white",
+              border: "1px solid #e2e8f0",
+              borderRadius: "12px",
+              padding: "14px 18px",
+              borderTop: `4px solid ${COLORS[f]}`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+            }}>
+              <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
+                {LABELS[f]}
+              </div>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
+                {formatEuro(totali[f])}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Placeholder ── */}
       {!selectedTipo && tipiContratto.length > 1 && (
         <div style={{
-          padding: "32px", textAlign: "center", color: "#888", fontSize: "13px",
-          borderRadius: "10px", border: "1px dashed #dadce0", background: "#fafafa",
+          padding: "48px 32px", textAlign: "center", color: "#94a3b8", fontSize: "14px",
+          borderRadius: "12px", border: "2px dashed #e2e8f0", background: "#f8fafc",
         }}>
+          <div style={{ fontSize: "32px", marginBottom: "12px" }}>📂</div>
           Seleziona un tipo di contratto per visualizzare i dati
         </div>
       )}
@@ -489,7 +517,7 @@ function ConsumoTowSection({ towRows }) {
       {selectedTipo && (
         <>
           {/* ── Tabella Servizi a Task / Canone espandibile ── */}
-          <div style={{ borderRadius: "10px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "20px" }}>
+          <div style={{ borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
                 <tr>
@@ -513,41 +541,22 @@ function ConsumoTowSection({ towRows }) {
                     <tr
                       onClick={() => setOpenServizi(v => !v)}
                       style={{
-                        background: "#dbeafe",
-                        borderBottom: "1px solid #93c5fd",
-                        cursor: "pointer"
+                        background: "linear-gradient(90deg, #1e40af 0%, #2563eb 100%)",
+                        borderBottom: "1px solid #1d4ed8",
+                        cursor: "pointer",
                       }}
                     >
-                      <td style={TD("center", { fontWeight: 700 })}>
+                      <td style={TD("center", { fontWeight: 700, color: "white" })}>
                         {openServizi ? "▲" : "▶"}
                       </td>
-
-                      <td style={TD("left", {
-                        fontWeight: 700,
-                        color: "#1a73e8"
-                      })}>
+                      <td style={TD("left", { fontWeight: 700, color: "white", fontSize: "13px" })}>
                         Servizi
                       </td>
-
-                      <td style={TD("right", { fontWeight: 700 })}>
-                        {formatEuro(sum(taskRows, "valoreTotale"))}
-                      </td>
-
-                      <td style={TD("right", { fontWeight: 700 })}>
-                        {formatEuro(sum(taskRows, "approvato"))}
-                      </td>
-
-                      <td style={TD("right", { fontWeight: 700 })}>
-                        {formatEuro(sum(taskRows, "ordinatiRda"))}
-                      </td>
-
-                      <td style={TD("right", { fontWeight: 700 })}>
-                        {formatEuro(sum(taskRows, "impegnato"))}
-                      </td>
-
-                      <td style={TD("right", { fontWeight: 700 })}>
-                        {formatEuro(sum(taskRows, "residuo"))}
-                      </td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "valoreTotale"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "approvato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "ordinatiRda"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "impegnato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "residuo"))}</td>
                     </tr>
 
                     {openServizi &&
@@ -558,9 +567,9 @@ function ConsumoTowSection({ towRows }) {
                             <tr
                               key={sec.key}
                               onClick={() => setOpenDetail(p => ({ ...p, [sec.key]: !p[sec.key] }))}
-                              style={{ background: isOpen ? "#e8f0fe" : "#f0f4ff", borderBottom: "1px solid #dadce0", cursor: "pointer" }}
-                              onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#e4edff"; }}
-                              onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f0f4ff"; }}
+                              style={{ background: isOpen ? "#eff6ff" : "#f8fafc", borderBottom: "1px solid #e2e8f0", cursor: "pointer" }}
+                              onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#eff6ff"; }}
+                              onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f8fafc"; }}
                             >
                               <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
                                 {isOpen ? "▲" : "▶"}
@@ -807,7 +816,7 @@ function ConsumoTowSection({ towRows }) {
           </div>
 
           {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>
             {allRows.length > 0 && (
               <TowPieChart title="Totale Servizi" rows={allRows} sum={sum} />
             )}
@@ -1020,7 +1029,7 @@ function ContrattiPage({ onUnauthorized }) {
   );
 
   return (
-    <div style={{ padding: "20px 24px" }}>
+    <div style={{ padding: "24px 28px", background: "#f8fafc", minHeight: "100vh" }}>
       <ConsumoTowSection towRows={towRows} />
     </div>
   );
