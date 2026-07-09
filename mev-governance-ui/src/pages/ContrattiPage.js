@@ -603,6 +603,7 @@ function ConsumoTowSection({ towRows }) {
                               )}
                             </tr>
                             {isOpen && sec.key === "collaudo" && (
+                              
                               <tr style={{ background: "#f8f9fa" }}>
                                 <td />
                                 <td style={TD("left", { fontWeight: 700 })}>
@@ -620,9 +621,8 @@ function ConsumoTowSection({ towRows }) {
                                 <td style={TD("right", { fontWeight: 700 })}>
                                   Impegnato
                                 </td>
-
-                                <td />
                               </tr>
+
                             )}
 
                             {isOpen && sec.rows.map((row, ri) => (
@@ -709,9 +709,17 @@ function ConsumoTowSection({ towRows }) {
                               {sec.label}
                             </td>
 
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "valoreTotale"))}
-                            </td>
+
+                            {sec.key === "collaudo" ? (
+                              <>
+                                <td />
+                              </>
+                            ) : (
+                              <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                                {formatEuro(sum(sec.rows, "valoreTotale"))}
+                              </td>
+                            )}
+
 
                             <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
                               {formatEuro(sum(sec.rows, "approvato"))}
@@ -750,7 +758,13 @@ function ConsumoTowSection({ towRows }) {
                                   {row.tow}
                                 </td>
 
-                                <td style={TD("right")}>{formatEuro(row.valoreTotale)}</td>
+                                {sec.key === "collaudo" ? (
+                                  <td />
+                                ) : (
+                                  <td style={TD("right", { fontSize: "12px" })}>
+                                    {formatEuro(row.valoreTotale)}
+                                  </td>
+                                )}
                                 <td style={TD("right")}>{formatEuro(row.approvato)}</td>
                                 <td style={TD("right")}>{formatEuro(row.ordinatiRda)}</td>
                                 <td style={TD("right")}>{formatEuro(row.impegnato)}</td>
