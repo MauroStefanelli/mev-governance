@@ -40,32 +40,92 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
       >
         {label} ▾
       </div>
+
       {open && (
-        <div style={{
-          position: "absolute", top: "100%", left: 0, zIndex: 1000,
-          background: "white", border: "1px solid #dadce0", borderRadius: "4px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.12)", minWidth: "160px", maxHeight: "220px",
-          overflowY: "auto",
-        }}>
-          {selected.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            zIndex: 20,
+            background: "white",
+            border: "1px solid #dadce0",
+            borderRadius: "4px",
+            marginTop: "2px",
+            minWidth: "220px",
+            maxHeight: "300px",
+            overflowY: "auto",
+            boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
+          }}
+        >
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 2,
+              display: "flex",
+              justifyContent: "space-between",
+              background: "white",
+              borderBottom: "1px solid #dadce0",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+            }}
+          >
+            <div
+              onClick={() => onChange(options.map((o) => String(o)))}
+              style={{
+                padding: "8px 10px",
+                color: "#34a853",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: 600
+              }}
+            >
+              ✓ Seleziona tutti
+            </div>
+
             <div
               onClick={() => onChange([])}
-              style={{ padding: "6px 10px", fontSize: "11px", color: "#ea4335", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}
+              style={{
+                padding: "8px 10px",
+                color: "#ea4335",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: 600
+              }}
             >
               ✕ Deseleziona tutti
             </div>
-          )}
+          </div>
+
           {options.map((opt) => (
-            <label key={opt} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", cursor: "pointer", fontSize: "12px" }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "#f8f9fa"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "white"}
+            <label
+              key={opt}
+              style={{
+                display: "block",
+                padding: "6px 10px",
+                fontSize: "12px",
+                cursor: "pointer"
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#f8f9fa")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "white")
+              }
             >
-              <input type="checkbox" checked={selected.includes(String(opt))} onChange={() => toggle(String(opt))} style={{ cursor: "pointer" }} />
+              <input
+                type="checkbox"
+                checked={selected.includes(String(opt))}
+                onChange={() => toggle(String(opt))}
+                style={{ cursor: "pointer" }}
+              />
+              {" "}
               {opt}
             </label>
           ))}
         </div>
       )}
+
     </div>
   );
 }
@@ -94,11 +154,11 @@ const btn = (variant = "default") => {
     whiteSpace: "nowrap",
   };
   const variants = {
-    primary:  { ...base, background: "#1a73e8", color: "#fff", boxShadow: "0 1px 3px rgba(26,115,232,.35)" },
-    danger:   { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
-    ghost:    { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
-    success:  { ...base, background: "#34a853", color: "#fff", boxShadow: "0 1px 3px rgba(52,168,83,.35)" },
-    default:  { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
+    primary: { ...base, background: "#1a73e8", color: "#fff", boxShadow: "0 1px 3px rgba(26,115,232,.35)" },
+    danger: { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
+    ghost: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
+    success: { ...base, background: "#34a853", color: "#fff", boxShadow: "0 1px 3px rgba(52,168,83,.35)" },
+    default: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
   };
   return variants[variant] || variants.default;
 };
@@ -111,12 +171,12 @@ const inputStyle = (extra = {}) => ({
 
 // ── Componente ───────────────────────────────────────────────────────────────
 function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned }) {
-  const [rows, setRows]                     = useState([]);
-  const [loading, setLoading]               = useState(true);
-  const [savedRows, setSavedRows]           = useState({});
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [savedRows, setSavedRows] = useState({});
   const [editingImporto, setEditingImporto] = useState({});
-  const [aligning, setAligning]             = useState(false);
-  const [notePopover, setNotePopover]       = useState(null); // { id, text, x, y }
+  const [aligning, setAligning] = useState(false);
+  const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
   const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
@@ -156,32 +216,32 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const buildOptions = (field) =>
     [...new Set(rows.map((r) => r[field]).filter((v) => v !== null && v !== undefined && v !== ""))].sort();
 
-  const goToOptions        = buildOptions("goTo");
+  const goToOptions = buildOptions("goTo");
   const applicativoOptions = buildOptions("applicativo");
-  const annoOptions        = buildOptions("annoCompetenza");
-  const pAnnoOptions       = buildOptions("pAnno");
-  const pReleaseOptions    = buildOptions("pRelease");
+  const annoOptions = buildOptions("annoCompetenza");
+  const pAnnoOptions = buildOptions("pAnno");
+  const pReleaseOptions = buildOptions("pRelease");
   // const rdaOptions         = buildOptions("rda");
-  const capgeminiOptions   = buildOptions("capgemini");
-  const ietOptions         = buildOptions("iet");
-  const subcoOptions       = buildOptions("subco");
+  const capgeminiOptions = buildOptions("capgemini");
+  const ietOptions = buildOptions("iet");
+  const subcoOptions = buildOptions("subco");
 
   // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
   const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
-  const statoOptions  = [
+  const statoOptions = [
     ...buildOptions("stato"),
     ...(hasEmptyStato ? ["(vuoto)"] : []),
   ];
 
-// RDA: include "(vuoto)" se esistono righe con RDA vuoto/null
-const hasEmptyRda = rows.some(
-  (r) => !r.rda || String(r.rda).trim() === ""
-);
+  // RDA: include "(vuoto)" se esistono righe con RDA vuoto/null
+  const hasEmptyRda = rows.some(
+    (r) => !r.rda || String(r.rda).trim() === ""
+  );
 
-const rdaOptions = [
-  ...buildOptions("rda"),
-  ...(hasEmptyRda ? ["(vuoto)"] : []),
-];
+  const rdaOptions = [
+    ...buildOptions("rda"),
+    ...(hasEmptyRda ? ["(vuoto)"] : []),
+  ];
 
 
   // ── Filtering ──────────────────────────────────────────────────────────────
@@ -206,20 +266,20 @@ const rdaOptions = [
 
 
   const filteredRows = rows.filter((r) =>
-    (filters.goTo.length === 0           || filters.goTo.includes(String(r.goTo))) &&
-    (filters.applicativo.length === 0    || filters.applicativo.includes(String(r.applicativo))) &&
+    (filters.goTo.length === 0 || filters.goTo.includes(String(r.goTo))) &&
+    (filters.applicativo.length === 0 || filters.applicativo.includes(String(r.applicativo))) &&
     matchStato(r) &&
     (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
     matchRda(r) &&
-    (filters.pAnno.length === 0          || filters.pAnno.includes(String(r.pAnno))) &&
-    (filters.pRelease.length === 0       || filters.pRelease.includes(String(r.pRelease))) &&
-    (filters.capgemini.length === 0      || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
-    (filters.iet.length === 0            || filters.iet.includes(String(r.iet ?? ""))) &&
-    (filters.subco.length === 0          || filters.subco.includes(String(r.subco ?? "")))
+    (filters.pAnno.length === 0 || filters.pAnno.includes(String(r.pAnno))) &&
+    (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
+    (filters.capgemini.length === 0 || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
+    (filters.iet.length === 0 || filters.iet.includes(String(r.iet ?? ""))) &&
+    (filters.subco.length === 0 || filters.subco.includes(String(r.subco ?? "")))
   );
 
-  const totCap   = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
-  const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto)    || 0), 0);
+  const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
+  const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
   const hasActiveFilters = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : v !== "");
 
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
@@ -284,8 +344,8 @@ const rdaOptions = [
             try {
               const result = await alignMevData({});
               const msg = result.countContratti !== undefined
-                  ? `Allineamento completato: ${result.count} record MEV, ${result.countContratti} contratti`
-                  : `Allineamento completato: ${result.count} record caricati`;
+                ? `Allineamento completato: ${result.count} record MEV, ${result.countContratti} contratti`
+                : `Allineamento completato: ${result.count} record caricati`;
               alert(msg);
               onAligned?.();
               await loadMev();
@@ -372,26 +432,26 @@ const rdaOptions = [
             {/* Filtri */}
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
               <th style={{ padding: "4px 6px" }}>{/* ID */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={goToOptions}        selected={filters.goTo}           onChange={(v) => handleFilterChange("goTo", v)}           placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={applicativoOptions} selected={filters.applicativo}    onChange={(v) => handleFilterChange("applicativo", v)}    placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}>{/* Descrizione */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions}        selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions}       selected={filters.stato}          onChange={(v) => handleFilterChange("stato", v)}          placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}>{/* Importo CAP */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions}         selected={filters.rda}            onChange={(v) => handleFilterChange("rda", v)}            placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions}    selected={filters.capgemini}      onChange={(v) => handleFilterChange("capgemini", v)}      placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions}          selected={filters.iet}            onChange={(v) => handleFilterChange("iet", v)}            placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions}        selected={filters.subco}          onChange={(v) => handleFilterChange("subco", v)}          placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions}       selected={filters.pAnno}          onChange={(v) => handleFilterChange("pAnno", v)}          placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions}    selected={filters.pRelease}       onChange={(v) => handleFilterChange("pRelease", v)}       placeholder="Tutte" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
               <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
               <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID","GoTo","Applicativo","Descrizione","Anno","Stato","Importo CAP","Note","RDA","Capgemini","IET","Subco","P Anno","P Release","P Importo","P Note","Azioni"].map((h) => (
+              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "RDA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
@@ -421,7 +481,7 @@ const rdaOptions = [
                       display: "inline-block", padding: "2px 8px", borderRadius: "12px",
                       fontSize: "13px",
                       background: r.stato === "Approvato" ? "#e6f4ea" : r.stato === "In approvazione" ? "#fff8e1" : "#f1f3f4",
-                      color:      r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
+                      color: r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
                     }}>{r.stato || "(vuoto)"}</span>
                   </td>
                   <td style={{ ...TD, textAlign: "right" }}>{formatEuro(r.importoExcel)}</td>
