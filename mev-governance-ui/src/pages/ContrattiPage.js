@@ -565,7 +565,16 @@ function ConsumoTowSection({ towRows }) {
                               <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
                                 {isOpen ? "▲" : "▶"}
                               </td>
-                              <td style={TD("left", { fontWeight: 700, color: "#1a73e8" })}>{sec.label}</td>
+
+                              <td
+                                style={TD("left", {
+                                  fontWeight: 700,
+                                  color: "#1a73e8",
+                                  paddingLeft: sec.key === "canone" ? "12px" : "45px"
+                                })}
+                              >
+                                {sec.label}
+                              </td>
                               <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
                               {sec.key === "collaudo" ? (
                                 <>
@@ -712,7 +721,7 @@ function ConsumoTowSection({ towRows }) {
                                 color: "#1a73e8",
                                 fontWeight: 700,
                                 fontSize: "11px",
-                                paddingLeft: "30px"
+                                paddingLeft: sec.key === "canone" ? "0" : "60px"
                               })}
                             >
                               {isOpen ? "▲" : "▶"}
@@ -722,7 +731,7 @@ function ConsumoTowSection({ towRows }) {
                               style={TD("left", {
                                 fontWeight: 700,
                                 color: "#1a73e8",
-                                paddingLeft: "20px"
+                                paddingLeft: sec.key === "canone" ? "0" : "20px"
                               })}
                             >
                               {sec.label}
