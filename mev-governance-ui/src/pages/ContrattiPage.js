@@ -711,22 +711,11 @@ function ConsumoTowSection({ towRows }) {
                               {sec.label}
                             </td>
 
-
-                            {sec.key === "collaudo" ? (
-                              <>
-                                <td />
-                              </>
-                            ) : (
-
-                              {
-                                sec.key === "collaudo" ? (
-                                  <td />
-                                ) : (
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "valoreTotale"))}
-                                  </td>
-                                )
-                              }
+                            {sec.key !== "collaudo" && (
+                              <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                                {formatEuro(sum(sec.rows, "valoreTotale"))}
+                              </td>
+                            )}
 
                               < td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
                             {formatEuro(sum(sec.rows, "approvato"))}
