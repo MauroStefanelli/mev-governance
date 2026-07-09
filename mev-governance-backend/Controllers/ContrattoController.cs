@@ -474,17 +474,21 @@ public class ContrattoController : BaseController
         Console.WriteLine($"[TOW] ColumnMap keys: {string.Join(", ", columnMap.Keys)}");
 
         // Risolvi i numeri di colonna una volta sola usando FindCol (match normalizzato)
-        int colTow            = FindCol(columnMap, "TOW");
-        int colContratto      = FindCol(columnMap, "TOW Contratto", "Contratto", "Tipo Contratto", "TowContratto");
-        int colValoreUnitario = FindCol(columnMap, "Valore Unitario", "ValoreUnitario");
-        int colValoreTotale   = FindCol(columnMap, "Valore Totale", "ValoreTotale");
-        int colApprovato      = FindCol(columnMap, "Approvato");
-        int colOrdinatiRda    = FindCol(columnMap, "Ordinati(RDA)", "Ordinati (RDA)", "Ordinati RDA", "OrdinatiRDA", "OrdinatiRda");
-        int colImpegnato      = FindCol(columnMap, "Impegnato");
-        int colResiduo        = FindCol(columnMap, "Residuo");
-        int colTowApprovati   = FindCol(columnMap, "TOW Approvati");
-        int colTowImpegnati   = FindCol(columnMap, "TOW Impegnati");
-        int colTowResidui     = FindCol(columnMap, "TOW Residui");
+        int colTow               = FindCol(columnMap, "TOW");
+        int colContratto         = FindCol(columnMap, "TOW Contratto", "Contratto", "Tipo Contratto", "TowContratto");
+        int colValoreUnitario    = FindCol(columnMap, "Valore Unitario", "ValoreUnitario");
+        int colValoreTotale      = FindCol(columnMap, "Valore Totale", "ValoreTotale");
+        int colApprovato         = FindCol(columnMap, "Approvato");
+        int colOrdinatiRda       = FindCol(columnMap, "Ordinati(RDA)", "Ordinati (RDA)", "Ordinati RDA", "OrdinatiRDA", "OrdinatiRda");
+        int colImpegnato         = FindCol(columnMap, "Impegnato");
+        int colResiduo           = FindCol(columnMap, "Residuo");
+        int colTowApprovati      = FindCol(columnMap, "TOW Approvati");
+        int colTowImpegnati      = FindCol(columnMap, "TOW Impegnati");
+        int colTowResidui        = FindCol(columnMap, "TOW Residui");
+        int colCollaudoApprovato = FindCol(columnMap, "CollaudoApprovato", "Collaudo Approvato");
+        int colCollaudoOrdinato  = FindCol(columnMap, "CollaudoOrdinato", "Collaudo Ordinato");
+        int colCollaudoFatturato = FindCol(columnMap, "CollaudoFatturato", "Collaudo Fatturato");
+
         
 
         Console.WriteLine($"[TOW] Colonne: TOW={colTow}, Contratto={colContratto}, OrdinatiRDA={colOrdinatiRda}, Impegnato={colImpegnato}, TOW_Approvati={colTowApprovati}, TOW_Impegnati={colTowImpegnati}, TOW_Residui={colTowResidui}");
@@ -514,16 +518,20 @@ public class ContrattoController : BaseController
             _db.ConsumoTow.Add(new ConsumoTow
             {
                 Tow            = tow,
-                TowContratto   = GetStr(row, colContratto),
-                ValoreUnitario = GetDec(row, colValoreUnitario),
-                ValoreTotale   = GetDec(row, colValoreTotale),
-                Approvato      = GetDec(row, colApprovato),
-                OrdinatiRda    = GetDec(row, colOrdinatiRda),
-                Impegnato      = GetDec(row, colImpegnato),
-                Residuo        = GetDec(row, colResiduo),
-                TowApprovati   = GetDec(row, colTowApprovati),
-                TowImpegnati   = GetDec(row, colTowImpegnati),
-                TowResidui     = GetDec(row, colTowResidui),
+                TowContratto      = GetStr(row, colContratto),
+                ValoreUnitario    = GetDec(row, colValoreUnitario),
+                ValoreTotale      = GetDec(row, colValoreTotale),
+                Approvato         = GetDec(row, colApprovato),
+                OrdinatiRda       = GetDec(row, colOrdinatiRda),
+                Impegnato         = GetDec(row, colImpegnato),
+                Residuo           = GetDec(row, colResiduo),
+                TowApprovati      = GetDec(row, colTowApprovati),
+                TowImpegnati      = GetDec(row, colTowImpegnati),
+                TowResidui        = GetDec(row, colTowResidui),
+                CollaudoApprovato = GetDec(row, colCollaudoApprovato),
+                CollaudoOrdinato  = GetDec(row, colCollaudoOrdinato),
+                CollaudoFatturato = GetDec(row, colCollaudoFatturato)
+
             });
             count++;
         }
