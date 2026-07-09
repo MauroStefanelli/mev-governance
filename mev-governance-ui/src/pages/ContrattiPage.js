@@ -402,22 +402,16 @@ function ConsumoTowSection({ towRows }) {
 
   const allRows = [...taskRows, ...canoneRows];
 
-  const sections = [
-    {
-      key: "servizi",
-      label: "Servizi",
-      rows: [],
-      children: [
-        { key: "task", label: "Servizi a Task", rows: taskRows },
-        { key: "collaudo", label: "Collaudo", rows: taskRows }
-      ]
-    },
-    {
-      key: "canone",
-      label: "Servizi a Canone",
-      rows: canoneRows
-    }
+
+  const serviziSections = [
+    { key: "task", label: "Servizi a Task", rows: taskRows },
+    { key: "collaudo", label: "Collaudo", rows: collaudoRows },
   ];
+
+  const canoneSections = [
+    { key: "canone", label: "Servizi a Canone", rows: canoneRows },
+  ];
+
 
   const totali = {
     valoreTotale: sum(allRows, "valoreTotale"),
