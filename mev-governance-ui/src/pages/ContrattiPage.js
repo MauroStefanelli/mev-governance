@@ -7,14 +7,22 @@ import {
 
 
 const TH = (align = "left") => ({
-  padding: "10px 14px", fontSize: "11px", fontWeight: 700, color: "#fff",
+  padding: "13px 16px", fontSize: "13px", fontWeight: 700, color: "#fff",
   whiteSpace: "nowrap", background: "#1e293b", textAlign: align,
   borderBottom: "none", textTransform: "uppercase", letterSpacing: "0.5px",
 });
 const TD = (align = "left", extra = {}) => ({
-  padding: "8px 14px", fontSize: "13px", color: "#334155",
+  padding: "8px 16px", fontSize: "13px", color: "#334155",
   verticalAlign: "middle", whiteSpace: "nowrap", textAlign: align, ...extra,
 });
+
+// ── Chevron SVG ───────────────────────────────────────────────────────────────
+const Chevron = ({ open, color = "#64748b" }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+    style={{ display: "block", flexShrink: 0, transition: "transform 0.2s", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}>
+    <path d="M6 4l4 4-4 4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 // ── Formattazione ─────────────────────────────────────────────────────────────
 const formatEuro = (value) => {
@@ -546,8 +554,8 @@ function ConsumoTowSection({ towRows }) {
                         cursor: "pointer",
                       }}
                     >
-                      <td style={TD("center", { fontWeight: 700, color: "white" })}>
-                        {openServizi ? "▲" : "▶"}
+                      <td style={TD("center", { width: "40px", padding: "8px" })}>
+                        <Chevron open={openServizi} color="white" />
                       </td>
                       <td style={TD("left", { fontWeight: 700, color: "white", fontSize: "13px" })}>
                         Servizi
@@ -571,52 +579,27 @@ function ConsumoTowSection({ towRows }) {
                               onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#eff6ff"; }}
                               onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f8fafc"; }}
                             >
-                              <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
-                                {isOpen ? "▲" : "▶"}
+                              <td style={TD("center", { width: "40px", padding: "8px" })}>
+                                <Chevron open={isOpen} color="#3b82f6" />
                               </td>
-
-                              <td
-                                style={TD("left", {
-                                  fontWeight: 700,
-                                  color: "#1a73e8",
-                                  paddingLeft: sec.key === "canone" ? "12px" : "45px"
-                                })}
-                              >
+                              <td style={TD("left", { fontWeight: 700, color: "#1e40af", paddingLeft: "44px" })}>
                                 {sec.label}
                               </td>
-                              <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                              {/* Valore Totale: vuoto per Task e Collaudo */}
+                              <td style={TD("right")} />
                               {sec.key === "collaudo" ? (
                                 <>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "collaudoApprovato"))}
-                                  </td>
-
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "collaudoOrdinato"))}
-                                  </td>
-
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "collaudoFatturato"))}
-                                  </td>
-
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "collaudoApprovato"))}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "collaudoOrdinato"))}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "collaudoFatturato"))}</td>
+                                  <td />
                                 </>
                               ) : (
                                 <>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "approvato"))}
-                                  </td>
-
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "ordinatiRda"))}
-                                  </td>
-
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "impegnato"))}
-                                  </td>
-
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    {formatEuro(sum(sec.rows, "residuo"))}
-                                  </td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
                                 </>
                               )}
                             </tr>
@@ -719,55 +702,23 @@ function ConsumoTowSection({ towRows }) {
                               }))
                             }
                             style={{
-                              background: isOpen ? "#e8f0fe" : "#f0f4ff",
-                              borderBottom: "1px solid #dadce0",
+                              background: isOpen ? "#eff6ff" : "#f8fafc",
+                              borderBottom: "1px solid #e2e8f0",
                               cursor: "pointer",
                             }}
-                          >                           
-                            <td
-                              style={TD("center", {
-                                width: "28px",
-                                color: "#1a73e8",
-                                fontWeight: 700,
-                                fontSize: "11px",
-                                paddingLeft: sec.key === "canone" ? "0" : "60px"
-                              })}
-                            >
-                              {isOpen ? "▲" : "▶"}
+                          >
+                            <td style={TD("center", { width: "40px", padding: "8px" })}>
+                              <Chevron open={isOpen} color="#3b82f6" />
                             </td>
-                           
-                            <td
-                              style={TD("left", {
-                                fontWeight: 700,
-                                color: "#1a73e8",
-                                paddingLeft: sec.key === "canone" ? "0" : "20px"
-                              })}
-                            >
+                            <td style={TD("left", { fontWeight: 700, color: "#1e40af" })}>
                               {sec.label}
                             </td>
-
-                            {sec.key !== "collaudo" && (
-                              <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                {formatEuro(sum(sec.rows, "valoreTotale"))}
-                              </td>
-                            )}
-
-                            < td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "approvato"))}
-                            </td>
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "ordinatiRda"))}
-                            </td>
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "impegnato"))}
-                            </td>
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "residuo"))}
-                            </td>
-                          </tr >
+                            <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                          </tr>
 
                           {isOpen &&
                             sec.rows.map((row, ri) => (
