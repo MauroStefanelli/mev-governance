@@ -18,6 +18,9 @@ public class ConsumoTow
     public decimal TowApprovati { get; set; }
     public decimal TowImpegnati { get; set; }
     public decimal TowResidui { get; set; } 
+    public decimal CollaudoApprovato { get; set; }
+    public decimal CollaudoOrdinato { get; set; }
+    public decimal CollaudoFatturato { get; set; }
 
 }
 
