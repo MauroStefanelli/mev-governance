@@ -529,26 +529,26 @@ function ConsumoTowSection({ towRows }) {
                         Servizi
                       </td>
 
-                        <td style={TD("right", { fontWeight: 700 })}>
-                          {formatEuro(sum(taskRows, "valoreTotale"))}
-                        </td>
+                      <td style={TD("right", { fontWeight: 700 })}>
+                        {formatEuro(sum(taskRows, "valoreTotale"))}
+                      </td>
 
-                        <td style={TD("right", { fontWeight: 700 })}>
-                          {formatEuro(sum(taskRows, "approvato"))}
-                        </td>
+                      <td style={TD("right", { fontWeight: 700 })}>
+                        {formatEuro(sum(taskRows, "approvato"))}
+                      </td>
 
-                        <td style={TD("right", { fontWeight: 700 })}>
-                          {formatEuro(sum(taskRows, "ordinatiRda"))}
-                        </td>
+                      <td style={TD("right", { fontWeight: 700 })}>
+                        {formatEuro(sum(taskRows, "ordinatiRda"))}
+                      </td>
 
-                        <td style={TD("right", { fontWeight: 700 })}>
-                          {formatEuro(sum(taskRows, "impegnato"))}
-                        </td>
+                      <td style={TD("right", { fontWeight: 700 })}>
+                        {formatEuro(sum(taskRows, "impegnato"))}
+                      </td>
 
-                        <td style={TD("right", { fontWeight: 700 })}>
-                          {formatEuro(sum(taskRows, "residuo"))}
-                        </td>
-                      </tr>
+                      <td style={TD("right", { fontWeight: 700 })}>
+                        {formatEuro(sum(taskRows, "residuo"))}
+                      </td>
+                    </tr>
 
                     {openServizi &&
                       serviziSections.map((sec) => {
@@ -603,7 +603,8 @@ function ConsumoTowSection({ towRows }) {
                               )}
                             </tr>
                             {isOpen && sec.key === "collaudo" && (
-                              
+
+
                               <tr style={{ background: "#f8f9fa" }}>
                                 <td />
                                 <td style={TD("left", { fontWeight: 700 })}>
@@ -623,15 +624,21 @@ function ConsumoTowSection({ towRows }) {
                                 </td>
                               </tr>
 
+
                             )}
 
                             {isOpen && sec.rows.map((row, ri) => (
                               <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
                                 <td />
                                 <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
-                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
 
-                               {sec.key === "collaudo" ? (
+                                {sec.key !== "collaudo" && (
+                                  <td style={TD("right", { fontSize: "12px" })}>
+                                    {formatEuro(row.valoreTotale)}
+                                  </td>
+                                )}
+
+                                {sec.key === "collaudo" ? (
                                   <>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(row.collaudoApprovato)}
@@ -650,19 +657,15 @@ function ConsumoTowSection({ towRows }) {
                                 ) : (
                                   <>
                                     <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.approvato)}
+                                      {formatEuro(row.collaudoApprovato)}
                                     </td>
 
                                     <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.ordinatiRda)}
+                                      {formatEuro(row.collaudoOrdinato)}
                                     </td>
 
                                     <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.impegnato)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.residuo)}
+                                      {formatEuro(row.collaudoFatturato)}
                                     </td>
                                   </>
                                 )}
@@ -672,7 +675,6 @@ function ConsumoTowSection({ towRows }) {
                           </>
                         );
                       })}
-
 
 
                     {canoneSections.map((sec) => {
@@ -715,257 +717,264 @@ function ConsumoTowSection({ towRows }) {
                                 <td />
                               </>
                             ) : (
-                              <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                {formatEuro(sum(sec.rows, "valoreTotale"))}
-                              </td>
-                            )}
 
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "approvato"))}
-                            </td>
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "ordinatiRda"))}
-                            </td>
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "impegnato"))}
-                            </td>
-
-                            <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                              {formatEuro(sum(sec.rows, "residuo"))}
-                            </td>
-                          </tr>
-
-                          {isOpen &&
-                            sec.rows.map((row, ri) => (
-                              <tr
-                                key={`${sec.key}-${ri}`}
-                                style={{
-                                  background: ri % 2 === 0 ? "white" : "#fafafa",
-                                  borderBottom: "1px solid #f0f0f0",
-                                }}
-                              >
-                                <td />
-                                <td
-                                  style={TD("left", {
-                                    fontSize: "12px",
-                                    paddingLeft: "28px",
-                                    color: "#555",
-                                  })}
-                                >
-                                  {row.tow}
-                                </td>
-
-                                {sec.key === "collaudo" ? (
+                              {
+                                sec.key === "collaudo" ? (
                                   <td />
                                 ) : (
-                                  <td style={TD("right", { fontSize: "12px" })}>
-                                    {formatEuro(row.valoreTotale)}
+                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                                    {formatEuro(sum(sec.rows, "valoreTotale"))}
                                   </td>
-                                )}
-                                <td style={TD("right")}>{formatEuro(row.approvato)}</td>
-                                <td style={TD("right")}>{formatEuro(row.ordinatiRda)}</td>
-                                <td style={TD("right")}>{formatEuro(row.impegnato)}</td>
-                                <td style={TD("right")}>{formatEuro(row.residuo)}</td>
-                              </tr>
-                            ))}
+                                )
+                              }
+
+                              < td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                            {formatEuro(sum(sec.rows, "approvato"))}
+                          </td>
+
+                          <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                            {formatEuro(sum(sec.rows, "ordinatiRda"))}
+                          </td>
+
+                          <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                            {formatEuro(sum(sec.rows, "impegnato"))}
+                          </td>
+
+                          <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
+                            {formatEuro(sum(sec.rows, "residuo"))}
+                          </td>
+                        </tr >
+
+                          { isOpen &&
+                          sec.rows.map((row, ri) => (
+                            <tr
+                              key={`${sec.key}-${ri}`}
+                              style={{
+                                background: ri % 2 === 0 ? "white" : "#fafafa",
+                                borderBottom: "1px solid #f0f0f0",
+                              }}
+                            >
+                              <td />
+                              <td
+                                style={TD("left", {
+                                  fontSize: "12px",
+                                  paddingLeft: "28px",
+                                  color: "#555",
+                                })}
+                              >
+                                {row.tow}
+                              </td>
+
+                              {sec.key === "collaudo" ? (
+                                <td />
+                              ) : (
+                                <td style={TD("right", { fontSize: "12px" })}>
+                                  {formatEuro(row.valoreTotale)}
+                                </td>
+                              )}
+                              <td style={TD("right")}>{formatEuro(row.approvato)}</td>
+                              <td style={TD("right")}>{formatEuro(row.ordinatiRda)}</td>
+                              <td style={TD("right")}>{formatEuro(row.impegnato)}</td>
+                              <td style={TD("right")}>{formatEuro(row.residuo)}</td>
+                            </tr>
+                          ))
+                    }
                         </>
-                      );
+                );
                     })}
 
-                  </>
+              </>
                 )}
 
 
-              </tbody >
-            </table>
-          </div>
+            </tbody >
+          </table>
+        </div>
 
-          {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
-            {allRows.length > 0 && (
-              <TowPieChart title="Totale Servizi" rows={allRows} sum={sum} />
-            )}
-            {taskRows.length > 0 && (
-              <TowPieChart title="Servizi a Task" rows={taskRows} sum={sum} />
-            )}
-            {canoneRows.length > 0 && (
-              <TowPieChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
-            )}
-          </div>
+      {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
+      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
+        {allRows.length > 0 && (
+          <TowPieChart title="Totale Servizi" rows={allRows} sum={sum} />
+        )}
+        {taskRows.length > 0 && (
+          <TowPieChart title="Servizi a Task" rows={taskRows} sum={sum} />
+        )}
+        {canoneRows.length > 0 && (
+          <TowPieChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
+        )}
+      </div>
 
 
-          {/* ── Grafico TOW contratto selezionato ── */}
-          {selectedTipo && filtered.length > 0 && (
+      {/* ── Grafico TOW contratto selezionato ── */}
+      {selectedTipo && filtered.length > 0 && (
+        <div style={{
+          background: "white",
+          border: "1px solid #e5e7eb",
+          borderRadius: "12px",
+          padding: "20px 20px 12px",
+          marginTop: "12px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "16px",
+          }}>
             <div style={{
-              background: "white",
-              border: "1px solid #e5e7eb",
-              borderRadius: "12px",
-              padding: "20px 20px 12px",
-              marginTop: "12px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#1e293b",
+              letterSpacing: "0.3px",
             }}>
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "16px",
-              }}>
-                <div style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#1e293b",
-                  letterSpacing: "0.3px",
-                }}>
-                  Consumo TOW
-                </div>
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  {["ordinatiRda", "impegnato", "residuo"].map(key => (
-                    <div key={key} style={{
-                      display: "flex", alignItems: "center", gap: "7px",
-                      background: "#f8fafc", borderRadius: "8px",
-                      padding: "5px 12px 5px 10px",
-                    }}>
-                      <span style={{
-                        width: 12, height: 12, borderRadius: "4px",
-                        background: COLORS[key], display: "inline-block",
-                        flexShrink: 0,
-                      }} />
-                      <span style={{ fontSize: "13px", color: "#1e293b", fontWeight: 600 }}>
-                        {LABELS[key]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <ResponsiveContainer width="100%" height={Math.max(200, percentData.length * 50)}>
-                <BarChart data={percentData} layout="vertical"
-                  margin={{ top: 0, right: 36, left: 0, bottom: 0 }}
-                  barCategoryGap={10}
-                >
-                  <XAxis
-                    type="number"
-                    domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: "#94a3b8" }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={v => `${v}%`}
-                  />
-                  <YAxis
-                    dataKey="tow"
-                    type="category"
-                    tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={150}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null;
-                      const EURO_KEY = {
-                        ordinatoPerc: "ordinatoEuro",
-                        impegnatoPerc: "impegnatoEuro",
-                        residuoPerc: "residuoEuro",
-                      };
-                      return (
-                        <div style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "8px",
-                          padding: "10px 14px",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                          fontSize: "12px",
-                          minWidth: 180,
-                        }}>
-                          <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: "6px", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
-                            {label}
-                          </div>
-                          {payload.filter(p => p.value > 0).map(p => {
-                            const euroKey = EURO_KEY[p.dataKey];
-                            const euroVal = p.payload?.[euroKey];
-                            return (
-                              <div key={p.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                  <span style={{
-                                    width: 8, height: 8, borderRadius: "50%",
-                                    background: p.color, display: "inline-block", flexShrink: 0,
-                                  }} />
-                                  <span style={{ color: "#64748b" }}>{p.name}</span>
-                                </div>
-                                <span style={{ fontWeight: 600, color: "#1e293b", textAlign: "right", whiteSpace: "nowrap" }}>
-                                  {formatEuro(euroVal)}
-                                  <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: "4px" }}>
-                                    ({Number(p.value).toFixed(1)}%)
-                                  </span>
-                                </span>
-                              </div>
-                            );
-                          })}
-                          {payload[0]?.payload?.totaleEuro > 0 && (
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "6px", borderTop: "1px solid #f1f5f9", paddingTop: "6px" }}>
-                              <span style={{ color: "#64748b", fontWeight: 500 }}>Totale</span>
-                              <span style={{ fontWeight: 700, color: "#1e293b" }}>{formatEuro(payload[0].payload.totaleEuro)}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }}
-                  />
-
-                  <Bar
-                    dataKey="ordinatoPerc"
-                    stackId="a"
-                    fill={COLORS.ordinatiRda}
-                    name="Ordinato"
-                    minPointSize={8}
-                    radius={[4, 0, 0, 4]}
-                    background={{ fill: "#f1f5f9", radius: 4 }}
-                    label={{
-                      position: "insideLeft",
-                      formatter: (v) => v > 2 ? `${Number(v).toFixed(0)}%` : "",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      fill: "#fff",
-                    }}
-                  />
-                  <Bar
-                    dataKey="impegnatoPerc"
-                    stackId="a"
-                    fill={COLORS.impegnato}
-                    name="Impegnato"
-                    minPointSize={5}
-                    label={{
-                      position: "inside",
-                      formatter: (v) => v > 4 ? `${Number(v).toFixed(0)}%` : "",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      fill: "#1e293b",
-                    }}
-                  />
-                  <Bar
-                    dataKey="residuoPerc"
-                    stackId="a"
-                    fill={COLORS.residuo}
-                    name="Residuo"
-                    radius={[0, 4, 4, 0]}
-                    label={{
-                      position: "right",
-                      formatter: (v) => v > 0 ? `${Number(v).toFixed(0)}%` : "",
-                      fontSize: 11,
-                      fill: "#64748b",
-                      offset: 4,
-                    }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              Consumo TOW
             </div>
-          )}
-        </>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              {["ordinatiRda", "impegnato", "residuo"].map(key => (
+                <div key={key} style={{
+                  display: "flex", alignItems: "center", gap: "7px",
+                  background: "#f8fafc", borderRadius: "8px",
+                  padding: "5px 12px 5px 10px",
+                }}>
+                  <span style={{
+                    width: 12, height: 12, borderRadius: "4px",
+                    background: COLORS[key], display: "inline-block",
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ fontSize: "13px", color: "#1e293b", fontWeight: 600 }}>
+                    {LABELS[key]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <ResponsiveContainer width="100%" height={Math.max(200, percentData.length * 50)}>
+            <BarChart data={percentData} layout="vertical"
+              margin={{ top: 0, right: 36, left: 0, bottom: 0 }}
+              barCategoryGap={10}
+            >
+              <XAxis
+                type="number"
+                domain={[0, 100]}
+                tick={{ fontSize: 10, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => `${v}%`}
+              />
+              <YAxis
+                dataKey="tow"
+                type="category"
+                tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
+                axisLine={false}
+                tickLine={false}
+                width={150}
+              />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const EURO_KEY = {
+                    ordinatoPerc: "ordinatoEuro",
+                    impegnatoPerc: "impegnatoEuro",
+                    residuoPerc: "residuoEuro",
+                  };
+                  return (
+                    <div style={{
+                      background: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                      fontSize: "12px",
+                      minWidth: 180,
+                    }}>
+                      <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: "6px", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
+                        {label}
+                      </div>
+                      {payload.filter(p => p.value > 0).map(p => {
+                        const euroKey = EURO_KEY[p.dataKey];
+                        const euroVal = p.payload?.[euroKey];
+                        return (
+                          <div key={p.dataKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{
+                                width: 8, height: 8, borderRadius: "50%",
+                                background: p.color, display: "inline-block", flexShrink: 0,
+                              }} />
+                              <span style={{ color: "#64748b" }}>{p.name}</span>
+                            </div>
+                            <span style={{ fontWeight: 600, color: "#1e293b", textAlign: "right", whiteSpace: "nowrap" }}>
+                              {formatEuro(euroVal)}
+                              <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: "4px" }}>
+                                ({Number(p.value).toFixed(1)}%)
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {payload[0]?.payload?.totaleEuro > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "6px", borderTop: "1px solid #f1f5f9", paddingTop: "6px" }}>
+                          <span style={{ color: "#64748b", fontWeight: 500 }}>Totale</span>
+                          <span style={{ fontWeight: 700, color: "#1e293b" }}>{formatEuro(payload[0].payload.totaleEuro)}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+
+              <Bar
+                dataKey="ordinatoPerc"
+                stackId="a"
+                fill={COLORS.ordinatiRda}
+                name="Ordinato"
+                minPointSize={8}
+                radius={[4, 0, 0, 4]}
+                background={{ fill: "#f1f5f9", radius: 4 }}
+                label={{
+                  position: "insideLeft",
+                  formatter: (v) => v > 2 ? `${Number(v).toFixed(0)}%` : "",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fill: "#fff",
+                }}
+              />
+              <Bar
+                dataKey="impegnatoPerc"
+                stackId="a"
+                fill={COLORS.impegnato}
+                name="Impegnato"
+                minPointSize={5}
+                label={{
+                  position: "inside",
+                  formatter: (v) => v > 4 ? `${Number(v).toFixed(0)}%` : "",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fill: "#1e293b",
+                }}
+              />
+              <Bar
+                dataKey="residuoPerc"
+                stackId="a"
+                fill={COLORS.residuo}
+                name="Residuo"
+                radius={[0, 4, 4, 0]}
+                label={{
+                  position: "right",
+                  formatter: (v) => v > 0 ? `${Number(v).toFixed(0)}%` : "",
+                  fontSize: 11,
+                  fill: "#64748b",
+                  offset: 4,
+                }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
-    </div>
+    </>
+  )
+}
+    </div >
   );
 }
 
