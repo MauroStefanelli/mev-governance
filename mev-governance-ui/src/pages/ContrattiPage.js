@@ -397,11 +397,14 @@ function ConsumoTowSection({ towRows }) {
 
 
   const taskRows = group(TOW_TASK);
+
   const canoneRows = group(TOW_CANONE);
-  const collaudoRows = taskRows;
+
+  const collaudoRows = taskRows.filter(
+    r => r.tow?.toUpperCase() === "TOW02.3"
+  );
 
   const allRows = [...taskRows, ...canoneRows];
-
 
   const serviziSections = [
     { key: "task", label: "Servizi a Task", rows: taskRows },
@@ -411,6 +414,8 @@ function ConsumoTowSection({ towRows }) {
   const canoneSections = [
     { key: "canone", label: "Servizi a Canone", rows: canoneRows },
   ];
+
+
 
 
   const totali = {
@@ -524,8 +529,26 @@ function ConsumoTowSection({ towRows }) {
                         Servizi
                       </td>
 
-                      <td colSpan={5}></td>
-                    </tr>
+                        <td style={TD("right", { fontWeight: 700 })}>
+                          {formatEuro(sum(taskRows, "valoreTotale"))}
+                        </td>
+
+                        <td style={TD("right", { fontWeight: 700 })}>
+                          {formatEuro(sum(taskRows, "approvato"))}
+                        </td>
+
+                        <td style={TD("right", { fontWeight: 700 })}>
+                          {formatEuro(sum(taskRows, "ordinatiRda"))}
+                        </td>
+
+                        <td style={TD("right", { fontWeight: 700 })}>
+                          {formatEuro(sum(taskRows, "impegnato"))}
+                        </td>
+
+                        <td style={TD("right", { fontWeight: 700 })}>
+                          {formatEuro(sum(taskRows, "residuo"))}
+                        </td>
+                      </tr>
 
                     {openServizi &&
                       serviziSections.map((sec) => {
@@ -558,9 +581,6 @@ function ConsumoTowSection({ towRows }) {
                                     {formatEuro(sum(sec.rows, "collaudoFatturato"))}
                                   </td>
 
-                                  <td style={TD("right", { fontWeight: 700, color: "#1a73e8" })}>
-                                    -
-                                  </td>
                                 </>
                               ) : (
                                 <>
@@ -582,13 +602,36 @@ function ConsumoTowSection({ towRows }) {
                                 </>
                               )}
                             </tr>
+                            {isOpen && sec.key === "collaudo" && (
+                              <tr style={{ background: "#f8f9fa" }}>
+                                <td />
+                                <td style={TD("left", { fontWeight: 700 })}>
+                                  TOW
+                                </td>
+
+                                <td style={TD("right", { fontWeight: 700 })}>
+                                  Approvato
+                                </td>
+
+                                <td style={TD("right", { fontWeight: 700 })}>
+                                  Ordinato
+                                </td>
+
+                                <td style={TD("right", { fontWeight: 700 })}>
+                                  Impegnato
+                                </td>
+
+                                <td />
+                              </tr>
+                            )}
+
                             {isOpen && sec.rows.map((row, ri) => (
                               <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
                                 <td />
                                 <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
                                 <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
 
-                                {sec.key === "collaudo" ? (
+                               {sec.key === "collaudo" ? (
                                   <>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(row.collaudoApprovato)}
@@ -602,9 +645,7 @@ function ConsumoTowSection({ towRows }) {
                                       {formatEuro(row.collaudoFatturato)}
                                     </td>
 
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      -
-                                    </td>
+                                    <td />
                                   </>
                                 ) : (
                                   <>
