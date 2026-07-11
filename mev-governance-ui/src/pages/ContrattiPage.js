@@ -51,7 +51,7 @@ const COLORS = {
   valoreTotale: "#1e293b",
   approvato:    "#3b82f6",
   ordinatiRda:  "#10b981",
-  impegnato:    "#f59e0b",
+  impegnato:    "#FFFF00",
   residuo:      "#f97316",
 };
 
