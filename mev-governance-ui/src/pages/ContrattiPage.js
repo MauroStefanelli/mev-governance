@@ -438,6 +438,15 @@ function ConsumoTowSection({ towRows }) {
     impegnato:   sum(collaudoRows, "collaudoFatturato"),
   };
 
+  // Totali per la riga "Servizi a Task" = taskRows ma TOW02.3 al netto del collaudo
+  const tow023Row = collaudoRows[0];
+  const taskNetTotals = {
+    approvato:   sum(taskOnlyRows, "approvato")   + (tow023Row ? tow023Row.approvato   - tow023Row.collaudoApprovato : 0),
+    ordinatiRda: sum(taskOnlyRows, "ordinatiRda") + (tow023Row ? tow023Row.ordinatiRda - tow023Row.collaudoOrdinato  : 0),
+    impegnato:   sum(taskOnlyRows, "impegnato")   + (tow023Row ? tow023Row.impegnato   - tow023Row.collaudoFatturato : 0),
+    residuo:     sum(taskRows, "residuo"),
+  };
+
   const allRows = [...taskRows, ...canoneRows];
 
   const serviziSections = [
@@ -617,10 +626,10 @@ function ConsumoTowSection({ towRows }) {
                                 </>
                               ) : (
                                 <>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(taskNetTotals.approvato)}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(taskNetTotals.ordinatiRda)}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(taskNetTotals.impegnato)}</td>
+                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(taskNetTotals.residuo)}</td>
                                 </>
                               )}
                             </tr>
