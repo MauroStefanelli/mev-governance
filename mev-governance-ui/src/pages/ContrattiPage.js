@@ -422,6 +422,13 @@ function ConsumoTowSection({ towRows }) {
     r => r.tow?.toUpperCase() !== "TOW02.3"
   );
 
+  // Somma dei valori Collaudo (TOW02.3) da sottrarre nella riga task TOW02.3
+  const collaudoSum = {
+    approvato:   sum(collaudoRows, "approvato"),
+    ordinatiRda: sum(collaudoRows, "ordinatiRda"),
+    impegnato:   sum(collaudoRows, "impegnato"),
+  };
+
   const allRows = [...taskRows, ...canoneRows];
 
   const serviziSections = [
@@ -642,13 +649,25 @@ function ConsumoTowSection({ towRows }) {
                                  ) : (
                                    <>
                                      <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.approvato)}
+                                       {formatEuro(
+                                         sec.key === "task" && row.tow?.toUpperCase() === "TOW02.3"
+                                           ? row.approvato - collaudoSum.approvato
+                                           : row.approvato
+                                       )}
                                      </td>
                                      <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.ordinatiRda)}
+                                       {formatEuro(
+                                         sec.key === "task" && row.tow?.toUpperCase() === "TOW02.3"
+                                           ? row.ordinatiRda - collaudoSum.ordinatiRda
+                                           : row.ordinatiRda
+                                       )}
                                      </td>
                                      <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.impegnato)}
+                                       {formatEuro(
+                                         sec.key === "task" && row.tow?.toUpperCase() === "TOW02.3"
+                                           ? row.impegnato - collaudoSum.impegnato
+                                           : row.impegnato
+                                       )}
                                      </td>
                                      <td style={TD("right", { fontSize: "12px" })}>
                                        {formatEuro(row.residuo)}
