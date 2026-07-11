@@ -530,7 +530,7 @@ function ConsumoTowSection({ towRows }) {
               <thead>
                 <tr>
                   <th style={TH()} />
-                  <th style={TH()}>Servizi</th>
+                  <th style={TH()}>Servizi a Task e Collaudo</th>
                   <th style={TH("right")}>Valore Totale</th>
                   <th style={TH("right")}>Approvato</th>
                   <th style={TH("right")}>Ordinato</th>
