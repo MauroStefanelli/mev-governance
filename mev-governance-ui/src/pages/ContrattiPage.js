@@ -417,6 +417,11 @@ function ConsumoTowSection({ towRows }) {
     r => r.tow?.toUpperCase() === "TOW02.3"
   );
 
+  // Righe task senza collaudo (per i totali della riga padre "Servizi a Task")
+  const taskOnlyRows = taskRows.filter(
+    r => r.tow?.toUpperCase() !== "TOW02.3"
+  );
+
   const allRows = [...taskRows, ...canoneRows];
 
   const serviziSections = [
@@ -560,11 +565,11 @@ function ConsumoTowSection({ towRows }) {
                       <td style={TD("left", { fontWeight: 700, color: "white", fontSize: "13px" })}>
                         Servizi a Task e Collaudo
                       </td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "valoreTotale"))}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "approvato"))}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "ordinatiRda"))}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "impegnato"))}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "residuo"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskOnlyRows, "valoreTotale"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskOnlyRows, "approvato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskOnlyRows, "ordinatiRda"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskOnlyRows, "impegnato"))}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskOnlyRows, "residuo"))}</td>
                     </tr>
 
                     {openServizi &&
