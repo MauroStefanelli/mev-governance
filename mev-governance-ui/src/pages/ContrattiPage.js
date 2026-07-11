@@ -530,7 +530,7 @@ function ConsumoTowSection({ towRows }) {
               <thead>
                 <tr>
                   <th style={TH()} />
-                  <th style={TH()}>Servizi a Task e Collaudo</th>
+                  <th style={TH()}>Servizi</th>
                   <th style={TH("right")}>Valore Totale</th>
                   <th style={TH("right")}>Approvato</th>
                   <th style={TH("right")}>Ordinato</th>
@@ -558,7 +558,7 @@ function ConsumoTowSection({ towRows }) {
                         <Chevron open={openServizi} color="white" />
                       </td>
                       <td style={TD("left", { fontWeight: 700, color: "white", fontSize: "13px" })}>
-                        Servizi
+                        Servizi a Task e Collaudo
                       </td>
                       <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "valoreTotale"))}</td>
                       <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(taskRows, "approvato"))}</td>
