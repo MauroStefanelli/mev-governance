@@ -422,14 +422,12 @@ function ConsumoTowSection({ towRows }) {
     r => r.tow?.toUpperCase() !== "TOW02.3"
   );
 
-  // Totali corretti per la riga blu "Servizi a Task e Collaudo":
-  // tutti i task (incluso TOW02.3) ma per TOW02.3 si sottrae la parte collaudo
-  const tow023Row = collaudoRows[0]; // unica riga TOW02.3
+  // Totali riga blu = somma grezza di tutti i taskRows (Servizi a Task netto + Collaudo)
   const blueRowTotals = {
     valoreTotale: sum(taskRows, "valoreTotale"),
-    approvato:    sum(taskOnlyRows, "approvato")   + (tow023Row ? tow023Row.approvato   - tow023Row.collaudoApprovato : 0),
-    ordinatiRda:  sum(taskOnlyRows, "ordinatiRda") + (tow023Row ? tow023Row.ordinatiRda - tow023Row.collaudoOrdinato  : 0),
-    impegnato:    sum(taskOnlyRows, "impegnato")   + (tow023Row ? tow023Row.impegnato   - tow023Row.collaudoFatturato : 0),
+    approvato:    sum(taskRows, "approvato"),
+    ordinatiRda:  sum(taskRows, "ordinatiRda"),
+    impegnato:    sum(taskRows, "impegnato"),
     residuo:      sum(taskRows, "residuo"),
   };
 
