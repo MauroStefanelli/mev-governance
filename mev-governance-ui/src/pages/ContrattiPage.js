@@ -422,12 +422,7 @@ function ConsumoTowSection({ towRows }) {
     r => r.tow?.toUpperCase() !== "TOW02.3"
   );
 
-  // Somma dei valori Collaudo (TOW02.3) da sottrarre nella riga task TOW02.3
-  const collaudoSum = {
-    approvato:   sum(collaudoRows, "approvato"),
-    ordinatiRda: sum(collaudoRows, "ordinatiRda"),
-    impegnato:   sum(collaudoRows, "impegnato"),
-  };
+
 
   const allRows = [...taskRows, ...canoneRows];
 
@@ -641,31 +636,31 @@ function ConsumoTowSection({ towRows }) {
                                  {sec.key === "collaudo" ? (
                                    <>
                                      <td />{/* Valore Totale vuoto */}
-                                     <td />{/* Approvato vuoto */}
-                                     <td />{/* Ordinato vuoto */}
-                                     <td />{/* Impegnato vuoto */}
+                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoApprovato)}</td>
+                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoOrdinato)}</td>
+                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoFatturato)}</td>
                                      <td />{/* Residuo vuoto */}
                                    </>
                                  ) : (
                                    <>
                                      <td style={TD("right", { fontSize: "12px" })}>
                                        {formatEuro(
-                                         sec.key === "task" && row.tow?.toUpperCase() === "TOW02.3"
-                                           ? row.approvato - collaudoSum.approvato
+                                         row.tow?.toUpperCase() === "TOW02.3"
+                                           ? row.approvato - row.collaudoApprovato
                                            : row.approvato
                                        )}
                                      </td>
                                      <td style={TD("right", { fontSize: "12px" })}>
                                        {formatEuro(
-                                         sec.key === "task" && row.tow?.toUpperCase() === "TOW02.3"
-                                           ? row.ordinatiRda - collaudoSum.ordinatiRda
+                                         row.tow?.toUpperCase() === "TOW02.3"
+                                           ? row.ordinatiRda - row.collaudoOrdinato
                                            : row.ordinatiRda
                                        )}
                                      </td>
                                      <td style={TD("right", { fontSize: "12px" })}>
                                        {formatEuro(
-                                         sec.key === "task" && row.tow?.toUpperCase() === "TOW02.3"
-                                           ? row.impegnato - collaudoSum.impegnato
+                                         row.tow?.toUpperCase() === "TOW02.3"
+                                           ? row.impegnato - row.collaudoFatturato
                                            : row.impegnato
                                        )}
                                      </td>
