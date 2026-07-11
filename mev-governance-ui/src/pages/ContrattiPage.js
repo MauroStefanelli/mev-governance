@@ -289,9 +289,9 @@ function TowChart({ title, rows, sum }) {
             wrapperStyle={{ fontSize: "12px" }}
             iconType="square"
             payload={[
-              { value: "Ordinato", type: "square", color: "#2E75B6" },
-              { value: "Impegnato", type: "square", color: "#9DC3E6" },
-              { value: "Residuo", type: "square", color: "#D6DCE5" }
+              { value: "Ordinato", type: "square", color: "#00B853" },
+              { value: "Impegnato", type: "square", color: "#FFFF00" },
+              { value: "Residuo", type: "square", color: "#FFC000" }
             ]}
           />
 
@@ -604,28 +604,15 @@ function ConsumoTowSection({ towRows }) {
                               )}
                             </tr>
                             {isOpen && sec.key === "collaudo" && (
-                              
-                              <tr style={{ background: "#f8f9fa" }}>
+                              <tr style={{ background: "#f1f5f9", borderBottom: "1px solid #e2e8f0" }}>
                                 <td />
-                                <td style={TD("left", { fontWeight: 700 })}>
-                                  TOW
-                                </td>
-
+                                <td style={TD("left", { fontWeight: 700, fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", paddingLeft: "28px" })}>TOW</td>
+                                <td />{/* Valore Totale vuoto */}
+                                <td style={TD("right", { fontWeight: 700, fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" })}>Approvato</td>
+                                <td style={TD("right", { fontWeight: 700, fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" })}>Ordinato</td>
+                                <td style={TD("right", { fontWeight: 700, fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" })}>Impegnato</td>
                                 <td />
-
-                                <td style={TD("right", { fontWeight: 700 })}>
-                                  Approvato
-                                </td>
-
-                                <td style={TD("right", { fontWeight: 700 })}>
-                                  Ordinato
-                                </td>
-
-                                <td style={TD("right", { fontWeight: 700 })}>
-                                  Impegnato
-                                </td>
                               </tr>
-
                             )}
 
                             {isOpen && sec.rows.map((row, ri) => (
@@ -633,53 +620,42 @@ function ConsumoTowSection({ towRows }) {
                                 <td />
                                 <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
 
-                                {sec.key !== "collaudo" && (
-                                  <td style={TD("right", { fontSize: "12px" })}>
-                                    {formatEuro(row.valoreTotale)}
-                                  </td>
-                                )}
+                                 {sec.key !== "collaudo" && (
+                                   <td style={TD("right", { fontSize: "12px" })}>
+                                     {formatEuro(row.valoreTotale)}
+                                   </td>
+                                 )}
 
-                                {sec.key === "collaudo" ? (
-                                  <>
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.collaudoApprovato)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.collaudoOrdinato)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.collaudoFatturato)}
-                                    </td>
-
-                                    <td />
-                                  </>
-                                ) : (
-
-                                  <>
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.valoreTotale)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.approvato)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.ordinatiRda)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.impegnato)}
-                                    </td>
-
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.residuo)}
-                                    </td>
-                                  </>
-
-                                )}
+                                 {sec.key === "collaudo" ? (
+                                   <>
+                                     <td />{/* cella vuota per Valore Totale */}
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.collaudoApprovato)}
+                                     </td>
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.collaudoOrdinato)}
+                                     </td>
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.collaudoFatturato)}
+                                     </td>
+                                     <td />
+                                   </>
+                                 ) : (
+                                   <>
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.approvato)}
+                                     </td>
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.ordinatiRda)}
+                                     </td>
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.impegnato)}
+                                     </td>
+                                     <td style={TD("right", { fontSize: "12px" })}>
+                                       {formatEuro(row.residuo)}
+                                     </td>
+                                   </>
+                                 )}
 
                               </tr>
                             ))}
