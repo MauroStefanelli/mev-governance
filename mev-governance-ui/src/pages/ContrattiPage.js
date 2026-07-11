@@ -594,10 +594,10 @@ function ConsumoTowSection({ towRows }) {
                               <td style={TD("right")} />
                               {sec.key === "collaudo" ? (
                                 <>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "collaudoApprovato"))}</td>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "collaudoOrdinato"))}</td>
-                                  <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "collaudoFatturato"))}</td>
-                                  <td />
+                                  <td />{/* Approvato vuoto */}
+                                  <td />{/* Ordinato vuoto */}
+                                  <td />{/* Impegnato vuoto */}
+                                  <td />{/* Residuo vuoto */}
                                 </>
                               ) : (
                                 <>
@@ -633,17 +633,11 @@ function ConsumoTowSection({ towRows }) {
 
                                  {sec.key === "collaudo" ? (
                                    <>
-                                     <td />{/* cella vuota per Valore Totale */}
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.collaudoApprovato)}
-                                     </td>
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.collaudoOrdinato)}
-                                     </td>
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.collaudoFatturato)}
-                                     </td>
-                                     <td />
+                                     <td />{/* Valore Totale vuoto */}
+                                     <td />{/* Approvato vuoto */}
+                                     <td />{/* Ordinato vuoto */}
+                                     <td />{/* Impegnato vuoto */}
+                                     <td />{/* Residuo vuoto */}
                                    </>
                                  ) : (
                                    <>
