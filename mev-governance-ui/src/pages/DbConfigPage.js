@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDbConfig, setDbConfig, testDbConnection, restartBackend } from "../services/mevService";
+import { getDbConfig, setDbConfig, testDbConnection, restartBackend, getAppSettings, setAppSettings } from "../services/mevService";
 
 const fieldStyle = {
   display: "flex", flexDirection: "column", gap: "4px"
@@ -21,7 +21,8 @@ const radioStyle = {
   cursor: "pointer", fontSize: "13px", background: "#fff"
 };
 
-export default function DbConfigPage() {
+// ── Tab: Configurazione Database ─────────────────────────────────────────────
+function DbConfigTab() {
   const [provider, setProvider] = useState("sqlite");
   const [sqlitePath, setSqlitePath] = useState("/data/mev.db");
   const [host, setHost] = useState("");
@@ -67,9 +68,7 @@ export default function DbConfigPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    setMessage(null);
-    setError(null);
+    setSaving(true); setMessage(null); setError(null);
     try {
       const result = await setDbConfig(buildBody());
       if (password) setPasswordSet(true);
@@ -77,40 +76,24 @@ export default function DbConfigPage() {
       setMessage(result.message || "Configurazione salvata");
     } catch (e) {
       setError(e.message || "Errore salvataggio");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const handleTest = async () => {
-    setTesting(true);
-    setMessage(null);
-    setError(null);
+    setTesting(true); setMessage(null); setError(null);
     try {
       const result = await testDbConnection(buildBody());
-      if (result.success) {
-        setMessageType("success");
-        setMessage(result.message || "Connessione riuscita");
-      } else {
-        setMessageType("error");
-        setMessage(result.message || "Connessione fallita");
-      }
+      setMessageType(result.success ? "success" : "error");
+      setMessage(result.message || (result.success ? "Connessione riuscita" : "Connessione fallita"));
     } catch (e) {
       setMessageType("error");
       setMessage(e.message || "Errore test connessione");
-    } finally {
-      setTesting(false);
-    }
+    } finally { setTesting(false); }
   };
 
   const handleRestart = async () => {
-    if (!confirmRestart) {
-      setConfirmRestart(true);
-      return;
-    }
-    setRestarting(true);
-    setMessage(null);
-    setError(null);
+    if (!confirmRestart) { setConfirmRestart(true); return; }
+    setRestarting(true); setMessage(null); setError(null);
     try {
       const result = await restartBackend();
       setMessageType("success");
@@ -121,21 +104,11 @@ export default function DbConfigPage() {
       setMessageType("error");
       setMessage(e.message || "Errore riavvio");
       setConfirmRestart(false);
-    } finally {
-      setRestarting(false);
-    }
+    } finally { setRestarting(false); }
   };
 
   return (
-    <div style={{
-      maxWidth: "600px", margin: "40px auto", background: "#fff",
-      borderRadius: "12px", padding: "28px 32px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-    }}>
-      <h2 style={{ margin: "0 0 24px 0", fontSize: "18px", color: "#1a1a1a" }}>
-        Configurazione Database
-      </h2>
-
-      {/* Banner: configurazione da variabile d'ambiente */}
+    <div>
       {readonlyEnv && (
         <div style={{
           padding: "12px 16px", borderRadius: "8px", marginBottom: "20px",
@@ -155,35 +128,26 @@ export default function DbConfigPage() {
           color: messageType === "success" ? "#2e7d32" : "#c62828",
           fontSize: "13px",
           border: messageType === "success" ? "1px solid #c8e6c9" : "1px solid #f8bbd0"
-        }}>
-          {message}
-        </div>
+        }}>{message}</div>
       )}
 
       {error && (
         <div style={{
           padding: "10px 14px", borderRadius: "8px", marginBottom: "16px",
           background: "#fce4ec", color: "#c62828", fontSize: "13px", border: "1px solid #f8bbd0"
-        }}>
-          {error}
-        </div>
+        }}>{error}</div>
       )}
 
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
         <div style={{ display: "flex", gap: "12px" }}>
-          <div
-            onClick={() => !readonlyEnv && setProvider("sqlite")}
-            style={{ ...radioStyle, flex: 1, borderColor: provider === "sqlite" ? "#1a73e8" : "#dadce0", background: provider === "sqlite" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}
-          >
+          <div onClick={() => !readonlyEnv && setProvider("sqlite")}
+            style={{ ...radioStyle, flex: 1, borderColor: provider === "sqlite" ? "#1a73e8" : "#dadce0", background: provider === "sqlite" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}>
             <input type="radio" checked={provider === "sqlite"} onChange={() => {}} readOnly />
             <span style={{ fontWeight: provider === "sqlite" ? 600 : 400 }}>SQLite</span>
             <span style={{ fontSize: "11px", color: "#888" }}>(locale)</span>
           </div>
-          <div
-            onClick={() => !readonlyEnv && setProvider("postgresql")}
-            style={{ ...radioStyle, flex: 1, borderColor: provider === "postgresql" ? "#1a73e8" : "#dadce0", background: provider === "postgresql" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}
-          >
+          <div onClick={() => !readonlyEnv && setProvider("postgresql")}
+            style={{ ...radioStyle, flex: 1, borderColor: provider === "postgresql" ? "#1a73e8" : "#dadce0", background: provider === "postgresql" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}>
             <input type="radio" checked={provider === "postgresql"} onChange={() => {}} readOnly />
             <span style={{ fontWeight: provider === "postgresql" ? 600 : 400 }}>PostgreSQL</span>
             <span style={{ fontSize: "11px", color: "#888" }}>(remoto)</span>
@@ -268,6 +232,124 @@ export default function DbConfigPage() {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// ── Tab: Impostazioni Applicazione ────────────────────────────────────────────
+function AppSettingsTab() {
+  const [logoutMinutes, setLogoutMinutes] = useState(60);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [messageType, setMessageType] = useState("success");
+
+  useEffect(() => {
+    getAppSettings()
+      .then(s => setLogoutMinutes(s.logoutMinutes ?? 60))
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true); setMessage(null);
+    try {
+      const result = await setAppSettings({ logoutMinutes: parseInt(logoutMinutes, 10) || 60 });
+      setMessageType("success");
+      setMessage(result.message || "Impostazioni salvate");
+    } catch (err) {
+      setMessageType("error");
+      setMessage(err.message || "Errore salvataggio");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      {message && (
+        <div style={{
+          padding: "10px 14px", borderRadius: "8px", marginBottom: "16px",
+          background: messageType === "success" ? "#e8f5e9" : "#fce4ec",
+          color: messageType === "success" ? "#2e7d32" : "#c62828",
+          fontSize: "13px",
+          border: messageType === "success" ? "1px solid #c8e6c9" : "1px solid #f8bbd0"
+        }}>{message}</div>
+      )}
+
+      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Minuti per il logout automatico</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <input
+              type="number"
+              min="1"
+              max="480"
+              value={logoutMinutes}
+              onChange={e => setLogoutMinutes(e.target.value)}
+              style={{ ...inputStyle, width: "100px" }}
+            />
+            <span style={{ fontSize: "12px", color: "#888" }}>
+              Minuti di inattività prima del logout automatico (default: 60)
+            </span>
+          </div>
+        </div>
+
+        <div style={{ paddingTop: "8px" }}>
+          <button type="submit" disabled={saving} style={{
+            background: "#1a73e8", color: "white", border: "none", padding: "10px 24px",
+            borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+            opacity: saving ? 0.6 : 1
+          }}>
+            {saving ? "Salvataggio..." : "Salva impostazioni"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── Pagina principale con tab ─────────────────────────────────────────────────
+export default function DbConfigPage() {
+  const [activeTab, setActiveTab] = useState("dbconfig");
+
+  const tabs = [
+    { id: "dbconfig",    label: "Configurazione Database" },
+    { id: "appsettings", label: "Impostazioni Applicazione" },
+  ];
+
+  return (
+    <div style={{
+      maxWidth: "640px", margin: "40px auto", background: "#fff",
+      borderRadius: "12px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden"
+    }}>
+      {/* Tab bar */}
+      <div style={{ display: "flex", borderBottom: "2px solid #e2e8f0" }}>
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            style={{
+              flex: 1,
+              padding: "14px 20px",
+              fontSize: "13px",
+              fontWeight: activeTab === t.id ? 700 : 400,
+              color: activeTab === t.id ? "#1a73e8" : "#555",
+              background: "white",
+              border: "none",
+              borderBottom: activeTab === t.id ? "2px solid #1a73e8" : "2px solid transparent",
+              marginBottom: "-2px",
+              cursor: "pointer",
+              transition: "color 0.15s",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenuto tab */}
+      <div style={{ padding: "28px 32px" }}>
+        {activeTab === "dbconfig"    && <DbConfigTab />}
+        {activeTab === "appsettings" && <AppSettingsTab />}
+      </div>
     </div>
   );
 }

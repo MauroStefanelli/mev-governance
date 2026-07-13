@@ -6,7 +6,7 @@ import DbConfigPage from "./pages/DbConfigPage";
 import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings } from "./services/mevService";
 
 function App() {
   const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
@@ -23,6 +23,7 @@ function App() {
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
+  const [idleTimeout, setIdleTimeout] = useState(60 * 60 * 1000); // default 60 min
 
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
@@ -32,6 +33,9 @@ function App() {
     if (token) {
       getMevList().then(setRows).catch(() => {});
       getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
+      getAppSettings().then(s => {
+        if (s.logoutMinutes > 0) setIdleTimeout(s.logoutMinutes * 60 * 1000);
+      }).catch(() => {});
     }
   }, [token]);
 
@@ -75,8 +79,7 @@ function App() {
     setEditorAlerts([]);
   };
 
-  // ── Logout automatico dopo 60 minuti di inattività ──────────────────────────
-  const IDLE_TIMEOUT = 60 * 60 * 1000;
+  // ── Logout automatico dopo inattività (minuti configurabili dal DB) ──────────
   const idleLogoutRef = useRef(handleLogout);
   idleLogoutRef.current = handleLogout;
 
@@ -87,7 +90,7 @@ function App() {
 
     const resetTimer = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => idleLogoutRef.current(), IDLE_TIMEOUT);
+      timer = setTimeout(() => idleLogoutRef.current(), idleTimeout);
     };
 
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "wheel"];
@@ -98,7 +101,7 @@ function App() {
       clearTimeout(timer);
       events.forEach(e => window.removeEventListener(e, resetTimer));
     };
-  }, [token]);
+  }, [token, idleTimeout]);
 
   const handleChangePassword = async () => {
     setPwdError("");
@@ -126,7 +129,7 @@ function App() {
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
       { id: "admin", label: "Utenti" },
-      { id: "dbconfig", label: "Configurazione DB" },
+      { id: "dbconfig", label: "Configurazione" },
     ] : []),
   ];
 

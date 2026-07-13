@@ -365,3 +365,23 @@ export const restartBackend = async () => {
   return response.json();
 };
 
+export const getAppSettings = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/app`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore recupero impostazioni");
+  return response.json();
+};
+
+export const setAppSettings = async (data) => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/app`, {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore salvataggio impostazioni");
+  return response.json();
+};
+

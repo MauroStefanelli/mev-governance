@@ -11,4 +11,7 @@ public class AppSettings
     public int Id { get; set; }
 
     public DateTime? LastAlignAt { get; set; }
+
+    /// <summary>Minuti di inattività prima del logout automatico. Default 60.</summary>
+    public int LogoutMinutes { get; set; } = 60;
 }

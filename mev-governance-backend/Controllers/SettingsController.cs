@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Npgsql;
 using System.Text.Json;
+using MevGovernanceBackend.Data;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -12,6 +13,31 @@ namespace MevGovernanceBackend.Controllers;
 public class SettingsController : ControllerBase
 {
     private const string ConfigFile = "/data/db-config.json";
+    private readonly AppDbContext _db;
+
+    public SettingsController(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    // GET /api/settings/app  — legge le impostazioni applicative (es. LogoutMinutes)
+    [HttpGet("app")]
+    public IActionResult GetAppSettings()
+    {
+        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        return Ok(new { logoutMinutes = s?.LogoutMinutes ?? 60 });
+    }
+
+    // PUT /api/settings/app  — salva le impostazioni applicative
+    [HttpPut("app")]
+    public IActionResult SetAppSettings([FromBody] AppSettingsDto dto)
+    {
+        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        if (s == null) { s = new MevGovernanceBackend.Models.AppSettings { Id = 1 }; _db.AppSettings.Add(s); }
+        s.LogoutMinutes = dto.LogoutMinutes > 0 ? dto.LogoutMinutes : 60;
+        _db.SaveChanges();
+        return Ok(new { message = "Impostazioni salvate", logoutMinutes = s.LogoutMinutes });
+    }
 
     [HttpGet("db-config")]
     public IActionResult GetDbConfig()
@@ -194,4 +220,9 @@ public class DbConfigDto
     public string? Username { get; set; }
     public string? Password { get; set; }
     public bool? ReadonlyEnv { get; set; }
+}
+
+public class AppSettingsDto
+{
+    public int LogoutMinutes { get; set; } = 60;
 }

@@ -748,22 +748,22 @@ function ConsumoTowSection({ towRows }) {
                               }))
                             }
                             style={{
-                              background: "#0A64D8",
-                              borderBottom: "1px solid #0A64D8",
+                              background: "#DCEEFF",
+                              borderBottom: "1px solid #BFDFFF",
                               cursor: "pointer",
                             }}
                           >
-                            <td style={TD("left", { fontWeight: 700, color: "white" })}>
+                            <td style={TD("left", { fontWeight: 700, color: "#0F4C81" })}>
                               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <Chevron open={isOpen} color="white" />
+                                <Chevron open={isOpen} color="#0F4C81" />
                                 <span>{sec.label}</span>
                               </div>
                             </td>
-                            <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
                           </tr>
 
                           {isOpen &&
