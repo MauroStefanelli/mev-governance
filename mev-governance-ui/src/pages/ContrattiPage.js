@@ -641,11 +641,11 @@ function ConsumoTowSection({ towRows }) {
                         </div>
                       </td>
 
-                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.approvato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.impegnato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.residuo)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.approvato)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.impegnato)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.residuo)}</td>
                     </tr>
 
                     {openServizi &&
