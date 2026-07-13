@@ -49,10 +49,10 @@ const TOW_CANONE = ["TOW02.6"];
 // Palette colori per le 5 voci
 const COLORS = {
   valoreTotale: "#1e293b",
-  approvato:    "#3b82f6",
-  ordinatiRda:  "#10b981",
-  impegnato:    "#FFFF00",
-  residuo:      "#f97316",
+  approvato: "#3b82f6",
+  ordinatiRda: "#10b981",
+  impegnato: "#FFFF00",
+  residuo: "#f97316",
 };
 
 const LABELS = {
@@ -425,26 +425,26 @@ function ConsumoTowSection({ towRows }) {
   // Totali riga blu = somma grezza di tutti i taskRows (Servizi a Task netto + Collaudo)
   const blueRowTotals = {
     valoreTotale: sum(taskRows, "valoreTotale"),
-    approvato:    sum(taskRows, "approvato"),
-    ordinatiRda:  sum(taskRows, "ordinatiRda"),
-    impegnato:    sum(taskRows, "impegnato"),
-    residuo:      sum(taskRows, "residuo"),
+    approvato: sum(taskRows, "approvato"),
+    ordinatiRda: sum(taskRows, "ordinatiRda"),
+    impegnato: sum(taskRows, "impegnato"),
+    residuo: sum(taskRows, "residuo"),
   };
 
   // Totali per la riga "Collaudo" (sezione cliccabile)
   const collaudoTotals = {
-    approvato:   sum(collaudoRows, "collaudoApprovato"),
+    approvato: sum(collaudoRows, "collaudoApprovato"),
     ordinatiRda: sum(collaudoRows, "collaudoOrdinato"),
-    impegnato:   sum(collaudoRows, "collaudoFatturato"),
+    impegnato: sum(collaudoRows, "collaudoFatturato"),
   };
 
   // Totali per la riga "Servizi a Task" = taskRows ma TOW02.3 al netto del collaudo
   const tow023Row = collaudoRows[0];
   const taskNetTotals = {
-    approvato:   sum(taskOnlyRows, "approvato")   + (tow023Row ? tow023Row.approvato   - tow023Row.collaudoApprovato : 0),
-    ordinatiRda: sum(taskOnlyRows, "ordinatiRda") + (tow023Row ? tow023Row.ordinatiRda - tow023Row.collaudoOrdinato  : 0),
-    impegnato:   sum(taskOnlyRows, "impegnato")   + (tow023Row ? tow023Row.impegnato   - tow023Row.collaudoFatturato : 0),
-    residuo:     sum(taskRows, "residuo"),
+    approvato: sum(taskOnlyRows, "approvato") + (tow023Row ? tow023Row.approvato - tow023Row.collaudoApprovato : 0),
+    ordinatiRda: sum(taskOnlyRows, "ordinatiRda") + (tow023Row ? tow023Row.ordinatiRda - tow023Row.collaudoOrdinato : 0),
+    impegnato: sum(taskOnlyRows, "impegnato") + (tow023Row ? tow023Row.impegnato - tow023Row.collaudoFatturato : 0),
+    residuo: sum(taskRows, "residuo"),
   };
 
   const allRows = [...taskRows, ...canoneRows];
@@ -619,13 +619,22 @@ function ConsumoTowSection({ towRows }) {
                         cursor: "pointer",
                       }}
                     >
-                      <td style={TD("center", { width: "40px", padding: "8px" })}>
-                        <Chevron open={openServizi} color="white" />
-                      </td>
+                      <td />
+
                       <td style={TD("left", { fontWeight: 700, color: "white", fontSize: "13px" })}>
-                        Servizi a Task e Collaudo
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                        >
+                          <Chevron open={openServizi} color="white" />
+                          <span>Servizi a Task e Collaudo</span>
+                        </div>
                       </td>
-                       <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
+
+                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
                       <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.approvato)}</td>
                       <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
                       <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.impegnato)}</td>
@@ -700,48 +709,48 @@ function ConsumoTowSection({ towRows }) {
                                 <td />
                                 <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#555" })}>{row.tow}</td>
 
-                                 {sec.key !== "collaudo" && (
-                                   <td style={TD("right", { fontSize: "12px" })}>
-                                     {formatEuro(row.valoreTotale)}
-                                   </td>
-                                 )}
+                                {sec.key !== "collaudo" && (
+                                  <td style={TD("right", { fontSize: "12px" })}>
+                                    {formatEuro(row.valoreTotale)}
+                                  </td>
+                                )}
 
-                                 {sec.key === "collaudo" ? (
-                                   <>
-                                     <td />{/* Valore Totale vuoto */}
-                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoApprovato)}</td>
-                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoOrdinato)}</td>
-                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoFatturato)}</td>
-                                     <td />{/* Residuo vuoto */}
-                                   </>
-                                 ) : (
-                                   <>
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(
-                                         row.tow?.toUpperCase() === "TOW02.3"
-                                           ? row.approvato - row.collaudoApprovato
-                                           : row.approvato
-                                       )}
-                                     </td>
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(
-                                         row.tow?.toUpperCase() === "TOW02.3"
-                                           ? row.ordinatiRda - row.collaudoOrdinato
-                                           : row.ordinatiRda
-                                       )}
-                                     </td>
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(
-                                         row.tow?.toUpperCase() === "TOW02.3"
-                                           ? row.impegnato - row.collaudoFatturato
-                                           : row.impegnato
-                                       )}
-                                     </td>
-                                     <td style={TD("right", { fontSize: "12px" })}>
-                                       {formatEuro(row.residuo)}
-                                     </td>
-                                   </>
-                                 )}
+                                {sec.key === "collaudo" ? (
+                                  <>
+                                    <td />{/* Valore Totale vuoto */}
+                                    <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoApprovato)}</td>
+                                    <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoOrdinato)}</td>
+                                    <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.collaudoFatturato)}</td>
+                                    <td />{/* Residuo vuoto */}
+                                  </>
+                                ) : (
+                                  <>
+                                    <td style={TD("right", { fontSize: "12px" })}>
+                                      {formatEuro(
+                                        row.tow?.toUpperCase() === "TOW02.3"
+                                          ? row.approvato - row.collaudoApprovato
+                                          : row.approvato
+                                      )}
+                                    </td>
+                                    <td style={TD("right", { fontSize: "12px" })}>
+                                      {formatEuro(
+                                        row.tow?.toUpperCase() === "TOW02.3"
+                                          ? row.ordinatiRda - row.collaudoOrdinato
+                                          : row.ordinatiRda
+                                      )}
+                                    </td>
+                                    <td style={TD("right", { fontSize: "12px" })}>
+                                      {formatEuro(
+                                        row.tow?.toUpperCase() === "TOW02.3"
+                                          ? row.impegnato - row.collaudoFatturato
+                                          : row.impegnato
+                                      )}
+                                    </td>
+                                    <td style={TD("right", { fontSize: "12px" })}>
+                                      {formatEuro(row.residuo)}
+                                    </td>
+                                  </>
+                                )}
 
                               </tr>
                             ))}
@@ -769,12 +778,21 @@ function ConsumoTowSection({ towRows }) {
                               cursor: "pointer",
                             }}
                           >
-                            <td style={TD("center", { width: "40px", padding: "8px" })}>
-                              <Chevron open={isOpen} color="#3b82f6" />
-                            </td>
+                            <td />
+
                             <td style={TD("left", { fontWeight: 700, color: "#1e40af" })}>
-                              {sec.label}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px"
+                                }}
+                              >
+                                <Chevron open={isOpen} color="#3b82f6" />
+                                <span>{sec.label}</span>
+                              </div>
                             </td>
+
                             <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
                             <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
                             <td style={TD("right", { fontWeight: 700, color: "#1e40af" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
