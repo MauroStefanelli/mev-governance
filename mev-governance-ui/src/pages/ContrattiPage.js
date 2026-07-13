@@ -791,17 +791,19 @@ function ConsumoTowSection({ towRows }) {
                           >
                             <td />
 
-                            <td style={TD("left", { fontWeight: 700, color: "#fefeff" })}>
+                            <td style={TD("left", {
+                              fontWeight: 700,
+                              color: "white",
+                              paddingLeft: "0px"
+                            })}>
                               <div
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
-                                  gap: "4px"
+                                  gap: "4px",
+                                  marginLeft: "-12px"
                                 }}
-                              >
-                                <Chevron open={isOpen} color="#3b82f6" />
-                                <span>{sec.label}</span>
-                              </div>
+                              ></div>
                             </td>
 
                             <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
