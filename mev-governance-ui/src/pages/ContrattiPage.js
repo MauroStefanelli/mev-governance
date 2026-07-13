@@ -501,9 +501,9 @@ function ConsumoTowSection({ towRows }) {
           >
             <span
               style={{
-                fontSize: "13px",
+                fontSize: "18px",
                 fontWeight: 600,
-                color: "#475569",
+                color: "#1e293b",
               }}
             >
               Contratto
@@ -621,14 +621,22 @@ function ConsumoTowSection({ towRows }) {
                     >
                       <td />
 
-                      <td style={TD("left", { fontWeight: 700, color: "white", fontSize: "13px" })}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px"
-                          }}
-                        >
+
+                        <td style={TD("left", {
+                          fontWeight: 700,
+                          color: "white",
+                          fontSize: "13px",
+                          paddingLeft: "0px"
+                        })}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              marginLeft: "-12px"
+                            }}
+                          >
+
                           <Chevron open={openServizi} color="white" />
                           <span>Servizi a Task e Collaudo</span>
                         </div>
@@ -660,24 +668,19 @@ function ConsumoTowSection({ towRows }) {
                                   fontWeight: 700,
                                   color: "#1e40af"
                                 })}
-                                style={TD("left", {
-                                  fontWeight: 700,
-                                  color: "#1e40af"
-                                })}
                               >
                                 <div
                                   style={{
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "8px",
-                                    marginLeft: "32px"
+                                    marginLeft: "12px"
                                   }}
                                 >
                                   <Chevron open={isOpen} color="#3b82f6" />
                                   <span>{sec.label}</span>
                                 </div>
                               </td>
-
 
 
                               {/* Valore Totale: vuoto per Task e Collaudo */}
