@@ -23,7 +23,7 @@ function App() {
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
-  const [idleTimeout, setIdleTimeout] = useState(60 * 60 * 1000); // default 60 min
+  const idleTimeoutRef = useRef(60 * 60 * 1000); // default 60 min, aggiornato via ref
 
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
@@ -34,7 +34,7 @@ function App() {
       getMevList().then(setRows).catch(() => {});
       getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
       getAppSettings().then(s => {
-        if (s.logoutMinutes > 0) setIdleTimeout(s.logoutMinutes * 60 * 1000);
+        if (s.logoutMinutes > 0) idleTimeoutRef.current = s.logoutMinutes * 60 * 1000;
       }).catch(() => {});
     }
   }, [token]);
@@ -72,7 +72,17 @@ function App() {
   };
 
   const handleLogout = async () => {
-    await logout();
+    // sendBeacon garantisce la chiamata anche durante unmount/chiusura pagina
+    const token = localStorage.getItem("jwt");
+    if (token) {
+      try {
+        await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        });
+      } catch { /* ignora errori di rete */ }
+    }
     ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole("");
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
@@ -90,7 +100,7 @@ function App() {
 
     const resetTimer = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => idleLogoutRef.current(), idleTimeout);
+      timer = setTimeout(() => idleLogoutRef.current(), idleTimeoutRef.current);
     };
 
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "wheel"];
@@ -101,7 +111,7 @@ function App() {
       clearTimeout(timer);
       events.forEach(e => window.removeEventListener(e, resetTimer));
     };
-  }, [token, idleTimeout]);
+  }, [token]);
 
   const handleChangePassword = async () => {
     setPwdError("");
