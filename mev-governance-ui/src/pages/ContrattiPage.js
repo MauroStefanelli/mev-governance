@@ -594,7 +594,6 @@ function ConsumoTowSection({ towRows }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
                 <tr>
-                  <th style={TH()} />
                   <th style={TH()}>Servizi</th>
                   <th style={TH("right")}>Valore Totale</th>
                   <th style={TH("right")}>Approvato</th>
