@@ -486,7 +486,7 @@ function ConsumoTowSection({ towRows }) {
           fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(59,130,246,0.4)",
         }}>📊</div>
         <div>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Consumo TOW</div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Monitoraggio contratto</div>
           <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "1px" }}>Monitoraggio consumi per tipo di contratto</div>
         </div>
         {tipiContratto.length > 1 && (
@@ -612,7 +612,7 @@ function ConsumoTowSection({ towRows }) {
                               <td style={TD("center", { width: "40px", padding: "8px" })}>
                                 <Chevron open={isOpen} color="#3b82f6" />
                               </td>
-                              <td style={TD("left", { fontWeight: 700, color: "#1e40af", paddingLeft: "44px" })}>
+                              <td style={TD("left", { fontWeight: 700, color: "#1e40af", paddingLeft: "0px" })}>
                                 {sec.label}
                               </td>
                               {/* Valore Totale: vuoto per Task e Collaudo */}
@@ -784,7 +784,7 @@ function ConsumoTowSection({ towRows }) {
               <TowPieChart title="Totale Servizi" rows={allRows} sum={sum} />
             )}
             {taskRows.length > 0 && (
-              <TowPieChart title="Servizi a Task" rows={taskRows} sum={sum} />
+              <TowPieChart title="Servizi a Task e Collaudo" rows={taskRows} sum={sum} />
             )}
             {canoneRows.length > 0 && (
               <TowPieChart title="Servizi a Canone" rows={canoneRows} sum={sum} />
