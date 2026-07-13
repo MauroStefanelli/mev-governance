@@ -613,8 +613,8 @@ function ConsumoTowSection({ towRows }) {
                     <tr
                       onClick={() => setOpenServizi(v => !v)}
                       style={{
-                        background: "#0A64D8",
-                        borderBottom: "1px solid #0A64D8",
+                        background: "#DCEEFF",
+                        borderBottom: "1px solid #BFDFFF",
                         cursor: "pointer",
                       }}
                     >
@@ -623,7 +623,7 @@ function ConsumoTowSection({ towRows }) {
 
                         <td style={TD("left", {
                           fontWeight: 700,
-                          color: "white",
+                          color: "#0F4C81",
                           fontSize: "13px",
                           paddingLeft: "0px"
                         })}>
@@ -632,20 +632,20 @@ function ConsumoTowSection({ towRows }) {
                               display: "flex",
                               alignItems: "center",
                               gap: "4px",
-                              marginLeft: "-12px"
+                              marginLeft: "-35px"
                             }}
                           >
 
-                          <Chevron open={openServizi} color="white" />
+                          <Chevron open={openServizi} color="#0F4C81" />
                           <span>Servizi a Task e Collaudo</span>
                         </div>
                       </td>
 
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.approvato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.impegnato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "white" })}>{formatEuro(blueRowTotals.residuo)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.approvato)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.impegnato)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: #0F4C81 })}>{formatEuro(blueRowTotals.residuo)}</td>
                     </tr>
 
                     {openServizi &&
@@ -800,7 +800,7 @@ function ConsumoTowSection({ towRows }) {
                                   display: "flex",
                                   alignItems: "center",
                                   gap: "4px",
-                                  marginLeft: "-12px"
+                                  marginLeft: "-35px"
                                 }}
                               ></div>
                             </td>
