@@ -489,22 +489,57 @@ function ConsumoTowSection({ towRows }) {
           <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Monitoraggio contratto</div>
           <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "1px" }}>Monitoraggio consumi per tipo di contratto</div>
         </div>
+
         {tipiContratto.length > 1 && (
-          <select
-            value={selectedTipo}
-            onChange={e => { setSelectedTipo(e.target.value); setOpenDetail({}); }}
+          <div
             style={{
               marginLeft: "auto",
-              padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: "8px",
-              fontSize: "13px", background: "white", color: selectedTipo ? "#1e293b" : "#94a3b8",
-              cursor: "pointer", fontWeight: 500, outline: "none",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
             }}
           >
-            <option value="">— Seleziona contratto —</option>
-            {tipiContratto.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+            <span
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "#475569",
+              }}
+            >
+              Contratto
+            </span>
+
+            <select
+              value={selectedTipo}
+              onChange={e => {
+                setSelectedTipo(e.target.value);
+                setOpenDetail({});
+              }}
+              style={{
+                padding: "8px 14px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                fontSize: "13px",
+                background: "white",
+                color: selectedTipo ? "#1e293b" : "#94a3b8",
+                cursor: "pointer",
+                fontWeight: 500,
+                outline: "none",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+            >
+              <option value="">— Seleziona contratto —</option>
+              {tipiContratto.map(t => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
+
+
+
         {tipiContratto.length === 1 && (
           <span style={{
             marginLeft: "auto",
@@ -609,12 +644,27 @@ function ConsumoTowSection({ towRows }) {
                               onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = "#eff6ff"; }}
                               onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "#f8fafc"; }}
                             >
-                              <td style={TD("center", { width: "40px", padding: "8px" })}>
-                                <Chevron open={isOpen} color="#3b82f6" />
+                              <td />
+
+                              <td
+                                style={TD("left", {
+                                  fontWeight: 700,
+                                  color: "#1e40af"
+                                })}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px"
+                                  }}
+                                >
+                                  <Chevron open={isOpen} color="#3b82f6" />
+                                  {sec.label}
+                                </div>
                               </td>
-                              <td style={TD("left", { fontWeight: 700, color: "#1e40af", paddingLeft: "0px" })}>
-                                {sec.label}
-                              </td>
+
+
                               {/* Valore Totale: vuoto per Task e Collaudo */}
                               <td style={TD("right")} />
                               {sec.key === "collaudo" ? (
