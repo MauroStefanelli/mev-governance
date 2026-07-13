@@ -180,6 +180,22 @@ using (var scope = app.Services.CreateScope())
         db.Database.EnsureCreated();
     }
 
+    // Garantisce che LogoutMinutes esista anche se la migration non è stata applicata
+    try
+    {
+        db.Database.ExecuteSqlRaw(@"
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='AppSettings' AND column_name='LogoutMinutes'
+                ) THEN
+                    ALTER TABLE ""AppSettings"" ADD COLUMN ""LogoutMinutes"" INTEGER NOT NULL DEFAULT 60;
+                END IF;
+            END $$;
+        ");
+    }
+    catch { /* SQLite o DB non ancora inizializzato: ignora */ }
+
     if (!db.Users.Any())
     {
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
