@@ -614,7 +614,7 @@ function ConsumoTowSection({ towRows }) {
                     <tr
                       onClick={() => setOpenServizi(v => !v)}
                       style={{
-                        background: "#0A64D8"
+                        background: "#0A64D8",
                         borderBottom: "1px solid #0A64D8",
                         cursor: "pointer",
                       }}
