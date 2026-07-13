@@ -590,7 +590,7 @@ function ConsumoTowSection({ towRows }) {
       {selectedTipo && (
         <>
           {/* ── Tabella Servizi a Task / Canone espandibile ── */}
-          <div style={{ borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+          <div style={{ borderRadius: "0px", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
                 <tr>
@@ -674,7 +674,7 @@ function ConsumoTowSection({ towRows }) {
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "8px",
-                                    marginLeft: "12px"
+                                    marginLeft: "-12px"
                                   }}
                                 >
                                   <Chevron open={isOpen} color="#3b82f6" />
