@@ -385,3 +385,13 @@ export const setAppSettings = async (data) => {
   return response.json();
 };
 
+export const resetData = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/reset-data`, {
+    method: "POST",
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore durante il reset dei dati");
+  return response.json();
+};
+

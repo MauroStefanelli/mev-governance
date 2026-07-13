@@ -20,6 +20,25 @@ public class SettingsController : ControllerBase
         _db = db;
     }
 
+    // POST /api/settings/reset-data — cancella tutti i dati operativi, preserva utenti/log/settings
+    [HttpPost("reset-data")]
+    public IActionResult ResetData()
+    {
+        try
+        {
+            _db.ConsumoTow.RemoveRange(_db.ConsumoTow);
+            _db.BuoniConsegna.RemoveRange(_db.BuoniConsegna);
+            _db.Contratti.RemoveRange(_db.Contratti);
+            _db.MevItems.RemoveRange(_db.MevItems);
+            _db.SaveChanges();
+            return Ok(new { message = "Dati operativi eliminati. Utenti, storico accessi e configurazione sono stati preservati." });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore durante il reset: {ex.Message}");
+        }
+    }
+
     // GET /api/settings/app  — legge le impostazioni applicative (es. LogoutMinutes)
     [HttpGet("app")]
     public IActionResult GetAppSettings()

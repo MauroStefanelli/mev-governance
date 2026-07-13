@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDbConfig, setDbConfig, testDbConnection, restartBackend, getAppSettings, setAppSettings } from "../services/mevService";
+import { getDbConfig, setDbConfig, testDbConnection, restartBackend, getAppSettings, setAppSettings, resetData } from "../services/mevService";
 
 const fieldStyle = {
   display: "flex", flexDirection: "column", gap: "4px"
@@ -243,6 +243,10 @@ function AppSettingsTab() {
   const [message, setMessage] = useState(null);
   const [messageType, setMessageType] = useState("success");
 
+  // reset: 0=nessuno, 1=prima conferma, 2=seconda conferma
+  const [resetStep, setResetStep] = useState(0);
+  const [resetting, setResetting] = useState(false);
+
   useEffect(() => {
     getAppSettings()
       .then(s => setLogoutMinutes(s.logoutMinutes ?? 60))
@@ -261,6 +265,30 @@ function AppSettingsTab() {
       setMessage(err.message || "Errore salvataggio");
     } finally { setSaving(false); }
   };
+
+  const handleReset = async () => {
+    if (resetStep === 0) { setResetStep(1); return; }
+    if (resetStep === 1) { setResetStep(2); return; }
+    // step 2: esegui
+    setResetting(true); setMessage(null);
+    try {
+      const result = await resetData();
+      setMessageType("success");
+      setMessage(result.message || "Dati eliminati con successo");
+    } catch (err) {
+      setMessageType("error");
+      setMessage(err.message || "Errore durante il reset");
+    } finally {
+      setResetting(false);
+      setResetStep(0);
+    }
+  };
+
+  const resetLabels = [
+    "Azzera dati DB",
+    "Sei sicuro? Questa operazione è irreversibile",
+    "Conferma eliminazione definitiva",
+  ];
 
   return (
     <div>
@@ -302,6 +330,68 @@ function AppSettingsTab() {
           </button>
         </div>
       </form>
+
+      {/* Separatore */}
+      <div style={{ borderTop: "1px solid #e2e8f0", margin: "28px 0" }} />
+
+      {/* Sezione reset */}
+      <div>
+        <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "6px" }}>
+          Reset dati operativi
+        </div>
+        <div style={{ fontSize: "12px", color: "#888", marginBottom: "16px", lineHeight: "1.6" }}>
+          Elimina tutti i dati operativi (MEV, Contratti, Buoni Consegna, Consumi TOW).<br />
+          Vengono preservati: utenti, storico accessi, configurazione DB e impostazioni.
+        </div>
+
+        {resetStep > 0 && (
+          <div style={{
+            padding: "12px 16px", borderRadius: "8px", marginBottom: "14px",
+            background: "#fff3e0", color: "#e65100", fontSize: "13px",
+            border: "1px solid #ffcc80", lineHeight: "1.5"
+          }}>
+            {resetStep === 1 && <>
+              <strong>Attenzione:</strong> tutti i dati operativi verranno eliminati definitivamente e non potranno essere recuperati.
+              Clicca di nuovo per confermare.
+            </>}
+            {resetStep === 2 && <>
+              <strong>Ultima conferma:</strong> stai per eliminare tutti i dati. Questa operazione è irreversibile.
+              Clicca di nuovo per procedere.
+            </>}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={resetting}
+            style={{
+              background: resetStep === 0 ? "#f5f5f5" : resetStep === 1 ? "#fff3e0" : "#d32f2f",
+              color: resetStep === 2 ? "white" : resetStep === 1 ? "#e65100" : "#333",
+              border: resetStep === 2 ? "none" : `1px solid ${resetStep === 1 ? "#ffcc80" : "#dadce0"}`,
+              padding: "10px 24px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+              cursor: resetting ? "not-allowed" : "pointer",
+              opacity: resetting ? 0.6 : 1,
+              transition: "background 0.2s, color 0.2s",
+            }}
+          >
+            {resetting ? "Eliminazione in corso..." : resetLabels[resetStep]}
+          </button>
+          {resetStep > 0 && (
+            <button
+              type="button"
+              onClick={() => setResetStep(0)}
+              style={{
+                background: "transparent", color: "#888", border: "none",
+                fontSize: "12px", cursor: "pointer", textDecoration: "underline"
+              }}
+            >
+              Annulla
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
