@@ -434,10 +434,11 @@ export default function ToolsPage({ onUnauthorized }) {
             <thead>
               <tr style={{ background: "#1a73e8", color: "white" }}>
                 {[
-                  "N. Ordine", "Data", "D. Consegna", "Rif. Contr.",
-                  "Art.", "Codice", "Descrizione", "Tipo",
-                  "Q.tà", "UM", "Prezzo Netto", "Importo",
-                  "N. RdA", "Iniziativa", "AP", "Contratto"                 
+                  "N. Ordine", "Data", "D. Consegna", "Contratto",
+                  "N. RdA", "Iniziativa", "Descrizione",
+                  "Art.", "TOW", 
+                  "Descrizione", "Tipo",
+                  "Q.tà", "UM", "Prezzo Netto", "Importo",  "AP"                
                 ].map((h) => (
                   <th key={h} style={{
                     padding: "10px 8px", fontWeight: 600, textAlign: "left",
@@ -460,12 +461,15 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={tdStyle}>{r.numeroOrdine}</td>
                   <td style={tdStyle}>{r.data}</td>
                   <td style={tdStyle}>{r.dataConsegna}</td>
-                  <td style={tdStyle}>{r.rifContratto}</td>
-                  <td style={tdStyle}>{r.art}</td>
+                  <td style={tdStyle}>{r.Contratto}</td>
+                  <td style={tdStyle}>{r.numeroRda}</td>
+                  <td style={tdStyle}>{r.iniziativa}</td>
                   <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.codice}</td>
                   <td style={{ ...tdStyle, maxWidth: "260px", whiteSpace: "normal", wordBreak: "break-word" }}>
                     {r.descrizione}
                   </td>
+                  <td style={tdStyle}>{r.art}</td>
+
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <span style={{
                       background: r.tipoAtt === "AP" ? "#e8f5e9" : r.tipoAtt === "AR" ? "#e3f2fd" : "#fff3e0",
@@ -477,10 +481,8 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={tdStyle}>{r.um}</td>
                   <td style={{ ...tdStyle, textAlign: "right" }}>€ {fmt(r.prezzoNetto)}</td>
                   <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>€ {fmt(r.importo)}</td>
-                  <td style={tdStyle}>{r.numeroRda}</td>
-                  <td style={tdStyle}>{r.iniziativa}</td>
+
                   <td style={tdStyle}>{r.ap}</td>
-                  <td style={tdStyle}>{r.contratto}</td>
                 </tr>
               ))}
             </tbody>
