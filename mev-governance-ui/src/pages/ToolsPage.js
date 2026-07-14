@@ -144,21 +144,26 @@ export default function ToolsPage({ onUnauthorized }) {
   };
 
   // ── Export Excel lato backend ────────────────────────────────
-  const handleExport = () => {
-    const a = document.createElement("a");
-    a.href = `${API_BASE_URL}/api/tools/export`;
-    a.setAttribute("download", "");
-    // header Authorization via fetch + blob
-    fetch(`${API_BASE_URL}/api/tools/export`, { headers: authHeaders() })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        a.href = url;
-        a.download = `OrdiniConsegna_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        a.click();
-        URL.revokeObjectURL(url);
-      })
-      .catch(() => alert("Errore durante l'export"));
+  const handleExport = async () => {
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/tools/export`, { headers: authHeaders() });
+      if (!r.ok) {
+        const text = await r.text();
+        alert(`Errore export: ${r.status} — ${text}`);
+        return;
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `OrdiniConsegna_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(`Errore durante l'export: ${e.message}`);
+    }
   };
 
   // ── Elimina tutte le righe di un PDF ────────────────────────
