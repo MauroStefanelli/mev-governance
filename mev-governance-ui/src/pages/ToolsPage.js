@@ -437,8 +437,7 @@ export default function ToolsPage({ onUnauthorized }) {
                   "N. Ordine", "Data", "D. Consegna", "Rif. Contr.",
                   "Art.", "Codice", "Descrizione", "Tipo",
                   "Q.tà", "UM", "Prezzo Netto", "Importo",
-                  "N. RdA", "Iniziativa", "AP", "Contratto",
-                  "PDF", "Importato"
+                  "N. RdA", "Iniziativa", "AP", "Contratto"                 
                 ].map((h) => (
                   <th key={h} style={{
                     padding: "10px 8px", fontWeight: 600, textAlign: "left",
@@ -482,14 +481,6 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={tdStyle}>{r.iniziativa}</td>
                   <td style={tdStyle}>{r.ap}</td>
                   <td style={tdStyle}>{r.contratto}</td>
-                  <td style={{ ...tdStyle, fontSize: "11px", color: "#666", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                    title={r.nomePdf}>
-                    {r.nomePdf}
-                  </td>
-                  <td style={{ ...tdStyle, fontSize: "11px", color: "#888", whiteSpace: "nowrap" }}>
-                    {fmtDate(r.importatoIl)}<br />
-                    <span style={{ color: "#aaa" }}>{r.importatoDA}</span>
-                  </td>
                 </tr>
               ))}
             </tbody>
