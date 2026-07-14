@@ -256,10 +256,10 @@ export default function ToolsPage({ onUnauthorized }) {
             borderRadius: "10px", padding: "12px 22px",
             boxShadow: "0 2px 8px rgba(26,115,232,0.25)", flexShrink: 0, marginLeft: "24px",
           }}>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
               Totale Ordinato
             </div>
-            <div style={{ fontSize: "20px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
               € {fmtEuro(totaleOrdinato)}
             </div>
             {search && (
@@ -430,7 +430,7 @@ export default function ToolsPage({ onUnauthorized }) {
         </div>
       ) : (
         <div style={{ overflowX: "auto", borderRadius: "10px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", background: "white" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", background: "white" }}>
             <thead>
               <tr style={{ background: "#1a73e8", color: "white" }}>
                 {[
