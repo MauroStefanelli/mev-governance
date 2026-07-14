@@ -112,7 +112,9 @@ public class OrdineConsegnaController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Problem($"Errore durante l'elaborazione del PDF: {ex.Message}");
+            var inner = ex.InnerException?.Message ?? "";
+            var inner2 = ex.InnerException?.InnerException?.Message ?? "";
+            return Problem($"Errore durante l'elaborazione del PDF: {ex.Message} | Inner: {inner} | Inner2: {inner2}");
         }
     }
 
