@@ -171,14 +171,15 @@ app.UseCors("FrontendPolicy");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    string? migrateError = null;
     try
     {
         db.Database.Migrate(); // applica tutte le migration pendenti
     }
-    catch
+    catch (Exception ex)
     {
-        // Se Migrate() fallisce (es. DB nuovo senza tabella migrations), usa EnsureCreated
-        db.Database.EnsureCreated();
+        migrateError = ex.Message;
+        try { db.Database.EnsureCreated(); } catch { /* ignora */ }
     }
 
     // Garantisce che LogoutMinutes esista anche se la migration non è stata applicata
@@ -196,6 +197,36 @@ using (var scope = app.Services.CreateScope())
         ");
     }
     catch { /* SQLite o DB non ancora inizializzato: ignora */ }
+
+    // Garantisce che la tabella OrdiniConsegna esista (crea se non presente)
+    try
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""OrdiniConsegna"" (
+                ""Id""           SERIAL PRIMARY KEY,
+                ""NumeroOrdine"" TEXT NOT NULL DEFAULT '',
+                ""Data""         TEXT NOT NULL DEFAULT '',
+                ""DataConsegna"" TEXT NOT NULL DEFAULT '',
+                ""RifContratto"" TEXT NOT NULL DEFAULT '',
+                ""Art""          TEXT NOT NULL DEFAULT '',
+                ""Codice""       TEXT NOT NULL DEFAULT '',
+                ""Descrizione""  TEXT NOT NULL DEFAULT '',
+                ""TipoAtt""      TEXT NOT NULL DEFAULT '',
+                ""Quantita""     TEXT NOT NULL DEFAULT '',
+                ""Um""           TEXT NOT NULL DEFAULT '',
+                ""PrezzoNetto""  TEXT NOT NULL DEFAULT '',
+                ""Importo""      TEXT NOT NULL DEFAULT '',
+                ""NumeroRda""    TEXT NOT NULL DEFAULT '',
+                ""Iniziativa""   TEXT NOT NULL DEFAULT '',
+                ""Ap""           TEXT NOT NULL DEFAULT '',
+                ""Contratto""    TEXT NOT NULL DEFAULT '',
+                ""NomePdf""      TEXT NOT NULL DEFAULT '',
+                ""ImportatoIl""  TIMESTAMP NOT NULL DEFAULT NOW(),
+                ""ImportatoDA""  TEXT NOT NULL DEFAULT ''
+            );
+        ");
+    }
+    catch { /* tabella già esistente o SQLite: ignora */ }
 
     if (!db.Users.Any())
     {
