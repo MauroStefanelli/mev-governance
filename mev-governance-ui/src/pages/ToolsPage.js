@@ -88,6 +88,7 @@ export default function ToolsPage({ onUnauthorized }) {
   const [confirmDel, setConfirmDel] = useState(null);
   const [debugText, setDebugText] = useState(null); // testo grezzo PDF
   const [debugging, setDebugging] = useState(false);
+  const [showPdfPanel, setShowPdfPanel] = useState(false);
   const fileRef = useRef();
   const debugRef = useRef();
 
@@ -195,6 +196,15 @@ export default function ToolsPage({ onUnauthorized }) {
   // Raggruppa per nomePdf per mostrare il badge del PDF
   const pdfGroups = [...new Set(items.map((i) => i.nomePdf))];
 
+  // Totale ordinato (su righe filtrate)
+  const totaleOrdinato = filtered.reduce((s, r) => {
+    const n = parseFloat(String(r.importo || "0").replace(/\./g, "").replace(",", "."));
+    return s + (isNaN(n) ? 0 : n);
+  }, 0);
+
+  const fmtEuro = (n) =>
+    new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -287,6 +297,28 @@ export default function ToolsPage({ onUnauthorized }) {
           }}
         />
 
+        {/* Tasto PDF caricati */}
+        <button
+          onClick={() => setShowPdfPanel(true)}
+          disabled={pdfGroups.length === 0}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "6px",
+            padding: "8px 14px", borderRadius: "7px",
+            background: pdfGroups.length === 0 ? "#f1f3f4" : "#fff8e1",
+            color: pdfGroups.length === 0 ? "#aaa" : "#e65100",
+            border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#ffcc80"}`,
+            fontWeight: 600, fontSize: "13px", cursor: pdfGroups.length === 0 ? "default" : "pointer",
+          }}
+        >
+          📄 PDF caricati
+          {pdfGroups.length > 0 && (
+            <span style={{
+              background: "#e65100", color: "white", borderRadius: "10px",
+              padding: "1px 7px", fontSize: "11px", fontWeight: 700,
+            }}>{pdfGroups.length}</span>
+          )}
+        </button>
+
         <span style={{ fontSize: "12px", color: "#888", marginLeft: "auto" }}>
           {filtered.length} righe {search && `(filtrate su ${items.length})`}
         </span>
@@ -307,6 +339,28 @@ export default function ToolsPage({ onUnauthorized }) {
             onClick={() => setUploadMsg(null)}
             style={{ border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#888" }}
           >×</button>
+        </div>
+      )}
+
+      {/* ── KPI Totale Ordinato ── */}
+      {items.length > 0 && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: "16px",
+          background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+          borderRadius: "10px", padding: "14px 28px", marginBottom: "20px",
+          boxShadow: "0 2px 8px rgba(26,115,232,0.25)",
+        }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+            Totale Ordinato
+          </div>
+          <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
+            € {fmtEuro(totaleOrdinato)}
+          </div>
+          {search && (
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "14px" }}>
+              su {filtered.length} righe filtrate
+            </div>
+          )}
         </div>
       )}
 
@@ -332,35 +386,6 @@ export default function ToolsPage({ onUnauthorized }) {
           }}>
             {debugText}
           </pre>
-        </div>
-      )}
-
-      {/* ── PDF caricati (badge) ── */}
-      {pdfGroups.length > 0 && (
-        <div style={{ marginBottom: "14px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {pdfGroups.map((pdf) => {
-            const count = items.filter((i) => i.nomePdf === pdf).length;
-            return (
-              <div key={pdf} style={{
-                display: "inline-flex", alignItems: "center", gap: "6px",
-                background: "#f1f3f4", border: "1px solid #dadce0",
-                borderRadius: "20px", padding: "4px 10px 4px 12px", fontSize: "12px",
-              }}>
-                <span style={{ color: "#333" }}>
-                  📄 {pdf} <span style={{ color: "#888" }}>({count})</span>
-                </span>
-                <button
-                  onClick={() => setConfirmDel(pdf)}
-                  disabled={deleting === pdf}
-                  title={`Elimina tutte le righe di "${pdf}"`}
-                  style={{
-                    border: "none", background: "none", cursor: "pointer",
-                    color: "#ea4335", fontSize: "14px", lineHeight: 1, padding: "0 2px",
-                  }}
-                >×</button>
-              </div>
-            );
-          })}
         </div>
       )}
 
@@ -442,6 +467,65 @@ export default function ToolsPage({ onUnauthorized }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Modale PDF caricati ── */}
+      {showPdfPanel && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "white", borderRadius: "12px", padding: "28px 32px",
+            width: "520px", maxHeight: "70vh", display: "flex", flexDirection: "column",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>
+                PDF caricati ({pdfGroups.length})
+              </div>
+              <button onClick={() => setShowPdfPanel(false)}
+                style={{ border: "none", background: "none", cursor: "pointer", fontSize: "20px", color: "#888" }}>×</button>
+            </div>
+            <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+              {pdfGroups.map((pdf) => {
+                const count = items.filter((i) => i.nomePdf === pdf).length;
+                const importo = items
+                  .filter((i) => i.nomePdf === pdf)
+                  .reduce((s, r) => {
+                    const n = parseFloat(String(r.importo || "0").replace(/\./g, "").replace(",", "."));
+                    return s + (isNaN(n) ? 0 : n);
+                  }, 0);
+                return (
+                  <div key={pdf} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "10px 14px", borderRadius: "8px",
+                    border: "1px solid #e2e8f0", background: "#f8fafc",
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        📄 {pdf}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+                        {count} righe — € {fmtEuro(importo)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setShowPdfPanel(false); setConfirmDel(pdf); }}
+                      disabled={deleting === pdf}
+                      title={`Elimina tutte le righe di "${pdf}"`}
+                      style={{
+                        marginLeft: "12px", border: "1px solid #fecaca", background: "#fef2f2",
+                        color: "#ea4335", borderRadius: "6px", padding: "5px 10px",
+                        cursor: "pointer", fontSize: "12px", fontWeight: 600,
+                      }}
+                    >Elimina</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
