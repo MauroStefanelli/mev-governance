@@ -461,13 +461,13 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={tdStyle}>{r.numeroOrdine}</td>
                   <td style={tdStyle}>{r.data}</td>
                   <td style={tdStyle}>{r.dataConsegna}</td>
-                  <td style={tdStyle}>{r.Contratto}</td>
+                  <td style={tdStyle}>{r.contratto}</td>
                   <td style={tdStyle}>{r.numeroRda}</td>
                   <td style={tdStyle}>{r.iniziativa}</td>
-                  <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.codice}</td>
                   <td style={{ ...tdStyle, maxWidth: "260px", whiteSpace: "normal", wordBreak: "break-word" }}>
                     {r.descrizione}
                   </td>
+                  <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.codice}</td>
                   <td style={tdStyle}>{r.art}</td>
 
                   <td style={{ ...tdStyle, textAlign: "center" }}>
