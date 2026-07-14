@@ -31,6 +31,21 @@ const uploadPdf = async (file) => {
   return res.json();
 };
 
+const debugPdf = async (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/tools/debug-pdf`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+  return res.json();
+};
+
 const deleteByPdf = async (nomePdf) => {
   const res = await fetch(
     `${API_BASE_URL}/api/tools/ordini/by-pdf/${encodeURIComponent(nomePdf)}`,
@@ -69,9 +84,12 @@ export default function ToolsPage({ onUnauthorized }) {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState(null); // { type: "ok"|"err", text }
   const [search, setSearch]       = useState("");
-  const [deleting, setDeleting]   = useState(null); // nomePdf in corso di eliminazione
-  const [confirmDel, setConfirmDel] = useState(null); // nomePdf da confermare
+  const [deleting, setDeleting]   = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [debugText, setDebugText] = useState(null); // testo grezzo PDF
+  const [debugging, setDebugging] = useState(false);
   const fileRef = useRef();
+  const debugRef = useRef();
 
   const load = async () => {
     setLoading(true);
@@ -86,6 +104,23 @@ export default function ToolsPage({ onUnauthorized }) {
   };
 
   useEffect(() => { load(); }, []); // eslint-disable-line
+
+  // ── Debug PDF ────────────────────────────────────────────────
+  const handleDebug = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDebugging(true);
+    setDebugText(null);
+    try {
+      const res = await debugPdf(file);
+      setDebugText(res.testo);
+    } catch (e) {
+      setDebugText(`ERRORE: ${e.message}`);
+    } finally {
+      setDebugging(false);
+      if (debugRef.current) debugRef.current.value = "";
+    }
+  };
 
   // ── Upload PDF ──────────────────────────────────────────────
   const handleFile = async (e) => {
@@ -214,6 +249,27 @@ export default function ToolsPage({ onUnauthorized }) {
           Esporta Excel
         </button>
 
+        {/* Debug PDF */}
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
+          background: debugging ? "#b0bec5" : "#f1f3f4",
+          color: "#444", fontWeight: 500, fontSize: "12px",
+          border: "1px solid #dadce0",
+          pointerEvents: debugging ? "none" : "auto",
+        }}
+          title="Carica un PDF per vedere il testo grezzo estratto (utile per debug parsing)"
+        >
+          {debugging ? "Analisi..." : "Debug testo PDF"}
+          <input
+            ref={debugRef}
+            type="file"
+            accept=".pdf"
+            style={{ display: "none" }}
+            onChange={handleDebug}
+          />
+        </label>
+
         {/* Ricerca */}
         <input
           value={search}
@@ -246,6 +302,31 @@ export default function ToolsPage({ onUnauthorized }) {
             onClick={() => setUploadMsg(null)}
             style={{ border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#888" }}
           >×</button>
+        </div>
+      )}
+
+      {/* ── Pannello debug testo PDF ── */}
+      {debugText !== null && (
+        <div style={{ marginBottom: "16px" }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: "#263238", color: "#80cbc4", padding: "8px 14px",
+            borderRadius: "7px 7px 0 0", fontSize: "12px", fontWeight: 600,
+          }}>
+            <span>Testo grezzo estratto dal PDF ({debugText.length} caratteri)</span>
+            <button
+              onClick={() => setDebugText(null)}
+              style={{ border: "none", background: "none", color: "#aaa", cursor: "pointer", fontSize: "16px" }}
+            >×</button>
+          </div>
+          <pre style={{
+            background: "#1e272c", color: "#e0e0e0", padding: "14px",
+            borderRadius: "0 0 7px 7px", fontSize: "11px", lineHeight: 1.6,
+            maxHeight: "400px", overflowY: "auto", whiteSpace: "pre-wrap",
+            wordBreak: "break-word", margin: 0,
+          }}>
+            {debugText}
+          </pre>
         </div>
       )}
 

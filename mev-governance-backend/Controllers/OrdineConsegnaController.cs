@@ -241,6 +241,31 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
+    // POST /api/tools/debug-pdf  — restituisce testo grezzo estratto dal PDF
+    // ============================================================
+    [HttpPost("debug-pdf")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> DebugPdf(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File non valido");
+
+        try
+        {
+            string text = await ExtractTextFromPdf(file);
+            return Ok(new
+            {
+                lunghezza = text.Length,
+                testo     = text
+            });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore: {ex.Message}");
+        }
+    }
+
+    // ============================================================
     // METODI PRIVATI: parsing PDF
     // ============================================================
 
