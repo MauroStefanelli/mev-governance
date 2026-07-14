@@ -436,8 +436,7 @@ export default function ToolsPage({ onUnauthorized }) {
                 {[
                   "N. Ordine", "Data", "D. Consegna", "Contratto",
                   "N. RdA", "Iniziativa", "Descrizione",
-                  "Art.", "TOW", 
-                  "Descrizione", "Tipo",
+                  "Art.", "TOW", "Tipo",
                   "Q.tà", "UM", "Prezzo Netto", "Importo",  "AP"                
                 ].map((h) => (
                   <th key={h} style={{
@@ -467,8 +466,8 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={{ ...tdStyle, maxWidth: "260px", whiteSpace: "normal", wordBreak: "break-word" }}>
                     {r.descrizione}
                   </td>
-                  <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.codice}</td>
                   <td style={tdStyle}>{r.art}</td>
+                  <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.codice}</td>
 
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <span style={{
