@@ -2,13 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using ClosedXML.Excel;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
 using MevGovernanceBackend.Data;
 using MevGovernanceBackend.Models;
 using System.Security.Claims;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -18,10 +15,14 @@ namespace MevGovernanceBackend.Controllers;
 public class OrdineConsegnaController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _pdfParserUrl;
 
-    public OrdineConsegnaController(AppDbContext db)
+    public OrdineConsegnaController(AppDbContext db, IHttpClientFactory httpClientFactory, IConfiguration config)
     {
         _db = db;
+        _httpClientFactory = httpClientFactory;
+        _pdfParserUrl = config["PDF_PARSER_URL"] ?? "http://localhost:8765";
     }
 
     // ============================================================
@@ -39,7 +40,7 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
-    // POST /api/tools/upload-pdf  — upload + parse + salva su DB
+    // POST /api/tools/upload-pdf  — upload → parser Python → salva su DB
     // ============================================================
     [HttpPost("upload-pdf")]
     [Consumes("multipart/form-data")]
@@ -55,56 +56,88 @@ public class OrdineConsegnaController : ControllerBase
 
         try
         {
-            // Leggi il testo dal PDF
-            string text = await ExtractTextFromPdf(file);
+            // Chiama il microservizio Python per il parsing
+            var parseResult = await CallPdfParser(file, "/parse");
 
-            // Estrai testata
-            var header = ExtractHeader(text);
+            var header = parseResult.GetProperty("header");
+            var rows   = parseResult.GetProperty("rows");
+            int count  = parseResult.GetProperty("count").GetInt32();
 
-            // Estrai righe articoli
-            var rows = ExtractRows(text);
-
-            if (rows.Count == 0)
+            if (count == 0)
                 return BadRequest("Nessun articolo trovato nel PDF. Verificare il formato del documento.");
 
-            // Salva su DB
-            var items = rows.Select(r => new OrdineConsegnaItem
+            string GetH(string key) =>
+                header.TryGetProperty(key, out var v) ? v.GetString() ?? "" : "";
+
+            var items = new List<OrdineConsegnaItem>();
+            foreach (var r in rows.EnumerateArray())
             {
-                NumeroOrdine = header.GetValueOrDefault("NumeroOrdine", ""),
-                Data         = header.GetValueOrDefault("Data", ""),
-                DataConsegna = header.GetValueOrDefault("DataConsegna", ""),
-                RifContratto = header.GetValueOrDefault("RifContratto", ""),
-                Art          = r.GetValueOrDefault("Art", ""),
-                Codice       = r.GetValueOrDefault("Codice", ""),
-                Descrizione  = r.GetValueOrDefault("Descrizione", ""),
-                TipoAtt      = r.GetValueOrDefault("TipoAtt", ""),
-                Quantita     = r.GetValueOrDefault("Quantita", ""),
-                Um           = r.GetValueOrDefault("Um", ""),
-                PrezzoNetto  = r.GetValueOrDefault("PrezzoNetto", ""),
-                Importo      = r.GetValueOrDefault("Importo", ""),
-                NumeroRda    = r.GetValueOrDefault("NumeroRda", ""),
-                Iniziativa   = r.GetValueOrDefault("Iniziativa", ""),
-                Ap           = r.GetValueOrDefault("Ap", ""),
-                Contratto    = r.GetValueOrDefault("Contratto", ""),
-                NomePdf      = file.FileName,
-                ImportatoIl  = DateTime.UtcNow,
-                ImportatoDA  = username
-            }).ToList();
+                string Get(string key) =>
+                    r.TryGetProperty(key, out var v) ? v.GetString() ?? "" : "";
+
+                items.Add(new OrdineConsegnaItem
+                {
+                    NumeroOrdine = GetH("numeroOrdine"),
+                    Data         = GetH("data"),
+                    DataConsegna = GetH("dataConsegna"),
+                    RifContratto = GetH("rifContratto"),
+                    Art          = Get("art"),
+                    Codice       = Get("codice"),
+                    Descrizione  = Get("descrizione"),
+                    TipoAtt      = Get("tipoAtt"),
+                    Quantita     = Get("quantita"),
+                    Um           = Get("um"),
+                    PrezzoNetto  = Get("prezzoNetto"),
+                    Importo      = Get("importo"),
+                    NumeroRda    = Get("numeroRda"),
+                    Iniziativa   = Get("iniziativa"),
+                    Ap           = Get("ap"),
+                    Contratto    = Get("contratto"),
+                    NomePdf      = file.FileName,
+                    ImportatoIl  = DateTime.UtcNow,
+                    ImportatoDA  = username
+                });
+            }
 
             _db.OrdiniConsegna.AddRange(items);
             await _db.SaveChangesAsync();
 
             return Ok(new
             {
-                message        = "PDF importato con successo",
-                nomePdf        = file.FileName,
-                numeroOrdine   = header.GetValueOrDefault("NumeroOrdine", ""),
+                message         = "PDF importato con successo",
+                nomePdf         = file.FileName,
+                numeroOrdine    = GetH("numeroOrdine"),
                 articoliSalvati = items.Count
             });
         }
         catch (Exception ex)
         {
             return Problem($"Errore durante l'elaborazione del PDF: {ex.Message}");
+        }
+    }
+
+    // ============================================================
+    // POST /api/tools/debug-pdf  — restituisce testo grezzo dal parser Python
+    // ============================================================
+    [HttpPost("debug-pdf")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> DebugPdf(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File non valido");
+
+        try
+        {
+            var result = await CallPdfParser(file, "/debug");
+            return Ok(new
+            {
+                lunghezza = result.GetProperty("lunghezza").GetInt32(),
+                testo     = result.GetProperty("testo").GetString()
+            });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore: {ex.Message}");
         }
     }
 
@@ -122,7 +155,7 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
-    // DELETE /api/tools/ordini/by-pdf/{nomePdf}  — cancella tutte le righe di un PDF
+    // DELETE /api/tools/ordini/by-pdf/{nomePdf}
     // ============================================================
     [HttpDelete("ordini/by-pdf/{nomePdf}")]
     public async Task<IActionResult> DeleteByPdf(string nomePdf)
@@ -138,7 +171,7 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
-    // GET /api/tools/export  — export Excel di tutti gli ordini
+    // GET /api/tools/export
     // ============================================================
     [HttpGet("export")]
     public IActionResult ExportExcel()
@@ -152,7 +185,6 @@ public class OrdineConsegnaController : ControllerBase
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("Ordini Consegna");
 
-        // HEADER
         var headers = new[]
         {
             "Numero Ordine", "Data", "Data Consegna", "Rif. Contratto",
@@ -171,7 +203,6 @@ public class OrdineConsegnaController : ControllerBase
             cell.Style.Font.FontColor = XLColor.White;
         }
 
-        // DATI
         int row = 2;
         foreach (var item in items)
         {
@@ -183,34 +214,32 @@ public class OrdineConsegnaController : ControllerBase
             ws.Cell(row, 6).Value  = item.Codice;
             ws.Cell(row, 7).Value  = item.Descrizione;
             ws.Cell(row, 8).Value  = item.TipoAtt;
-            ws.Cell(row, 9).Value  = item.Quantita;
+
+            // Q.tà come numero
+            if (TryParseItalian(item.Quantita, out var qty))
+            {
+                ws.Cell(row, 9).Value = qty;
+                ws.Cell(row, 9).Style.NumberFormat.Format = "#,##0.000";
+            }
+            else ws.Cell(row, 9).Value = item.Quantita;
+
             ws.Cell(row, 10).Value = item.Um;
 
-            // Prezzo Netto come numero
-            if (decimal.TryParse(item.PrezzoNetto.Replace(".", "").Replace(",", "."),
-                System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out var pn))
+            // Prezzo Netto in Euro
+            if (TryParseItalian(item.PrezzoNetto, out var pn))
             {
                 ws.Cell(row, 11).Value = pn;
                 ws.Cell(row, 11).Style.NumberFormat.Format = "€ #,##0.00";
             }
-            else
-            {
-                ws.Cell(row, 11).Value = item.PrezzoNetto;
-            }
+            else ws.Cell(row, 11).Value = item.PrezzoNetto;
 
-            // Importo come numero
-            if (decimal.TryParse(item.Importo.Replace(".", "").Replace(",", "."),
-                System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out var imp))
+            // Importo in Euro
+            if (TryParseItalian(item.Importo, out var imp))
             {
                 ws.Cell(row, 12).Value = imp;
                 ws.Cell(row, 12).Style.NumberFormat.Format = "€ #,##0.00";
             }
-            else
-            {
-                ws.Cell(row, 12).Value = item.Importo;
-            }
+            else ws.Cell(row, 12).Value = item.Importo;
 
             ws.Cell(row, 13).Value = item.NumeroRda;
             ws.Cell(row, 14).Value = item.Iniziativa;
@@ -222,10 +251,7 @@ public class OrdineConsegnaController : ControllerBase
             row++;
         }
 
-        // Autofit colonne
         ws.Columns().AdjustToContents();
-
-        // Filtro + freeze intestazione
         ws.RangeUsed()?.SetAutoFilter();
         ws.SheetView.FreezeRows(1);
 
@@ -241,109 +267,38 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
-    // POST /api/tools/debug-pdf  — restituisce testo grezzo estratto dal PDF
+    // METODI PRIVATI
     // ============================================================
-    [HttpPost("debug-pdf")]
-    [Consumes("multipart/form-data")]
-    public async Task<IActionResult> DebugPdf(IFormFile file)
+
+    private async Task<JsonElement> CallPdfParser(IFormFile file, string endpoint)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("File non valido");
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(60);
 
-        try
-        {
-            string text = await ExtractTextFromPdf(file);
-            return Ok(new
-            {
-                lunghezza = text.Length,
-                testo     = text
-            });
-        }
-        catch (Exception ex)
-        {
-            return Problem($"Errore: {ex.Message}");
-        }
-    }
-
-    // ============================================================
-    // METODI PRIVATI: parsing PDF
-    // ============================================================
-
-    private static async Task<string> ExtractTextFromPdf(IFormFile file)
-    {
+        using var content = new MultipartFormDataContent();
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         ms.Position = 0;
+        var fileContent = new ByteArrayContent(ms.ToArray());
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        content.Add(fileContent, "file", file.FileName);
 
-        var sb = new StringBuilder();
-        using var document = PdfDocument.Open(ms.ToArray());
-        foreach (var page in document.GetPages())
-        {
-            sb.AppendLine(page.Text);
-        }
-        return sb.ToString();
+        var response = await client.PostAsync($"{_pdfParserUrl}{endpoint}", content);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"Parser Python ({endpoint}): {body}");
+
+        return JsonDocument.Parse(body).RootElement;
     }
 
-    private static Dictionary<string, string> ExtractHeader(string text)
+    private static bool TryParseItalian(string value, out decimal result)
     {
-        var info = new Dictionary<string, string>();
-
-        var patterns = new Dictionary<string, string>
-        {
-            ["NumeroOrdine"] = @"Numero d'ordine\s+(\d+)",
-            ["Data"]         = @"Numero d'ordine\s+\d+\s+Data\s+(\d{2}\.\d{2}\.\d{4})",
-            ["DataConsegna"] = @"Data di consegna\s+(\d{2}\.\d{2}\.\d{4})",
-            ["RifContratto"] = @"Rif\.\s*Contratto\s+(\d+)"
-        };
-
-        foreach (var kvp in patterns)
-        {
-            var match = Regex.Match(text, kvp.Value, RegexOptions.IgnoreCase);
-            info[kvp.Key] = match.Success ? match.Groups[1].Value : "";
-        }
-
-        return info;
-    }
-
-    private static List<Dictionary<string, string>> ExtractRows(string text)
-    {
-        var rows = new List<Dictionary<string, string>>();
-
-        var pattern = new Regex(
-            @"(\d{4})\s+"                        // Art.
-            + @"([A-Z0-9\.]+)\s*-\s*"            // Codice
-            + @"(.*?)\s+"                        // Descrizione
-            + @"(AR|AP|AF|PR)\s+"                // Tipo Att.
-            + @"([\d\.,]+)\s+"                   // Q.tà
-            + @"([A-Z]{2})\s+"                   // UM
-            + @"([\d\.,]+)\s+"                   // Prezzo Netto
-            + @"([\d\.,]+).*?"                   // Importo
-            + @"Numero\s+RdA:\s*(\d+)"           // RdA
-            + @"(?:\s+(\d{6}))?"                 // Iniziativa opzionale
-            + @"(?:\s+AP-(\d+))?"                // AP opzionale
-            + @".*?contratto\s+n\.\s*(\d+)",     // Contratto
-            RegexOptions.IgnoreCase | RegexOptions.Singleline
-        );
-
-        foreach (Match m in pattern.Matches(text))
-        {
-            rows.Add(new Dictionary<string, string>
-            {
-                ["Art"]          = m.Groups[1].Value,
-                ["Codice"]       = m.Groups[2].Value,
-                ["Descrizione"]  = Regex.Replace(m.Groups[3].Value, @"\s+", " ").Trim(),
-                ["TipoAtt"]      = m.Groups[4].Value,
-                ["Quantita"]     = m.Groups[5].Value,
-                ["Um"]           = m.Groups[6].Value,
-                ["PrezzoNetto"]  = m.Groups[7].Value,
-                ["Importo"]      = m.Groups[8].Value,
-                ["NumeroRda"]    = m.Groups[9].Value,
-                ["Iniziativa"]   = m.Groups[10].Value,
-                ["Ap"]           = m.Groups[11].Value,
-                ["Contratto"]    = m.Groups[12].Value
-            });
-        }
-
-        return rows;
+        // Formato italiano: 1.234,56 → rimuove punti migliaia, sostituisce virgola con punto
+        var cleaned = value.Replace(".", "").Replace(",", ".");
+        return decimal.TryParse(cleaned,
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out result);
     }
 }

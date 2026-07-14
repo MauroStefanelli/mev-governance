@@ -12,6 +12,7 @@ services:
       - JWT_ISSUER=mev-governance
       - JWT_AUDIENCE=mev-governance-ui
       - DATABASE_PATH=/data/mev.db
+      - PDF_PARSER_URL=http://localhost:8765
     volumes:
       - /share/Public/mev-data:/data
     ports:
