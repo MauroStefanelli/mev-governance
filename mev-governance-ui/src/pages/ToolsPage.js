@@ -89,6 +89,7 @@ export default function ToolsPage({ onUnauthorized }) {
   const [debugText, setDebugText] = useState(null); // testo grezzo PDF
   const [debugging, setDebugging] = useState(false);
   const [showPdfPanel, setShowPdfPanel] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(null); // { file, nomePdf }
   const fileRef = useRef();
   const debugRef = useRef();
 
@@ -124,9 +125,7 @@ export default function ToolsPage({ onUnauthorized }) {
   };
 
   // ── Upload PDF ──────────────────────────────────────────────
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const doUpload = async (file) => {
     setUploadMsg(null);
     setUploading(true);
     try {
@@ -142,6 +141,34 @@ export default function ToolsPage({ onUnauthorized }) {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  };
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Se esiste già un PDF con lo stesso nome, chiedi conferma
+    const exists = pdfGroups.includes(file.name);
+    if (exists) {
+      setConfirmReplace({ file });
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    await doUpload(file);
+  };
+
+  const handleReplaceConfirm = async () => {
+    const { file } = confirmReplace;
+    setConfirmReplace(null);
+    setDeleting(file.name);
+    try {
+      await deleteByPdf(file.name);
+    } catch (e) {
+      setUploadMsg({ type: "err", text: `Errore eliminazione precedente: ${e.message}` });
+      setDeleting(null);
+      return;
+    }
+    setDeleting(null);
+    await doUpload(file);
   };
 
   // ── Export Excel lato backend ────────────────────────────────
@@ -212,14 +239,36 @@ export default function ToolsPage({ onUnauthorized }) {
     <div style={{ padding: "24px 28px", maxWidth: "100%" }}>
 
       {/* ── Titolo ── */}
-      <div style={{ marginBottom: "20px" }}>
-        <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a" }}>
-          Tools — Ordini di Consegna
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
+        <div>
+          <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a" }}>
+            Tools — Ordini di Consegna
+          </div>
+          <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
+            Carica un PDF di Buono di Consegna per estrarre gli articoli e salvarli nel database.
+            Accesso riservato agli Amministratori.
+          </div>
         </div>
-        <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
-          Carica un PDF di Buono di Consegna per estrarre gli articoli e salvarli nel database.
-          Accesso riservato agli Amministratori.
-        </div>
+        {items.length > 0 && (
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "flex-end",
+            background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+            borderRadius: "10px", padding: "12px 22px",
+            boxShadow: "0 2px 8px rgba(26,115,232,0.25)", flexShrink: 0, marginLeft: "24px",
+          }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
+              Totale Ordinato
+            </div>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
+              € {fmtEuro(totaleOrdinato)}
+            </div>
+            {search && (
+              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
+                su {filtered.length} righe filtrate
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Barra azioni ── */}
@@ -339,28 +388,6 @@ export default function ToolsPage({ onUnauthorized }) {
             onClick={() => setUploadMsg(null)}
             style={{ border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#888" }}
           >×</button>
-        </div>
-      )}
-
-      {/* ── KPI Totale Ordinato ── */}
-      {items.length > 0 && (
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: "16px",
-          background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
-          borderRadius: "10px", padding: "14px 28px", marginBottom: "20px",
-          boxShadow: "0 2px 8px rgba(26,115,232,0.25)",
-        }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-            Totale Ordinato
-          </div>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
-            € {fmtEuro(totaleOrdinato)}
-          </div>
-          {search && (
-            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "14px" }}>
-              su {filtered.length} righe filtrate
-            </div>
-          )}
         </div>
       )}
 
@@ -524,6 +551,45 @@ export default function ToolsPage({ onUnauthorized }) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modale conferma sostituzione PDF ── */}
+      {confirmReplace && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "white", borderRadius: "12px", padding: "28px 32px",
+            width: "420px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#e65100", marginBottom: "14px" }}>
+              PDF già presente
+            </div>
+            <div style={{ fontSize: "13px", color: "#333", marginBottom: "20px", lineHeight: 1.6 }}>
+              Il file <strong>"{confirmReplace.file.name}"</strong> è già stato caricato in precedenza.<br />
+              I dati esistenti verranno <strong>eliminati</strong> e sostituiti con quelli del nuovo file.<br /><br />
+              Vuoi procedere?
+            </div>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setConfirmReplace(null)}
+                style={{
+                  padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
+                  background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px",
+                }}
+              >Annulla</button>
+              <button
+                onClick={handleReplaceConfirm}
+                style={{
+                  padding: "8px 18px", borderRadius: "6px", border: "none",
+                  background: "#e65100", color: "white", cursor: "pointer",
+                  fontSize: "13px", fontWeight: 600,
+                }}
+              >Sostituisci</button>
             </div>
           </div>
         </div>
