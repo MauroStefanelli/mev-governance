@@ -434,13 +434,13 @@ export default function ToolsPage({ onUnauthorized }) {
             <thead>
               <tr style={{ background: "#1a73e8", color: "white" }}>
                 {[
-                  "N. Ordine", "Data", "D. Consegna", "Contratto",
+                  "N. Ordine", "Data", "Contratto",
                   "N. RdA", "Iniziativa", "Descrizione",
                   "Art.", "TOW", "Tipo",
                   "Q.tà", "UM", "Prezzo Netto", "Importo",  "AP"                
                 ].map((h) => (
                   <th key={h} style={{
-                    padding: "10px 8px", fontWeight: 600, textAlign: "left",
+                    padding: "10px 8px", fontWeight: 600, textAlign: "center",
                     whiteSpace: "nowrap", borderBottom: "2px solid #1557b0",
                   }}>{h}</th>
                 ))}
@@ -459,10 +459,9 @@ export default function ToolsPage({ onUnauthorized }) {
                 >
                   <td style={tdStyle}>{r.numeroOrdine}</td>
                   <td style={tdStyle}>{r.data}</td>
-                  <td style={tdStyle}>{r.dataConsegna}</td>
                   <td style={tdStyle}>{r.contratto}</td>
                   <td style={tdStyle}>{r.numeroRda}</td>
-                  <td style={tdStyle}>{r.iniziativa}</td>
+                  <td style={{ ...tdStyle, textalign: "center", fontWeight: 600 }}>{r.iniziativa}</td>
                   <td style={{ ...tdStyle, maxWidth: "260px", whiteSpace: "normal", wordBreak: "break-word" }}>
                     {r.descrizione}
                   </td>
