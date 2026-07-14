@@ -440,7 +440,7 @@ export default function ToolsPage({ onUnauthorized }) {
                   "Q.tà", "UM", "Prezzo Netto", "Importo",  "AP"                
                 ].map((h) => (
                   <th key={h} style={{
-                    padding: "10px 8px", fontWeight: 600, textAlign: "center",
+                    padding: "10px 8px", fontWeight: 600, textAlign: "left",
                     whiteSpace: "nowrap", borderBottom: "2px solid #1557b0",
                   }}>{h}</th>
                 ))}
