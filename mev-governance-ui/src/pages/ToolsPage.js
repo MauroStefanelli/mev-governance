@@ -217,7 +217,8 @@ export default function ToolsPage({ onUnauthorized }) {
     r.descrizione?.toLowerCase().includes(q) ||
     r.numeroRda?.toLowerCase().includes(q) ||
     r.nomePdf?.toLowerCase().includes(q) ||
-    r.rifContratto?.toLowerCase().includes(q)
+    r.rifContratto?.toLowerCase().includes(q) ||
+    r.iniziativa?.toLowerCase().includes(q)
   );
 
   // Raggruppa per nomePdf per mostrare il badge del PDF
@@ -338,7 +339,7 @@ export default function ToolsPage({ onUnauthorized }) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cerca ordine, codice, descrizione, RdA..."
+          placeholder="Cerca ordine, codice, descrizione, RdA, Iniziativa..."
           style={{
             flex: 1, minWidth: "200px", maxWidth: "380px",
             padding: "8px 12px", border: "1px solid #dadce0",
