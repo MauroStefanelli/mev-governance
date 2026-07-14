@@ -6,6 +6,7 @@ import DbConfigPage from "./pages/DbConfigPage";
 import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
+import ToolsPage from "./pages/ToolsPage";
 import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings } from "./services/mevService";
 
 function App() {
@@ -138,8 +139,9 @@ function App() {
     { id: "contratti_interni", label: "Ordini" },
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
-      { id: "admin", label: "Utenti" },
+      { id: "admin",    label: "Utenti" },
       { id: "dbconfig", label: "Configurazione" },
+      { id: "tools",    label: "Tools" },
     ] : []),
   ];
 
@@ -289,6 +291,7 @@ function App() {
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
         {page === "admin"             && role === "Admin" && <AdminPage />}
         {page === "dbconfig"          && role === "Admin" && <DbConfigPage />}
+        {page === "tools"             && role === "Admin" && <ToolsPage onUnauthorized={handleLogout} />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}

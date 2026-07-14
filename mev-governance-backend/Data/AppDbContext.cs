@@ -17,4 +17,5 @@ public class AppDbContext : DbContext
     public DbSet<ConsumoTow> ConsumoTow => Set<ConsumoTow>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
     public DbSet<UserAccessLog> UserAccessLogs => Set<UserAccessLog>();
+    public DbSet<OrdineConsegnaItem> OrdiniConsegna => Set<OrdineConsegnaItem>();
 }
