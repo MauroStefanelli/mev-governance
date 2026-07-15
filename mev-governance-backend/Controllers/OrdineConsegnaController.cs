@@ -356,11 +356,21 @@ public class OrdineConsegnaController : ControllerBase
         var righe = new List<(string oda, string pos, string qta, string importo, string subappalto)>();
 
         // ── Strategia robusta: raggruppa le righe per blocchi ODA ──
-        // Ogni blocco inizia con una riga che inizia con 4xxxxxxxxx e finisce
-        // prima della riga ODA successiva, di "TOTALE" o di fine testo.
-        // Poi applica il match sulla riga riassemblata (join con spazio).
-        var odaStartRe = new Regex(@"^4\d{9}\b");
-        var stopRe     = new Regex(@"^(TOTALE|EVENTUALI|Per gli|Flaggare|\*)", RegexOptions.IgnoreCase);
+        //
+        // Il PDF ha un watermark ruotato che pdfplumber estrae come singoli
+        // caratteri su righe separate (es. "8","1","0","/","re .",".1"…).
+        // Questi si mescolano alle righe dati in due modi:
+        //   a) righe con solo watermark → da saltare
+        //   b) prefisso watermark prima dell'ODA sulla stessa riga (es. ".1 4100698371 20 …")
+        //
+        // Soluzione:
+        //  1. Salta righe vuote e righe watermark (≤6 char, solo cifre/slash/punto/underscore/spazio)
+        //  2. Cerca l'ODA OVUNQUE nella riga (non solo all'inizio)
+        //     e taglia tutto ciò che precede l'ODA (prefisso watermark)
+        //  3. Il blocco termina SOLO su nuova ODA, parola-chiave di stop o fine testo
+        var odaAnywhereRe = new Regex(@"(4\d{9})\s+(\d{1,4})\b");
+        var stopRe        = new Regex(@"^(TOTALE|EVENTUALI|Per gli|Flaggare|\*)", RegexOptions.IgnoreCase);
+        var watermarkRe   = new Regex(@"^[\d/\._\s]{1,6}$");
 
         var lines = testoNorm.Split('\n');
         var blocchi = new List<string>();
@@ -369,25 +379,30 @@ public class OrdineConsegnaController : ControllerBase
         foreach (var rawLine in lines)
         {
             var l = rawLine.Trim();
-            if (odaStartRe.IsMatch(l))
+
+            // Salta righe vuote e righe che sono solo watermark
+            if (string.IsNullOrEmpty(l) || watermarkRe.IsMatch(l)) continue;
+
+            // Parola chiave di stop → chiude il blocco corrente
+            if (stopRe.IsMatch(l))
             {
-                // Inizia un nuovo blocco ODA
+                if (bloccoCorrente != null) { blocchi.Add(bloccoCorrente); bloccoCorrente = null; }
+                continue;
+            }
+
+            // Cerca ODA ovunque nella riga
+            var odaM = odaAnywhereRe.Match(l);
+            if (odaM.Success)
+            {
+                // Nuova ODA → salva il blocco precedente e inizia uno nuovo
+                // tagliando il prefisso watermark che precede l'ODA
                 if (bloccoCorrente != null) blocchi.Add(bloccoCorrente);
-                bloccoCorrente = l;
+                bloccoCorrente = l.Substring(odaM.Index);
             }
             else if (bloccoCorrente != null)
             {
-                if (stopRe.IsMatch(l) || string.IsNullOrEmpty(l))
-                {
-                    // Fine del blocco corrente
-                    blocchi.Add(bloccoCorrente);
-                    bloccoCorrente = null;
-                }
-                else
-                {
-                    // Riga di continuazione: aggiunge al blocco corrente
-                    bloccoCorrente += " " + l;
-                }
+                // Riga di continuazione (testo descrizione spezzato, coda €, ecc.)
+                bloccoCorrente += " " + l;
             }
         }
         if (bloccoCorrente != null) blocchi.Add(bloccoCorrente);
