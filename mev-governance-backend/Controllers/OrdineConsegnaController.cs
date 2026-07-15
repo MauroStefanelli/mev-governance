@@ -148,13 +148,29 @@ public class OrdineConsegnaController : ControllerBase
                 return BadRequest("Nessuna riga di avanzamento trovata nel PDF. Verificare il formato del verbale.");
 
             // ── Aggiorna le righe corrispondenti in OrdiniConsegna ──
+            // Il campo Art nel DB è zero-padded a 4 cifre (es. "0010")
+            // mentre pos dal VAP è stripped (es. "10") — confrontiamo numericamente
             int aggiornati = 0;
             foreach (var (oda, pos, qta, importo, subappalto) in righe)
             {
-                // Match per ODA; se la pos è vuota match solo sull'ODA (aggiorna tutte le posizioni)
-                var records = string.IsNullOrEmpty(pos)
-                    ? _db.OrdiniConsegna.Where(r => r.NumeroOrdine == oda).ToList()
-                    : _db.OrdiniConsegna.Where(r => r.NumeroOrdine == oda && r.Art == pos).ToList();
+                List<OrdineConsegnaItem> records;
+                if (string.IsNullOrEmpty(pos))
+                {
+                    records = _db.OrdiniConsegna
+                        .Where(r => r.NumeroOrdine == oda)
+                        .ToList();
+                }
+                else
+                {
+                    // Carica tutte le righe dell'ODA e filtra in memoria confrontando
+                    // il valore numerico dell'Art (gestisce "0010" vs "10", "10" vs "10", ecc.)
+                    int posInt = int.TryParse(pos, out var p) ? p : -1;
+                    records = _db.OrdiniConsegna
+                        .Where(r => r.NumeroOrdine == oda)
+                        .ToList()
+                        .Where(r => int.TryParse(r.Art, out var a) && a == posInt)
+                        .ToList();
+                }
 
                 foreach (var rec in records)
                 {
@@ -273,33 +289,42 @@ public class OrdineConsegnaController : ControllerBase
             RegexOptions.IgnoreCase);
         var mese = meseMatch.Success ? meseMatch.Groups[1].Value.Trim() : "";
 
-        // ── Normalizza spazi/tab (mantieni newline) ──
-        var testoNorm = Regex.Replace(testo, @"[ \t]+", " ");
+        // ── Normalizza: collassa spazi/tab, rimuovi \r, mantieni \n ──
+        var testoNorm = Regex.Replace(testo, @"[ \t]+", " ")
+                             .Replace("\r\n", "\n")
+                             .Replace("\r", "\n");
 
         var righe = new List<(string oda, string pos, string qta, string importo, string subappalto)>();
 
         // Pattern ODA + POS all'inizio riga
         var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b", RegexOptions.Multiline);
 
-        // Pattern coda fissa (fine riga):
-        //   PREZZO_UNIT €   QTA_SENZA_EURO   IMPORTO_CON_EURO   (SI|NO)
+        // Pattern coda fissa — NON usa $ per evitare problemi con \r residui
+        // Cerca: PREZZO€  QTA  IMPORTO€  (SI|NO)  seguito da fine riga o spazi
         var codaRe = new Regex(
-            @"(\d[\d,]*)\s*€\s+" +                        // prezzo unitario €
-            @"(\d[\d.,]*)\s+" +                            // qta (senza €)
-            @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +      // importo €
-            @"(SI|NO)\s*$",
-            RegexOptions.IgnoreCase | RegexOptions.Multiline
+            @"(\d[\d,]*)\s*€\s+" +
+            @"(\d[\d.,]*)\s+" +
+            @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +
+            @"(SI|NO)\s*(?:\r?\n|$)",
+            RegexOptions.IgnoreCase
         );
 
         foreach (var line in testoNorm.Split('\n'))
         {
-            var odaM  = odaRe.Match(line);
-            var codaM = codaRe.Match(line);
-            if (!odaM.Success || !codaM.Success) continue;
+            // Trim completo per rimuovere \r e spazi residui
+            var l = line.Trim();
+            if (l.Length < 15) continue;
 
-            var oda        = odaM.Groups[1].Value;
-            var pos        = odaM.Groups[2].Value.TrimStart('0');
-            if (pos == "") pos = "0";
+            var odaM = odaRe.Match(l);
+            if (!odaM.Success) continue;
+
+            // Cerca la coda nella riga (aggiunge \n fittizio per far matchare il pattern)
+            var codaM = codaRe.Match(l + "\n");
+            if (!codaM.Success) continue;
+
+            var oda  = odaM.Groups[1].Value;
+            var pos  = odaM.Groups[2].Value.TrimStart('0');
+            if (string.IsNullOrEmpty(pos)) pos = "0";
             var qta        = codaM.Groups[2].Value;
             var importo    = codaM.Groups[3].Value;
             var subappalto = codaM.Groups[4].Value.ToUpper();
