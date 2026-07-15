@@ -225,6 +225,11 @@ public class OrdineConsegnaController : ControllerBase
         {
             var parseResult = await CallPdfParser(file, "/debug");
             var testo = parseResult.GetProperty("testo").GetString() ?? "";
+
+            // Normalizza identico a ParseVap per vedere la struttura reale
+            var testoNorm = System.Text.RegularExpressions.Regex.Replace(testo, @"[ \t]+", " ")
+                                 .Replace("\r\n", "\n").Replace("\r", "\n");
+
             var (mese, righe) = ParseVap(testo);
 
             // Carica tutti i NumeroOrdine distinti dal DB per confronto diretto
@@ -281,6 +286,11 @@ public class OrdineConsegnaController : ControllerBase
                 meseAvanzamento = mese,
                 odaDalVerbale,
                 odaInDb,
+                // Righe del testo che contengono "410" per vedere come arrivano dal parser
+                righeConOda = testoNorm.Split('\n')
+                    .Where(l => System.Text.RegularExpressions.Regex.IsMatch(l.Trim(), @"^4\d{9}"))
+                    .Select(l => l.Trim())
+                    .ToList(),
                 righe = matches
             });
         }
