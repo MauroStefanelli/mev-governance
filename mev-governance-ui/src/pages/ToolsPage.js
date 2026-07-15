@@ -430,7 +430,18 @@ export default function ToolsPage({ onUnauthorized }) {
             : "Nessun risultato per la ricerca corrente."}
         </div>
       ) : (
-        <div style={{ overflowX: "auto", borderRadius: "10px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
+
+            <div
+              style={{
+                overflowX: "auto",
+                overflowY: "auto",
+                maxHeight: "calc(100vh - 250px)",   // altezza desiderata
+                borderRadius: "10px",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.08)"
+              }}
+            >
+
+
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", background: "white" }}>
             <thead>
               <tr style={{ background: "#1a73e8", color: "white" }}>
@@ -451,10 +462,20 @@ export default function ToolsPage({ onUnauthorized }) {
               {filtered.map((r, idx) => (
                 <tr
                   key={r.id}
+
                   style={{
-                    background: idx % 2 === 0 ? "white" : "#f8f9ff",
-                    borderBottom: "1px solid #f0f0f0",
+                    padding: "10px 8px",
+                    fontWeight: 600,
+                    textAlign: "left",
+                    whiteSpace: "nowrap",
+                    borderBottom: "2px solid #1557b0",
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 10,
+                    background: "#1a73e8",
+                    color: "white",
                   }}
+
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#e8f0fe")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? "white" : "#f8f9ff")}
                 >
