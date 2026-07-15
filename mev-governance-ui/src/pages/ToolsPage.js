@@ -92,6 +92,7 @@ export default function ToolsPage({ onUnauthorized }) {
   const [confirmReplace, setConfirmReplace] = useState(null); // { file, nomePdf }
   const fileRef = useRef();
   const debugRef = useRef();
+  const governanceRef = useRef();
 
   const load = async () => {
     setLoading(true);
@@ -169,6 +170,40 @@ export default function ToolsPage({ onUnauthorized }) {
     }
     setDeleting(null);
     await doUpload(file);
+  };
+
+  // ── Esporta in Governance ────────────────────────────────────
+  const handleExportGovernance = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (governanceRef.current) governanceRef.current.value = "";
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const r = await fetch(`${API_BASE_URL}/api/tools/export-governance`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+        body: form,
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        alert(`Errore export: ${r.status} — ${text}`);
+        return;
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = r.headers.get("content-disposition") || "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      a.download = match ? match[1] : `Governance_Ordini_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(`Errore durante l'export: ${e.message}`);
+    }
   };
 
   // ── Export Excel lato backend ────────────────────────────────
@@ -328,6 +363,30 @@ export default function ToolsPage({ onUnauthorized }) {
         >
           Esporta Excel
         </button>
+
+        {/* Esporta in Governance */}
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          padding: "8px 18px", borderRadius: "7px",
+          background: items.length === 0 ? "#f1f3f4" : "#6d28d9",
+          color: items.length === 0 ? "#aaa" : "white",
+          fontWeight: 600, fontSize: "13px", border: "none",
+          boxShadow: items.length === 0 ? "none" : "0 1px 4px rgba(109,40,217,0.3)",
+          cursor: items.length === 0 ? "default" : "pointer",
+          pointerEvents: items.length === 0 ? "none" : "auto",
+          transition: "background 0.15s",
+        }}
+          title="Seleziona un file Excel esistente: verrà aggiunto uno sheet Ordini con la data odierna"
+        >
+          Esporta in Governance
+          <input
+            ref={governanceRef}
+            type="file"
+            accept=".xlsx,.xls"
+            style={{ display: "none" }}
+            onChange={handleExportGovernance}
+          />
+        </label>
 
         {/* Debug PDF */}
         <label style={{

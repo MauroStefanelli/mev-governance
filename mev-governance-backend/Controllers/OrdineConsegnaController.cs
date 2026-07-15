@@ -269,6 +269,113 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
+    // POST /api/tools/export-governance
+    // Riceve un file Excel esistente, aggiunge uno sheet "Ordini DD/MM/YYYY"
+    // con tutti i dati degli ordini, restituisce il file modificato
+    // ============================================================
+    [HttpPost("export-governance")]
+    [Consumes("multipart/form-data")]
+    public IActionResult ExportGovernance(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File non valido");
+
+        var items = _db.OrdiniConsegna
+            .AsNoTracking()
+            .OrderByDescending(x => x.ImportatoIl)
+            .ThenBy(x => x.NumeroOrdine)
+            .ToList();
+
+        // Carica il workbook esistente
+        using var inputStream = file.OpenReadStream();
+        using var workbook = new XLWorkbook(inputStream);
+
+        // Nome sheet: "Ordini" + data corrente
+        var sheetName = $"Ordini {DateTime.Now:dd/MM/yyyy}";
+
+        // Se esiste già uno sheet con lo stesso nome lo elimina e lo ricrea
+        if (workbook.Worksheets.TryGetWorksheet(sheetName, out var existing))
+            workbook.Worksheets.Delete(sheetName);
+
+        var ws = workbook.Worksheets.Add(sheetName);
+
+        var headers = new[]
+        {
+            "Numero Ordine", "Data", "Data Consegna", "Rif. Contratto",
+            "Art.", "Codice", "Descrizione", "Tipo Att.",
+            "Q.tà", "UM", "Prezzo Netto", "Importo",
+            "Numero RdA", "Iniziativa", "AP", "Contratto",
+            "Nome PDF", "Importato Il", "Importato Da"
+        };
+
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var cell = ws.Cell(1, i + 1);
+            cell.Value = headers[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1a73e8");
+            cell.Style.Font.FontColor = XLColor.White;
+        }
+
+        int row = 2;
+        foreach (var item in items)
+        {
+            ws.Cell(row, 1).Value  = item.NumeroOrdine;
+            ws.Cell(row, 2).Value  = item.Data;
+            ws.Cell(row, 3).Value  = item.DataConsegna;
+            ws.Cell(row, 4).Value  = item.RifContratto;
+            ws.Cell(row, 5).Value  = item.Art;
+            ws.Cell(row, 6).Value  = item.Codice;
+            ws.Cell(row, 7).Value  = item.Descrizione;
+            ws.Cell(row, 8).Value  = item.TipoAtt;
+
+            if (TryParseItalian(item.Quantita, out var qty))
+            { ws.Cell(row, 9).Value = qty; ws.Cell(row, 9).Style.NumberFormat.Format = "#,##0.000"; }
+            else ws.Cell(row, 9).Value = item.Quantita;
+
+            ws.Cell(row, 10).Value = item.Um;
+
+            if (TryParseItalian(item.PrezzoNetto, out var pn))
+            { ws.Cell(row, 11).Value = pn; ws.Cell(row, 11).Style.NumberFormat.Format = "€ #,##0.00"; }
+            else ws.Cell(row, 11).Value = item.PrezzoNetto;
+
+            if (TryParseItalian(item.Importo, out var imp))
+            { ws.Cell(row, 12).Value = imp; ws.Cell(row, 12).Style.NumberFormat.Format = "€ #,##0.00"; }
+            else ws.Cell(row, 12).Value = item.Importo;
+
+            ws.Cell(row, 13).Value = item.NumeroRda;
+            ws.Cell(row, 14).Value = item.Iniziativa;
+            ws.Cell(row, 15).Value = item.Ap;
+            ws.Cell(row, 16).Value = item.Contratto;
+            ws.Cell(row, 17).Value = item.NomePdf;
+            ws.Cell(row, 18).Value = item.ImportatoIl.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+            ws.Cell(row, 19).Value = item.ImportatoDA;
+            row++;
+        }
+
+        ws.Columns().AdjustToContents();
+        ws.RangeUsed()?.SetAutoFilter();
+        ws.SheetView.FreezeRows(1);
+
+        // Sposta lo sheet in fondo
+        ws.Position = workbook.Worksheets.Count;
+
+        using var outputStream = new MemoryStream();
+        workbook.SaveAs(outputStream);
+        outputStream.Position = 0;
+
+        var outputFileName = Path.GetFileNameWithoutExtension(file.FileName)
+            + $"_Ordini_{DateTime.Now:yyyyMMdd}"
+            + Path.GetExtension(file.FileName);
+
+        return File(
+            outputStream.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            outputFileName
+        );
+    }
+
+    // ============================================================
     // METODI PRIVATI
     // ============================================================
 
