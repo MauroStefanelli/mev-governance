@@ -171,18 +171,20 @@ app.UseCors("FrontendPolicy");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    string? migrateError = null;
     try
     {
         db.Database.Migrate(); // applica tutte le migration pendenti
     }
     catch (Exception ex)
     {
-        migrateError = ex.Message;
-        try { db.Database.EnsureCreated(); } catch { /* ignora */ }
+        Console.Error.WriteLine($"[MIGRATE ERROR] {ex.Message}");
+        // Non crashare: il blocco SQL idempotente sotto copre i casi mancanti
+        try { db.Database.EnsureCreated(); } catch (Exception ex2) {
+            Console.Error.WriteLine($"[ENSURECREATED ERROR] {ex2.Message}");
+        }
     }
 
-    // Garantisce che LogoutMinutes esista anche se la migration non è stata applicata
+    // Aggiunge colonne mancanti in modo idempotente (PostgreSQL)
     try
     {
         db.Database.ExecuteSqlRaw(@"
@@ -205,9 +207,9 @@ using (var scope = app.Services.CreateScope())
             END $$;
         ");
     }
-    catch { /* SQLite o DB non ancora inizializzato: ignora */ }
+    catch (Exception ex) { Console.Error.WriteLine($"[ALTER COLUMNS ERROR] {ex.Message}"); }
 
-    // Garantisce che la tabella OrdiniConsegna esista con TUTTE le colonne (crea se non presente)
+    // Crea OrdiniConsegna se non esiste (con tutte le colonne)
     try
     {
         db.Database.ExecuteSqlRaw(@"
@@ -239,9 +241,9 @@ using (var scope = app.Services.CreateScope())
             );
         ");
     }
-    catch { /* tabella già esistente o SQLite: ignora */ }
+    catch (Exception ex) { Console.Error.WriteLine($"[CREATE OrdiniConsegna ERROR] {ex.Message}"); }
 
-    // Garantisce che la tabella VerbaliAvanzamento esista
+    // Crea VerbaliAvanzamento se non esiste
     try
     {
         db.Database.ExecuteSqlRaw(@"
@@ -256,7 +258,7 @@ using (var scope = app.Services.CreateScope())
             );
         ");
     }
-    catch { /* tabella già esistente o SQLite: ignora */ }
+    catch (Exception ex) { Console.Error.WriteLine($"[CREATE VerbaliAvanzamento ERROR] {ex.Message}"); }
 
     if (!db.Users.Any())
     {

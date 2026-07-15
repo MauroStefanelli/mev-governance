@@ -27,6 +27,11 @@ COPY pdf_parser/main.py /pdf_parser/main.py
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV PDF_PARSER_URL=http://localhost:8765
 
+# Limita memoria GC di .NET per restare nel piano free di Render (512MB)
+ENV DOTNET_GCHeapHardLimit=314572800
+ENV DOTNET_GCConserve=1
+ENV DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=0
+
 RUN mkdir -p /data && chmod 777 /data
 
 # Script di avvio: lancia FastAPI in background, poi ASP.NET
