@@ -5,7 +5,7 @@ services:
     name: mev-pdf-parser
     runtime: docker
     dockerfilePath: ./mev-pdf-parser/Dockerfile
-    dockerContext: ./mev-pdf-parser
+    dockerContext: .
     plan: free
 
   # ── Backend ASP.NET Core ──────────────────────────────────────────────────────

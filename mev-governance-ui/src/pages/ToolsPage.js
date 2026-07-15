@@ -502,11 +502,10 @@ export default function ToolsPage({ onUnauthorized }) {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
         <div>
           <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a" }}>
-            Tools — Ordini di Consegna
+            Tools — Ordini di Consegna e Verbali di Avanzamento
           </div>
           <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
-            Carica un PDF di Buono di Consegna per estrarre gli articoli e salvarli nel database.
-            Accesso riservato agli Amministratori.
+            Carica un PDF di Buono di Consegna e Verbali di Avanzamento per estrarre gli articoli e salvarli nel database.
           </div>
         </div>
         {items.length > 0 && (
@@ -546,7 +545,7 @@ export default function ToolsPage({ onUnauthorized }) {
           transition: "background 0.15s",
           pointerEvents: uploading ? "none" : "auto",
         }}>
-          {uploading ? "Importazione..." : "Carica PDF"}
+          {uploading ? "Importazione..." : "Carica PDF Ordine"}
           <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFile} />
         </label>
 
