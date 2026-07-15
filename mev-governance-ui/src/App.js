@@ -231,21 +231,38 @@ function App() {
                 Admin {showAdminMenu ? "▲" : "▼"}
               </button>
 
-              {showAdminMenu && (
+          {showAdminMenu && (
                 <div style={{
                   position: "absolute", top: "38px", right: 0,
-                  background: "white", borderRadius: "8px", minWidth: "200px",
+                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+                  borderRadius: "8px", minWidth: "180px",
                   boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid rgba(255,255,255,0.2)",
                 }}>
-                  <div onClick={() => { setPage("tools"); setShowAdminMenu(false); }} style={adminItemStyle}>
-                    Caricamento Ordini
-                  </div>
-                  <div onClick={() => { setPage("admin"); setShowAdminMenu(false); }} style={adminItemStyle}>
-                    User
-                  </div>
-                  <div onClick={() => { setPage("dbconfig"); setShowAdminMenu(false); }} style={adminItemStyle}>
-                    Configurazione
-                  </div>
+                  {[
+                    { id: "tools",    label: "Caricamento Ordini" },
+                    { id: "admin",    label: "Utenti" },
+                    { id: "dbconfig", label: "Configurazione" },
+                  ].map(({ id, label }) => (
+                    <div
+                      key={id}
+                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
+                      style={{
+                        padding: "8px 16px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: page === id ? 600 : 400,
+                        color: "white",
+                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {label}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -417,13 +434,5 @@ function App() {
     </div>
   );
 }
-
-const adminItemStyle = {
-  padding: "10px 14px",
-  cursor: "pointer",
-  fontSize: "13px",
-  color: "#333",
-  borderBottom: "1px solid #eee",
-};
 
 export default App;
