@@ -339,7 +339,7 @@ export default function ToolsPage({ onUnauthorized }) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cerca ordine, codice, descrizione, RdA, Iniziativa..."
+          placeholder="Cerca Ordine, Contratto, RdA, Iniziativa..."
           style={{
             flex: 1, minWidth: "200px", maxWidth: "380px",
             padding: "8px 12px", border: "1px solid #dadce0",
@@ -482,7 +482,7 @@ export default function ToolsPage({ onUnauthorized }) {
                       color: "white",
                       padding: "10px 8px",
                       fontWeight: 600,
-                      textAlign: "left",
+                      textAlign: "center",
                       whiteSpace: "nowrap",
                       borderBottom: "2px solid #1557b0",
                     }}
