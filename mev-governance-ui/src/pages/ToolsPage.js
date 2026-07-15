@@ -79,12 +79,12 @@ const fmtDate = (iso) => {
 // ============================================================
 
 export default function ToolsPage({ onUnauthorized }) {
-  const [items, setItems]         = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState(null); // { type: "ok"|"err", text }
-  const [search, setSearch]       = useState("");
-  const [deleting, setDeleting]   = useState(null);
+  const [search, setSearch] = useState("");
+  const [deleting, setDeleting] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
   const [debugText, setDebugText] = useState(null); // testo grezzo PDF
   const [debugging, setDebugging] = useState(false);
@@ -419,85 +419,166 @@ export default function ToolsPage({ onUnauthorized }) {
 
       {/* ── Tabella ── */}
       {loading ? (
-        <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>Caricamento...</div>
+        <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+          Caricamento...
+        </div>
       ) : filtered.length === 0 ? (
-        <div style={{
-          padding: "60px 40px", textAlign: "center", color: "#aaa",
-          border: "2px dashed #e0e0e0", borderRadius: "10px",
-        }}>
+        <div
+          style={{
+            padding: "60px 40px",
+            textAlign: "center",
+            color: "#aaa",
+            border: "2px dashed #e0e0e0",
+            borderRadius: "10px",
+          }}
+        >
           {items.length === 0
             ? "Nessun ordine importato. Carica un PDF per iniziare."
             : "Nessun risultato per la ricerca corrente."}
         </div>
       ) : (
-
-            <div
-              style={{
-                overflowX: "auto",
-                overflowY: "auto",
-                maxHeight: "calc(100vh - 250px)",   // altezza desiderata
-                borderRadius: "10px",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.08)"
-              }}
-            >
-
-
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", background: "white" }}>
+        <div
+          style={{
+            overflowX: "auto",
+            overflowY: "auto",
+            height: "600px",
+            borderRadius: "10px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+          }}
+        >
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "separate",
+              borderSpacing: 0,
+              fontSize: "14px",
+              background: "white",
+            }}
+          >
             <thead>
-              <tr style={{ background: "#1a73e8", color: "white" }}>
+              <tr>
                 {[
-                  "N. Ordine", "Data", "Contratto",
-                  "N. RdA", "Iniziativa", 
-                  "Art.", "TOW", "Tipo",
-                  "Q.tà", "UM", "Prezzo Netto", "Importo",  "AP"                
+                  "N. Ordine",
+                  "Data",
+                  "Contratto",
+                  "N. RdA",
+                  "Iniziativa",
+                  "Art.",
+                  "TOW",
+                  "Tipo",
+                  "Q.tà",
+                  "UM",
+                  "Prezzo Netto",
+                  "Importo",
+                  "AP",
                 ].map((h) => (
-                  <th key={h} style={{
-                    padding: "10px 8px", fontWeight: 600, textAlign: "left",
-                    whiteSpace: "nowrap", borderBottom: "2px solid #1557b0",
-                  }}>{h}</th>
+                  <th
+                    key={h}
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 100,
+                      background: "#1a73e8",
+                      color: "white",
+                      padding: "10px 8px",
+                      fontWeight: 600,
+                      textAlign: "left",
+                      whiteSpace: "nowrap",
+                      borderBottom: "2px solid #1557b0",
+                    }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
+
             <tbody>
               {filtered.map((r, idx) => (
                 <tr
                   key={r.id}
-
                   style={{
-                    padding: "10px 8px",
-                    fontWeight: 600,
-                    textAlign: "left",
-                    whiteSpace: "nowrap",
-                    borderBottom: "2px solid #1557b0",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 10,
-                    background: "#1a73e8",
-                    color: "white",
+                    background: idx % 2 === 0 ? "white" : "#f8f9ff",
+                    borderBottom: "1px solid #f0f0f0",
                   }}
-
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#e8f0fe")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? "white" : "#f8f9ff")}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "#e8f0fe")
+                  }
+                  onMouseLeave={(e) =>
+                  (e.currentTarget.style.background =
+                    idx % 2 === 0 ? "white" : "#f8f9ff")
+                  }
                 >
                   <td style={tdStyle}>{r.numeroOrdine}</td>
                   <td style={tdStyle}>{r.data}</td>
                   <td style={tdStyle}>{r.contratto}</td>
                   <td style={tdStyle}>{r.numeroRda}</td>
-                  <td style={{ ...tdStyle, textalign: "center", fontWeight: 600 }}>{r.iniziativa}</td>
+
+                  <td
+                    style={{
+                      ...tdStyle,
+                      textAlign: "center",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {r.iniziativa}
+                  </td>
+
                   <td style={tdStyle}>{r.art}</td>
-                  <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.codice}</td>
+
+                  <td
+                    style={{
+                      ...tdStyle,
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {r.codice}
+                  </td>
 
                   <td style={{ ...tdStyle, textAlign: "center" }}>
-                    <span style={{
-                      background: r.tipoAtt === "AP" ? "#e8f5e9" : r.tipoAtt === "AR" ? "#e3f2fd" : "#fff3e0",
-                      color: r.tipoAtt === "AP" ? "#1e8e3e" : r.tipoAtt === "AR" ? "#1565c0" : "#e65100",
-                      padding: "2px 7px", borderRadius: "12px", fontWeight: 600, fontSize: "11px",
-                    }}>{r.tipoAtt}</span>
+                    <span
+                      style={{
+                        background:
+                          r.tipoAtt === "AP"
+                            ? "#e8f5e9"
+                            : r.tipoAtt === "AR"
+                              ? "#e3f2fd"
+                              : "#fff3e0",
+                        color:
+                          r.tipoAtt === "AP"
+                            ? "#1e8e3e"
+                            : r.tipoAtt === "AR"
+                              ? "#1565c0"
+                              : "#e65100",
+                        padding: "2px 7px",
+                        borderRadius: "12px",
+                        fontWeight: 600,
+                        fontSize: "11px",
+                      }}
+                    >
+                      {r.tipoAtt}
+                    </span>
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>{r.quantita}</td>
+
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    {r.quantita}
+                  </td>
+
                   <td style={tdStyle}>{r.um}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>€ {fmt(r.prezzoNetto)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>€ {fmt(r.importo)}</td>
+
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    € {fmt(r.prezzoNetto)}
+                  </td>
+
+                  <td
+                    style={{
+                      ...tdStyle,
+                      textAlign: "right",
+                      fontWeight: 600,
+                    }}
+                  >
+                    € {fmt(r.importo)}
+                  </td>
 
                   <td style={tdStyle}>{r.ap}</td>
                 </tr>
