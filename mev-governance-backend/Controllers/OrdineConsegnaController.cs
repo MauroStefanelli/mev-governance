@@ -275,7 +275,7 @@ public class OrdineConsegnaController : ControllerBase
     // ============================================================
     [HttpPost("export-governance")]
     [Consumes("multipart/form-data")]
-    public IActionResult ExportGovernance(IFormFile file)
+    public async Task<IActionResult> ExportGovernance(IFormFile file)
     {
         if (file == null || file.Length == 0)
             return BadRequest("File non valido");
@@ -287,8 +287,19 @@ public class OrdineConsegnaController : ControllerBase
             .ToList();
 
         // Carica il workbook esistente
-        using var inputStream = file.OpenReadStream();
-        using var workbook = new XLWorkbook(inputStream);
+        XLWorkbook workbook;
+        try
+        {
+            using var inputStream = file.OpenReadStream();
+            using var ms = new MemoryStream();
+            await inputStream.CopyToAsync(ms);
+            ms.Position = 0;
+            workbook = new XLWorkbook(ms);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Impossibile aprire il file Excel: {ex.Message}. Assicurarsi che sia un file .xlsx valido e non protetto da password.");
+        }
 
         // Nome sheet: "Ordini" + data corrente
         var sheetName = $"Ordini {DateTime.Now:dd/MM/yyyy}";
@@ -362,6 +373,7 @@ public class OrdineConsegnaController : ControllerBase
 
         using var outputStream = new MemoryStream();
         workbook.SaveAs(outputStream);
+        workbook.Dispose();
         outputStream.Position = 0;
 
         var outputFileName = Path.GetFileNameWithoutExtension(file.FileName)

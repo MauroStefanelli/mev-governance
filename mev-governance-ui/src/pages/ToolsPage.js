@@ -196,11 +196,17 @@ export default function ToolsPage({ onUnauthorized }) {
       clearTimeout(timeoutId);
 
       if (!r.ok) {
-        const text = await r.text();
-        alert(`Errore export: ${r.status} — ${text}`);
+        let errText = "";
+        try { errText = await r.text(); } catch { errText = `HTTP ${r.status}`; }
+        alert(`Errore export (${r.status}): ${errText}`);
         return;
       }
-      const blob = await r.blob();
+
+      let blob;
+      try { blob = await r.blob(); } catch (blobErr) {
+        alert(`Errore lettura risposta: ${blobErr.message}`);
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
