@@ -94,6 +94,8 @@ export default function ToolsPage({ onUnauthorized }) {
   const debugRef = useRef();
   const governanceRef = useRef();
 
+  const [exportingGovernance, setExportingGovernance] = useState(false);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -177,14 +179,22 @@ export default function ToolsPage({ onUnauthorized }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (governanceRef.current) governanceRef.current.value = "";
+    setExportingGovernance(true);
     try {
       const form = new FormData();
       form.append("file", file);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minuti
+
       const r = await fetch(`${API_BASE_URL}/api/tools/export-governance`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
         body: form,
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
       if (!r.ok) {
         const text = await r.text();
         alert(`Errore export: ${r.status} — ${text}`);
@@ -202,7 +212,13 @@ export default function ToolsPage({ onUnauthorized }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(`Errore durante l'export: ${e.message}`);
+      if (e.name === "AbortError") {
+        alert("Timeout: il server ha impiegato troppo tempo a rispondere. Riprova tra qualche secondo.");
+      } else {
+        alert(`Errore durante l'export: ${e.message}`);
+      }
+    } finally {
+      setExportingGovernance(false);
     }
   };
 
@@ -368,17 +384,17 @@ export default function ToolsPage({ onUnauthorized }) {
         <label style={{
           display: "inline-flex", alignItems: "center", gap: "8px",
           padding: "8px 18px", borderRadius: "7px",
-          background: items.length === 0 ? "#f1f3f4" : "#6d28d9",
-          color: items.length === 0 ? "#aaa" : "white",
+          background: items.length === 0 || exportingGovernance ? "#ede9fe" : "#6d28d9",
+          color: items.length === 0 || exportingGovernance ? "#a78bfa" : "white",
           fontWeight: 600, fontSize: "13px", border: "none",
-          boxShadow: items.length === 0 ? "none" : "0 1px 4px rgba(109,40,217,0.3)",
-          cursor: items.length === 0 ? "default" : "pointer",
-          pointerEvents: items.length === 0 ? "none" : "auto",
+          boxShadow: items.length === 0 || exportingGovernance ? "none" : "0 1px 4px rgba(109,40,217,0.3)",
+          cursor: items.length === 0 || exportingGovernance ? "default" : "pointer",
+          pointerEvents: items.length === 0 || exportingGovernance ? "none" : "auto",
           transition: "background 0.15s",
         }}
           title="Seleziona un file Excel esistente: verrà aggiunto uno sheet Ordini con la data odierna"
         >
-          Esporta in Governance
+          {exportingGovernance ? "Elaborazione..." : "Esporta in Governance"}
           <input
             ref={governanceRef}
             type="file"
