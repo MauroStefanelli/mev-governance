@@ -348,41 +348,75 @@ public class OrdineConsegnaController : ControllerBase
             RegexOptions.IgnoreCase);
         var mese = meseMatch.Success ? meseMatch.Groups[1].Value.Trim() : "";
 
-        // ── Normalizza: collassa spazi/tab, rimuovi \r, mantieni \n ──
+        // ── Normalizza: collassa spazi/tab, normalizza newline ──
         var testoNorm = Regex.Replace(testo, @"[ \t]+", " ")
                              .Replace("\r\n", "\n")
                              .Replace("\r", "\n");
 
         var righe = new List<(string oda, string pos, string qta, string importo, string subappalto)>();
 
-        // Pattern ODA + POS all'inizio riga
-        var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b", RegexOptions.Multiline);
+        // ── Strategia robusta: raggruppa le righe per blocchi ODA ──
+        // Ogni blocco inizia con una riga che inizia con 4xxxxxxxxx e finisce
+        // prima della riga ODA successiva, di "TOTALE" o di fine testo.
+        // Poi applica il match sulla riga riassemblata (join con spazio).
+        var odaStartRe = new Regex(@"^4\d{9}\b");
+        var stopRe     = new Regex(@"^(TOTALE|EVENTUALI|Per gli|Flaggare|\*)", RegexOptions.IgnoreCase);
 
-        // Pattern coda fissa — NON usa $ per evitare problemi con \r residui
-        // Cerca: PREZZO€  QTA  IMPORTO€  (SI|NO)  seguito da fine riga o spazi
+        var lines = testoNorm.Split('\n');
+        var blocchi = new List<string>();
+        string? bloccoCorrente = null;
+
+        foreach (var rawLine in lines)
+        {
+            var l = rawLine.Trim();
+            if (odaStartRe.IsMatch(l))
+            {
+                // Inizia un nuovo blocco ODA
+                if (bloccoCorrente != null) blocchi.Add(bloccoCorrente);
+                bloccoCorrente = l;
+            }
+            else if (bloccoCorrente != null)
+            {
+                if (stopRe.IsMatch(l) || string.IsNullOrEmpty(l))
+                {
+                    // Fine del blocco corrente
+                    blocchi.Add(bloccoCorrente);
+                    bloccoCorrente = null;
+                }
+                else
+                {
+                    // Riga di continuazione: aggiunge al blocco corrente
+                    bloccoCorrente += " " + l;
+                }
+            }
+        }
+        if (bloccoCorrente != null) blocchi.Add(bloccoCorrente);
+
+        // Pattern ODA + POS all'inizio del blocco riassemblato
+        var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b");
+
+        // Pattern coda: PREZZO€  QTA  IMPORTO€  (SI|NO)
         var codaRe = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
             @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +
-            @"(SI|NO)\s*(?:\r?\n|$)",
+            @"(SI|NO)\s*$",
             RegexOptions.IgnoreCase
         );
 
-        foreach (var line in testoNorm.Split('\n'))
+        foreach (var blocco in blocchi)
         {
-            // Trim completo per rimuovere \r e spazi residui
-            var l = line.Trim();
-            if (l.Length < 15) continue;
+            var b = Regex.Replace(blocco.Trim(), @"\s+", " ");
+            if (b.Length < 15) continue;
 
-            var odaM = odaRe.Match(l);
+            var odaM  = odaRe.Match(b);
             if (!odaM.Success) continue;
 
-            // Cerca la coda nella riga (aggiunge \n fittizio per far matchare il pattern)
-            var codaM = codaRe.Match(l + "\n");
+            var codaM = codaRe.Match(b);
             if (!codaM.Success) continue;
 
-            var oda  = odaM.Groups[1].Value;
-            var pos  = odaM.Groups[2].Value.TrimStart('0');
+            var oda        = odaM.Groups[1].Value;
+            var pos        = odaM.Groups[2].Value.TrimStart('0');
             if (string.IsNullOrEmpty(pos)) pos = "0";
             var qta        = codaM.Groups[2].Value;
             var importo    = codaM.Groups[3].Value;
