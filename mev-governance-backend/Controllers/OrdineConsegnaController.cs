@@ -212,7 +212,7 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
-    // POST /api/tools/debug-vap  — restituisce testo grezzo + righe parsate dal verbale
+    // POST /api/tools/debug-vap  — restituisce testo grezzo + righe parsate + match DB
     // ============================================================
     [HttpPost("debug-vap")]
     [Consumes("multipart/form-data")]
@@ -227,12 +227,37 @@ public class OrdineConsegnaController : ControllerBase
             var testo = parseResult.GetProperty("testo").GetString() ?? "";
             var (mese, righe) = ParseVap(testo);
 
+            // Per ogni riga parsata mostra cosa trova nel DB
+            var matches = righe.Select(r =>
+            {
+                int posInt = int.TryParse(r.pos, out var p) ? p : -1;
+
+                // Tutti i record dell'ODA
+                var inDb = _db.OrdiniConsegna
+                    .Where(x => x.NumeroOrdine == r.oda)
+                    .Select(x => new { x.NumeroOrdine, x.Art, x.Id })
+                    .ToList();
+
+                // Record che matchano per posizione
+                var matched = inDb
+                    .Where(x => int.TryParse(x.Art, out var a) && a == posInt)
+                    .ToList();
+
+                return new
+                {
+                    r.oda, r.pos, posInt,
+                    r.qta, r.importo, r.subappalto,
+                    recordInDb     = inDb.Count,
+                    artValuesInDb  = inDb.Select(x => x.Art).ToList(),
+                    matched        = matched.Count,
+                    matchedIds     = matched.Select(x => x.Id).ToList()
+                };
+            }).ToList();
+
             return Ok(new
             {
-                testo,
-                lunghezza       = testo.Length,
                 meseAvanzamento = mese,
-                righe           = righe.Select(r => new { r.oda, r.pos, r.qta, r.importo, r.subappalto }).ToList()
+                righe           = matches
             });
         }
         catch (Exception ex)
