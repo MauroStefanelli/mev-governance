@@ -509,10 +509,10 @@ export default function ToolsPage({ onUnauthorized }) {
                     idx % 2 === 0 ? "white" : "#f8f9ff")
                   }
                 >
-                  <td style={tdStyle}>{r.numeroOrdine}</td>
-                  <td style={tdStyle}>{r.data}</td>
-                  <td style={tdStyle}>{r.contratto}</td>
-                  <td style={tdStyle}>{r.numeroRda}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.numeroOrdine}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.data}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.contratto}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.numeroRda}</td>
 
                   <td
                     style={{
@@ -524,12 +524,12 @@ export default function ToolsPage({ onUnauthorized }) {
                     {r.iniziativa}
                   </td>
 
-                  <td style={tdStyle}>{r.art}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.art}</td>
 
                   <td
                     style={{
                       ...tdStyle,
-                      fontFamily: "monospace",
+                      fontFamily: "monospace", textAlign: "center",
                     }}
                   >
                     {r.codice}
@@ -564,7 +564,7 @@ export default function ToolsPage({ onUnauthorized }) {
                     {r.quantita}
                   </td>
 
-                  <td style={tdStyle}>{r.um}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.um}</td>
 
                   <td style={{ ...tdStyle, textAlign: "right" }}>
                     € {fmt(r.prezzoNetto)}
@@ -580,7 +580,7 @@ export default function ToolsPage({ onUnauthorized }) {
                     € {fmt(r.importo)}
                   </td>
 
-                  <td style={tdStyle}>{r.ap}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.ap}</td>
                 </tr>
               ))}
             </tbody>
