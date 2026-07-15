@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
@@ -175,7 +176,7 @@ export default function ToolsPage({ onUnauthorized }) {
     await doUpload(file);
   };
 
-  // ── Esporta in Governance (tutto nel browser, nessuna chiamata al server) ────
+  // ── Esporta in Governance (JSZip: aggiunge sheet senza toccare gli altri) ────
   const handleExportGovernance = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -183,27 +184,40 @@ export default function ToolsPage({ onUnauthorized }) {
     setExportingGovernance(true);
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
-        // Apre il workbook esistente
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-
-        // Nome sheet: "Ordini DD-MM-YYYY"
         const today = new Date();
         const dd = String(today.getDate()).padStart(2, "0");
         const mm = String(today.getMonth() + 1).padStart(2, "0");
         const yyyy = today.getFullYear();
         const sheetName = `Ordini ${dd}-${mm}-${yyyy}`;
 
-        // Rimuove sheet con stesso nome se esiste
-        if (workbook.SheetNames.includes(sheetName)) {
-          const idx = workbook.SheetNames.indexOf(sheetName);
-          workbook.SheetNames.splice(idx, 1);
-          delete workbook.Sheets[sheetName];
+        // Apre il file xlsx come ZIP preservando tutto
+        const zip = await JSZip.loadAsync(evt.target.result);
+
+        // Legge workbook.xml per trovare il numero degli sheet esistenti
+        const wbXml = await zip.file("xl/workbook.xml").async("string");
+
+        // Trova l'indice del prossimo sheet
+        const sheetMatches = [...wbXml.matchAll(/<sheet [^/]*/g)];
+        const nextSheetId = sheetMatches.length + 1;
+        const rId = `rId${nextSheetId + 10}`; // offset per evitare conflitti con rId esistenti
+
+        // Rimuove sheet con lo stesso nome se esiste già
+        const existingMatch = wbXml.match(new RegExp(`<sheet[^>]*name="${sheetName}"[^>]*/>`));
+        let cleanWbXml = wbXml;
+        if (existingMatch) {
+          // Trova l'r:id del vecchio sheet e rimuovilo
+          const oldRid = existingMatch[0].match(/r:id="([^"]+)"/)?.[1];
+          cleanWbXml = wbXml.replace(existingMatch[0], "");
+          if (oldRid) {
+            const oldIdx = wbXml.match(new RegExp(`<sheet[^>]*r:id="${oldRid}"[^>]*/>`));
+            const sheetNum = oldRid.replace(/\D/g, "");
+            zip.remove(`xl/worksheets/sheet${sheetNum}.xml`);
+          }
         }
 
-        // Costruisce i dati dello sheet
+        // Costruisce il nuovo sheet XML
         const headers = [
           "Numero Ordine", "Data", "Data Consegna", "Rif. Contratto",
           "Art.", "Codice", "Descrizione", "Tipo Att.",
@@ -212,26 +226,83 @@ export default function ToolsPage({ onUnauthorized }) {
           "Nome PDF", "Importato Il", "Importato Da"
         ];
 
-        const rows = items.map(r => [
-          r.numeroOrdine, r.data, r.dataConsegna, r.rifContratto,
-          r.art, r.codice, r.descrizione, r.tipoAtt,
-          r.quantita, r.um, r.prezzoNetto, r.importo,
-          r.numeroRda, r.iniziativa, r.ap, r.contratto,
-          r.nomePdf,
-          r.importatoIl ? new Date(r.importatoIl.endsWith("Z") ? r.importatoIl : r.importatoIl + "Z")
-            .toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
-          r.importatoDA,
-        ]);
+        const escapeXml = (v) => String(v ?? "")
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const colLetter = (n) => {
+          let s = "";
+          while (n > 0) { s = String.fromCharCode(((n - 1) % 26) + 65) + s; n = Math.floor((n - 1) / 26); }
+          return s;
+        };
 
-        // Aggiunge lo sheet in fondo
-        XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+        let rowsXml = "";
+        // Header row
+        rowsXml += `<row r="1">`;
+        headers.forEach((h, ci) => {
+          rowsXml += `<c r="${colLetter(ci + 1)}1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>`;
+        });
+        rowsXml += `</row>`;
 
-        // Scarica il file modificato
+        // Data rows
+        items.forEach((r, ri) => {
+          const rowNum = ri + 2;
+          const vals = [
+            r.numeroOrdine, r.data, r.dataConsegna, r.rifContratto,
+            r.art, r.codice, r.descrizione, r.tipoAtt,
+            r.quantita, r.um, r.prezzoNetto, r.importo,
+            r.numeroRda, r.iniziativa, r.ap, r.contratto,
+            r.nomePdf,
+            r.importatoIl ? new Date(r.importatoIl.endsWith("Z") ? r.importatoIl : r.importatoIl + "Z")
+              .toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+            r.importatoDA,
+          ];
+          rowsXml += `<row r="${rowNum}">`;
+          vals.forEach((v, ci) => {
+            rowsXml += `<c r="${colLetter(ci + 1)}${rowNum}" t="inlineStr"><is><t>${escapeXml(v)}</t></is></c>`;
+          });
+          rowsXml += `</row>`;
+        });
+
+        const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetData>${rowsXml}</sheetData>
+</worksheet>`;
+
+        // Aggiunge il nuovo sheet al ZIP
+        const newSheetPath = `xl/worksheets/sheet${nextSheetId}.xml`;
+        zip.file(newSheetPath, sheetXml);
+
+        // Aggiorna workbook.xml aggiungendo il riferimento al nuovo sheet
+        const sheetEntry = `<sheet name="${sheetName}" sheetId="${nextSheetId}" r:id="${rId}"/>`;
+        const updatedWbXml = cleanWbXml.replace("</sheets>", `${sheetEntry}</sheets>`);
+        zip.file("xl/workbook.xml", updatedWbXml);
+
+        // Aggiorna workbook.xml.rels
+        const relsPath = "xl/_rels/workbook.xml.rels";
+        const relsXml = await zip.file(relsPath).async("string");
+        const newRel = `<Relationship Id="${rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${nextSheetId}.xml"/>`;
+        const updatedRels = relsXml.replace("</Relationships>", `${newRel}</Relationships>`);
+        zip.file(relsPath, updatedRels);
+
+        // Aggiorna [Content_Types].xml
+        const ctPath = "[Content_Types].xml";
+        const ctXml = await zip.file(ctPath).async("string");
+        const newCt = `<Override PartName="/xl/worksheets/sheet${nextSheetId}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
+        const updatedCt = ctXml.replace("</Types>", `${newCt}</Types>`);
+        zip.file(ctPath, updatedCt);
+
+        // Genera e scarica il file
+        const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
         const baseName = file.name.replace(/\.(xlsx|xls)$/i, "");
-        const outputName = `${baseName}_Ordini_${today.toISOString().slice(0,10)}.xlsx`;
-        XLSX.writeFile(workbook, outputName);
+        a.download = `${baseName}_Ordini_${yyyy}${mm}${dd}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       } catch (err) {
         alert(`Errore durante l'elaborazione: ${err.message}`);
       } finally {

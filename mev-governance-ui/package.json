@@ -23,6 +23,9 @@
   "@testing-library/user-event": "^13.5.0",
   
     
+  "jszip": "^3.10.1",
+  
+    
   "react": "^19.2.5",
   
     
