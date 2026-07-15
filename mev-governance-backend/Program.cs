@@ -207,31 +207,52 @@ using (var scope = app.Services.CreateScope())
     }
     catch { /* SQLite o DB non ancora inizializzato: ignora */ }
 
-    // Garantisce che la tabella OrdiniConsegna esista (crea se non presente)
+    // Garantisce che la tabella OrdiniConsegna esista con TUTTE le colonne (crea se non presente)
     try
     {
         db.Database.ExecuteSqlRaw(@"
             CREATE TABLE IF NOT EXISTS ""OrdiniConsegna"" (
-                ""Id""           SERIAL PRIMARY KEY,
-                ""NumeroOrdine"" TEXT NOT NULL DEFAULT '',
-                ""Data""         TEXT NOT NULL DEFAULT '',
-                ""DataConsegna"" TEXT NOT NULL DEFAULT '',
-                ""RifContratto"" TEXT NOT NULL DEFAULT '',
-                ""Art""          TEXT NOT NULL DEFAULT '',
-                ""Codice""       TEXT NOT NULL DEFAULT '',
-                ""Descrizione""  TEXT NOT NULL DEFAULT '',
-                ""TipoAtt""      TEXT NOT NULL DEFAULT '',
-                ""Quantita""     TEXT NOT NULL DEFAULT '',
-                ""Um""           TEXT NOT NULL DEFAULT '',
-                ""PrezzoNetto""  TEXT NOT NULL DEFAULT '',
-                ""Importo""      TEXT NOT NULL DEFAULT '',
-                ""NumeroRda""    TEXT NOT NULL DEFAULT '',
-                ""Iniziativa""   TEXT NOT NULL DEFAULT '',
-                ""Ap""           TEXT NOT NULL DEFAULT '',
-                ""Contratto""    TEXT NOT NULL DEFAULT '',
-                ""NomePdf""      TEXT NOT NULL DEFAULT '',
-                ""ImportatoIl""  TIMESTAMP NOT NULL DEFAULT NOW(),
-                ""ImportatoDA""  TEXT NOT NULL DEFAULT ''
+                ""Id""                   SERIAL PRIMARY KEY,
+                ""NumeroOrdine""         TEXT NOT NULL DEFAULT '',
+                ""Data""                 TEXT NOT NULL DEFAULT '',
+                ""DataConsegna""         TEXT NOT NULL DEFAULT '',
+                ""RifContratto""         TEXT NOT NULL DEFAULT '',
+                ""Art""                  TEXT NOT NULL DEFAULT '',
+                ""Codice""               TEXT NOT NULL DEFAULT '',
+                ""Descrizione""          TEXT NOT NULL DEFAULT '',
+                ""TipoAtt""              TEXT NOT NULL DEFAULT '',
+                ""Quantita""             TEXT NOT NULL DEFAULT '',
+                ""Um""                   TEXT NOT NULL DEFAULT '',
+                ""PrezzoNetto""          TEXT NOT NULL DEFAULT '',
+                ""Importo""              TEXT NOT NULL DEFAULT '',
+                ""NumeroRda""            TEXT NOT NULL DEFAULT '',
+                ""Iniziativa""           TEXT NOT NULL DEFAULT '',
+                ""Ap""                   TEXT NOT NULL DEFAULT '',
+                ""Contratto""            TEXT NOT NULL DEFAULT '',
+                ""NomePdf""              TEXT NOT NULL DEFAULT '',
+                ""ImportatoIl""          TIMESTAMP NOT NULL DEFAULT NOW(),
+                ""ImportatoDA""          TEXT NOT NULL DEFAULT '',
+                ""MeseAvanzamento""      TEXT NOT NULL DEFAULT '',
+                ""QtaAvanzata""          TEXT NOT NULL DEFAULT '',
+                ""ImportoFatturabile""   TEXT NOT NULL DEFAULT '',
+                ""Subappalto""           TEXT NOT NULL DEFAULT ''
+            );
+        ");
+    }
+    catch { /* tabella già esistente o SQLite: ignora */ }
+
+    // Garantisce che la tabella VerbaliAvanzamento esista
+    try
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""VerbaliAvanzamento"" (
+                ""Id""               SERIAL PRIMARY KEY,
+                ""NomePdf""          TEXT NOT NULL DEFAULT '',
+                ""MeseAvanzamento""  TEXT NOT NULL DEFAULT '',
+                ""RigheElaborate""   INTEGER NOT NULL DEFAULT 0,
+                ""RigheAggiornate""  INTEGER NOT NULL DEFAULT 0,
+                ""CaricatoIl""       TIMESTAMP NOT NULL DEFAULT NOW(),
+                ""CaricatoDa""       TEXT NOT NULL DEFAULT ''
             );
         ");
     }
