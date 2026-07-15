@@ -1,5 +1,13 @@
 services:
 
+  # ── PDF Parser Python/FastAPI ─────────────────────────────────────────────────
+  - type: web
+    name: mev-pdf-parser
+    runtime: docker
+    dockerfilePath: ./mev-pdf-parser/Dockerfile
+    dockerContext: ./mev-pdf-parser
+    plan: free
+
   # ── Backend ASP.NET Core ──────────────────────────────────────────────────────
   - type: web
     name: mev-governance-backend
@@ -16,12 +24,12 @@ services:
         value: mev-governance-ui
       - key: ADMIN_PASSWORD
         generateValue: true
-      # Imposta DATABASE_DIRECT_URL con la connection string Supabase (Session Pooler)
-      # formato: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
       - key: DATABASE_DIRECT_URL
         sync: false
       - key: CORS_ORIGINS
         value: https://mev-governance-frontend.onrender.com
+      - key: PDF_PARSER_URL
+        value: https://mev-pdf-parser.onrender.com
 
   # ── Frontend React (nginx) ────────────────────────────────────────────────────
   - type: web
