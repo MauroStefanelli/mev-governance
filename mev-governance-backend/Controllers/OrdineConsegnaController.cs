@@ -252,68 +252,59 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
-    // ParseVap — logica di parsing centralizzata (usata da upload e debug)
+    // ParseVap — calibrato sul formato reale del verbale Poste Italiane
+    //
+    // Ogni riga dati è su una singola riga di testo nel formato:
+    //   ODA(10)  POS  [...testo libero...]  PREZZO_UNIT €  QTA  IMPORTO_FATT €  SI/NO
+    // Esempi reali:
+    //   4100689952 10 (vuoto) Canone Presidio Q2 2026 (vuoto) 0,644 € 30000,00 19.329,00 € NO
+    //   4100698371 20 143578 Servizio Universale F1 AP-00226 COLLAUDO, 0,32 € 25600,00 8.079,36 € NO
+    //
+    // Strategia: per ogni riga del testo
+    //   - cerca ODA + POS all'inizio
+    //   - cerca la coda fissa (PREZZO€ QTA IMPORTO€ SI/NO) in fondo alla stessa riga
     // ============================================================
     private static (string mese, List<(string oda, string pos, string qta, string importo, string subappalto)> righe)
         ParseVap(string testo)
     {
         // ── Mese di avanzamento ──
-        // Accetta: "Periodo di riferimento: Giugno 2026" o varianti
         var meseMatch = Regex.Match(testo,
-            @"(?:Periodo di riferimento|Mese di avanzamento|Mese avanzamento)[:\s]+([^\n\r]+)",
+            @"Periodo di riferimento[:\s]+([^\n\r]+)",
             RegexOptions.IgnoreCase);
         var mese = meseMatch.Success ? meseMatch.Groups[1].Value.Trim() : "";
 
-        // ── Normalizza spazi/tab ma mantieni newline ──
+        // ── Normalizza spazi/tab (mantieni newline) ──
         var testoNorm = Regex.Replace(testo, @"[ \t]+", " ");
 
         var righe = new List<(string oda, string pos, string qta, string importo, string subappalto)>();
 
-        // Divide il testo in blocchi: ogni blocco inizia con un ODA 4xxxxxxxxx
-        var blocchi = Regex.Split(testoNorm, @"(?=\b4\d{9}\b)");
+        // Pattern ODA + POS all'inizio riga
+        var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b", RegexOptions.Multiline);
 
-        foreach (var blocco in blocchi)
+        // Pattern coda fissa (fine riga):
+        //   PREZZO_UNIT €   QTA_SENZA_EURO   IMPORTO_CON_EURO   (SI|NO)
+        var codaRe = new Regex(
+            @"(\d[\d,]*)\s*€\s+" +                        // prezzo unitario €
+            @"(\d[\d.,]*)\s+" +                            // qta (senza €)
+            @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +      // importo €
+            @"(SI|NO)\s*$",
+            RegexOptions.IgnoreCase | RegexOptions.Multiline
+        );
+
+        foreach (var line in testoNorm.Split('\n'))
         {
-            var b = blocco.Trim();
-            if (b.Length < 5) continue;
+            var odaM  = odaRe.Match(line);
+            var codaM = codaRe.Match(line);
+            if (!odaM.Success || !codaM.Success) continue;
 
-            // Deve iniziare con ODA
-            var odaM = Regex.Match(b, @"^(4\d{9})");
-            if (!odaM.Success) continue;
-            var oda = odaM.Groups[1].Value;
+            var oda        = odaM.Groups[1].Value;
+            var pos        = odaM.Groups[2].Value.TrimStart('0');
+            if (pos == "") pos = "0";
+            var qta        = codaM.Groups[2].Value;
+            var importo    = codaM.Groups[3].Value;
+            var subappalto = codaM.Groups[4].Value.ToUpper();
 
-            // Posizione: primo numero (1-4 cifre) dopo l'ODA, eventualmente zero-padded
-            var posM = Regex.Match(b, @"^4\d{9}\s+(\d{1,4})\b");
-            var pos = posM.Success ? posM.Groups[1].Value.TrimStart('0') : "";
-
-            // Tutti i numeri in formato italiano con 2 decimali (es. 1.234,56)
-            var numeriM = Regex.Matches(b, @"\b(\d{1,3}(?:\.\d{3})*,\d{2})\b");
-
-            string importo = "", qta = "";
-            if (numeriM.Count >= 1)
-            {
-                // L'ultimo numero è l'importo fatturabile
-                importo = numeriM[numeriM.Count - 1].Groups[1].Value;
-
-                // Cerca la Q.tà tra il primo e l'ultimo importo
-                if (numeriM.Count >= 2)
-                {
-                    int startIdx = numeriM[0].Index + numeriM[0].Length;
-                    int endIdx   = numeriM[numeriM.Count - 1].Index;
-                    if (endIdx > startIdx)
-                    {
-                        var traMezzo = b.Substring(startIdx, endIdx - startIdx);
-                        var qtaM = Regex.Match(traMezzo, @"\b(\d{1,6}(?:,\d{1,3})?)\b");
-                        qta = qtaM.Success ? qtaM.Groups[1].Value : "";
-                    }
-                }
-            }
-
-            // Subappalto: ultima occorrenza di SI o NO nel blocco
-            var subM = Regex.Matches(b, @"\b(SI|NO)\b", RegexOptions.IgnoreCase);
-            var subappalto = subM.Count > 0 ? subM[subM.Count - 1].Groups[1].Value.ToUpper() : "";
-
-            righe.Add((oda, pos, qta, importo, subappalto));
+            righe.Add((oda, pos == "0" ? "" : pos, qta, importo, subappalto));
         }
 
         return (mese, righe);
