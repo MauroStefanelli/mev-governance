@@ -292,17 +292,36 @@ export default function ToolsPage({ onUnauthorized }) {
         const updatedCt = ctXml.replace("</Types>", `${newCt}</Types>`);
         zip.file(ctPath, updatedCt);
 
-        // Genera e scarica il file
+        // Genera il blob
         const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
         const baseName = file.name.replace(/\.(xlsx|xls)$/i, "");
-        a.download = `${baseName}_Ordini_${yyyy}${mm}${dd}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const suggestedName = `${baseName}_Ordini_${yyyy}${mm}${dd}.xlsx`;
+
+        // Usa File System Access API se disponibile (Chrome/Edge) per scegliere dove salvare
+        if (window.showSaveFilePicker) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName,
+              types: [{ description: "Excel", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] } }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+          } catch (saveErr) {
+            if (saveErr.name !== "AbortError") throw saveErr;
+            // Utente ha annullato: non fare nulla
+          }
+        } else {
+          // Fallback per Safari e altri browser
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = suggestedName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
       } catch (err) {
         alert(`Errore durante l'elaborazione: ${err.message}`);
       } finally {
