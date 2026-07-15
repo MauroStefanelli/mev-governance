@@ -133,16 +133,25 @@ function App() {
 
   if (!token) return <LoginPage onLogin={handleLogin} />;
 
-  const navItems = [
+  /*const navItems = [
     { id: "mev",               label: "MEV" },
     { id: "contratti",         label: "Contratti" },
     { id: "contratti_interni", label: "Ordini" },
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
       { id: "tools",    label: "Caricamento Ordini" },
-      { id: "admin",    label: "Utenti" },
+      { id: "admin",    label: "User" },
       { id: "dbconfig", label: "Configurazione" },
    ] : []),
+  ];
+*/
+
+
+  const navItems = [
+    { id: "mev", label: "MEV" },
+    { id: "contratti", label: "Contratti" },
+    { id: "contratti_interni", label: "Ordini" },
+    { id: "chart", label: "Grafici" },
   ];
 
   return (
@@ -180,6 +189,73 @@ function App() {
         {/* Nav */}
         <nav style={{ display: "flex", alignItems: "center", gap: "4px" }}>
           {navItems.map(({ id, label }) => (
+            {role === "Admin" && (
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setShowAdminMenu(!showAdminMenu)}
+                  style={{
+                    background:
+                      ["tools", "admin", "dbconfig"].includes(page)
+                        ? "rgba(255,255,255,0.22)"
+                        : "transparent",
+                    color: "white",
+                    border: "1px solid transparent",
+                    cursor: "pointer",
+                    padding: "6px 16px",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                  }}
+                >
+                  Admin {showAdminMenu ? "▲" : "▼"}
+                </button>
+
+                {showAdminMenu && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "38px",
+                      right: 0,
+                      background: "white",
+                      borderRadius: "8px",
+                      minWidth: "200px",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+                      overflow: "hidden",
+                      zIndex: 1000,
+                    }}
+                  >
+                    <div
+                      onClick={() => {
+                        setPage("tools");
+                        setShowAdminMenu(false);
+                      }}
+                      style={adminItemStyle}
+                    >
+                      Caricamento Ordini
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setPage("admin");
+                        setShowAdminMenu(false);
+                      }}
+                      style={adminItemStyle}
+                    >
+                      User
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setPage("dbconfig");
+                        setShowAdminMenu(false);
+                      }}
+                      style={adminItemStyle}
+                    >
+                      Configurazione
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <button
               key={id}
               onClick={() => setPage(id)}
@@ -367,5 +443,13 @@ function App() {
     </div>
   );
 }
+
+const adminItemStyle = {
+  padding: "10px 14px",
+  cursor: "pointer",
+  fontSize: "13px",
+  color: "#333",
+  borderBottom: "1px solid #eee",
+};
 
 export default App;

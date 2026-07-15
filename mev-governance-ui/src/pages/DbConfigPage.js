@@ -437,8 +437,8 @@ export default function DbConfigPage() {
 
       {/* Contenuto tab */}
       <div style={{ padding: "28px 32px" }}>
-        {activeTab === "dbconfig"    && <DbConfigTab />}
         {activeTab === "appsettings" && <AppSettingsTab />}
+        {activeTab === "dbconfig"    && <DbConfigTab />}
       </div>
     </div>
   );
