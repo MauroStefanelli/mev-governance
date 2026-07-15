@@ -56,10 +56,19 @@ const debugPdf = async (file) => {
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text);
-  }
+  if (!res.ok) { const text = await res.text(); throw new Error(text); }
+  return res.json();
+};
+
+const debugVap = async (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/tools/debug-vap`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (!res.ok) { const text = await res.text(); throw new Error(text); }
   return res.json();
 };
 
@@ -126,6 +135,9 @@ export default function ToolsPage({ onUnauthorized }) {
   const [verbali, setVerbali] = useState([]);
   const [showVerbaliPanel, setShowVerbaliPanel] = useState(false);
   const [deletingVerbale, setDeletingVerbale] = useState(null);
+  const [debugVapResult, setDebugVapResult] = useState(null);
+  const [debuggingVap, setDebuggingVap] = useState(false);
+  const debugVapRef = useRef();
   const fileRef = useRef();
   const debugRef = useRef();
   const governanceRef = useRef();
@@ -247,6 +259,22 @@ export default function ToolsPage({ onUnauthorized }) {
       alert(`Errore eliminazione verbale: ${e.message}`);
     } finally {
       setDeletingVerbale(null);
+    }
+  };
+
+  const handleDebugVap = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (debugVapRef.current) debugVapRef.current.value = "";
+    setDebuggingVap(true);
+    setDebugVapResult(null);
+    try {
+      const res = await debugVap(file);
+      setDebugVapResult(res);
+    } catch (e) {
+      setDebugVapResult({ error: e.message });
+    } finally {
+      setDebuggingVap(false);
     }
   };
 
@@ -651,7 +679,20 @@ export default function ToolsPage({ onUnauthorized }) {
           />
         </label>
 
-        {/* Ricerca */}
+        {/* Debug VAP */}
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
+          background: debuggingVap ? "#b0bec5" : "#f0fdf4",
+          color: "#0f766e", fontWeight: 500, fontSize: "12px",
+          border: "1px solid #6ee7b7",
+          pointerEvents: debuggingVap ? "none" : "auto",
+        }}
+          title="Carica un Verbale per vedere cosa trova il parser e cosa matcha nel DB"
+        >
+          {debuggingVap ? "Analisi..." : "Debug VAP"}
+          <input ref={debugVapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebugVap} />
+        </label>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -763,10 +804,8 @@ export default function ToolsPage({ onUnauthorized }) {
             borderRadius: "7px 7px 0 0", fontSize: "12px", fontWeight: 600,
           }}>
             <span>Testo grezzo estratto dal PDF ({debugText.length} caratteri)</span>
-            <button
-              onClick={() => setDebugText(null)}
-              style={{ border: "none", background: "none", color: "#aaa", cursor: "pointer", fontSize: "16px" }}
-            >×</button>
+            <button onClick={() => setDebugText(null)}
+              style={{ border: "none", background: "none", color: "#aaa", cursor: "pointer", fontSize: "16px" }}>×</button>
           </div>
           <pre style={{
             background: "#1e272c", color: "#e0e0e0", padding: "14px",
@@ -776,6 +815,48 @@ export default function ToolsPage({ onUnauthorized }) {
           }}>
             {debugText}
           </pre>
+        </div>
+      )}
+
+      {/* ── Pannello debug VAP ── */}
+      {debugVapResult !== null && (
+        <div style={{ marginBottom: "16px", border: "1px solid #6ee7b7", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: "#0f766e", color: "white", padding: "8px 14px",
+            fontSize: "12px", fontWeight: 600,
+          }}>
+            <span>Debug VAP — {debugVapResult.error ? "ERRORE" : `${debugVapResult.righe?.length || 0} righe trovate / Mese: ${debugVapResult.meseAvanzamento || "—"}`}</span>
+            <button onClick={() => setDebugVapResult(null)}
+              style={{ border: "none", background: "none", color: "white", cursor: "pointer", fontSize: "16px" }}>×</button>
+          </div>
+          {debugVapResult.error ? (
+            <div style={{ padding: "12px 14px", color: "#c5221f", fontSize: "12px" }}>{debugVapResult.error}</div>
+          ) : (
+            <table style={{ width: "100%", fontSize: "11px", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f0fdf4" }}>
+                  {["ODA","POS (int)","QTA","Importo","Sub","Rec. in DB","Art in DB","Matched"].map(h => (
+                    <th key={h} style={{ padding: "6px 10px", textAlign: "left", borderBottom: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(debugVapResult.righe || []).map((r, i) => (
+                  <tr key={i} style={{ background: r.matched > 0 ? "#f0fdf4" : "#fff5f5", borderBottom: "1px solid #e0e0e0" }}>
+                    <td style={{ padding: "5px 10px", fontFamily: "monospace" }}>{r.oda}</td>
+                    <td style={{ padding: "5px 10px", textAlign: "center" }}>{r.pos} ({r.posInt})</td>
+                    <td style={{ padding: "5px 10px" }}>{r.qta}</td>
+                    <td style={{ padding: "5px 10px" }}>{r.importo}</td>
+                    <td style={{ padding: "5px 10px", textAlign: "center" }}>{r.subappalto}</td>
+                    <td style={{ padding: "5px 10px", textAlign: "center" }}>{r.recordInDb}</td>
+                    <td style={{ padding: "5px 10px", fontFamily: "monospace", color: "#555" }}>{(r.artValuesInDb || []).join(", ")}</td>
+                    <td style={{ padding: "5px 10px", textAlign: "center", fontWeight: 700, color: r.matched > 0 ? "#0f766e" : "#c5221f" }}>{r.matched}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
