@@ -137,14 +137,18 @@ export default function ToolsPage({ onUnauthorized }) {
   const load = async () => {
     setLoading(true);
     try {
-      const [data, vaps] = await Promise.all([getOrdini(), getVerbali()]);
+      const data = await getOrdini();
       setItems(data);
-      setVerbali(vaps);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
     } finally {
       setLoading(false);
     }
+    // Verbali: caricati separatamente — un errore qui non blocca gli ordini
+    try {
+      const vaps = await getVerbali();
+      setVerbali(vaps);
+    } catch { /* tabella VerbaliAvanzamento non ancora creata: ignora */ }
   };
 
   useEffect(() => { load(); }, []); // eslint-disable-line
