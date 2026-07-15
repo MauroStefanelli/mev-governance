@@ -189,9 +189,12 @@ export default function ToolsPage({ onUnauthorized }) {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: "array" });
 
-        // Nome sheet: "Ordini DD/MM/YYYY"
+        // Nome sheet: "Ordini DD-MM-YYYY"
         const today = new Date();
-        const sheetName = `Ordini ${today.toLocaleDateString("it-IT")}`;
+        const dd = String(today.getDate()).padStart(2, "0");
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const yyyy = today.getFullYear();
+        const sheetName = `Ordini ${dd}-${mm}-${yyyy}`;
 
         // Rimuove sheet con stesso nome se esiste
         if (workbook.SheetNames.includes(sheetName)) {
