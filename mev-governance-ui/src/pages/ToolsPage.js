@@ -220,6 +220,21 @@ export default function ToolsPage({ onUnauthorized }) {
     r.rifContratto?.toLowerCase().includes(q) ||
     r.iniziativa?.toLowerCase().includes(q)
   );
+  const sortedData = [...filtered].sort((a, b) => {
+    const ordine = (a.numeroOrdine || "").localeCompare(
+      b.numeroOrdine || "",
+      "it",
+      { numeric: true }
+    );
+
+    if (ordine !== 0) return ordine;
+
+    return (a.art || "").localeCompare(
+      b.art || "",
+      "it",
+      { numeric: true }
+    );
+  });
 
   // Raggruppa per nomePdf per mostrare il badge del PDF
   const pdfGroups = [...new Set(items.map((i) => i.nomePdf))];
@@ -494,7 +509,7 @@ export default function ToolsPage({ onUnauthorized }) {
             </thead>
 
             <tbody>
-              {filtered.map((r, idx) => (
+              {sortedData.map((r, idx) => (
                 <tr
                   key={r.id}
                   style={{
