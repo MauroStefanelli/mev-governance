@@ -401,8 +401,8 @@ export default function DbConfigPage() {
   const [activeTab, setActiveTab] = useState("dbconfig");
 
   const tabs = [
-    { id: "dbconfig",    label: "Configurazione Database" },
     { id: "appsettings", label: "Impostazioni Applicazione" },
+    { id: "dbconfig",    label: "Configurazione Database" },
   ];
 
   return (

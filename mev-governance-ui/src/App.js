@@ -139,10 +139,10 @@ function App() {
     { id: "contratti_interni", label: "Ordini" },
     { id: "chart",             label: "Grafici" },
     ...(role === "Admin" ? [
+      { id: "tools",    label: "Caricamento Ordini" },
       { id: "admin",    label: "Utenti" },
       { id: "dbconfig", label: "Configurazione" },
-      { id: "tools",    label: "Tools" },
-    ] : []),
+   ] : []),
   ];
 
   return (
