@@ -72,6 +72,20 @@ const deleteByPdf = async (nomePdf) => {
   return res.json();
 };
 
+const getVerbali = async () => {
+  const res = await fetch(`${API_BASE_URL}/api/tools/verbali`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Errore recupero verbali");
+  return res.json();
+};
+
+const deleteVerbale = async (id) => {
+  const res = await fetch(`${API_BASE_URL}/api/tools/verbali/${id}`, {
+    method: "DELETE", headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Errore eliminazione verbale");
+  return res.json();
+};
+
 // ============================================================
 // HELPERS UI
 // ============================================================
@@ -109,6 +123,9 @@ export default function ToolsPage({ onUnauthorized }) {
   const [confirmReplace, setConfirmReplace] = useState(null);
   const [uploadingVap, setUploadingVap] = useState(false);
   const [vapMsg, setVapMsg] = useState(null); // { type: "ok"|"err", text }
+  const [verbali, setVerbali] = useState([]);
+  const [showVerbaliPanel, setShowVerbaliPanel] = useState(false);
+  const [deletingVerbale, setDeletingVerbale] = useState(null);
   const fileRef = useRef();
   const debugRef = useRef();
   const governanceRef = useRef();
@@ -120,8 +137,9 @@ export default function ToolsPage({ onUnauthorized }) {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await getOrdini();
+      const [data, vaps] = await Promise.all([getOrdini(), getVerbali()]);
       setItems(data);
+      setVerbali(vaps);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
     } finally {
@@ -213,6 +231,18 @@ export default function ToolsPage({ onUnauthorized }) {
       setVapMsg({ type: "err", text: `Errore: ${e.message}` });
     } finally {
       setUploadingVap(false);
+    }
+  };
+
+  const handleDeleteVerbale = async (id) => {
+    setDeletingVerbale(id);
+    try {
+      await deleteVerbale(id);
+      setVerbali(prev => prev.filter(v => v.id !== id));
+    } catch (e) {
+      alert(`Errore eliminazione verbale: ${e.message}`);
+    } finally {
+      setDeletingVerbale(null);
     }
   };
 
@@ -531,6 +561,30 @@ export default function ToolsPage({ onUnauthorized }) {
           {uploadingVap ? "Elaborazione..." : "Carica Verbale"}
           <input ref={vapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleVap} />
         </label>
+
+        {/* Verbali Caricati */}
+        <button
+          onClick={() => setShowVerbaliPanel(true)}
+          disabled={verbali.length === 0}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "6px",
+            padding: "8px 14px", borderRadius: "7px",
+            background: verbali.length === 0 ? "#f1f3f4" : "#f0fdf4",
+            color: verbali.length === 0 ? "#aaa" : "#0f766e",
+            border: `1px solid ${verbali.length === 0 ? "#dadce0" : "#6ee7b7"}`,
+            fontWeight: 600, fontSize: "13px",
+            cursor: verbali.length === 0 ? "default" : "pointer",
+          }}
+          title="Visualizza i verbali di avanzamento caricati"
+        >
+          Verbali caricati
+          {verbali.length > 0 && (
+            <span style={{
+              background: "#0f766e", color: "white", borderRadius: "10px",
+              padding: "1px 7px", fontSize: "11px", fontWeight: 700,
+            }}>{verbali.length}</span>
+          )}
+        </button>
 
         {/* Export Excel */}
         <button
@@ -970,6 +1024,67 @@ export default function ToolsPage({ onUnauthorized }) {
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modale Verbali Caricati ── */}
+      {showVerbaliPanel && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "white", borderRadius: "12px", padding: "28px 32px",
+            width: "560px", maxHeight: "72vh", display: "flex", flexDirection: "column",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#0f766e" }}>
+                Verbali di Avanzamento caricati ({verbali.length})
+              </div>
+              <button onClick={() => setShowVerbaliPanel(false)}
+                style={{ border: "none", background: "none", cursor: "pointer", fontSize: "20px", color: "#888" }}>×</button>
+            </div>
+            {verbali.length === 0 ? (
+              <div style={{ color: "#888", fontSize: "13px", textAlign: "center", padding: "24px 0" }}>
+                Nessun verbale caricato.
+              </div>
+            ) : (
+              <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+                {verbali.map((v) => (
+                  <div key={v.id} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "10px 14px", borderRadius: "8px",
+                    border: "1px solid #d1fae5", background: "#f0fdf4",
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f766e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {v.nomePdf}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#555", marginTop: "3px" }}>
+                        <span style={{ fontWeight: 600 }}>{v.meseAvanzamento || "—"}</span>
+                        {" · "}
+                        {v.righeAggiornate}/{v.righeElaborate} righe aggiornate
+                        {" · "}
+                        {fmtDate(v.caricatoIl)} da <em>{v.caricatoDa}</em>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteVerbale(v.id)}
+                      disabled={deletingVerbale === v.id}
+                      title="Elimina questo verbale dal registro (non annulla i dati già aggiornati)"
+                      style={{
+                        marginLeft: "12px", border: "1px solid #fecaca", background: "#fef2f2",
+                        color: "#ea4335", borderRadius: "6px", padding: "5px 10px",
+                        cursor: "pointer", fontSize: "12px", fontWeight: 600,
+                        opacity: deletingVerbale === v.id ? 0.5 : 1,
+                      }}
+                    >{deletingVerbale === v.id ? "..." : "Elimina"}</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
