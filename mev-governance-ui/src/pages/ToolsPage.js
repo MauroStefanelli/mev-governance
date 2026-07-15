@@ -96,6 +96,7 @@ export default function ToolsPage({ onUnauthorized }) {
   const debugRef = useRef();
   const governanceRef = useRef();
 
+  const [governanceBlob, setGovernanceBlob] = useState(null); // { blob, name }
   const [exportingGovernance, setExportingGovernance] = useState(false);
 
   const load = async () => {
@@ -297,31 +298,9 @@ export default function ToolsPage({ onUnauthorized }) {
         const baseName = file.name.replace(/\.(xlsx|xls)$/i, "");
         const suggestedName = `${baseName}_Ordini_${yyyy}${mm}${dd}.xlsx`;
 
-        // Usa File System Access API se disponibile (Chrome/Edge) per scegliere dove salvare
-        if (window.showSaveFilePicker) {
-          try {
-            const handle = await window.showSaveFilePicker({
-              suggestedName,
-              types: [{ description: "Excel", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] } }],
-            });
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-          } catch (saveErr) {
-            if (saveErr.name !== "AbortError") throw saveErr;
-            // Utente ha annullato: non fare nulla
-          }
-        } else {
-          // Fallback per Safari e altri browser
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = suggestedName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
+        // Salva il blob nello stato: l'utente cliccherà il pulsante "Salva file"
+        // come gesto diretto per aggirare la restrizione di showSaveFilePicker
+        setGovernanceBlob({ blob, name: suggestedName });
       } catch (err) {
         alert(`Errore durante l'elaborazione: ${err.message}`);
       } finally {
@@ -333,6 +312,34 @@ export default function ToolsPage({ onUnauthorized }) {
       setExportingGovernance(false);
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  // ── Salva file Governance (chiamato come gesto diretto per showSaveFilePicker) ─
+  const handleSaveGovernance = async () => {
+    if (!governanceBlob) return;
+    const { blob, name } = governanceBlob;
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: "Excel", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        setGovernanceBlob(null);
+      } catch (err) {
+        if (err.name !== "AbortError") alert(`Errore salvataggio: ${err.message}`);
+      }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setGovernanceBlob(null);
+    }
   };
 
   // ── Export Excel lato backend ────────────────────────────────
@@ -576,6 +583,38 @@ export default function ToolsPage({ onUnauthorized }) {
           {filtered.length} righe {search && `(filtrate su ${items.length})`}
         </span>
       </div>
+
+      {/* ── Banner salvataggio Governance ── */}
+      {governanceBlob && (
+        <div style={{
+          marginBottom: "16px", padding: "12px 18px", borderRadius: "8px",
+          background: "#f3e8ff", border: "1px solid #c084fc",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+        }}>
+          <div style={{ fontSize: "13px", color: "#6d28d9", fontWeight: 500 }}>
+            File pronto: <strong>{governanceBlob.name}</strong>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={handleSaveGovernance}
+              style={{
+                background: "#6d28d9", color: "white", border: "none",
+                padding: "8px 18px", borderRadius: "6px", fontSize: "13px",
+                fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Salva file
+            </button>
+            <button
+              onClick={() => setGovernanceBlob(null)}
+              style={{
+                background: "transparent", color: "#888", border: "none",
+                fontSize: "18px", cursor: "pointer", lineHeight: 1,
+              }}
+            >×</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Messaggio upload ── */}
       {uploadMsg && (
