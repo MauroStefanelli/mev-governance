@@ -24,6 +24,7 @@ function App() {
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
   const idleTimeoutRef = useRef(60 * 60 * 1000); // default 60 min, aggiornato via ref
 
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
