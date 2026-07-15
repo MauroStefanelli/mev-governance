@@ -31,4 +31,10 @@ public class OrdineConsegnaItem
     public string NomePdf          { get; set; } = "";
     public DateTime ImportatoIl    { get; set; } = DateTime.UtcNow;
     public string ImportatoDA      { get; set; } = "";
+
+    // Dati Verbale Avanzamento (VAP)
+    public string MeseAvanzamento    { get; set; } = "";
+    public string QtaAvanzata        { get; set; } = "";
+    public string ImportoFatturabile { get; set; } = "";
+    public string Subappalto         { get; set; } = "";
 }

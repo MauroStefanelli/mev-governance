@@ -33,6 +33,21 @@ const uploadPdf = async (file) => {
   return res.json();
 };
 
+const uploadVap = async (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/tools/upload-vap`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+  return res.json();
+};
+
 const debugPdf = async (file) => {
   const form = new FormData();
   form.append("file", file);
@@ -88,15 +103,18 @@ export default function ToolsPage({ onUnauthorized }) {
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
-  const [debugText, setDebugText] = useState(null); // testo grezzo PDF
+  const [debugText, setDebugText] = useState(null);
   const [debugging, setDebugging] = useState(false);
   const [showPdfPanel, setShowPdfPanel] = useState(false);
-  const [confirmReplace, setConfirmReplace] = useState(null); // { file, nomePdf }
+  const [confirmReplace, setConfirmReplace] = useState(null);
+  const [uploadingVap, setUploadingVap] = useState(false);
+  const [vapMsg, setVapMsg] = useState(null); // { type: "ok"|"err", text }
   const fileRef = useRef();
   const debugRef = useRef();
   const governanceRef = useRef();
+  const vapRef = useRef();
 
-  const [governanceBlob, setGovernanceBlob] = useState(null); // { blob, name }
+  const [governanceBlob, setGovernanceBlob] = useState(null);
   const [exportingGovernance, setExportingGovernance] = useState(false);
 
   const load = async () => {
@@ -175,6 +193,27 @@ export default function ToolsPage({ onUnauthorized }) {
     }
     setDeleting(null);
     await doUpload(file);
+  };
+
+  // ── Upload Verbale Avanzamento (VAP) ─────────────────────────
+  const handleVap = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (vapRef.current) vapRef.current.value = "";
+    setVapMsg(null);
+    setUploadingVap(true);
+    try {
+      const res = await uploadVap(file);
+      setVapMsg({
+        type: "ok",
+        text: `✔ "${res.nomePdf}" — ${res.meseAvanzamento} — ${res.righeAggiornate} righe aggiornate su ${res.righeElaborate} elaborate`,
+      });
+      await load();
+    } catch (e) {
+      setVapMsg({ type: "err", text: `Errore: ${e.message}` });
+    } finally {
+      setUploadingVap(false);
+    }
   };
 
   // ── Esporta in Governance (JSZip: aggiunge sheet senza toccare gli altri) ────
@@ -474,13 +513,23 @@ export default function ToolsPage({ onUnauthorized }) {
           pointerEvents: uploading ? "none" : "auto",
         }}>
           {uploading ? "Importazione..." : "Carica PDF"}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf"
-            style={{ display: "none" }}
-            onChange={handleFile}
-          />
+          <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFile} />
+        </label>
+
+        {/* Carica Verbale Avanzamento */}
+        <label style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          padding: "8px 18px", borderRadius: "7px", cursor: "pointer",
+          background: uploadingVap ? "#b0bec5" : "#0f766e",
+          color: "white", fontWeight: 600, fontSize: "13px",
+          border: "none", boxShadow: "0 1px 4px rgba(15,118,110,0.3)",
+          transition: "background 0.15s",
+          pointerEvents: uploadingVap ? "none" : "auto",
+        }}
+          title="Carica un PDF Verbale di Avanzamento per aggiornare Q.tà Avanzata, Importo Fatturabile e Subappalto"
+        >
+          {uploadingVap ? "Elaborazione..." : "Carica Verbale"}
+          <input ref={vapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleVap} />
         </label>
 
         {/* Export Excel */}
@@ -627,10 +676,24 @@ export default function ToolsPage({ onUnauthorized }) {
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span>{uploadMsg.text}</span>
-          <button
-            onClick={() => setUploadMsg(null)}
-            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#888" }}
-          >×</button>
+          <button onClick={() => setUploadMsg(null)}
+            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#888" }}>×</button>
+        </div>
+      )}
+
+      {/* ── Messaggio VAP ── */}
+      {vapMsg && (
+        <div style={{
+          marginBottom: "16px", padding: "10px 16px", borderRadius: "7px",
+          fontSize: "13px", fontWeight: 500,
+          background: vapMsg.type === "ok" ? "#e0f2f1" : "#fce8e6",
+          color: vapMsg.type === "ok" ? "#0f766e" : "#c5221f",
+          border: `1px solid ${vapMsg.type === "ok" ? "#99d6d0" : "#f5c6c4"}`,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <span>{vapMsg.text}</span>
+          <button onClick={() => setVapMsg(null)}
+            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "16px", color: "#888" }}>×</button>
         </div>
       )}
 
@@ -713,6 +776,10 @@ export default function ToolsPage({ onUnauthorized }) {
                   "Prezzo Netto",
                   "Importo",
                   "AP",
+                  "Mese Avanzamento",
+                  "Q.tà Avanzata",
+                  "Importo Fatturabile",
+                  "Subappalto",
                 ].map((h) => (
                   <th
                     key={h}
@@ -823,6 +890,24 @@ export default function ToolsPage({ onUnauthorized }) {
                   </td>
 
                   <td style={{ ...tdStyle, textAlign: "center" }}>{r.ap}</td>
+                  <td style={{ ...tdStyle, textAlign: "center", color: r.meseAvanzamento ? "#0f766e" : "#ccc" }}>
+                    {r.meseAvanzamento || "—"}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right", color: r.qtaAvanzata ? "#0f766e" : "#ccc" }}>
+                    {r.qtaAvanzata || "—"}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: r.importoFatturabile ? 600 : 400, color: r.importoFatturabile ? "#0f766e" : "#ccc" }}>
+                    {r.importoFatturabile ? `€ ${fmt(r.importoFatturabile)}` : "—"}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>
+                    {r.subappalto ? (
+                      <span style={{
+                        background: r.subappalto === "SI" ? "#fef3c7" : "#f0fdf4",
+                        color: r.subappalto === "SI" ? "#92400e" : "#166534",
+                        padding: "2px 8px", borderRadius: "10px", fontWeight: 600, fontSize: "11px",
+                      }}>{r.subappalto}</span>
+                    ) : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
