@@ -610,24 +610,42 @@ public class OrdineConsegnaController : ControllerBase
 
     private async Task<JsonElement> CallPdfParser(IFormFile file, string endpoint)
     {
-        var client = _httpClientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(60);
-
-        using var content = new MultipartFormDataContent();
+        // Legge il file in memoria una sola volta
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
-        ms.Position = 0;
-        var fileContent = new ByteArrayContent(ms.ToArray());
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
-        content.Add(fileContent, "file", file.FileName);
+        var fileBytes = ms.ToArray();
 
-        var response = await client.PostAsync($"{_pdfParserUrl}{endpoint}", content);
-        var body = await response.Content.ReadAsStringAsync();
+        // Timeout lungo per gestire cold start del parser su Render free (può impiegare 30-60s)
+        // Retry 1 volta in caso di errore transitorio (es. cold start)
+        Exception? lastEx = null;
+        for (int attempt = 1; attempt <= 2; attempt++)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(90);
 
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"Parser Python ({endpoint}): {body}");
+                using var content = new MultipartFormDataContent();
+                var fileContent = new ByteArrayContent(fileBytes);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+                content.Add(fileContent, "file", file.FileName);
 
-        return JsonDocument.Parse(body).RootElement;
+                var response = await client.PostAsync($"{_pdfParserUrl}{endpoint}", content);
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new Exception($"Parser Python ({endpoint}): {body}");
+
+                return JsonDocument.Parse(body).RootElement;
+            }
+            catch (Exception ex) when (attempt == 1)
+            {
+                // Primo tentativo fallito: aspetta 3s e riprova (cold start)
+                lastEx = ex;
+                await Task.Delay(3000);
+            }
+        }
+        throw lastEx!;
     }
 
     private static bool TryParseItalian(string value, out decimal result)

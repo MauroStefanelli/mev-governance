@@ -8,8 +8,16 @@ app = FastAPI(title="PDF Parser – Ordini di Consegna")
 
 
 # ============================================================
-# INFORMAZIONI TESTATA
+# HEALTH / ROOT
 # ============================================================
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "mev-pdf-parser"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 def extract_header_info(text: str) -> dict:
     info = {}
