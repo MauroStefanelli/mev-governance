@@ -227,25 +227,47 @@ public class OrdineConsegnaController : ControllerBase
             var testo = parseResult.GetProperty("testo").GetString() ?? "";
             var (mese, righe) = ParseVap(testo);
 
+            // Carica tutti i NumeroOrdine distinti dal DB per confronto diretto
+            var odaDalVerbale = righe.Select(r => r.oda).Distinct().ToList();
+            var tuttiGliOrdini = _db.OrdiniConsegna
+                .Select(x => new { x.NumeroOrdine, x.Art, x.Id })
+                .ToList();
+
+            // Mostra i NumeroOrdine nel DB che iniziano con 41 (per confronto)
+            var odaInDb = tuttiGliOrdini
+                .Select(x => x.NumeroOrdine)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
             // Per ogni riga parsata mostra cosa trova nel DB
             var matches = righe.Select(r =>
             {
                 int posInt = int.TryParse(r.pos, out var p) ? p : -1;
 
-                // Tutti i record dell'ODA
-                var inDb = _db.OrdiniConsegna
-                    .Where(x => x.NumeroOrdine == r.oda)
-                    .Select(x => new { x.NumeroOrdine, x.Art, x.Id })
+                // Match: confronta byte a byte dopo trim
+                var inDb = tuttiGliOrdini
+                    .Where(x => x.NumeroOrdine.Trim() == r.oda.Trim())
                     .ToList();
 
-                // Record che matchano per posizione
                 var matched = inDb
-                    .Where(x => int.TryParse(x.Art, out var a) && a == posInt)
+                    .Where(x => int.TryParse(x.Art.Trim(), out var a) && a == posInt)
                     .ToList();
+
+                // Diagnostica: mostra lunghezza e bytes dei primi chars per individuare caratteri invisibili
+                var odaBytes = string.Join("-", System.Text.Encoding.UTF8.GetBytes(r.oda).Take(12).Select(b => b.ToString("X2")));
+                var firstDbOda = tuttiGliOrdini.FirstOrDefault(x => x.NumeroOrdine.Contains(r.oda.Substring(0, 6)));
+                var dbOdaBytes = firstDbOda != null
+                    ? string.Join("-", System.Text.Encoding.UTF8.GetBytes(firstDbOda.NumeroOrdine).Take(12).Select(b => b.ToString("X2")))
+                    : "N/A";
 
                 return new
                 {
-                    r.oda, r.pos, posInt,
+                    r.oda,
+                    odaLen     = r.oda.Length,
+                    odaBytes,
+                    dbOdaBytes,
+                    r.pos, posInt,
                     r.qta, r.importo, r.subappalto,
                     recordInDb     = inDb.Count,
                     artValuesInDb  = inDb.Select(x => x.Art).ToList(),
@@ -257,7 +279,9 @@ public class OrdineConsegnaController : ControllerBase
             return Ok(new
             {
                 meseAvanzamento = mese,
-                righe           = matches
+                odaDalVerbale,
+                odaInDb,
+                righe = matches
             });
         }
         catch (Exception ex)
