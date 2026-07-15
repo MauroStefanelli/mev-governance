@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
@@ -174,58 +175,71 @@ export default function ToolsPage({ onUnauthorized }) {
     await doUpload(file);
   };
 
-  // ── Esporta in Governance ────────────────────────────────────
-  const handleExportGovernance = async (e) => {
+  // ── Esporta in Governance (tutto nel browser, nessuna chiamata al server) ────
+  const handleExportGovernance = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (governanceRef.current) governanceRef.current.value = "";
     setExportingGovernance(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minuti
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        // Apre il workbook esistente
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
 
-      const r = await fetch(`${API_BASE_URL}/api/tools/export-governance`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
-        body: form,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+        // Nome sheet: "Ordini DD/MM/YYYY"
+        const today = new Date();
+        const sheetName = `Ordini ${today.toLocaleDateString("it-IT")}`;
 
-      if (!r.ok) {
-        let errText = "";
-        try { errText = await r.text(); } catch { errText = `HTTP ${r.status}`; }
-        alert(`Errore export (${r.status}): ${errText}`);
-        return;
+        // Rimuove sheet con stesso nome se esiste
+        if (workbook.SheetNames.includes(sheetName)) {
+          const idx = workbook.SheetNames.indexOf(sheetName);
+          workbook.SheetNames.splice(idx, 1);
+          delete workbook.Sheets[sheetName];
+        }
+
+        // Costruisce i dati dello sheet
+        const headers = [
+          "Numero Ordine", "Data", "Data Consegna", "Rif. Contratto",
+          "Art.", "Codice", "Descrizione", "Tipo Att.",
+          "Q.tà", "UM", "Prezzo Netto", "Importo",
+          "Numero RdA", "Iniziativa", "AP", "Contratto",
+          "Nome PDF", "Importato Il", "Importato Da"
+        ];
+
+        const rows = items.map(r => [
+          r.numeroOrdine, r.data, r.dataConsegna, r.rifContratto,
+          r.art, r.codice, r.descrizione, r.tipoAtt,
+          r.quantita, r.um, r.prezzoNetto, r.importo,
+          r.numeroRda, r.iniziativa, r.ap, r.contratto,
+          r.nomePdf,
+          r.importatoIl ? new Date(r.importatoIl.endsWith("Z") ? r.importatoIl : r.importatoIl + "Z")
+            .toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+          r.importatoDA,
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+        // Aggiunge lo sheet in fondo
+        XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+
+        // Scarica il file modificato
+        const baseName = file.name.replace(/\.(xlsx|xls)$/i, "");
+        const outputName = `${baseName}_Ordini_${today.toISOString().slice(0,10)}.xlsx`;
+        XLSX.writeFile(workbook, outputName);
+      } catch (err) {
+        alert(`Errore durante l'elaborazione: ${err.message}`);
+      } finally {
+        setExportingGovernance(false);
       }
-
-      let blob;
-      try { blob = await r.blob(); } catch (blobErr) {
-        alert(`Errore lettura risposta: ${blobErr.message}`);
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const disposition = r.headers.get("content-disposition") || "";
-      const match = disposition.match(/filename="?([^"]+)"?/);
-      a.download = match ? match[1] : `Governance_Ordini_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      if (e.name === "AbortError") {
-        alert("Timeout: il server ha impiegato troppo tempo a rispondere. Riprova tra qualche secondo.");
-      } else {
-        alert(`Errore durante l'export: ${e.message}`);
-      }
-    } finally {
+    };
+    reader.onerror = () => {
+      alert("Errore nella lettura del file.");
       setExportingGovernance(false);
-    }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   // ── Export Excel lato backend ────────────────────────────────
