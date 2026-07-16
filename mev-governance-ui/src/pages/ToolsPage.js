@@ -834,14 +834,26 @@ export default function ToolsPage({ onUnauthorized }) {
             <div style={{ padding: "12px 14px", color: "#c5221f", fontSize: "12px" }}>{debugVapResult.error}</div>
           ) : (debugVapResult.righe || []).length === 0 ? (
             <div style={{ padding: "12px 14px" }}>
-              <div style={{ color: "#c5221f", fontSize: "12px", marginBottom: "10px" }}>
-                Nessuna riga parsata. Testo grezzo estratto dal PDF (prime 80 righe non vuote):
+              <div style={{ color: "#c5221f", fontSize: "12px", marginBottom: "6px" }}>
+                Nessuna riga parsata.
               </div>
+              <div style={{ fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>Blocchi assemblati dal parser ({(debugVapResult.blocchiAssemblati || []).length}):</div>
+              <textarea
+                readOnly
+                value={(debugVapResult.blocchiAssemblati || []).map((b, i) => `[${i + 1}] ${b}`).join("\n\n")}
+                style={{
+                  width: "100%", height: "200px", fontFamily: "monospace",
+                  fontSize: "11px", border: "1px solid #f59e0b", borderRadius: "4px",
+                  padding: "8px", boxSizing: "border-box", background: "#fffbeb",
+                  resize: "vertical", marginBottom: "10px",
+                }}
+              />
+              <div style={{ fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>Testo grezzo (prime 80 righe non vuote):</div>
               <textarea
                 readOnly
                 value={(debugVapResult.righeGrezze || []).join("\n")}
                 style={{
-                  width: "100%", height: "300px", fontFamily: "monospace",
+                  width: "100%", height: "250px", fontFamily: "monospace",
                   fontSize: "11px", border: "1px solid #ccc", borderRadius: "4px",
                   padding: "8px", boxSizing: "border-box", background: "#fafafa",
                   resize: "vertical",

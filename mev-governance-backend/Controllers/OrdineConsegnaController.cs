@@ -308,6 +308,25 @@ public class OrdineConsegnaController : ControllerBase
                 .Take(80)
                 .ToList();
 
+            // Blocchi assemblati dal ParseVap (per diagnostica)
+            var blocchiDebug = new List<string>();
+            {
+                var odaAnyRe2 = new System.Text.RegularExpressions.Regex(@"(4\d{9})\s+(\d{1,4})\b");
+                var stopRe2   = new System.Text.RegularExpressions.Regex(@"^(TOTALE|EVENTUALI|Per gli|Flaggare|\*)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                var wmRe2     = new System.Text.RegularExpressions.Regex(@"^[\d/\._\s]{1,6}$");
+                string? bc = null;
+                foreach (var rawLine in testoNorm.Split('\n'))
+                {
+                    var l2 = rawLine.Trim();
+                    if (string.IsNullOrEmpty(l2) || wmRe2.IsMatch(l2)) continue;
+                    if (stopRe2.IsMatch(l2)) { if (bc != null) { blocchiDebug.Add(bc); bc = null; } continue; }
+                    var m2 = odaAnyRe2.Match(l2);
+                    if (m2.Success) { if (bc != null) blocchiDebug.Add(bc); bc = l2.Substring(m2.Index); }
+                    else if (bc != null) bc += " " + l2;
+                }
+                if (bc != null) blocchiDebug.Add(bc);
+            }
+
             return Ok(new
             {
                 meseAvanzamento = mese,
@@ -318,6 +337,7 @@ public class OrdineConsegnaController : ControllerBase
                     .Select(l => l.Trim())
                     .ToList(),
                 righeGrezze,
+                blocchiAssemblati = blocchiDebug,
                 righe = matches
             });
         }
