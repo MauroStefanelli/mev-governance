@@ -539,9 +539,6 @@ export default function ToolsPage({ onUnauthorized }) {
           <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a" }}>
             Tools — Ordini di Consegna e Verbali di Avanzamento
           </div>
-          <div style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
-            Carica un PDF di Buono di Consegna e Verbali di Avanzamento per estrarre gli articoli e salvarli nel database.
-          </div>
         </div>
         {items.length > 0 && (
           <div style={{ display: "flex", gap: "12px", flexShrink: 0, marginLeft: "24px" }}>
@@ -596,9 +593,9 @@ export default function ToolsPage({ onUnauthorized }) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cerca Ordine, Contratto..."
+          placeholder="Cerca Ordine, Contratto, Iniziativa..."
           style={{
-            minWidth: "200px", maxWidth: "280px",
+            minWidth: "200px", maxWidth: "400px",
             padding: "8px 12px", border: "1px solid #dadce0",
             borderRadius: "7px", fontSize: "13px", outline: "none",
           }}
@@ -614,7 +611,7 @@ export default function ToolsPage({ onUnauthorized }) {
           transition: "background 0.15s",
           pointerEvents: uploading ? "none" : "auto",
         }}>
-          {uploading ? "Importazione..." : "Carica PDF Ordine"}
+          {uploading ? "Importazione..." : "Carica Ordine"}
           <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFile} />
         </label>
 
@@ -631,7 +628,7 @@ export default function ToolsPage({ onUnauthorized }) {
             fontWeight: 600, fontSize: "13px", cursor: pdfGroups.length === 0 ? "default" : "pointer",
           }}
         >
-          PDF Caricati
+          Ordini Caricati
           {pdfGroups.length > 0 && (
             <span style={{
               background: "#e65100", color: "white", borderRadius: "10px",
@@ -906,7 +903,7 @@ export default function ToolsPage({ onUnauthorized }) {
             <table style={{ width: "100%", fontSize: "11px", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#f0fdf4" }}>
-                  {["ODA","POS (int)","QTA","Importo","Sub","Rec. in DB","Art in DB","Matched"].map(h => (
+                  {["ODA", "POS (int)", "QTA", "Importo", "Sub", "Rec. in DB", "Art in DB", "Matched"].map(h => (
                     <th key={h} style={{ padding: "6px 10px", textAlign: "left", borderBottom: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
