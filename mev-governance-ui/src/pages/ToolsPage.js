@@ -145,6 +145,7 @@ export default function ToolsPage({ onUnauthorized }) {
 
   const [governanceBlob, setGovernanceBlob] = useState(null);
   const [exportingGovernance, setExportingGovernance] = useState(false);
+  const [showDebugTools, setShowDebugTools] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -517,6 +518,12 @@ export default function ToolsPage({ onUnauthorized }) {
     return s + (isNaN(n) ? 0 : n);
   }, 0);
 
+  // Totale fatturato = somma ImportoFatturabile su righe filtrate
+  const totaleFatturato = filtered.reduce((s, r) => {
+    const n = parseFloat(String(r.importoFatturabile || "0").replace(/\./g, "").replace(",", "."));
+    return s + (isNaN(n) ? 0 : n);
+  }, 0);
+
   const fmtEuro = (n) =>
     new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
@@ -537,33 +544,67 @@ export default function ToolsPage({ onUnauthorized }) {
           </div>
         </div>
         {items.length > 0 && (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "flex-end",
-            background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
-            borderRadius: "10px", padding: "12px 22px",
-            boxShadow: "0 2px 8px rgba(26,115,232,0.25)", flexShrink: 0, marginLeft: "24px",
-          }}>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
-              Totale Ordinato
-            </div>
-            <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
-              € {fmtEuro(totaleOrdinato)}
-            </div>
-            {search && (
-              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
-                su {filtered.length} righe filtrate
+          <div style={{ display: "flex", gap: "12px", flexShrink: 0, marginLeft: "24px" }}>
+            {/* Totale Ordinato */}
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-end",
+              background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+              borderRadius: "10px", padding: "12px 22px",
+              boxShadow: "0 2px 8px rgba(26,115,232,0.25)",
+            }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
+                Totale Ordinato
               </div>
-            )}
+              <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
+                € {fmtEuro(totaleOrdinato)}
+              </div>
+              {search && (
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
+                  su {filtered.length} righe filtrate
+                </div>
+              )}
+            </div>
+            {/* Totale Fatturato */}
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-end",
+              background: "linear-gradient(135deg, #0f766e 0%, #065f46 100%)",
+              borderRadius: "10px", padding: "12px 22px",
+              boxShadow: "0 2px 8px rgba(15,118,110,0.25)",
+            }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
+                Totale Fatturato
+              </div>
+              <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
+                € {fmtEuro(totaleFatturato)}
+              </div>
+              {search && (
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
+                  su {filtered.length} righe filtrate
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
       {/* ── Barra azioni ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: "12px",
+        display: "flex", alignItems: "center", gap: "10px",
         flexWrap: "wrap", marginBottom: "20px",
       }}>
-        {/* Upload PDF */}
+        {/* 1. Cerca */}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Cerca Ordine, Contratto..."
+          style={{
+            minWidth: "200px", maxWidth: "280px",
+            padding: "8px 12px", border: "1px solid #dadce0",
+            borderRadius: "7px", fontSize: "13px", outline: "none",
+          }}
+        />
+
+        {/* 2. Carica PDF Ordine */}
         <label style={{
           display: "inline-flex", alignItems: "center", gap: "8px",
           padding: "8px 18px", borderRadius: "7px", cursor: "pointer",
@@ -577,7 +618,29 @@ export default function ToolsPage({ onUnauthorized }) {
           <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFile} />
         </label>
 
-        {/* Carica Verbale Avanzamento */}
+        {/* 3. PDF Caricati */}
+        <button
+          onClick={() => setShowPdfPanel(true)}
+          disabled={pdfGroups.length === 0}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "6px",
+            padding: "8px 14px", borderRadius: "7px",
+            background: pdfGroups.length === 0 ? "#f1f3f4" : "#fff8e1",
+            color: pdfGroups.length === 0 ? "#aaa" : "#e65100",
+            border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#ffcc80"}`,
+            fontWeight: 600, fontSize: "13px", cursor: pdfGroups.length === 0 ? "default" : "pointer",
+          }}
+        >
+          PDF Caricati
+          {pdfGroups.length > 0 && (
+            <span style={{
+              background: "#e65100", color: "white", borderRadius: "10px",
+              padding: "1px 7px", fontSize: "11px", fontWeight: 700,
+            }}>{pdfGroups.length}</span>
+          )}
+        </button>
+
+        {/* 4. Carica Verbale */}
         <label style={{
           display: "inline-flex", alignItems: "center", gap: "8px",
           padding: "8px 18px", borderRadius: "7px", cursor: "pointer",
@@ -593,7 +656,7 @@ export default function ToolsPage({ onUnauthorized }) {
           <input ref={vapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleVap} />
         </label>
 
-        {/* Verbali Caricati */}
+        {/* 5. Verbali Caricati */}
         <button
           onClick={() => setShowVerbaliPanel(true)}
           disabled={verbali.length === 0}
@@ -608,7 +671,7 @@ export default function ToolsPage({ onUnauthorized }) {
           }}
           title="Visualizza i verbali di avanzamento caricati"
         >
-          Verbali caricati
+          Verbali Caricati
           {verbali.length > 0 && (
             <span style={{
               background: "#0f766e", color: "white", borderRadius: "10px",
@@ -617,24 +680,7 @@ export default function ToolsPage({ onUnauthorized }) {
           )}
         </button>
 
-        {/* Export Excel */}
-        <button
-          onClick={handleExport}
-          disabled={items.length === 0}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "8px",
-            padding: "8px 18px", borderRadius: "7px", cursor: items.length === 0 ? "default" : "pointer",
-            background: items.length === 0 ? "#e8f5e9" : "#34a853",
-            color: items.length === 0 ? "#aaa" : "white",
-            fontWeight: 600, fontSize: "13px", border: "none",
-            boxShadow: items.length === 0 ? "none" : "0 1px 4px rgba(52,168,83,0.3)",
-            transition: "background 0.15s",
-          }}
-        >
-          Esporta Excel
-        </button>
-
-        {/* Esporta in Governance */}
+        {/* 6. Esporta in Governance */}
         <label style={{
           display: "inline-flex", alignItems: "center", gap: "8px",
           padding: "8px 18px", borderRadius: "7px",
@@ -658,73 +704,72 @@ export default function ToolsPage({ onUnauthorized }) {
           />
         </label>
 
-        {/* Debug PDF */}
-        <label style={{
-          display: "inline-flex", alignItems: "center", gap: "8px",
-          padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
-          background: debugging ? "#b0bec5" : "#f1f3f4",
-          color: "#444", fontWeight: 500, fontSize: "12px",
-          border: "1px solid #dadce0",
-          pointerEvents: debugging ? "none" : "auto",
-        }}
-          title="Carica un PDF per vedere il testo grezzo estratto (utile per debug parsing)"
-        >
-          {debugging ? "Analisi..." : "Debug testo PDF"}
-          <input
-            ref={debugRef}
-            type="file"
-            accept=".pdf"
-            style={{ display: "none" }}
-            onChange={handleDebug}
-          />
-        </label>
-
-        {/* Debug VAP */}
-        <label style={{
-          display: "inline-flex", alignItems: "center", gap: "8px",
-          padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
-          background: debuggingVap ? "#b0bec5" : "#f0fdf4",
-          color: "#0f766e", fontWeight: 500, fontSize: "12px",
-          border: "1px solid #6ee7b7",
-          pointerEvents: debuggingVap ? "none" : "auto",
-        }}
-          title="Carica un Verbale per vedere cosa trova il parser e cosa matcha nel DB"
-        >
-          {debuggingVap ? "Analisi..." : "Debug VAP"}
-          <input ref={debugVapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebugVap} />
-        </label>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cerca Ordine, Contratto, RdA, Iniziativa..."
-          style={{
-            flex: 1, minWidth: "200px", maxWidth: "380px",
-            padding: "8px 12px", border: "1px solid #dadce0",
-            borderRadius: "7px", fontSize: "13px", outline: "none",
-          }}
-        />
-
-        {/* Tasto PDF caricati */}
+        {/* 7. Esporta in Excel */}
         <button
-          onClick={() => setShowPdfPanel(true)}
-          disabled={pdfGroups.length === 0}
+          onClick={handleExport}
+          disabled={items.length === 0}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            padding: "8px 18px", borderRadius: "7px", cursor: items.length === 0 ? "default" : "pointer",
+            background: items.length === 0 ? "#e8f5e9" : "#34a853",
+            color: items.length === 0 ? "#aaa" : "white",
+            fontWeight: 600, fontSize: "13px", border: "none",
+            boxShadow: items.length === 0 ? "none" : "0 1px 4px rgba(52,168,83,0.3)",
+            transition: "background 0.15s",
+          }}
+        >
+          Esporta in Excel
+        </button>
+
+        {/* Debug toggle */}
+        <button
+          onClick={() => setShowDebugTools(v => !v)}
           style={{
             display: "inline-flex", alignItems: "center", gap: "6px",
-            padding: "8px 14px", borderRadius: "7px",
-            background: pdfGroups.length === 0 ? "#f1f3f4" : "#fff8e1",
-            color: pdfGroups.length === 0 ? "#aaa" : "#e65100",
-            border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#ffcc80"}`,
-            fontWeight: 600, fontSize: "13px", cursor: pdfGroups.length === 0 ? "default" : "pointer",
+            padding: "8px 12px", borderRadius: "7px",
+            background: showDebugTools ? "#fef3c7" : "#f1f3f4",
+            color: showDebugTools ? "#92400e" : "#666",
+            border: `1px solid ${showDebugTools ? "#fcd34d" : "#dadce0"}`,
+            fontWeight: 500, fontSize: "12px", cursor: "pointer",
           }}
+          title="Mostra/nascondi strumenti di debug"
         >
-          📄 PDF caricati
-          {pdfGroups.length > 0 && (
-            <span style={{
-              background: "#e65100", color: "white", borderRadius: "10px",
-              padding: "1px 7px", fontSize: "11px", fontWeight: 700,
-            }}>{pdfGroups.length}</span>
-          )}
+          Debug {showDebugTools ? "▲" : "▼"}
         </button>
+
+        {/* Debug testo PDF — visibile solo se showDebugTools */}
+        {showDebugTools && (
+          <label style={{
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
+            background: debugging ? "#b0bec5" : "#f1f3f4",
+            color: "#444", fontWeight: 500, fontSize: "12px",
+            border: "1px solid #dadce0",
+            pointerEvents: debugging ? "none" : "auto",
+          }}
+            title="Carica un PDF per vedere il testo grezzo estratto"
+          >
+            {debugging ? "Analisi..." : "Debug testo PDF"}
+            <input ref={debugRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebug} />
+          </label>
+        )}
+
+        {/* Debug VAP — visibile solo se showDebugTools */}
+        {showDebugTools && (
+          <label style={{
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
+            background: debuggingVap ? "#b0bec5" : "#f0fdf4",
+            color: "#0f766e", fontWeight: 500, fontSize: "12px",
+            border: "1px solid #6ee7b7",
+            pointerEvents: debuggingVap ? "none" : "auto",
+          }}
+            title="Carica un Verbale per vedere cosa trova il parser e cosa matcha nel DB"
+          >
+            {debuggingVap ? "Analisi..." : "Debug VAP"}
+            <input ref={debugVapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebugVap} />
+          </label>
+        )}
 
         <span style={{ fontSize: "12px", color: "#888", marginLeft: "auto" }}>
           {filtered.length} righe {search && `(filtrate su ${items.length})`}
