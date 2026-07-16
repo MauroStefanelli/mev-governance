@@ -38,6 +38,10 @@ function App() {
       getAppSettings().then(s => {
         if (s.logoutMinutes > 0) idleTimeoutRef.current = s.logoutMinutes * 60 * 1000;
       }).catch(() => {});
+      // Warm-up silenzioso del parser PDF (cold start Render free)
+      fetch(`${process.env.REACT_APP_API_URL || ""}/api/tools/parser-warmup`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
     }
   }, [token]);
 

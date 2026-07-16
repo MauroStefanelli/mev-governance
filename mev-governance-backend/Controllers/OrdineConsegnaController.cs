@@ -27,6 +27,26 @@ public class OrdineConsegnaController : ControllerBase
     }
 
     // ============================================================
+    // GET /api/tools/parser-warmup  — sveglia il parser (cold start Render free)
+    // ============================================================
+    [HttpGet("parser-warmup")]
+    public async Task<IActionResult> ParserWarmup()
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(30);
+            await client.GetAsync($"{_pdfParserUrl}/health");
+            return Ok(new { status = "ok" });
+        }
+        catch
+        {
+            // Ignora errori: il warmup è best-effort
+            return Ok(new { status = "warming" });
+        }
+    }
+
+    // ============================================================
     // GET /api/tools/ordini
     // ============================================================
     [HttpGet("ordini")]
