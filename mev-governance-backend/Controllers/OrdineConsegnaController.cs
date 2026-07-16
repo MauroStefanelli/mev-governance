@@ -295,7 +295,7 @@ public class OrdineConsegnaController : ControllerBase
                     r.pos, posInt,
                     r.qta, r.importo, r.subappalto,
                     recordInDb     = inDb.Count,
-                    artValuesInDb  = inDb.Select(x => x.Art).ToList(),
+                    artValuesInDb  = matched.Select(x => x.Art).ToList(),
                     matched        = matched.Count,
                     matchedIds     = matched.Select(x => x.Id).ToList()
                 };
