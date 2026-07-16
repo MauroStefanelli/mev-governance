@@ -29,7 +29,7 @@ jobs:
         with:
           context: ./mev-governance-ui
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ghcr.io/maurostefanelli/mev-governance-frontend:latest
 
   backend:
@@ -54,7 +54,7 @@ jobs:
         with:
           context: ./mev-governance-backend
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ghcr.io/maurostefanelli/mev-governance-backend:latest
 
   parser:
@@ -79,5 +79,5 @@ jobs:
         with:
           context: ./mev-pdf-parser
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ghcr.io/maurostefanelli/mev-pdf-parser:latest
