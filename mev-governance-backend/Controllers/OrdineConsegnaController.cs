@@ -458,11 +458,12 @@ public class OrdineConsegnaController : ControllerBase
         var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b");
 
         // Pattern coda: PREZZO€  QTA  IMPORTO€  (SI|NO)
+        // Non richiede fine riga ($) perché dopo NO ci possono essere residui del watermark
         var codaRe = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
             @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +
-            @"(SI|NO)\s*$",
+            @"(SI|NO)\b",
             RegexOptions.IgnoreCase
         );
 
@@ -474,8 +475,11 @@ public class OrdineConsegnaController : ControllerBase
             var odaM  = odaRe.Match(b);
             if (!odaM.Success) continue;
 
-            var codaM = codaRe.Match(b);
-            if (!codaM.Success) continue;
+            // Cerca l'ULTIMA occorrenza valida della coda (PREZZO€ QTA IMPORTO€ SI/NO)
+            // perché il watermark può aggiungere ulteriori sequenze numeriche dopo la coda reale
+            var codaMatches = codaRe.Matches(b);
+            if (codaMatches.Count == 0) continue;
+            var codaM = codaMatches[0]; // la prima è sempre quella corretta: ODA ... CODA [watermark spazzatura]
 
             var oda        = odaM.Groups[1].Value;
             var pos        = odaM.Groups[2].Value.TrimStart('0');
