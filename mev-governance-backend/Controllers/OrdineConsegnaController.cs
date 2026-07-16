@@ -301,16 +301,23 @@ public class OrdineConsegnaController : ControllerBase
                 };
             }).ToList();
 
+            // Prime 80 righe del testo grezzo per diagnostica
+            var righeGrezze = testoNorm.Split('\n')
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0)
+                .Take(80)
+                .ToList();
+
             return Ok(new
             {
                 meseAvanzamento = mese,
                 odaDalVerbale,
                 odaInDb,
-                // Righe del testo che contengono "410" per vedere come arrivano dal parser
                 righeConOda = testoNorm.Split('\n')
                     .Where(l => System.Text.RegularExpressions.Regex.IsMatch(l.Trim(), @"^4\d{9}"))
                     .Select(l => l.Trim())
                     .ToList(),
+                righeGrezze,
                 righe = matches
             });
         }

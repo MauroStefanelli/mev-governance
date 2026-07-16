@@ -832,6 +832,22 @@ export default function ToolsPage({ onUnauthorized }) {
           </div>
           {debugVapResult.error ? (
             <div style={{ padding: "12px 14px", color: "#c5221f", fontSize: "12px" }}>{debugVapResult.error}</div>
+          ) : (debugVapResult.righe || []).length === 0 ? (
+            <div style={{ padding: "12px 14px" }}>
+              <div style={{ color: "#c5221f", fontSize: "12px", marginBottom: "10px" }}>
+                Nessuna riga parsata. Testo grezzo estratto dal PDF (prime 80 righe non vuote):
+              </div>
+              <textarea
+                readOnly
+                value={(debugVapResult.righeGrezze || []).join("\n")}
+                style={{
+                  width: "100%", height: "300px", fontFamily: "monospace",
+                  fontSize: "11px", border: "1px solid #ccc", borderRadius: "4px",
+                  padding: "8px", boxSizing: "border-box", background: "#fafafa",
+                  resize: "vertical",
+                }}
+              />
+            </div>
           ) : (
             <table style={{ width: "100%", fontSize: "11px", borderCollapse: "collapse" }}>
               <thead>
