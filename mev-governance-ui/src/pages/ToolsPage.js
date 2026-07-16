@@ -595,7 +595,7 @@ export default function ToolsPage({ onUnauthorized }) {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cerca Ordine, Contratto, Iniziativa..."
           style={{
-            minWidth: "200px", maxWidth: "400px",
+            minWidth: "200px", maxWidth: "460px",
             padding: "8px 12px", border: "1px solid #dadce0",
             borderRadius: "7px", fontSize: "13px", outline: "none",
           }}
