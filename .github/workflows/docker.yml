@@ -27,7 +27,7 @@ jobs:
 
       - uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: ./mev-governance-ui
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/maurostefanelli/mev-governance-frontend:latest
@@ -52,7 +52,7 @@ jobs:
 
       - uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: ./mev-governance-backend
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/maurostefanelli/mev-governance-backend:latest
@@ -77,7 +77,7 @@ jobs:
 
       - uses: docker/build-push-action@v5
         with:
-          context: ./parser
+          context: ./mev-pdf-parser
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/maurostefanelli/mev-pdf-parser:latest
