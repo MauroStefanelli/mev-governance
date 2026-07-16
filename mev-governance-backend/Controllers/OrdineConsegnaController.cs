@@ -457,13 +457,24 @@ public class OrdineConsegnaController : ControllerBase
         // Pattern ODA + POS all'inizio del blocco riassemblato
         var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b");
 
-        // Pattern coda: PREZZO€  QTA  IMPORTO€  (SI|NO)
-        // Non richiede fine riga ($) perché dopo NO ci possono essere residui del watermark
-        var codaRe = new Regex(
+        // ── Formato v2 (template corrente): ODA POS [Cod] Descr [TOW] PREZZO€ QTA IMPORTO€ SI/NO
+        // SI/NO può essere seguito da watermark — usiamo \b non $
+        var codaReV2 = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
             @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +
             @"(SI|NO)\b",
+            RegexOptions.IgnoreCase
+        );
+
+        // ── Formato v1 (template vecchio): ODA POS [Cod] Descr QTA PREZZO€ TOTALE€ FATTURABILE€
+        // Non c'è SI/NO inline — subappalto lasciato vuoto
+        // Struttura coda: QTA  PREZZO€  TOTALE€  FATTURABILE€
+        var codaReV1 = new Regex(
+            @"(\d[\d.,]*)\s+" +          // QTA (intera o decimale, senza €)
+            @"(\d[\d,]*)\s*€\s+" +       // Prezzo unitario €
+            @"\d[\d.,]*\s*€\s+" +        // Totale avanzato € (da ignorare)
+            @"(\d[\d.,]*)\s*€",          // di cui Fatturabile € (= importo che ci interessa)
             RegexOptions.IgnoreCase
         );
 
@@ -472,23 +483,33 @@ public class OrdineConsegnaController : ControllerBase
             var b = Regex.Replace(blocco.Trim(), @"\s+", " ");
             if (b.Length < 15) continue;
 
-            var odaM  = odaRe.Match(b);
+            var odaM = odaRe.Match(b);
             if (!odaM.Success) continue;
 
-            // Cerca l'ULTIMA occorrenza valida della coda (PREZZO€ QTA IMPORTO€ SI/NO)
-            // perché il watermark può aggiungere ulteriori sequenze numeriche dopo la coda reale
-            var codaMatches = codaRe.Matches(b);
-            if (codaMatches.Count == 0) continue;
-            var codaM = codaMatches[0]; // la prima è sempre quella corretta: ODA ... CODA [watermark spazzatura]
-
-            var oda        = odaM.Groups[1].Value;
-            var pos        = odaM.Groups[2].Value.TrimStart('0');
+            var oda = odaM.Groups[1].Value;
+            var pos = odaM.Groups[2].Value.TrimStart('0');
             if (string.IsNullOrEmpty(pos)) pos = "0";
-            var qta        = codaM.Groups[2].Value;
-            var importo    = codaM.Groups[3].Value;
-            var subappalto = codaM.Groups[4].Value.ToUpper();
 
-            righe.Add((oda, pos == "0" ? "" : pos, qta, importo, subappalto));
+            // Prova prima il formato v2 (più recente, con SI/NO)
+            var codaMatchesV2 = codaReV2.Matches(b);
+            if (codaMatchesV2.Count > 0)
+            {
+                var codaM  = codaMatchesV2[0];
+                var qta        = codaM.Groups[2].Value;
+                var importo    = codaM.Groups[3].Value;
+                var subappalto = codaM.Groups[4].Value.ToUpper();
+                righe.Add((oda, pos == "0" ? "" : pos, qta, importo, subappalto));
+                continue;
+            }
+
+            // Fallback formato v1 (template vecchio, senza SI/NO inline)
+            var codaM1 = codaReV1.Match(b);
+            if (codaM1.Success)
+            {
+                var qta     = codaM1.Groups[1].Value;
+                var importo = codaM1.Groups[3].Value;
+                righe.Add((oda, pos == "0" ? "" : pos, qta, importo, ""));
+            }
         }
 
         return (mese, righe);
