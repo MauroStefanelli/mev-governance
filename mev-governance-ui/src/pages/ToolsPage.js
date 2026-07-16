@@ -618,7 +618,7 @@ export default function ToolsPage({ onUnauthorized }) {
           <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFile} />
         </label>
 
-        {/* 3. PDF Caricati */}
+        {/* 3. PDF Caricati — vicino a Carica PDF Ordine */}
         <button
           onClick={() => setShowPdfPanel(true)}
           disabled={pdfGroups.length === 0}
@@ -721,55 +721,52 @@ export default function ToolsPage({ onUnauthorized }) {
           Esporta in Excel
         </button>
 
-        {/* Debug toggle */}
-        <button
-          onClick={() => setShowDebugTools(v => !v)}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "6px",
-            padding: "8px 12px", borderRadius: "7px",
-            background: showDebugTools ? "#fef3c7" : "#f1f3f4",
-            color: showDebugTools ? "#92400e" : "#666",
-            border: `1px solid ${showDebugTools ? "#fcd34d" : "#dadce0"}`,
-            fontWeight: 500, fontSize: "12px", cursor: "pointer",
-          }}
-          title="Mostra/nascondi strumenti di debug"
-        >
-          Debug {showDebugTools ? "▲" : "▼"}
-        </button>
-
-        {/* Debug testo PDF — visibile solo se showDebugTools */}
-        {showDebugTools && (
-          <label style={{
-            display: "inline-flex", alignItems: "center", gap: "8px",
-            padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
-            background: debugging ? "#b0bec5" : "#f1f3f4",
-            color: "#444", fontWeight: 500, fontSize: "12px",
-            border: "1px solid #dadce0",
-            pointerEvents: debugging ? "none" : "auto",
-          }}
-            title="Carica un PDF per vedere il testo grezzo estratto"
+        {/* 8. Debug — gruppo compatto: toggle + DBG PDF + DBG VAP */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          <button
+            onClick={() => setShowDebugTools(v => !v)}
+            style={{
+              padding: "6px 10px", borderRadius: "6px",
+              background: showDebugTools ? "#fef3c7" : "#f1f3f4",
+              color: showDebugTools ? "#92400e" : "#666",
+              border: `1px solid ${showDebugTools ? "#fcd34d" : "#dadce0"}`,
+              fontWeight: 700, fontSize: "11px", cursor: "pointer",
+            }}
+            title="Mostra/nascondi strumenti di debug"
           >
-            {debugging ? "Analisi..." : "Debug testo PDF"}
-            <input ref={debugRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebug} />
-          </label>
-        )}
-
-        {/* Debug VAP — visibile solo se showDebugTools */}
-        {showDebugTools && (
-          <label style={{
-            display: "inline-flex", alignItems: "center", gap: "8px",
-            padding: "8px 14px", borderRadius: "7px", cursor: "pointer",
-            background: debuggingVap ? "#b0bec5" : "#f0fdf4",
-            color: "#0f766e", fontWeight: 500, fontSize: "12px",
-            border: "1px solid #6ee7b7",
-            pointerEvents: debuggingVap ? "none" : "auto",
-          }}
-            title="Carica un Verbale per vedere cosa trova il parser e cosa matcha nel DB"
-          >
-            {debuggingVap ? "Analisi..." : "Debug VAP"}
-            <input ref={debugVapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebugVap} />
-          </label>
-        )}
+            DBG {showDebugTools ? "▲" : "▼"}
+          </button>
+          {showDebugTools && (
+            <>
+              <label style={{
+                padding: "6px 10px", borderRadius: "6px", cursor: "pointer",
+                background: debugging ? "#b0bec5" : "#f1f3f4",
+                color: debugging ? "#666" : "#444",
+                border: "1px solid #dadce0",
+                fontWeight: 700, fontSize: "11px",
+                pointerEvents: debugging ? "none" : "auto",
+              }}
+                title="Debug testo PDF grezzo"
+              >
+                {debugging ? "..." : "DBG PDF"}
+                <input ref={debugRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebug} />
+              </label>
+              <label style={{
+                padding: "6px 10px", borderRadius: "6px", cursor: "pointer",
+                background: debuggingVap ? "#b0bec5" : "#f0fdf4",
+                color: debuggingVap ? "#666" : "#0f766e",
+                border: "1px solid #6ee7b7",
+                fontWeight: 700, fontSize: "11px",
+                pointerEvents: debuggingVap ? "none" : "auto",
+              }}
+                title="Debug VAP — match parser vs DB"
+              >
+                {debuggingVap ? "..." : "DBG VAP"}
+                <input ref={debugVapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebugVap} />
+              </label>
+            </>
+          )}
+        </div>
 
         <span style={{ fontSize: "12px", color: "#888", marginLeft: "auto" }}>
           {filtered.length} righe {search && `(filtrate su ${items.length})`}
