@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Npgsql;
 using System.Text.Json;
@@ -67,30 +69,35 @@ public class SettingsController : ControllerBase
             {
                 var path = dto.SqlitePath ?? "/data/mev.db";
                 var dir = Path.GetDirectoryName(path);
-mev-governance-backend/Controllers/SettingsController.cs                                                                                                                                                     [55%]  71,17       
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                    return Ok(new { success = false, message = $"La directory {dir} non esiste" });
 
-            }
-        }
-        else if (dto.Provider == "postgresql")
-        {
-                var port = dto.Port ?? 5432;
-
-                var connStr =
-                 $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Disable";
-
-                Console.WriteLine("===== TEST-DB =====");
-                Console.WriteLine(connStr);
-
-                using var conn = new NpgsqlConnection(connStr);
+                using var conn = new SqliteConnection($"Data Source={path}");
                 await conn.OpenAsync();
                 await conn.CloseAsync();
-
-                return Ok(new
-                {
-                 success = true,
-                 message = "Connessione PostgreSQL riuscita"
-                });
+                return Ok(new { success = true, message = "Connessione SQLite riuscita" });
+            }
         }
+	else if (dto.Provider == "postgresql")
+	{
+	    	var port = dto.Port ?? 5432;
+
+    		var connStr =
+       		 $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Disable";
+
+    		Console.WriteLine("===== TEST-DB =====");
+    		Console.WriteLine(connStr);
+
+    		using var conn = new NpgsqlConnection(connStr);
+    		await conn.OpenAsync();
+    		await conn.CloseAsync();
+
+    		return Ok(new
+    		{
+       		 success = true,
+       		 message = "Connessione PostgreSQL riuscita"
+    		});
+	}
         catch (Exception ex)
         {
             return Ok(new { success = false, message = ex.Message });
@@ -119,4 +126,3 @@ public class DbConfigDto
     public string? Username { get; set; }
     public string? Password { get; set; }
 }
-
