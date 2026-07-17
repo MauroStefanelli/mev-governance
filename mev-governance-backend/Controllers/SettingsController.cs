@@ -173,7 +173,7 @@ public class SettingsController : ControllerBase
             else if (dto.Provider == "postgresql")
             {
                 var port = dto.Port ?? 5432;
-                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Require;Trust Server Certificate=true";
+                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Disable";
 
                 using var conn = new NpgsqlConnection(connStr);
                 await conn.OpenAsync();
@@ -214,7 +214,7 @@ public class SettingsController : ControllerBase
         var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
         var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
 
-        return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+        return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Disable";
     }
 
     [HttpPost("restart")]
