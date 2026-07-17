@@ -26,7 +26,8 @@ if (File.Exists(dbConfigFile))
             if (cfg.Provider == "postgresql" && !string.IsNullOrEmpty(cfg.Host) && !string.IsNullOrEmpty(cfg.Database))
             {
                 var port = cfg.Port ?? 5432;
-                DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Require;Trust Server Certificate=true";
+                // DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Require;Trust Server Certificate=true";
+                DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Disable;
                 DbConfigIsPostgres = true;
             }
             else if (cfg.Provider == "sqlite")
@@ -131,7 +132,8 @@ static string ParsePostgresUrl(string url)
     var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
     var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
 
-    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Disable;
+    // return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
 }
 
 // ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
