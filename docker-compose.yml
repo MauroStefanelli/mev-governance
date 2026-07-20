@@ -1,4 +1,17 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mev-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=MEV-Governance
+      - POSTGRES_USER=mev_user
+      - POSTGRES_PASSWORD=Mev2025!
+    volumes:
+      - /share/Public/mev-data/pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   pdf-parser:
     build:
       context: .
@@ -30,6 +43,7 @@ services:
     ports:
       - "8081:5000"
     depends_on:
+      - postgres
       - pdf-parser
 
   frontend:
