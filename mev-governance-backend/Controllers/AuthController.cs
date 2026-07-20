@@ -296,6 +296,49 @@ public class AuthController : ControllerBase
     }
 }
 
+// ============================================================
+// EMERGENCY RESET — ripristina password admin
+// Protetto da chiave segreta, da rimuovere dopo l'uso
+// ============================================================
+[ApiController]
+[Route("api/auth")]
+public class EmergencyController : ControllerBase
+{
+    private readonly AppDbContext _db;
+    private const string EmergencyKey = "MEV-RESET-2025-Capgemini";
+
+    public EmergencyController(AppDbContext db) { _db = db; }
+
+    [HttpPost("emergency-reset")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EmergencyReset([FromBody] EmergencyResetRequest req)
+    {
+        if (req.Key != EmergencyKey)
+            return Unauthorized(new { message = "Chiave non valida" });
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == "MSTEFANE");
+        if (user == null)
+        {
+            // Crea utente se non esiste
+            user = new AppUser
+            {
+                Username     = "MSTEFANE",
+                FullName     = "Mauro Stefanelli",
+                Email        = "mauro.stefanelli@capgemini.com",
+                Role         = "Admin",
+                IsActive     = true,
+                SendEmail    = false,
+            };
+            _db.Users.Add(user);
+        }
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = $"Password aggiornata per {user.Username}" });
+    }
+}
+
+public record EmergencyResetRequest(string Key, string NewPassword);
+
 
 public record CreateUserRequest(
     string Username,
