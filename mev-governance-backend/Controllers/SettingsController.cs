@@ -18,6 +18,36 @@ public class SettingsController : ControllerBase
     [HttpGet("db-config")]
     public IActionResult GetDbConfig()
     {
+        // Se DATABASE_DIRECT_URL è presente → Render, sola lettura
+        var envUrl = Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
+                  ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+        if (!string.IsNullOrEmpty(envUrl))
+        {
+            // Estrae host/db dall'URL per mostrarlo in UI (senza password)
+            try
+            {
+                // formato: postgres://user:pwd@host:port/db
+                var s = envUrl;
+                if (s.StartsWith("postgresql://")) s = s.Substring("postgresql://".Length);
+                else if (s.StartsWith("postgres://"))  s = s.Substring("postgres://".Length);
+                var atIdx    = s.LastIndexOf('@');
+                var hostPart = atIdx >= 0 ? s.Substring(atIdx + 1) : s;
+                var slashIdx = hostPart.IndexOf('/');
+                var hostPort = slashIdx >= 0 ? hostPart.Substring(0, slashIdx) : hostPart;
+                var dbName   = slashIdx >= 0 ? hostPart.Substring(slashIdx + 1) : "";
+                var portIdx  = hostPort.LastIndexOf(':');
+                var host     = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
+                var port     = portIdx >= 0 ? (int?)int.Parse(hostPort.Substring(portIdx + 1)) : 5432;
+                return Ok(new { provider = "postgresql", host, port, database = dbName,
+                                username = (string?)null, passwordSet = true,
+                                sslMode = "require", readonlyEnv = true });
+            }
+            catch
+            {
+                return Ok(new { provider = "postgresql", readonlyEnv = true, passwordSet = true, sslMode = "require" });
+            }
+        }
+
         if (!System.IO.File.Exists(ConfigFile))
         {
             return Ok(new
@@ -28,24 +58,28 @@ public class SettingsController : ControllerBase
                 port = (int?)null,
                 database = (string?)null,
                 username = (string?)null,
-                passwordSet = false
+                passwordSet = false,
+                sslMode = "disable",
+                readonlyEnv = false
             });
         }
 
         var json = System.IO.File.ReadAllText(ConfigFile);
         var config = JsonSerializer.Deserialize<DbConfigDto>(json);
         if (config == null)
-            return Ok(new { provider = "sqlite" });
+            return Ok(new { provider = "sqlite", readonlyEnv = false });
 
         return Ok(new
         {
-            config.Provider,
-            config.SqlitePath,
-            config.Host,
-            config.Port,
-            config.Database,
-            config.Username,
-            passwordSet = !string.IsNullOrEmpty(config.Password)
+            provider    = config.Provider,
+            sqlitePath  = config.SqlitePath,
+            host        = config.Host,
+            port        = config.Port,
+            database    = config.Database,
+            username    = config.Username,
+            passwordSet = !string.IsNullOrEmpty(config.Password),
+            sslMode     = config.SslMode ?? "disable",
+            readonlyEnv = false
         });
     }
 
