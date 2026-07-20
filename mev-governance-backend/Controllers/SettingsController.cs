@@ -122,6 +122,7 @@ public class SettingsController : ControllerBase
             });
         }
     }
+}
 public class DbConfigDto
 {
     public string Provider { get; set; } = "sqlite";
