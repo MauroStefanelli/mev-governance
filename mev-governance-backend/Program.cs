@@ -266,6 +266,23 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Console.Error.WriteLine($"[CREATE VerbaliAvanzamento ERROR] {ex.Message}"); }
 
+    // Fix tipo colonne boolean su PostgreSQL (le migration SQLite le creano come INTEGER)
+    try
+    {
+        db.Database.ExecuteSqlRaw(@"
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns
+                           WHERE table_name='AppUsers' AND column_name='IsActive'
+                           AND data_type='integer') THEN
+                    ALTER TABLE ""AppUsers""
+                        ALTER COLUMN ""IsActive""  TYPE BOOLEAN USING ""IsActive""::boolean,
+                        ALTER COLUMN ""SendEmail"" TYPE BOOLEAN USING ""SendEmail""::boolean;
+                END IF;
+            END $$;
+        ");
+    }
+    catch (Exception ex) { Console.Error.WriteLine($"[FIX BOOLEAN COLUMNS ERROR] {ex.Message}"); }
+
     if (!db.Users.Any())
     {
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
