@@ -32,6 +32,7 @@ function DbConfigTab() {
   const [password, setPassword] = useState("");
   const [sslMode, setSslMode] = useState("disable");
   const [passwordSet, setPasswordSet] = useState(false);
+  const [isRender, setIsRender] = useState(false);
   const [readonlyEnv, setReadonlyEnv] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -52,6 +53,7 @@ function DbConfigTab() {
         setUsername(cfg.username || "");
         setSslMode(cfg.sslMode || "disable");
         setPasswordSet(cfg.passwordSet || false);
+        setIsRender(cfg.isRender || false);
         setReadonlyEnv(cfg.readonlyEnv || false);
       })
       .catch(() => {});
@@ -112,15 +114,27 @@ function DbConfigTab() {
 
   return (
     <div>
-      {readonlyEnv && (
+      {isRender && (
         <div style={{
           padding: "12px 16px", borderRadius: "8px", marginBottom: "20px",
-          background: "#e8f0fe", color: "#1a73e8", fontSize: "13px",
-          border: "1px solid #c5d9fb", lineHeight: "1.5"
+          background: "#fff8e1", color: "#e65100", fontSize: "13px",
+          border: "1px solid #ffcc80", lineHeight: "1.6"
         }}>
-          <strong>Database configurato tramite variabile d'ambiente</strong><br />
-          I dati mostrati sono in sola lettura. Per modificare la connessione,
-          aggiorna la variabile <code>DATABASE_DIRECT_URL</code> su Render.
+          <strong>Ambiente Render (cloud)</strong> — La configurazione salvata qui
+          sovrascrive la variabile d'ambiente <code>DATABASE_DIRECT_URL</code>
+          ma <strong>non persiste tra i deploy</strong>. Per una config permanente
+          su Render, aggiorna <code>DATABASE_DIRECT_URL</code> dal pannello Render.
+        </div>
+      )}
+      {!isRender && (
+        <div style={{
+          padding: "12px 16px", borderRadius: "8px", marginBottom: "20px",
+          background: "#e8f5e9", color: "#2e7d32", fontSize: "13px",
+          border: "1px solid #c8e6c9", lineHeight: "1.6"
+        }}>
+          <strong>Ambiente locale (QNAP)</strong> — La configurazione viene salvata
+          in modo persistente su file. Puoi connetterti a PostgreSQL sul QNAP
+          o su Supabase.
         </div>
       )}
 
@@ -143,24 +157,24 @@ function DbConfigTab() {
 
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
         <div style={{ display: "flex", gap: "12px" }}>
-          <div onClick={() => !readonlyEnv && setProvider("sqlite")}
-            style={{ ...radioStyle, flex: 1, borderColor: provider === "sqlite" ? "#1a73e8" : "#dadce0", background: provider === "sqlite" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}>
+          <div onClick={() => setProvider("sqlite")}
+            style={{ ...radioStyle, flex: 1, borderColor: provider === "sqlite" ? "#1a73e8" : "#dadce0", background: provider === "sqlite" ? "#f0f6ff" : "#fff" }}>
             <input type="radio" checked={provider === "sqlite"} onChange={() => {}} readOnly />
             <span style={{ fontWeight: provider === "sqlite" ? 600 : 400 }}>SQLite</span>
             <span style={{ fontSize: "11px", color: "#888" }}>(locale)</span>
           </div>
-          <div onClick={() => !readonlyEnv && setProvider("postgresql")}
-            style={{ ...radioStyle, flex: 1, borderColor: provider === "postgresql" ? "#1a73e8" : "#dadce0", background: provider === "postgresql" ? "#f0f6ff" : "#fff", opacity: readonlyEnv ? 0.6 : 1, cursor: readonlyEnv ? "default" : "pointer" }}>
+          <div onClick={() => setProvider("postgresql")}
+            style={{ ...radioStyle, flex: 1, borderColor: provider === "postgresql" ? "#1a73e8" : "#dadce0", background: provider === "postgresql" ? "#f0f6ff" : "#fff" }}>
             <input type="radio" checked={provider === "postgresql"} onChange={() => {}} readOnly />
             <span style={{ fontWeight: provider === "postgresql" ? 600 : 400 }}>PostgreSQL</span>
-            <span style={{ fontSize: "11px", color: "#888" }}>(remoto)</span>
+            <span style={{ fontSize: "11px", color: "#888" }}>(QNAP / Supabase / Render)</span>
           </div>
         </div>
 
         {provider === "sqlite" && (
           <div style={fieldStyle}>
             <label style={labelStyle}>Percorso file database</label>
-            <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={sqlitePath} onChange={e => setSqlitePath(e.target.value)} readOnly={readonlyEnv} />
+            <input style={inputStyle} value={sqlitePath} onChange={e => setSqlitePath(e.target.value)} />
           </div>
         )}
 
@@ -169,20 +183,20 @@ function DbConfigTab() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: "12px" }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Host</label>
-                <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.x o dominio" readOnly={readonlyEnv} />
+                <input style={inputStyle} value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.x, db.supabase.co, ..." />
               </div>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Porta</label>
-                <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={port} onChange={e => setPort(e.target.value)} readOnly={readonlyEnv} />
+                <input style={inputStyle} value={port} onChange={e => setPort(e.target.value)} />
               </div>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Nome database</label>
-              <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={database} onChange={e => setDatabase(e.target.value)} readOnly={readonlyEnv} />
+              <input style={inputStyle} value={database} onChange={e => setDatabase(e.target.value)} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Utente</label>
-              <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={username} onChange={e => setUsername(e.target.value)} readOnly={readonlyEnv} />
+              <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Modalità SSL</label>
@@ -190,17 +204,16 @@ function DbConfigTab() {
                 {[
                   { value: "disable", label: "Disabilitato", desc: "Nessun SSL (QNAP locale)" },
                   { value: "prefer",  label: "Automatico",   desc: "SSL se disponibile" },
-                  { value: "require", label: "Richiesto",    desc: "Obbligatorio (Render/cloud)" },
+                  { value: "require", label: "Richiesto",    desc: "Obbligatorio (Supabase/Render)" },
                 ].map(opt => (
                   <div
                     key={opt.value}
-                    onClick={() => !readonlyEnv && setSslMode(opt.value)}
+                    onClick={() => setSslMode(opt.value)}
                     style={{
                       flex: 1, padding: "8px 12px", borderRadius: "7px",
                       border: `1px solid ${sslMode === opt.value ? "#1a73e8" : "#dadce0"}`,
                       background: sslMode === opt.value ? "#f0f6ff" : "#fff",
-                      cursor: readonlyEnv ? "default" : "pointer",
-                      opacity: readonlyEnv ? 0.6 : 1,
+                      cursor: "pointer",
                     }}
                   >
                     <div style={{ fontSize: "12px", fontWeight: 600, color: sslMode === opt.value ? "#1a73e8" : "#333" }}>{opt.label}</div>
@@ -209,33 +222,23 @@ function DbConfigTab() {
                 ))}
               </div>
             </div>
-            {!readonlyEnv && (
-              <div style={fieldStyle}>
-                <label style={labelStyle}>
-                  Password {passwordSet ? <span style={{ fontWeight: 400, color: "#888", textTransform: "none" }}>(lasciare vuoto per non cambiare)</span> : ""}
-                </label>
-                <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={passwordSet ? "••••••••" : "Password"} />
-              </div>
-            )}
-            {readonlyEnv && (
-              <div style={fieldStyle}>
-                <label style={labelStyle}>Password</label>
-                <input style={{ ...inputStyle, background: "#f8f9fa" }} type="password" value="••••••••" readOnly />
-              </div>
-            )}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>
+                Password {passwordSet ? <span style={{ fontWeight: 400, color: "#888", textTransform: "none" }}>(lasciare vuoto per non cambiare)</span> : ""}
+              </label>
+              <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={passwordSet ? "••••••••" : "Password"} />
+            </div>
           </>
         )}
 
         <div style={{ display: "flex", gap: "12px", alignItems: "center", paddingTop: "8px", flexWrap: "wrap" }}>
-          {!readonlyEnv && (
-            <button type="submit" disabled={saving} style={{
-              background: "#1a73e8", color: "white", border: "none", padding: "10px 24px",
-              borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
-              opacity: saving ? 0.6 : 1
-            }}>
-              {saving ? "Salvataggio..." : "Salva configurazione"}
-            </button>
-          )}
+          <button type="submit" disabled={saving} style={{
+            background: "#1a73e8", color: "white", border: "none", padding: "10px 24px",
+            borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+            opacity: saving ? 0.6 : 1
+          }}>
+            {saving ? "Salvataggio..." : "Salva configurazione"}
+          </button>
           <button type="button" onClick={handleTest} disabled={testing} style={{
             background: testing ? "#e0e0e0" : "#f5f5f5", color: "#333", border: "1px solid #dadce0",
             padding: "10px 24px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
@@ -243,11 +246,9 @@ function DbConfigTab() {
           }}>
             {testing ? "Test in corso..." : "Test connessione"}
           </button>
-          {!readonlyEnv && (
-            <span style={{ fontSize: "12px", color: "#999" }}>
-              Il backend va riavviato per applicare le modifiche
-            </span>
-          )}
+          <span style={{ fontSize: "12px", color: "#999" }}>
+            Il backend va riavviato per applicare le modifiche
+          </span>
           <button type="button" onClick={handleRestart} disabled={restarting} style={{
             background: confirmRestart ? "#d32f2f" : restarting ? "#e0e0e0" : "#f5f5f5",
             color: confirmRestart ? "white" : "#333",
