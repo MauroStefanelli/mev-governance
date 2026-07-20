@@ -1,4 +1,16 @@
 services:
+  pdf-parser:
+    build:
+      context: .
+      dockerfile: ./mev-pdf-parser/Dockerfile
+    image: mev-pdf-parser:latest
+    container_name: mev-pdf-parser
+    restart: unless-stopped
+    environment:
+      - PORT=8765
+    ports:
+      - "8765:8765"
+
   backend:
     build:
       context: ./mev-governance-backend
@@ -12,11 +24,13 @@ services:
       - JWT_ISSUER=mev-governance
       - JWT_AUDIENCE=mev-governance-ui
       - DATABASE_PATH=/data/mev.db
-      - PDF_PARSER_URL=http://localhost:8765
+      - PDF_PARSER_URL=http://pdf-parser:8765
     volumes:
       - /share/Public/mev-data:/data
     ports:
       - "8081:5000"
+    depends_on:
+      - pdf-parser
 
   frontend:
     build:

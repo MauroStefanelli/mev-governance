@@ -21,7 +21,8 @@ tar czf "$ARCHIVE" \
   mev-governance-ui/package.json \
   mev-governance-ui/package-lock.json \
   mev-governance-ui/public/ \
-  mev-governance-ui/src/
+  mev-governance-ui/src/ \
+  mev-pdf-parser/
 
 echo "=== 2/3 Copio su QNAP ==="
 ssh "${QNAP_USER}@${QNAP_IP}" "mkdir -p ${REMOTE_DIR}"
@@ -43,10 +44,13 @@ ssh "${QNAP_USER}@${QNAP_IP}" "
     echo 'ERRORE: docker non trovato. Installare Container Station.'
     exit 1
   fi
-  echo "docker trovato: \$DOCKER"
+  echo \"docker trovato: \$DOCKER\"
   DOCKER_DIR=\$(dirname \$DOCKER)
   export PATH=\$DOCKER_DIR:\$PATH
   export DOCKER_CONFIG=/tmp/.docker
+
+  echo '--- Build pdf-parser (Python) ---'
+  \$DOCKER build --no-cache -t mev-pdf-parser:latest -f ./mev-pdf-parser/Dockerfile .
 
   echo '--- Build backend (ARM64 ~10-15 min) ---'
   \$DOCKER build --no-cache -t mev-backend:latest ./mev-governance-backend
@@ -59,4 +63,4 @@ ssh "${QNAP_USER}@${QNAP_IP}" "
 "
 
 rm -f "$ARCHIVE"
-echo "=== Fatto! App su http://${QNAP_IP} ==="
+echo "=== Fatto! App su http://${QNAP_IP}:8082 ==="
