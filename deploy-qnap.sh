@@ -34,12 +34,15 @@ tar czf "$ARCHIVE" \
   mev-governance-ui/src/ \
   mev-pdf-parser/
 
+SSH="ssh -o PubkeyAuthentication=no -o StrictHostKeyChecking=no"
+SCP="scp -o PubkeyAuthentication=no -o StrictHostKeyChecking=no"
+
 echo "=== Copio su QNAP ==="
-ssh "${QNAP_USER}@${QNAP_IP}" "mkdir -p ${REMOTE_DIR}"
-scp "$ARCHIVE" "${QNAP_USER}@${QNAP_IP}:${REMOTE_DIR}/"
+$SSH "${QNAP_USER}@${QNAP_IP}" "mkdir -p ${REMOTE_DIR}"
+$SCP "$ARCHIVE" "${QNAP_USER}@${QNAP_IP}:${REMOTE_DIR}/"
 
 echo "=== Deploy su QNAP ==="
-ssh "${QNAP_USER}@${QNAP_IP}" "
+$SSH "${QNAP_USER}@${QNAP_IP}" "
   cd ${REMOTE_DIR}
   tar xzf ${ARCHIVE}
 
