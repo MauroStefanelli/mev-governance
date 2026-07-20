@@ -58,44 +58,6 @@ public class SettingsController : ControllerBase
         return Ok(new { message = "Configurazione salvata. Riavvia il backend per applicare le modifiche." });
     }
 
-    [HttpPost("test-db")]
-    public async Task<IActionResult> TestDb([FromBody] DbConfigDto dto)
-    {
-        try
-        {
-            if (dto.Provider == "sqlite")
-            {
-                var path = dto.SqlitePath ?? "/data/mev.db";
-                var dir = Path.GetDirectoryName(path);
-mev-governance-backend/Controllers/SettingsController.cs                                                                                                                                                     [55%]  71,17       
-
-            }
-        }
-        else if (dto.Provider == "postgresql")
-        {
-                var port = dto.Port ?? 5432;
-
-                var connStr =
-                 $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Disable";
-
-                Console.WriteLine("===== TEST-DB =====");
-                Console.WriteLine(connStr);
-
-                using var conn = new NpgsqlConnection(connStr);
-                await conn.OpenAsync();
-                await conn.CloseAsync();
-
-                return Ok(new
-                {
-                 success = true,
-                 message = "Connessione PostgreSQL riuscita"
-                });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { success = false, message = ex.Message });
-        }
-    }
 
     [HttpPost("restart")]
     public IActionResult Restart()
@@ -107,8 +69,59 @@ mev-governance-backend/Controllers/SettingsController.cs                        
         });
         return Ok(new { message = "Riavvio in corso..." });
     }
-}
 
+    [HttpPost("test-db")]
+    public async Task<IActionResult> TestDb([FromBody] DbConfigDto dto)
+    {
+        try
+        {
+            if (dto.Provider == "sqlite")
+            {
+                var path = dto.SqlitePath ?? "/data/mev.db";
+
+                using var conn = new SqliteConnection($"Data Source={path}");
+                await conn.OpenAsync();
+                await conn.CloseAsync();
+
+                return Ok(new { success = true, message = "Connessione SQLite riuscita" });
+            }
+            else if (dto.Provider == "postgresql")
+            {
+                var port = dto.Port ?? 5432;
+
+                var connStr =
+                    $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Disable";
+
+                Console.WriteLine("===== TEST-DB =====");
+                Console.WriteLine(connStr);
+
+                using var conn = new NpgsqlConnection(connStr);
+
+                await conn.OpenAsync();
+                await conn.CloseAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Connessione PostgreSQL riuscita"
+                });
+            }
+
+            return Ok(new
+            {
+                success = false,
+                message = "Provider non supportato"
+            });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new
+            {
+                success = false,
+                message = ex.Message
+            });
+        }
+    }
 public class DbConfigDto
 {
     public string Provider { get; set; } = "sqlite";
