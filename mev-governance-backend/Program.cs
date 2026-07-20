@@ -283,20 +283,23 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Console.Error.WriteLine($"[FIX BOOLEAN COLUMNS ERROR] {ex.Message}"); }
 
-    if (!db.Users.Any())
+    // Seed admin — usa SQL raw per evitare problemi di tipo boolean con EF su PostgreSQL
+    try
     {
-        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
-        db.Users.Add(new AppUser
+        var exists = db.Database.ExecuteSqlRaw(@"SELECT 1 FROM ""AppUsers"" LIMIT 1") >= 0
+                     && db.Users.Any();
+        if (!exists)
         {
-            Username     = "MSTEFANE",
-            FullName     = "Mauro Stefanelli",
-            Email        = "mauro.stefanelli@capgemini.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-            Role         = "Admin",
-            IsActive     = true
-        });
-        db.SaveChanges();
+            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
+            var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+            db.Database.ExecuteSqlRaw(@"
+                INSERT INTO ""AppUsers"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{0},'Admin',true,false
+                WHERE NOT EXISTS (SELECT 1 FROM ""AppUsers"")
+            ", hash);
+        }
     }
+    catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
 }
 
 app.UseSwagger();
