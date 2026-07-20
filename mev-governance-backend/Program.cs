@@ -26,8 +26,12 @@ if (File.Exists(dbConfigFile))
             if (cfg.Provider == "postgresql" && !string.IsNullOrEmpty(cfg.Host) && !string.IsNullOrEmpty(cfg.Database))
             {
                 var port = cfg.Port ?? 5432;
-                // DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Require;Trust Server Certificate=true";
-                DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};SSL Mode=Disable";
+                var ssl = cfg.SslMode switch {
+                    "require" => "SSL Mode=Require;Trust Server Certificate=true",
+                    "prefer"  => "SSL Mode=Prefer",
+                    _         => "SSL Mode=Disable",
+                };
+                DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};{ssl}";
                 DbConfigIsPostgres = true;
             }
             else if (cfg.Provider == "sqlite")

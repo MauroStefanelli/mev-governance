@@ -30,6 +30,7 @@ function DbConfigTab() {
   const [database, setDatabase] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [sslMode, setSslMode] = useState("disable");
   const [passwordSet, setPasswordSet] = useState(false);
   const [readonlyEnv, setReadonlyEnv] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,6 +50,7 @@ function DbConfigTab() {
         setPort(cfg.port ? String(cfg.port) : "5432");
         setDatabase(cfg.database || "");
         setUsername(cfg.username || "");
+        setSslMode(cfg.sslMode || "disable");
         setPasswordSet(cfg.passwordSet || false);
         setReadonlyEnv(cfg.readonlyEnv || false);
       })
@@ -63,6 +65,7 @@ function DbConfigTab() {
     database: provider === "postgresql" ? database : null,
     username: provider === "postgresql" ? username : null,
     password: provider === "postgresql" ? password : null,
+    sslMode: provider === "postgresql" ? sslMode : "disable",
     readonlyEnv: readonlyEnv,
   });
 
@@ -180,6 +183,31 @@ function DbConfigTab() {
             <div style={fieldStyle}>
               <label style={labelStyle}>Utente</label>
               <input style={{ ...inputStyle, background: readonlyEnv ? "#f8f9fa" : "#fff" }} value={username} onChange={e => setUsername(e.target.value)} readOnly={readonlyEnv} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Modalità SSL</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {[
+                  { value: "disable", label: "Disabilitato", desc: "Nessun SSL (QNAP locale)" },
+                  { value: "prefer",  label: "Automatico",   desc: "SSL se disponibile" },
+                  { value: "require", label: "Richiesto",    desc: "Obbligatorio (Render/cloud)" },
+                ].map(opt => (
+                  <div
+                    key={opt.value}
+                    onClick={() => !readonlyEnv && setSslMode(opt.value)}
+                    style={{
+                      flex: 1, padding: "8px 12px", borderRadius: "7px",
+                      border: `1px solid ${sslMode === opt.value ? "#1a73e8" : "#dadce0"}`,
+                      background: sslMode === opt.value ? "#f0f6ff" : "#fff",
+                      cursor: readonlyEnv ? "default" : "pointer",
+                      opacity: readonlyEnv ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: sslMode === opt.value ? "#1a73e8" : "#333" }}>{opt.label}</div>
+                    <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{opt.desc}</div>
+                  </div>
+                ))}
+              </div>
             </div>
             {!readonlyEnv && (
               <div style={fieldStyle}>

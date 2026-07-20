@@ -92,9 +92,13 @@ public class SettingsController : ControllerBase
             else if (dto.Provider == "postgresql")
             {
                 var port = dto.Port ?? 5432;
+                var ssl = dto.SslMode switch {
+                    "require" => "SSL Mode=Require;Trust Server Certificate=true",
+                    "prefer"  => "SSL Mode=Prefer",
+                    _         => "SSL Mode=Disable",
+                };
 
-                var connStr =
-                    $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};SSL Mode=Disable";
+                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};{ssl}";
 
                 Console.WriteLine("===== TEST-DB =====");
                 Console.WriteLine(connStr);
@@ -136,5 +140,7 @@ public class DbConfigDto
     public string? Database { get; set; }
     public string? Username { get; set; }
     public string? Password { get; set; }
+    // "disable" (default) | "require" | "prefer"
+    public string SslMode { get; set; } = "disable";
 }
 
