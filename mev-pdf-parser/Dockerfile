@@ -2,10 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt /app/
-COPY main.py /app/
-
-RUN ls -la /app
+COPY mev-pdf-parser/requirements.txt /app/
+COPY mev-pdf-parser/main.py /app/
 
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
