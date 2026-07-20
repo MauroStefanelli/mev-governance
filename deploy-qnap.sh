@@ -1,12 +1,22 @@
 #!/bin/bash
 set -e
 
-QNAP_IP="${1:?Usa: ./deploy-qnap.sh <IP_QNAP> [utente]}"
+QNAP_IP="${1:?Usa: ./deploy-qnap.sh <IP_QNAP> [utente] [--backend|--frontend|--parser|--fast]}"
 QNAP_USER="${2:-admin}"
+MODE="${3:-full}"   # full | --fast | --backend | --frontend | --parser
 REMOTE_DIR="/share/homes/${QNAP_USER}/mev-governance"
 ARCHIVE="mev-deploy.tar.gz"
 
-echo "=== 1/3 Pacchetto sorgenti ==="
+# ── Modalità ────────────────────────────────────────────────────────────────
+# full        rebuild tutto (default)
+# --fast      copia sorgenti + riavvia container SENZA rebuild (solo config/compose)
+# --backend   rebuild solo backend .NET
+# --frontend  rebuild solo frontend React
+# --parser    rebuild solo pdf-parser Python
+
+echo "=== Modalità: ${MODE} ==="
+
+echo "=== Pacchetto sorgenti ==="
 tar czf "$ARCHIVE" \
   --exclude='node_modules' \
   --exclude='.git' \
@@ -24,16 +34,16 @@ tar czf "$ARCHIVE" \
   mev-governance-ui/src/ \
   mev-pdf-parser/
 
-echo "=== 2/3 Copio su QNAP ==="
+echo "=== Copio su QNAP ==="
 ssh "${QNAP_USER}@${QNAP_IP}" "mkdir -p ${REMOTE_DIR}"
 scp "$ARCHIVE" "${QNAP_USER}@${QNAP_IP}:${REMOTE_DIR}/"
 
-echo "=== 3/3 Build e avvio su QNAP ==="
+echo "=== Deploy su QNAP ==="
 ssh "${QNAP_USER}@${QNAP_IP}" "
   cd ${REMOTE_DIR}
   tar xzf ${ARCHIVE}
 
-  # Trova docker se non è nel PATH
+  # Trova docker
   DOCKER=\$(command -v docker 2>/dev/null)
   if [ -z \"\$DOCKER\" ]; then
     for p in /share/*/.qpkg/container-station/bin/docker; do
@@ -41,22 +51,38 @@ ssh "${QNAP_USER}@${QNAP_IP}" "
     done
   fi
   if [ -z \"\$DOCKER\" ]; then
-    echo 'ERRORE: docker non trovato. Installare Container Station.'
+    echo 'ERRORE: docker non trovato.'
     exit 1
   fi
-  echo \"docker trovato: \$DOCKER\"
   DOCKER_DIR=\$(dirname \$DOCKER)
   export PATH=\$DOCKER_DIR:\$PATH
   export DOCKER_CONFIG=/tmp/.docker
 
-  echo '--- Build pdf-parser (Python) ---'
-  \$DOCKER build --no-cache -t mev-pdf-parser:latest -f ./mev-pdf-parser/Dockerfile .
+  MODE='${MODE}'
 
-  echo '--- Build backend (ARM64 ~10-15 min) ---'
-  \$DOCKER build --no-cache -t mev-backend:latest ./mev-governance-backend
+  if [ \"\$MODE\" = 'full' ]; then
+    echo '--- Build pdf-parser ---'
+    \$DOCKER build --no-cache -t mev-pdf-parser:latest -f ./mev-pdf-parser/Dockerfile .
+    echo '--- Build backend (ARM64 ~10-15 min) ---'
+    \$DOCKER build --no-cache -t mev-backend:latest ./mev-governance-backend
+    echo '--- Build frontend ---'
+    \$DOCKER build --no-cache -t mev-frontend:latest ./mev-governance-ui
 
-  echo '--- Build frontend ---'
-  \$DOCKER build -t mev-frontend:latest ./mev-governance-ui
+  elif [ \"\$MODE\" = '--backend' ]; then
+    echo '--- Build solo backend ---'
+    \$DOCKER build --no-cache -t mev-backend:latest ./mev-governance-backend
+
+  elif [ \"\$MODE\" = '--frontend' ]; then
+    echo '--- Build solo frontend ---'
+    \$DOCKER build --no-cache -t mev-frontend:latest ./mev-governance-ui
+
+  elif [ \"\$MODE\" = '--parser' ]; then
+    echo '--- Build solo pdf-parser ---'
+    \$DOCKER build --no-cache -t mev-pdf-parser:latest -f ./mev-pdf-parser/Dockerfile .
+
+  elif [ \"\$MODE\" = '--fast' ]; then
+    echo '--- Modalità fast: nessun rebuild, solo riavvio ---'
+  fi
 
   echo '--- Fermo container esistenti ---'
   \$DOCKER compose down --remove-orphans 2>/dev/null || true
