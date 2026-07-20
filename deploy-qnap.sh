@@ -58,8 +58,11 @@ ssh "${QNAP_USER}@${QNAP_IP}" "
   echo '--- Build frontend ---'
   \$DOCKER build -t mev-frontend:latest ./mev-governance-ui
 
+  echo '--- Fermo container esistenti ---'
+  \$DOCKER compose down --remove-orphans 2>/dev/null || true
+
   echo '--- Avvio container ---'
-  \$DOCKER compose up -d
+  \$DOCKER compose up -d --remove-orphans
 "
 
 rm -f "$ARCHIVE"
