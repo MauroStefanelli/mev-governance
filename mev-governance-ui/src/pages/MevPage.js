@@ -137,8 +137,7 @@ const formatEuro = (value) => {
   if (value === null || value === undefined || value === "") return "";
   const num = parseFloat(value);
   if (isNaN(num)) return "";
-  const [intPart, decPart] = num.toFixed(2).split(".");
-  return `€ ${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${decPart}`;
+  return "€ " + new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
 };
 
 const isScostamento = (excel, pianificato) =>
