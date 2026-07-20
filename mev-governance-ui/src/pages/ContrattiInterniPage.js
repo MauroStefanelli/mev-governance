@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { getContratti } from "../services/mevService";
+import { fmtEuroIt } from "../utils";
 
 const formatEuro = (value) => {
-  if (value === null || value === undefined || value === "") return "€ 0,00";
-  const num = parseFloat(value);
-  if (isNaN(num)) return "€ 0,00";
-  const [intPart, decPart] = num.toFixed(2).split(".");
-  return `€ ${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${decPart}`;
+  const s = fmtEuroIt(value);
+  return s === "" ? "€ 0,00" : s;
 };
 
 const TH = (align = "left") => ({

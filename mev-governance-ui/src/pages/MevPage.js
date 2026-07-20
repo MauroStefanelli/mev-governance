@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import {
   getMevList, updateMev, alignMevData, exportMev, uploadExcel
 } from "../services/mevService";
+import { fmtItIT } from "../utils";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 
@@ -137,7 +138,7 @@ const formatEuro = (value) => {
   if (value === null || value === undefined || value === "") return "";
   const num = parseFloat(value);
   if (isNaN(num)) return "";
-  return "€ " + new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+  return `€ ${fmtItIT(num)}`;
 };
 
 const isScostamento = (excel, pianificato) =>

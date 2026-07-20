@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
+import { fmtItIT, fmtEuroIt } from "../utils";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
@@ -102,8 +103,8 @@ const deleteVerbale = async (id) => {
 const fmt = (v) => {
   if (v === null || v === undefined || v === "") return "";
   const n = parseFloat(String(v).replace(/\./g, "").replace(",", "."));
-  if (isNaN(n)) return v;
-  return new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  if (isNaN(n)) return String(v);
+  return fmtItIT(n);
 };
 
 const fmtDate = (iso) => {
@@ -524,8 +525,7 @@ export default function ToolsPage({ onUnauthorized }) {
     return s + (isNaN(n) ? 0 : n);
   }, 0);
 
-  const fmtEuro = (n) =>
-    new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const fmtEuro = (n) => fmtItIT(n);
 
   // ============================================================
   // RENDER
