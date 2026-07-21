@@ -581,24 +581,45 @@ function ConsumoTowSection({ towRows }) {
       {/* ── KPI cards totali ── */}
       {selectedTipo && allRows.length > 0 && (
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "24px" }}>
-          {FIELDS.map(f => (
-            <div key={f} style={{
-              flex: "1 1 140px", minWidth: 0,
-              background: "white",
-              border: "1px solid #e2e8f0",
-              borderRadius: "12px",
-              padding: "14px 18px",
-              borderTop: `4px solid ${COLORS[f]}`,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-            }}>
-              <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
-                {LABELS[f]}
+          {FIELDS.map(f => {
+            const hasPerc = f !== "valoreTotale" && f !== "approvato";
+            const perc = hasPerc && totali.valoreTotale
+              ? ((totali[f] / totali.valoreTotale) * 100).toFixed(1)
+              : null;
+            return (
+              <div key={f} style={{
+                flex: "1 1 140px", minWidth: 0,
+                background: "white",
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                padding: "14px 18px",
+                borderTop: `4px solid ${COLORS[f]}`,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+              }}>
+                <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
+                  {LABELS[f]}
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
+                    {formatEuro(totali[f])}
+                  </div>
+                  {perc !== null && (
+                    <span style={{
+                      fontSize: "12px", fontWeight: 700,
+                      color: COLORS[f],
+                      background: COLORS[f] + "18",
+                      border: `1px solid ${COLORS[f]}44`,
+                      borderRadius: "10px",
+                      padding: "1px 8px",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {perc}%
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
-                {formatEuro(totali[f])}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -652,18 +673,9 @@ function ConsumoTowSection({ towRows }) {
                       </td>
                       <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
                       <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.approvato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
-                        {formatEuro(blueRowTotals.ordinatiRda)}
-                        <PercBadge value={blueRowTotals.ordinatiRda} total={blueRowTotals.valoreTotale} color="#10b981" />
-                      </td>
-                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
-                        {formatEuro(blueRowTotals.impegnato)}
-                        <PercBadge value={blueRowTotals.impegnato} total={blueRowTotals.valoreTotale} color="#f59e0b" />
-                      </td>
-                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
-                        {formatEuro(blueRowTotals.residuo)}
-                        <PercBadge value={blueRowTotals.residuo} total={blueRowTotals.valoreTotale} color="#f97316" />
-                      </td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.impegnato)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.residuo)}</td>
                     </tr>
 
                     {openServizi &&
@@ -748,11 +760,6 @@ function ConsumoTowSection({ towRows }) {
                                           ? row.ordinatiRda - row.collaudoOrdinato
                                           : row.ordinatiRda
                                       )}
-                                      <PercBadge
-                                        value={row.tow?.toUpperCase() === "TOW02.3" ? row.ordinatiRda - row.collaudoOrdinato : row.ordinatiRda}
-                                        total={row.valoreTotale}
-                                        color="#10b981"
-                                      />
                                     </td>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(
@@ -760,15 +767,9 @@ function ConsumoTowSection({ towRows }) {
                                           ? row.impegnato - row.collaudoFatturato
                                           : row.impegnato
                                       )}
-                                      <PercBadge
-                                        value={row.tow?.toUpperCase() === "TOW02.3" ? row.impegnato - row.collaudoFatturato : row.impegnato}
-                                        total={row.valoreTotale}
-                                        color="#f59e0b"
-                                      />
                                     </td>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(row.residuo)}
-                                      <PercBadge value={row.residuo} total={row.valoreTotale} color="#f97316" />
                                     </td>
                                   </>
                                 )}
@@ -807,18 +808,9 @@ function ConsumoTowSection({ towRows }) {
                             </td>
                             <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
                             <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
-                              {formatEuro(sum(sec.rows, "ordinatiRda"))}
-                              <PercBadge value={sum(sec.rows, "ordinatiRda")} total={sum(sec.rows, "valoreTotale")} color="#10b981" />
-                            </td>
-                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
-                              {formatEuro(sum(sec.rows, "impegnato"))}
-                              <PercBadge value={sum(sec.rows, "impegnato")} total={sum(sec.rows, "valoreTotale")} color="#f59e0b" />
-                            </td>
-                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
-                              {formatEuro(sum(sec.rows, "residuo"))}
-                              <PercBadge value={sum(sec.rows, "residuo")} total={sum(sec.rows, "valoreTotale")} color="#f97316" />
-                            </td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
                           </tr>
 
                           {isOpen &&
@@ -835,18 +827,9 @@ function ConsumoTowSection({ towRows }) {
                                 </td>
                                 <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
                                 <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.approvato)}</td>
-                                <td style={TD("right", { fontSize: "12px" })}>
-                                  {formatEuro(row.ordinatiRda)}
-                                  <PercBadge value={row.ordinatiRda} total={row.valoreTotale} color="#10b981" />
-                                </td>
-                                <td style={TD("right", { fontSize: "12px" })}>
-                                  {formatEuro(row.impegnato)}
-                                  <PercBadge value={row.impegnato} total={row.valoreTotale} color="#f59e0b" />
-                                </td>
-                                <td style={TD("right", { fontSize: "12px" })}>
-                                  {formatEuro(row.residuo)}
-                                  <PercBadge value={row.residuo} total={row.valoreTotale} color="#f97316" />
-                                </td>
+                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.ordinatiRda)}</td>
+                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.impegnato)}</td>
+                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.residuo)}</td>
                               </tr>
                             ))
                           }
