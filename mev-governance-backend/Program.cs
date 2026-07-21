@@ -29,7 +29,7 @@ if (File.Exists(dbConfigFile))
                 var ssl = cfg.SslMode switch {
                     "require" => "SSL Mode=Require;Trust Server Certificate=true",
                     "prefer"  => "SSL Mode=Prefer",
-                    _         => "SSL Mode=Disable",
+                    _         => "SSL Mode=Disable;Trust Server Certificate=true",
                 };
                 DbConfigConnectionString = $"Host={cfg.Host};Port={port};Database={cfg.Database};Username={cfg.Username};Password={cfg.Password};{ssl}";
                 DbConfigIsPostgres = true;

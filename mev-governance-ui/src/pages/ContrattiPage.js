@@ -33,6 +33,32 @@ const formatEuro = (value) => {
   return `€ ${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${decPart}`;
 };
 
+const formatPerc = (value, total) => {
+  if (!total || total === 0) return "";
+  const perc = (parseFloat(value) / parseFloat(total)) * 100;
+  if (isNaN(perc)) return "";
+  return `${perc.toFixed(1)}%`;
+};
+
+const PercBadge = ({ value, total, color = "#64748b" }) => {
+  const perc = (!total || total === 0) ? null : (parseFloat(value) / parseFloat(total)) * 100;
+  if (perc === null || isNaN(perc)) return null;
+  return (
+    <span style={{
+      fontSize: "10px", fontWeight: 600, color,
+      background: color + "18",
+      border: `1px solid ${color}33`,
+      borderRadius: "10px",
+      padding: "1px 6px",
+      marginLeft: "6px",
+      whiteSpace: "nowrap",
+      letterSpacing: "0.2px",
+    }}>
+      {perc.toFixed(1)}%
+    </span>
+  );
+};
+
 const formatEuroK = (value) => {
   if (!value) return "€ 0";
   const num = parseFloat(value);
@@ -626,9 +652,18 @@ function ConsumoTowSection({ towRows }) {
                       </td>
                       <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.valoreTotale)}</td>
                       <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.approvato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.ordinatiRda)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.impegnato)}</td>
-                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(blueRowTotals.residuo)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                        {formatEuro(blueRowTotals.ordinatiRda)}
+                        <PercBadge value={blueRowTotals.ordinatiRda} total={blueRowTotals.valoreTotale} color="#10b981" />
+                      </td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                        {formatEuro(blueRowTotals.impegnato)}
+                        <PercBadge value={blueRowTotals.impegnato} total={blueRowTotals.valoreTotale} color="#f59e0b" />
+                      </td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                        {formatEuro(blueRowTotals.residuo)}
+                        <PercBadge value={blueRowTotals.residuo} total={blueRowTotals.valoreTotale} color="#f97316" />
+                      </td>
                     </tr>
 
                     {openServizi &&
@@ -699,7 +734,7 @@ function ConsumoTowSection({ towRows }) {
                                     <td />{/* Residuo vuoto */}
                                   </>
                                 ) : (
-                                  <>
+                                   <>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(
                                         row.tow?.toUpperCase() === "TOW02.3"
@@ -713,6 +748,11 @@ function ConsumoTowSection({ towRows }) {
                                           ? row.ordinatiRda - row.collaudoOrdinato
                                           : row.ordinatiRda
                                       )}
+                                      <PercBadge
+                                        value={row.tow?.toUpperCase() === "TOW02.3" ? row.ordinatiRda - row.collaudoOrdinato : row.ordinatiRda}
+                                        total={row.valoreTotale}
+                                        color="#10b981"
+                                      />
                                     </td>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(
@@ -720,9 +760,15 @@ function ConsumoTowSection({ towRows }) {
                                           ? row.impegnato - row.collaudoFatturato
                                           : row.impegnato
                                       )}
+                                      <PercBadge
+                                        value={row.tow?.toUpperCase() === "TOW02.3" ? row.impegnato - row.collaudoFatturato : row.impegnato}
+                                        total={row.valoreTotale}
+                                        color="#f59e0b"
+                                      />
                                     </td>
                                     <td style={TD("right", { fontSize: "12px" })}>
                                       {formatEuro(row.residuo)}
+                                      <PercBadge value={row.residuo} total={row.valoreTotale} color="#f97316" />
                                     </td>
                                   </>
                                 )}
@@ -761,9 +807,18 @@ function ConsumoTowSection({ towRows }) {
                             </td>
                             <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "valoreTotale"))}</td>
                             <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "approvato"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "ordinatiRda"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "impegnato"))}</td>
-                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(sum(sec.rows, "residuo"))}</td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                              {formatEuro(sum(sec.rows, "ordinatiRda"))}
+                              <PercBadge value={sum(sec.rows, "ordinatiRda")} total={sum(sec.rows, "valoreTotale")} color="#10b981" />
+                            </td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                              {formatEuro(sum(sec.rows, "impegnato"))}
+                              <PercBadge value={sum(sec.rows, "impegnato")} total={sum(sec.rows, "valoreTotale")} color="#f59e0b" />
+                            </td>
+                            <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                              {formatEuro(sum(sec.rows, "residuo"))}
+                              <PercBadge value={sum(sec.rows, "residuo")} total={sum(sec.rows, "valoreTotale")} color="#f97316" />
+                            </td>
                           </tr>
 
                           {isOpen &&
@@ -780,9 +835,18 @@ function ConsumoTowSection({ towRows }) {
                                 </td>
                                 <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
                                 <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.approvato)}</td>
-                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.ordinatiRda)}</td>
-                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.impegnato)}</td>
-                                <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.residuo)}</td>
+                                <td style={TD("right", { fontSize: "12px" })}>
+                                  {formatEuro(row.ordinatiRda)}
+                                  <PercBadge value={row.ordinatiRda} total={row.valoreTotale} color="#10b981" />
+                                </td>
+                                <td style={TD("right", { fontSize: "12px" })}>
+                                  {formatEuro(row.impegnato)}
+                                  <PercBadge value={row.impegnato} total={row.valoreTotale} color="#f59e0b" />
+                                </td>
+                                <td style={TD("right", { fontSize: "12px" })}>
+                                  {formatEuro(row.residuo)}
+                                  <PercBadge value={row.residuo} total={row.valoreTotale} color="#f97316" />
+                                </td>
                               </tr>
                             ))
                           }
@@ -984,6 +1048,16 @@ function ConsumoTowSection({ towRows }) {
     </div >
   );
 }
+
+
+// % in Italiano
+const formatPerc = (numeratore, denominatore) => {
+  if (!denominatore) return "0,0%";
+
+  return `${((numeratore / denominatore) * 100)
+    .toFixed(1)
+    .replace(".", ",")}%`;
+};
 
 
 // ── Pagina ────────────────────────────────────────────────────────────────────
