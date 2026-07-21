@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("bcrypt-test")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0e01916051eb9f0565ae54db32387eae15a0be69")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2efe25a6542b518ce177d5af7f52968196bd9200")]
 [assembly: System.Reflection.AssemblyProductAttribute("bcrypt-test")]
 [assembly: System.Reflection.AssemblyTitleAttribute("bcrypt-test")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

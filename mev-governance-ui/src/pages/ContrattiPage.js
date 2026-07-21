@@ -1050,16 +1050,6 @@ function ConsumoTowSection({ towRows }) {
 }
 
 
-// % in Italiano
-const formatPerc = (numeratore, denominatore) => {
-  if (!denominatore) return "0,0%";
-
-  return `${((numeratore / denominatore) * 100)
-    .toFixed(1)
-    .replace(".", ",")}%`;
-};
-
-
 // ── Pagina ────────────────────────────────────────────────────────────────────
 function ContrattiPage({ onUnauthorized }) {
   const [towRows, setTowRows] = useState([]);
