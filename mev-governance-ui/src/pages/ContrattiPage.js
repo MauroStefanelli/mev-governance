@@ -607,6 +607,10 @@ function ConsumoTowSection({ towRows }) {
                     <span style={{
                       fontSize: "15px", fontWeight: 700,
                       color: "#1e293b",
+                      background: COLORS[f] + "18",
+                      border: `1px solid ${COLORS[f]}44`,
+                      borderRadius: "10px",
+                      padding: "1px 8px",
                       whiteSpace: "nowrap",
                     }}>
                       {perc}%
