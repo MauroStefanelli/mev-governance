@@ -14,6 +14,39 @@ namespace MevGovernanceBackend.Controllers;
 public class SettingsController : ControllerBase
 {
     private const string ConfigFile = "/data/db-config.json";
+    private readonly AppDbContext _db;
+
+    public SettingsController(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    // ── App Settings (logoutMinutes, ecc.) ────────────────────────────────────
+
+    [HttpGet("app")]
+    public IActionResult GetAppSettings()
+    {
+        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        if (s == null) return Ok(new { logoutMinutes = 60 });
+        return Ok(new { logoutMinutes = s.LogoutMinutes });
+    }
+
+    [HttpPut("app")]
+    public IActionResult SetAppSettings([FromBody] AppSettingsDto dto)
+    {
+        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        if (s == null)
+        {
+            s = new MevGovernanceBackend.Models.AppSettings { Id = 1, LogoutMinutes = dto.LogoutMinutes };
+            _db.AppSettings.Add(s);
+        }
+        else
+        {
+            s.LogoutMinutes = dto.LogoutMinutes;
+        }
+        _db.SaveChanges();
+        return Ok(new { logoutMinutes = s.LogoutMinutes });
+    }
 
     [HttpGet("db-config")]
     public IActionResult GetDbConfig()
@@ -181,4 +214,10 @@ public class DbConfigDto
     // "disable" (default) | "require" | "prefer"
     public string SslMode { get; set; } = "disable";
 }
+
+public class AppSettingsDto
+{
+    public int LogoutMinutes { get; set; } = 60;
+}
+
 

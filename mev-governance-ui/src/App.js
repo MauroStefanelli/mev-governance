@@ -25,7 +25,7 @@ function App() {
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
-  const idleTimeoutRef = useRef(60 * 60 * 1000); // default 60 min, aggiornato via ref
+  const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
 
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
@@ -36,7 +36,7 @@ function App() {
       getMevList().then(setRows).catch(() => {});
       getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
       getAppSettings().then(s => {
-        if (s.logoutMinutes > 0) idleTimeoutRef.current = s.logoutMinutes * 60 * 1000;
+        if (s.logoutMinutes > 0) setIdleTimeoutMs(s.logoutMinutes * 60 * 1000);
       }).catch(() => {});
       // Warm-up silenzioso del parser PDF (cold start Render free)
       fetch(`${process.env.REACT_APP_API_URL || ""}/api/tools/parser-warmup`, {
@@ -106,7 +106,7 @@ function App() {
 
     const resetTimer = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => idleLogoutRef.current(), idleTimeoutRef.current);
+      timer = setTimeout(() => idleLogoutRef.current(), idleTimeoutMs);
     };
 
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "wheel"];
@@ -117,7 +117,7 @@ function App() {
       clearTimeout(timer);
       events.forEach(e => window.removeEventListener(e, resetTimer));
     };
-  }, [token]);
+  }, [token, idleTimeoutMs]);
 
   const handleChangePassword = async () => {
     setPwdError("");
