@@ -411,9 +411,46 @@ public class OrdineConsegnaController : ControllerBase
     {
         var item = await _db.VerbaliAvanzamento.FindAsync(id);
         if (item == null) return NotFound();
+
+        var mese = item.MeseAvanzamento;
+
+        // ── Controlla se ci sono altri verbali con lo stesso mese ──
+        var altriVerbaliStessoMese = _db.VerbaliAvanzamento
+            .Any(v => v.Id != id && v.MeseAvanzamento == mese);
+
+        // ── Aggiorna le righe OrdiniConsegna che contengono questo mese ──
+        var righeConMese = _db.OrdiniConsegna
+            .Where(r => r.MeseAvanzamento != null && r.MeseAvanzamento.Contains(mese))
+            .ToList();
+
+        foreach (var riga in righeConMese)
+        {
+            var mesi = riga.MeseAvanzamento.Split('/').Select(m => m.Trim()).ToList();
+
+            if (mesi.Count <= 1)
+            {
+                // Riga ha solo questo mese: resetta tutti i campi VAP
+                riga.MeseAvanzamento    = "";
+                riga.QtaAvanzata        = "";
+                riga.ImportoFatturabile = "";
+                riga.Subappalto         = "";
+            }
+            else
+            {
+                // Riga ha più mesi: rimuovi solo questo mese dal concatenato
+                // Non possiamo ricostruire i valori parziali — azzeriamo comunque
+                // i campi numerici e aggiorniamo il mese
+                var mesiRimanenti = mesi.Where(m => !m.Equals(mese, StringComparison.OrdinalIgnoreCase)).ToList();
+                riga.MeseAvanzamento    = string.Join("/", mesiRimanenti);
+                riga.QtaAvanzata        = "";
+                riga.ImportoFatturabile = "";
+                riga.Subappalto         = "";
+            }
+        }
+
         _db.VerbaliAvanzamento.Remove(item);
         await _db.SaveChangesAsync();
-        return Ok(new { message = "Verbale eliminato" });
+        return Ok(new { message = "Verbale eliminato", righeResettate = righeConMese.Count });
     }
 
     // ============================================================

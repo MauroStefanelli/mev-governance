@@ -257,6 +257,8 @@ export default function ToolsPage({ onUnauthorized }) {
     try {
       await deleteVerbale(id);
       setVerbali(prev => prev.filter(v => v.id !== id));
+      // Ricarica gli ordini perché i campi VAP sono stati resettati
+      await load();
     } catch (e) {
       alert(`Errore eliminazione verbale: ${e.message}`);
     } finally {
@@ -537,7 +539,7 @@ export default function ToolsPage({ onUnauthorized }) {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
         <div>
           <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a" }}>
-            Tools — Ordini di Consegna e Verbali di Avanzamento
+            Ordini di Consegna e Verbali di Avanzamento
           </div>
         </div>
         {items.length > 0 && (
