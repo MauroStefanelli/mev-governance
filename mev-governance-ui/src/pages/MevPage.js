@@ -183,7 +183,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [] };
+    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [], importoExcel: [] };
     if (!saved) return defaults;
     const parsed = JSON.parse(saved);
     return { ...defaults, ...parsed };
@@ -207,7 +207,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [] });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [], importoExcel: [] });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -227,6 +227,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const capgeminiOptions = buildOptions("capgemini");
   const ietOptions = buildOptions("iet");
   const subcoOptions = buildOptions("subco");
+  const importoExcelOptions = [...new Set(rows.map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
 
   // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
   const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
@@ -277,7 +278,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
     (filters.capgemini.length === 0 || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
     (filters.iet.length === 0 || filters.iet.includes(String(r.iet ?? ""))) &&
-    (filters.subco.length === 0 || filters.subco.includes(String(r.subco ?? "")))
+    (filters.subco.length === 0 || filters.subco.includes(String(r.subco ?? ""))) &&
+    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
   );
 
   const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
@@ -439,7 +441,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <th style={{ padding: "4px 6px" }}>{/* Descrizione */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Importo CAP */}</th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
