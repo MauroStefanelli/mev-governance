@@ -194,10 +194,43 @@ public class OrdineConsegnaController : ControllerBase
 
                 foreach (var rec in records)
                 {
-                    rec.MeseAvanzamento    = meseAvanzamento;
-                    rec.QtaAvanzata        = qta;
-                    rec.ImportoFatturabile = importo;
-                    rec.Subappalto         = subappalto;
+                    // ── Logica di merge: se la riga ha già dati VAP, somma invece di sovrascrivere ──
+                    bool hasDati = !string.IsNullOrWhiteSpace(rec.MeseAvanzamento)
+                                   && rec.MeseAvanzamento != meseAvanzamento;
+
+                    if (hasDati)
+                    {
+                        // Concatena il mese solo se non già presente
+                        var mesiEsistenti = rec.MeseAvanzamento.Split('/').Select(m => m.Trim()).ToList();
+                        if (!mesiEsistenti.Contains(meseAvanzamento.Trim(), StringComparer.OrdinalIgnoreCase))
+                            rec.MeseAvanzamento = rec.MeseAvanzamento.Trim() + "/" + meseAvanzamento.Trim();
+
+                        // Somma QtaAvanzata
+                        var qtaVecchia  = decimal.TryParse(rec.QtaAvanzata?.Replace(",", "."),
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var qv) ? qv : 0m;
+                        var qtaNuova    = decimal.TryParse(qta?.Replace(",", "."),
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var qn) ? qn : 0m;
+                        rec.QtaAvanzata = (qtaVecchia + qtaNuova).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+                        // Somma ImportoFatturabile
+                        var impVecchio  = decimal.TryParse(rec.ImportoFatturabile?.Replace(".", "").Replace(",", "."),
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var iv) ? iv : 0m;
+                        var impNuovo    = decimal.TryParse(importo?.Replace(".", "").Replace(",", "."),
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var inn) ? inn : 0m;
+                        rec.ImportoFatturabile = (impVecchio + impNuovo).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        // Prima scrittura: sovrascrive normalmente
+                        rec.MeseAvanzamento    = meseAvanzamento;
+                        rec.QtaAvanzata        = qta;
+                        rec.ImportoFatturabile = importo;
+                        rec.Subappalto         = subappalto;
+                    }
                     aggiornati++;
                 }
             }
