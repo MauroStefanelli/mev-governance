@@ -531,7 +531,10 @@ export default function ToolsPage({ onUnauthorized }) {
 
   // Totale fatturato = somma ImportoFatturabile su righe filtrate
   const totaleFatturato = filtered.reduce((s, r) => {
-    const n = parseFloat(String(r.importoFatturabile || "0").replace(/\./g, "").replace(",", "."));
+    const raw = String(r.importoFatturabile || "0").trim();
+    const n = raw.includes(",")
+      ? parseFloat(raw.replace(/\./g, "").replace(",", "."))
+      : parseFloat(raw);
     return s + (isNaN(n) ? 0 : n);
   }, 0);
 
