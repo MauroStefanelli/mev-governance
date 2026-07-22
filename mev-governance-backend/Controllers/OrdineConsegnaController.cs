@@ -215,12 +215,22 @@ public class OrdineConsegnaController : ControllerBase
                         rec.QtaAvanzata = (qtaVecchia + qtaNuova).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
                         // Somma ImportoFatturabile
-                        var impVecchio  = decimal.TryParse(rec.ImportoFatturabile?.Replace(".", "").Replace(",", "."),
-                            System.Globalization.NumberStyles.Any,
-                            System.Globalization.CultureInfo.InvariantCulture, out var iv) ? iv : 0m;
-                        var impNuovo    = decimal.TryParse(importo?.Replace(".", "").Replace(",", "."),
-                            System.Globalization.NumberStyles.Any,
-                            System.Globalization.CultureInfo.InvariantCulture, out var inn) ? inn : 0m;
+                        // Parsing robusto: gestisce sia formato IT (19.329,00) che invariant (19329.00)
+                        static decimal ParseImporto(string? s)
+                        {
+                            if (string.IsNullOrWhiteSpace(s)) return 0m;
+                            s = s.Trim();
+                            // Formato italiano: punto come sep migliaia, virgola come decimale
+                            // es. "19.329,00" → rimuovi punti, sostituisci virgola con punto
+                            if (s.Contains(','))
+                                s = s.Replace(".", "").Replace(",", ".");
+                            // Formato invariant: solo punto come decimale (es. "19329.00")
+                            // non toccare
+                            return decimal.TryParse(s, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0m;
+                        }
+                        var impVecchio  = ParseImporto(rec.ImportoFatturabile);
+                        var impNuovo    = ParseImporto(importo);
                         rec.ImportoFatturabile = (impVecchio + impNuovo).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
                     }
                     else
