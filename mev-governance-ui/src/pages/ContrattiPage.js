@@ -582,7 +582,7 @@ function ConsumoTowSection({ towRows }) {
       {selectedTipo && allRows.length > 0 && (
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "24px" }}>
           {FIELDS.map(f => {
-            const hasPerc = f !== "valoreTotale" && f !== "approvato";
+            const hasPerc = f !== "valoreTotale";
             const perc = hasPerc && totali.valoreTotale
               ? ((totali[f] / totali.valoreTotale) * 100).toFixed(1)
               : null;
