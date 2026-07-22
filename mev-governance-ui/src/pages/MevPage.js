@@ -7,7 +7,7 @@ import { fmtItIT } from "../utils";
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 
 // ── MultiSelect dropdown con checkbox ────────────────────────────────────────
-function MultiSelect({ options, selected, onChange, placeholder }) {
+function MultiSelect({ options, selected, onChange, placeholder, formatOption }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -123,7 +123,7 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
                 onChange={() => toggle(String(opt))}
                 style={{ cursor: "pointer", margin: 0 }}
               />
-              <span style={{ textAlign: "left" }}>{opt}</span>
+              <span style={{ textAlign: "left" }}>{formatOption ? formatOption(opt) : opt}</span>
             </label>
           ))}
         </div>
@@ -441,7 +441,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <th style={{ padding: "4px 6px" }}>{/* Descrizione */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
