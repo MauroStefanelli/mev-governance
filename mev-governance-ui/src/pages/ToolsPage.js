@@ -102,8 +102,16 @@ const deleteVerbale = async (id) => {
 
 const fmt = (v) => {
   if (v === null || v === undefined || v === "") return "";
-  const n = parseFloat(String(v).replace(/\./g, "").replace(",", "."));
-  if (isNaN(n)) return String(v);
+  const s = String(v).trim();
+  let n;
+  // Formato italiano: virgola come decimale (es. "19.329,00")
+  if (s.includes(",")) {
+    n = parseFloat(s.replace(/\./g, "").replace(",", "."));
+  } else {
+    // Formato invariant: punto come decimale (es. "38658.00")
+    n = parseFloat(s);
+  }
+  if (isNaN(n)) return s;
   return fmtItIT(n);
 };
 
