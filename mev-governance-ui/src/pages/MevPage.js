@@ -456,7 +456,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
               {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "RDA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
-                <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap" }}>{h}</th>
+                <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -488,7 +488,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                       color: r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
                     }}>{r.stato || "(vuoto)"}</span>
                   </td>
-                  <td style={{ ...TD, textAlign: "right" }}>{formatEuro(r.importoExcel)}</td>
+                  <td style={{ ...TD, textAlign: "right", minWidth: "130px", whiteSpace: "nowrap" }}>{formatEuro(r.importoExcel)}</td>
 
                   <td style={{ ...TD, textAlign: "center" }}>
                     {r.noteExcel ? (
