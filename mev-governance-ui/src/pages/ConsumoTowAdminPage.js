@@ -27,7 +27,7 @@ const FIELDS = [
   { key: "valoreUnitario",    label: "Valore Unitario",     group: "euro", color: "#64748b" },
   { key: "valoreTotale",      label: "Valore Totale",        group: "euro", color: "#1e293b" },
   { key: "approvato",         label: "Approvato",            group: "euro", color: "#1a73e8" },
-  { key: "ordinatiRda",       label: "Ordinati (RDA)",       group: "euro", color: "#10b981" },
+  { key: "ordinatiRda",       label: "Ordinato (RDA)",       group: "euro", color: "#10b981" },
   { key: "impegnato",         label: "Impegnato",            group: "euro", color: "#f59e0b" },
   { key: "residuo",           label: "Residuo",              group: "euro", color: "#f97316" },
   { key: "towApprovati",      label: "TOW Approvati",        group: "qta",  color: "#64748b" },
