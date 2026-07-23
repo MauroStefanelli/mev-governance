@@ -247,7 +247,7 @@ function App() {
                   {[
                     { id: "tools",      label: "Caricamento Ordini" },
                     { id: "admin",      label: "Utenti" },
-                    { id: "consumotow", label: "Consumo TOW" },
+                    { id: "consumotow", label: "TOW Contratti" },
                     { id: "dbconfig",   label: "Configurazione" },
                   ].map(({ id, label }) => (
                     <div

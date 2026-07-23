@@ -22,6 +22,20 @@ const formatNum = (v) => {
   return isNaN(n) ? v : n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+const formatEuro = (v) => {
+  if (v === null || v === undefined || v === "") return "";
+
+  const n = parseFloat(v);
+
+  if (isNaN(n)) return "";
+
+  return `€ ${n.toLocaleString("it-IT", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })}`;
+};
+
+
 const parseNum = (v) => {
   if (v === "" || v === null || v === undefined) return 0;
   // accetta sia virgola che punto come separatore decimale
@@ -229,6 +243,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
+  const euroFields = [
+    "valoreUnitario",
+    "valoreTotale",
+    "approvato",
+    "ordinatiRda",
+    "impegnato",
+    "residuo"
+  ];
+
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px 16px" }}>
       {/* Titolo */}
@@ -239,10 +262,10 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
       }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>
-            Gestione Consumo TOW
+            TOW — Contratto
           </h2>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#64748b" }}>
-            Visualizza e modifica i dati della tabella ConsumoTow per contratto
+            Visualizza e modifica i dati relativi ai Tow per contratto
           </p>
         </div>
       </div>
@@ -268,7 +291,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
         marginBottom: "20px", display: "flex", alignItems: "center", gap: "16px",
         flexWrap: "wrap",
       }}>
-        <div style={labelStyle}>Contratto (TowContratto)</div>
+        <div style={labelStyle}>TOW Contratto</div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {contratti.map(c => (
             <button key={c} onClick={() => setSelectedContratto(c)} style={{
@@ -296,7 +319,14 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         }}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <table
+              style={{
+                width: "100%",
+                minWidth: "1800px",
+                borderCollapse: "collapse",
+                fontSize: "13px"
+              }}
+            >
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
                   <th style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap" }}>TOW</th>
@@ -322,7 +352,9 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     </td>
                     {NUMERIC_FIELDS.map(f => (
                       <td key={f.key} style={{ padding: "10px 14px", textAlign: "right", color: "#374151", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
-                        {formatNum(row[f.key])}
+                        {euroFields.includes(f.key)
+                          ? formatEuro(row[f.key])
+                          : formatNum(row[f.key])}
                       </td>
                     ))}
                     <td style={{ padding: "10px 14px", textAlign: "center", borderBottom: "1px solid #f1f5f9" }}>
