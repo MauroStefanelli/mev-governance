@@ -4,7 +4,7 @@ import { getConsumoTow, updateConsumoTow } from "../services/mevService";
 const formatEuro = (v) => {
   const n = Number(v);
   if (isNaN(n)) return "—";
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true }).format(n) + " €";
 };
 
 const formatQta = (v) => {
