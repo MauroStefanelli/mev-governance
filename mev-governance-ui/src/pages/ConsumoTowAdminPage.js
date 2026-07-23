@@ -206,9 +206,9 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
       {/* ── Titolo ── */}
       <div style={{ marginBottom: "24px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
         <div>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Admin</div>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Logistica Lotto 2</div>
           <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
-          <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Seleziona un contratto per visualizzare e modificare le righe</p>
+          <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Seleziona un contratto per visualizzare e modificare</p>
         </div>
       </div>
 
@@ -282,9 +282,9 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
           {/* Header tabella */}
           <div style={{ padding: "16px 22px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafbfc" }}>
             <div>
-              <span style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>Contratto </span>
+              <span style={{ fontSize: "18px", fontWeight: 700, color: "#0f1012" }}>Contratto </span>
               <span style={{ fontSize: "14px", fontWeight: 800, color: "#1a73e8" }}>{selectedContratto}</span>
-              <span style={{ fontSize: "12px", fontWeight: 500, color: "#94a3b8", marginLeft: "10px" }}>{filteredRows.length} righe</span>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "#94a3b8", marginLeft: "10px" }}>{filteredRows.length} righe</span>
             </div>
             <button
               onClick={() => setShowCollaudo(v => !v)}
