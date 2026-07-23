@@ -36,6 +36,14 @@ const formatEuro = (v) => {
   }).format(n)}`;
 };
 
+const formatQta = (v) => {
+  if (v === null || v === undefined || isNaN(v)) return "";
+
+  return v.toLocaleString("it-IT", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+};
 
 const parseNum = (v) => {
   if (v === "" || v === null || v === undefined) return 0;
@@ -47,17 +55,17 @@ const parseNum = (v) => {
 
 // Campi numerici con label e chiave
 const NUMERIC_FIELDS = [
-  { key: "valoreUnitario",    label: "Valore Unitario" },
-  { key: "valoreTotale",      label: "Valore Totale" },
-  { key: "approvato",         label: "Approvato" },
-  { key: "ordinatiRda",       label: "Ordinati (RDA)" },
-  { key: "impegnato",         label: "Impegnato" },
-  { key: "residuo",           label: "Residuo" },
-  { key: "towApprovati",      label: "TOW Approvati" },
-  { key: "towImpegnati",      label: "TOW Impegnati" },
-  { key: "towResidui",        label: "TOW Residui" },
+  { key: "valoreUnitario", label: "Valore Unitario" },
+  { key: "valoreTotale", label: "Valore Totale" },
+  { key: "approvato", label: "Approvato" },
+  { key: "ordinatiRda", label: "Ordinati (RDA)" },
+  { key: "impegnato", label: "Impegnato" },
+  { key: "residuo", label: "Residuo" },
+  { key: "towApprovati", label: "TOW Approvati" },
+  { key: "towImpegnati", label: "TOW Impegnati" },
+  { key: "towResidui", label: "TOW Residui" },
   { key: "collaudoApprovato", label: "Collaudo Approvato" },
-  { key: "collaudoOrdinato",  label: "Collaudo Ordinato" },
+  { key: "collaudoOrdinato", label: "Collaudo Ordinato" },
   { key: "collaudoFatturato", label: "Collaudo Fatturato" },
 ];
 
@@ -331,65 +339,109 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
                   <th style={{ padding: "11px 14px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap" }}>TOW</th>
+                  <th>TOW</th>
+
+                  <th
+                    style={{
+                      padding: "11px 14px",
+                      textAlign: "right",
+                      fontWeight: 700,
+                      color: "#374151",
+                      borderBottom: "2px solid #e2e8f0",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    QTA
+                  </th>
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      fontWeight: 600,
+                      color: "#1e293b",
+                      borderBottom: "1px solid #f1f5f9",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {row.tow}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      textAlign: "right",
+                      color: "#374151",
+                      borderBottom: "1px solid #f1f5f9",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {formatQta(
+                      Number(row.valoreUnitario) > 0
+                        ? Number(row.valoreTotale) / Number(row.valoreUnitario)
+                        : 0
+                    )}
+                  </td>
+
                   {NUMERIC_FIELDS.map(f => (
-                    <th key={f.key} style={{ padding: "11px 14px", textAlign: "right", fontWeight: 700, color: "#374151", borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap" }}>
-                      {f.label}
-                    </th>
-                  ))}
-                  <th style={{ padding: "11px 14px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "2px solid #e2e8f0" }}>Azioni</th>
+                    {
+                      NUMERIC_FIELDS.map(f => (<th key={f.key} style={{ padding: "11px 14px", textAlign: "right", fontWeight: 700, color: "#374151", borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap" }}>
+                        {f.label}
+                      </th>
+                      ))
+                    }
+                    < th style = {{ padding: "11px 14px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "2px solid #e2e8f0" }}>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={NUMERIC_FIELDS.length + 2} style={{ padding: "32px", textAlign: "center", color: "#94a3b8" }}>
+                    Nessuna riga trovata per il contratto selezionato
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={NUMERIC_FIELDS.length + 2} style={{ padding: "32px", textAlign: "center", color: "#94a3b8" }}>
-                      Nessuna riga trovata per il contratto selezionato
-                    </td>
-                  </tr>
-                ) : filteredRows.map((row, idx) => (
-                  <tr key={row.id} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
-                    <td style={{ padding: "10px 14px", fontWeight: 600, color: "#1e293b", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
-                      {row.tow}
-                    </td>
-                    {NUMERIC_FIELDS.map(f => (
-                      <td key={f.key} style={{ padding: "10px 14px", textAlign: "right", color: "#374151", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
-                        {euroFields.includes(f.key)
-                          ? formatEuro(row[f.key])
-                          : formatNum(row[f.key])}
-                      </td>
+              ) : filteredRows.map((row, idx) => (
+                <tr key={row.id} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
+
+                  <td key={f.key} style={{ padding: "10px 14px", textAlign: "right", color: "#374151", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                    {euroFields.includes(f.key)
+                      ? formatEuro(row[f.key])
+                      : formatNum(row[f.key])}
+                  </td>
                     ))}
-                    <td style={{ padding: "10px 14px", textAlign: "center", borderBottom: "1px solid #f1f5f9" }}>
-                      <button onClick={() => setEditRow(row)} style={{
-                        padding: "5px 14px", borderRadius: "6px",
-                        border: "1px solid #1a73e8", background: "#eff6ff",
-                        color: "#1a73e8", fontSize: "12px", fontWeight: 600,
-                        cursor: "pointer",
-                      }}>Modifica</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <td style={{ padding: "10px 14px", textAlign: "center", borderBottom: "1px solid #f1f5f9" }}>
+                    <button onClick={() => setEditRow(row)} style={{
+                      padding: "5px 14px", borderRadius: "6px",
+                      border: "1px solid #1a73e8", background: "#eff6ff",
+                      color: "#1a73e8", fontSize: "12px", fontWeight: 600,
+                      cursor: "pointer",
+                    }}>Modifica</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
           {/* Footer conteggio */}
-          <div style={{
-            padding: "10px 16px", borderTop: "1px solid #e2e8f0",
-            fontSize: "12px", color: "#94a3b8",
-          }}>
-            {filteredRows.length} righe per contratto <strong>{selectedContratto}</strong>
-          </div>
-        </div>
-      )}
-
-      {/* Modale modifica */}
-      {editRow && (
-        <EditModal
-          row={editRow}
-          onClose={() => setEditRow(null)}
-          onSaved={handleSaved}
-        />
-      )}
+      <div style={{
+        padding: "10px 16px", borderTop: "1px solid #e2e8f0",
+        fontSize: "12px", color: "#94a3b8",
+      }}>
+        {filteredRows.length} righe per contratto <strong>{selectedContratto}</strong>
+      </div>
     </div>
+  )
+}
+
+{/* Modale modifica */ }
+{
+  editRow && (
+    <EditModal
+      row={editRow}
+      onClose={() => setEditRow(null)}
+      onSaved={handleSaved}
+    />
+  )
+}
+    </div >
   );
 }
