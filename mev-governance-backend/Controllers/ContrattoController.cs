@@ -467,6 +467,36 @@ public class ContrattoController : BaseController
         }
     }
 
+    // ============================================================
+    // PUT /api/contratti/consumo-tow/:id
+    // Aggiorna una riga ConsumoTow (solo Admin)
+    // ============================================================
+    [HttpPut("consumo-tow/{id}")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult UpdateConsumoTow(int id, [FromBody] ConsumoTowUpdateDto dto)
+    {
+        var row = _db.ConsumoTow.FirstOrDefault(r => r.Id == id);
+        if (row == null) return NotFound($"Riga ConsumoTow con Id={id} non trovata");
+
+        row.Tow                = dto.Tow;
+        row.TowContratto       = dto.TowContratto;
+        row.ValoreUnitario     = dto.ValoreUnitario;
+        row.ValoreTotale       = dto.ValoreTotale;
+        row.Approvato          = dto.Approvato;
+        row.OrdinatiRda        = dto.OrdinatiRda;
+        row.Impegnato          = dto.Impegnato;
+        row.Residuo            = dto.Residuo;
+        row.TowApprovati       = dto.TowApprovati;
+        row.TowImpegnati       = dto.TowImpegnati;
+        row.TowResidui         = dto.TowResidui;
+        row.CollaudoApprovato  = dto.CollaudoApprovato;
+        row.CollaudoOrdinato   = dto.CollaudoOrdinato;
+        row.CollaudoFatturato  = dto.CollaudoFatturato;
+
+        _db.SaveChanges();
+        return Ok(row);
+    }
+
     // ── Metodo privato: import tabella ConsumoTOW ─────────────────────────────
     private void ImportConsumoTow(IXLWorksheet ws, IXLRangeRow headerRow)
     {
@@ -584,4 +614,22 @@ public class ContrattoController : BaseController
         }
         return rows;
     }
+}
+
+public class ConsumoTowUpdateDto
+{
+    public string Tow { get; set; } = "";
+    public string? TowContratto { get; set; }
+    public decimal ValoreUnitario { get; set; }
+    public decimal ValoreTotale { get; set; }
+    public decimal Approvato { get; set; }
+    public decimal OrdinatiRda { get; set; }
+    public decimal Impegnato { get; set; }
+    public decimal Residuo { get; set; }
+    public decimal TowApprovati { get; set; }
+    public decimal TowImpegnati { get; set; }
+    public decimal TowResidui { get; set; }
+    public decimal CollaudoApprovato { get; set; }
+    public decimal CollaudoOrdinato { get; set; }
+    public decimal CollaudoFatturato { get; set; }
 }

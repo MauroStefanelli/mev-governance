@@ -7,6 +7,7 @@ import ChartPage from "./pages/ChartPage";
 import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
+import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings } from "./services/mevService";
 
 function App() {
@@ -221,7 +222,7 @@ function App() {
                 onClick={() => setShowAdminMenu(!showAdminMenu)}
                 style={{
                   background:
-                    ["tools", "admin", "dbconfig"].includes(page)
+                    ["tools", "admin", "dbconfig", "consumotow"].includes(page)
                       ? "rgba(255,255,255,0.22)"
                       : "transparent",
                   color: "white",
@@ -244,9 +245,10 @@ function App() {
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
                   {[
-                    { id: "tools",    label: "Caricamento Ordini" },
-                    { id: "admin",    label: "Utenti" },
-                    { id: "dbconfig", label: "Configurazione" },
+                    { id: "tools",      label: "Caricamento Ordini" },
+                    { id: "admin",      label: "Utenti" },
+                    { id: "consumotow", label: "Consumo TOW" },
+                    { id: "dbconfig",   label: "Configurazione" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -363,6 +365,7 @@ function App() {
         {page === "admin"             && role === "Admin" && <AdminPage />}
         {page === "dbconfig"          && role === "Admin" && <DbConfigPage />}
         {page === "tools"             && role === "Admin" && <ToolsPage onUnauthorized={handleLogout} />}
+        {page === "consumotow"        && role === "Admin" && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}
