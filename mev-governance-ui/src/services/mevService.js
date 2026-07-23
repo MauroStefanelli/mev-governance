@@ -5,6 +5,48 @@ const authHeaders = () => ({
   "Authorization": `Bearer ${localStorage.getItem("jwt") || ""}`
 });
 
+// ── Refresh automatico JWT ────────────────────────────────────────────────────
+// Tenta di rinnovare il JWT usando il refreshToken salvato in localStorage.
+// Ritorna true se il rinnovo è riuscito, false altrimenti.
+const tryRefreshToken = async () => {
+  const refreshToken = localStorage.getItem("refreshToken");
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem("jwt", data.token);
+    localStorage.setItem("refreshToken", data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Wrapper fetch che tenta il refresh automatico se riceve 401
+const fetchWithRefresh = async (url, options = {}) => {
+  let res = await fetch(url, options);
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Riprova con il nuovo JWT
+      const newOptions = {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          "Authorization": `Bearer ${localStorage.getItem("jwt") || ""}`,
+        },
+      };
+      res = await fetch(url, newOptions);
+    }
+  }
+  return res;
+};
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
@@ -19,7 +61,7 @@ export const login = async (username, password) => {
 };
 
 export const getMevList = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/mev`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -28,7 +70,7 @@ export const getMevList = async () => {
 };
 
 export async function updateMev(id, payload) {
-  const response = await fetch(`${API_BASE_URL}/api/mev/${id}`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/${id}`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(payload)
@@ -88,7 +130,7 @@ export const exportMev = async (rows, filters = {}) => {
 export const uploadExcel = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await fetch(`${API_BASE_URL}/api/mev/upload`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/upload`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${localStorage.getItem("jwt") || ""}`
@@ -104,7 +146,7 @@ export const uploadExcel = async (file) => {
 };
 
 export const alignMevData = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/mev/align`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/align`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({})
@@ -118,7 +160,7 @@ export const alignMevData = async () => {
 };
 
 export const getContratti = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/contratti`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -127,7 +169,7 @@ export const getContratti = async () => {
 };
 
 export const getContrattiPubblico = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/contratti/pubblico`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/pubblico`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -136,7 +178,7 @@ export const getContrattiPubblico = async () => {
 };
 
 export const getConsumoTow = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/contratti/consumo-tow`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -145,7 +187,7 @@ export const getConsumoTow = async () => {
 };
 
 export const getLastAlign = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/mev/last-align`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/last-align`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -154,7 +196,7 @@ export const getLastAlign = async () => {
 };
 
 export const alignContratti = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/contratti/align`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/align`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({})
@@ -168,7 +210,7 @@ export const alignContratti = async () => {
 };
 
 export const changeMyPassword = async (oldPassword, newPassword) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/me/password`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/password`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify({ oldPassword, newPassword })
@@ -198,13 +240,13 @@ export const getEditorLogins = async (since) => {
   const url = since
     ? `${API_BASE_URL}/api/auth/editor-logins?since=${encodeURIComponent(since)}`
     : `${API_BASE_URL}/api/auth/editor-logins`;
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetchWithRefresh(url, { headers: authHeaders() });
   if (!response.ok) throw new Error("Errore recupero editor logins");
   return response.json();
 };
 
 export const getUsers = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users`, {
     headers: authHeaders()
   });
   if (!response.ok) throw new Error("Errore recupero utenti");
@@ -212,7 +254,7 @@ export const getUsers = async () => {
 };
 
 export const createUser = async (payload) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(payload)
@@ -225,7 +267,7 @@ export const createUser = async (payload) => {
 };
 
 export const toggleUser = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/toggle`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/toggle`, {
     method: "PUT",
     headers: authHeaders()
   });
@@ -234,7 +276,7 @@ export const toggleUser = async (id) => {
 };
 
 export const toggleEmailUser = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/toggleemail`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/toggleemail`, {
     method: "PUT",
     headers: authHeaders()
   });
@@ -243,7 +285,7 @@ export const toggleEmailUser = async (id) => {
 };
 
 export const resetPassword = async (id, newPassword) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/password`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/password`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify({ newPassword })
@@ -252,9 +294,8 @@ export const resetPassword = async (id, newPassword) => {
   return response.json();
 };
 
-
 export const getUserAccessLog = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}/access-log`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/access-log`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -267,8 +308,9 @@ export const getUserAccessLog = async (id) => {
     logoutAt: log.logoutAt || log.logout || log.logoutTime || null,
   }));
 };
+
 export const deleteUser = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/users/${id}`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}`, {
     method: "DELETE",
     headers: authHeaders()
   });
@@ -276,10 +318,8 @@ export const deleteUser = async (id) => {
   return response.json();
 };
 
-
-
 export const getUserAccessLogSafe = async (username) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/editor-logins`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/editor-logins`, {
     headers: authHeaders()
   });
 
@@ -320,7 +360,7 @@ export const getUserAccessLogSafe = async (username) => {
 };
 
 export const getDbConfig = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/db-config`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/db-config`, {
     headers: authHeaders()
   });
   if (!response.ok) throw new Error("Errore lettura configurazione DB");
@@ -328,7 +368,7 @@ export const getDbConfig = async () => {
 };
 
 export const setDbConfig = async (config) => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/db-config`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/db-config`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(config)
@@ -341,7 +381,7 @@ export const setDbConfig = async (config) => {
 };
 
 export const testDbConnection = async (config) => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/test-db`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/test-db`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(config)
@@ -354,7 +394,7 @@ export const testDbConnection = async (config) => {
 };
 
 export const restartBackend = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/restart`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/restart`, {
     method: "POST",
     headers: authHeaders()
   });
@@ -366,7 +406,7 @@ export const restartBackend = async () => {
 };
 
 export const getAppSettings = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/app`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/app`, {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
@@ -375,7 +415,7 @@ export const getAppSettings = async () => {
 };
 
 export const setAppSettings = async (data) => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/app`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/app`, {
     method: "PUT",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -386,7 +426,7 @@ export const setAppSettings = async (data) => {
 };
 
 export const resetData = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/reset-data`, {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/reset-data`, {
     method: "POST",
     headers: authHeaders()
   });
