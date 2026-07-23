@@ -25,14 +25,15 @@ const formatNum = (v) => {
 const formatEuro = (v) => {
   if (v === null || v === undefined || v === "") return "";
 
-  const n = parseFloat(v);
+  const n = Number(v);
 
   if (isNaN(n)) return "";
 
-  return `€ ${n.toLocaleString("it-IT", {
+  return `€ ${new Intl.NumberFormat("it-IT", {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
-  })}`;
+    useGrouping: true,
+  }).format(n)}`;
 };
 
 
@@ -150,7 +151,7 @@ function EditModal({ row, onClose, onSaved }) {
               <input style={inputStyleReadonly} value={form.tow || ""} readOnly />
             </div>
             <div>
-              <div style={labelStyle}>TOW Contratto</div>
+              <div style={labelStyle}>Contratto</div>
               <input style={inputStyleReadonly} value={form.towContratto || ""} readOnly />
             </div>
           </div>
@@ -322,7 +323,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
             <table
               style={{
                 width: "100%",
-                minWidth: "1800px",
+                minWidth: "2300px",
                 borderCollapse: "collapse",
                 fontSize: "13px"
               }}
