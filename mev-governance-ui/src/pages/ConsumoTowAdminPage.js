@@ -174,6 +174,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
   const [selectedContratto, setSelectedContratto] = useState("");
   const [editRow, setEditRow] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [showCollaudo, setShowCollaudo] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -250,25 +251,37 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
               Contratto <span style={{ color: "#1a73e8" }}>{selectedContratto}</span>
               <span style={{ fontSize: "12px", fontWeight: 400, color: "#64748b", marginLeft: "10px" }}>— {filteredRows.length} righe</span>
             </div>
+            <button
+              onClick={() => setShowCollaudo(v => !v)}
+              style={{
+                padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                cursor: "pointer", transition: "all 0.15s",
+                border: showCollaudo ? "1.5px solid #1a73e8" : "1.5px solid #e2e8f0",
+                background: showCollaudo ? "#eff6ff" : "#f8fafc",
+                color: showCollaudo ? "#1a73e8" : "#64748b",
+              }}
+            >
+              {showCollaudo ? "▼ Nascondi Collaudo" : "▶ Mostra Collaudo"}
+            </button>
           </div>
 
           {/* Tabella scrollabile */}
           <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 340px)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  <th style={{ ...TH("left"), minWidth: "110px" }}>TOW</th>
-                  <th style={{ ...TH("right"), minWidth: "90px" }}>QTA</th>
-                  {FIELDS.map(f => (
-                    <th key={f.key} style={{ ...TH("right"), minWidth: f.group === "euro" ? "150px" : "110px" }}>{f.label}</th>
+                  <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
+                  <th style={{ ...TH("right"), width: "70px" }}>QTA</th>
+                  {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
+                    <th key={f.key} style={{ ...TH("right"), width: f.group === "euro" ? "130px" : "90px" }}>{f.label}</th>
                   ))}
-                  <th style={{ ...TH("center"), minWidth: "90px" }}>Azioni</th>
+                  <th style={{ ...TH("center"), width: "85px" }}>Azioni</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={FIELDS.length + 3} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
+                    <td colSpan={FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).length + 3} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
                       Nessuna riga per il contratto selezionato
                     </td>
                   </tr>
@@ -277,11 +290,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
                     onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}
                   >
-                    <td style={{ ...TD("left"), fontWeight: 700, color: "#1e293b" }}>{row.tow}</td>
+                    <td style={{ ...TD("left"), fontWeight: 700, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis" }}>{row.tow}</td>
                     <td style={TD("right")}>
                       {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
                     </td>
-                    {FIELDS.map(f => (
+                    {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
                       <td key={f.key} style={{ ...TD("right"), color: f.key === "residuo" ? "#f97316" : f.key === "approvato" ? "#1a73e8" : "#374151" }}>
                         {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
                       </td>
@@ -303,7 +316,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                   <tr style={{ background: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
                     <td style={{ ...TD("left"), fontWeight: 700, color: "#1e293b" }}>TOTALE</td>
                     <td style={TD("right")} />
-                    {FIELDS.map(f => {
+                    {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
                       const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                       return (
                         <td key={f.key} style={{ ...TD("right"), fontWeight: 700, color: "#1e293b" }}>
