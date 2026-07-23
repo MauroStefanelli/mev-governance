@@ -246,6 +246,10 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     ? rows.filter(r => r.towContratto === selectedContratto)
     : [];
 
+  const totaleContratto = filteredRows.reduce(
+    (sum, row) => sum + (Number(row.valoreTotale) || 0), 0
+  );
+
   const handleSaved = (updated) => {
     setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
     setSuccessMsg("Riga aggiornata con successo");
@@ -300,18 +304,55 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
         marginBottom: "20px", display: "flex", alignItems: "center", gap: "16px",
         flexWrap: "wrap",
       }}>
-        <div style={labelStyle}>TOW Contratto</div>
+        <div style={labelStyle}>Contratto</div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {contratti.map(c => (
-            <button key={c} onClick={() => setSelectedContratto(c)} style={{
-              padding: "6px 16px", borderRadius: "20px", fontSize: "13px",
-              fontWeight: selectedContratto === c ? 700 : 400,
-              border: selectedContratto === c ? "2px solid #1a73e8" : "2px solid #e2e8f0",
-              background: selectedContratto === c ? "#eff6ff" : "#fff",
-              color: selectedContratto === c ? "#1a73e8" : "#374151",
-              cursor: "pointer", transition: "all 0.15s",
-            }}>{c}</button>
-          ))}
+          {contratti.map(c => {
+            const totale = rows
+              .filter(r => r.towContratto === c)
+              .reduce(
+                (sum, r) => sum + (Number(r.valoreTotale) || 0),
+                0
+              );
+
+            return (
+              <button
+                key={c}
+                onClick={() => setSelectedContratto(c)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "20px",
+                  fontSize: "13px",
+                  fontWeight: selectedContratto === c ? 700 : 400,
+                  border:
+                    selectedContratto === c
+                      ? "2px solid #1a73e8"
+                      : "2px solid #e2e8f0",
+                  background:
+                    selectedContratto === c
+                      ? "#eff6ff"
+                      : "#fff",
+                  color:
+                    selectedContratto === c
+                      ? "#1a73e8"
+                      : "#374151",
+                  cursor: "pointer",
+                }}
+              >
+                <div>{c}</div>
+
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    marginTop: "2px"
+                  }}
+                >
+                  {formatEuro(totale)}
+                </div>
+              </button>
+            );
+          })}
+
         </div>
         {loading && (
           <span style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "auto" }}>
