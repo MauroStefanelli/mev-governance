@@ -2,7 +2,7 @@
  * Formattazione numero in stile it-IT (punto migliaia, virgola decimale)
  * Indipendente dal supporto ICU del browser.
  */
-export const fmtItIT = (num, decimals = 2) => {
+export const fmtItIT = (num, decimals = 3) => {
   if (num === null || num === undefined || num === "") return "";
   const n = parseFloat(num);
   if (isNaN(n)) return "";
