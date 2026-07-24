@@ -19,19 +19,23 @@ const authHeaders = () => ({
  * Lancia eccezione se il parser non risponde entro maxWaitMs.
  */
 const waitForParser = async (onProgress, maxWaitMs = 90000) => {
-  const interval = 4000;
+  const interval = 6000;  // polling ogni 6s (backend impiega max 5s a rispondere)
   const started = Date.now();
   let elapsed = 0;
   while (elapsed < maxWaitMs) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000); // timeout fetch 7s
       const res = await fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
         headers: authHeaders(),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         if (data.status === "ok") return; // parser pronto
       }
-    } catch { /* rete non disponibile, riprova */ }
+    } catch { /* rete non disponibile o timeout, riprova */ }
     elapsed = Date.now() - started;
     onProgress(Math.round(elapsed / 1000));
     await new Promise(r => setTimeout(r, interval));

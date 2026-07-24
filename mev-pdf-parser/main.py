@@ -124,9 +124,6 @@ async def debug_pdf(file: UploadFile = File(...)):
 
 
 # ============================================================
-# HEALTH CHECK
+# HEALTH CHECK (duplicato rimosso — definizione unica sopra)
 # ============================================================
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}

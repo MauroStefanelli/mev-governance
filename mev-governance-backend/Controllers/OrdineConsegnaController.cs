@@ -28,8 +28,10 @@ public class OrdineConsegnaController : ControllerBase
 
     // ============================================================
     // GET /api/tools/parser-warmup  — sveglia il parser (cold start Render free)
-    // Restituisce { status: "ok" } solo se il parser risponde con 2xx
-    // Restituisce { status: "warming" } se è ancora in avvio (502/errore rete)
+    // Risponde SEMPRE entro pochi secondi:
+    //   { status: "ok" }      → parser già attivo
+    //   { status: "warming" } → parser ancora in avvio
+    // Il frontend fa polling su questo endpoint finché ottiene "ok".
     // ============================================================
     [HttpGet("parser-warmup")]
     public async Task<IActionResult> ParserWarmup()
@@ -37,7 +39,8 @@ public class OrdineConsegnaController : ControllerBase
         try
         {
             var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(35);
+            // Timeout breve: se il parser non risponde in 5s è ancora in cold start
+            client.Timeout = TimeSpan.FromSeconds(5);
             var response = await client.GetAsync($"{_pdfParserUrl}/health");
             if (response.IsSuccessStatusCode)
                 return Ok(new { status = "ok" });
