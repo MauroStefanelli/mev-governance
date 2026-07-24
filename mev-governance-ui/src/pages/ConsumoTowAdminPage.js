@@ -20,6 +20,25 @@ const parseNum = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
+// Formatta un numero per la visualizzazione nel campo input (formato italiano)
+const formatForInput = (v, group) => {
+  const n = Number(v);
+  if (isNaN(n) || v === "" || v === null || v === undefined) return "0";
+  if (group === "euro") {
+    return new Intl.NumberFormat("it-IT", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      useGrouping: true,
+    }).format(n);
+  }
+  // qta: fino a 3 decimali, senza simbolo €
+  return new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+    useGrouping: true,
+  }).format(n);
+};
+
 // Campi con totale abilitato
 const TOTALE_KEYS = new Set(["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"]);
 
@@ -71,7 +90,7 @@ function EditModal({ row, onClose, onSaved }) {
 
   useEffect(() => {
     const init = { tow: row.tow || "", towContratto: row.towContratto || "" };
-    FIELDS.forEach(f => { init[f.key] = row[f.key] ?? 0; });
+    FIELDS.forEach(f => { init[f.key] = formatForInput(row[f.key] ?? 0, f.group); });
     setForm(init);
   }, [row]);
 
@@ -130,7 +149,7 @@ function EditModal({ row, onClose, onSaved }) {
                   style={{ ...inputBase, textAlign: "right" }}
                   value={form[f.key] ?? ""}
                   onChange={e => set(f.key, e.target.value)}
-                  onBlur={e => set(f.key, parseNum(e.target.value))}
+                  onBlur={e => set(f.key, formatForInput(parseNum(e.target.value), f.group))}
                 />
               </div>
             ))}
@@ -146,7 +165,7 @@ function EditModal({ row, onClose, onSaved }) {
                   style={{ ...inputBase, textAlign: "right" }}
                   value={form[f.key] ?? ""}
                   onChange={e => set(f.key, e.target.value)}
-                  onBlur={e => set(f.key, parseNum(e.target.value))}
+                  onBlur={e => set(f.key, formatForInput(parseNum(e.target.value), f.group))}
                 />
               </div>
             ))}
