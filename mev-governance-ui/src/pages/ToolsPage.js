@@ -97,6 +97,35 @@ const deleteVerbale = async (id) => {
 };
 
 // ============================================================
+// ERROR PARSING
+// ============================================================
+
+/**
+ * Converte un messaggio di errore grezzo in testo leggibile.
+ * Gestisce il caso in cui il backend riceva una pagina HTML 502
+ * dal parser Python (cold start su Render free tier).
+ */
+const parseApiError = (raw) => {
+  if (!raw) return "Errore sconosciuto.";
+  const s = String(raw);
+  // Risposta HTML grezza (502 / pagina di errore proxy)
+  if (s.trimStart().startsWith("<") || s.toLowerCase().includes("<!doctype")) {
+    return "Il servizio di parsing PDF non è disponibile (502). Potrebbe essere in fase di avvio su Render: attendere 30-60 secondi e riprovare.";
+  }
+  // Messaggio già "pulito" proveniente dal backend dopo il rilevamento 502
+  if (s.includes("502 Bad Gateway") || s.includes("cold start")) {
+    return "Il servizio di parsing PDF non è ancora pronto. Attendere qualche secondo e riprovare.";
+  }
+  // Prova a estrarre il campo "detail" o "title" da JSON ASP.NET ProblemDetails
+  try {
+    const json = JSON.parse(s);
+    return json.detail || json.title || json.message || s;
+  } catch {
+    return s;
+  }
+};
+
+// ============================================================
 // HELPERS UI
 // ============================================================
 
@@ -185,7 +214,7 @@ export default function ToolsPage({ onUnauthorized }) {
       const res = await debugPdf(file);
       setDebugText(res.testo);
     } catch (e) {
-      setDebugText(`ERRORE: ${e.message}`);
+      setDebugText(`ERRORE: ${parseApiError(e.message)}`);
     } finally {
       setDebugging(false);
       if (debugRef.current) debugRef.current.value = "";
@@ -204,7 +233,7 @@ export default function ToolsPage({ onUnauthorized }) {
       });
       await load();
     } catch (e) {
-      setUploadMsg({ type: "err", text: `Errore: ${e.message}` });
+      setUploadMsg({ type: "err", text: `Errore: ${parseApiError(e.message)}` });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -254,7 +283,7 @@ export default function ToolsPage({ onUnauthorized }) {
       });
       await load();
     } catch (e) {
-      setVapMsg({ type: "err", text: `Errore: ${e.message}` });
+      setVapMsg({ type: "err", text: `Errore: ${parseApiError(e.message)}` });
     } finally {
       setUploadingVap(false);
     }
@@ -284,7 +313,7 @@ export default function ToolsPage({ onUnauthorized }) {
       const res = await debugVap(file);
       setDebugVapResult(res);
     } catch (e) {
-      setDebugVapResult({ error: e.message });
+      setDebugVapResult({ error: parseApiError(e.message) });
     } finally {
       setDebuggingVap(false);
     }

@@ -876,7 +876,7 @@ public class OrdineConsegnaController : ControllerBase
         var fileBytes = ms.ToArray();
 
         // Timeout lungo per gestire cold start del parser su Render free (può impiegare 30-60s)
-        // Retry 1 volta in caso di errore transitorio (es. cold start)
+        // Retry 1 volta in caso di errore transitorio (es. cold start) o 502
         Exception? lastEx = null;
         for (int attempt = 1; attempt <= 2; attempt++)
         {
@@ -894,13 +894,34 @@ public class OrdineConsegnaController : ControllerBase
                 var body = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
+                {
+                    // Rileva risposta HTML (502 Bad Gateway / cold start Render)
+                    var isHtml = body.TrimStart().StartsWith("<", StringComparison.OrdinalIgnoreCase)
+                                 || (response.Content.Headers.ContentType?.MediaType?.Contains("html") ?? false);
+
+                    if (isHtml || (int)response.StatusCode == 502)
+                    {
+                        // Al primo tentativo riprova dopo una pausa più lunga per lasciare tempo al cold start
+                        if (attempt == 1)
+                        {
+                            lastEx = new Exception(
+                                "Il servizio di parsing PDF non è ancora pronto (cold start). Riprovo tra 8 secondi…");
+                            await Task.Delay(8000);
+                            continue;
+                        }
+                        throw new Exception(
+                            "Il servizio di parsing PDF non è disponibile (502 Bad Gateway). " +
+                            "Il servizio su Render potrebbe essere in fase di avvio: attendere 30-60 secondi e riprovare.");
+                    }
+
                     throw new Exception($"Parser Python ({endpoint}): {body}");
+                }
 
                 return JsonDocument.Parse(body).RootElement;
             }
-            catch (Exception ex) when (attempt == 1)
+            catch (Exception ex) when (attempt == 1 && lastEx == null)
             {
-                // Primo tentativo fallito: aspetta 3s e riprova (cold start)
+                // Primo tentativo fallito per errore di rete/timeout: aspetta 3s e riprova
                 lastEx = ex;
                 await Task.Delay(3000);
             }
