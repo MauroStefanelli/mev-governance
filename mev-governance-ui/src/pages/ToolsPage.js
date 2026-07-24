@@ -13,6 +13,32 @@ const authHeaders = () => ({
 // SERVICE CALLS
 // ============================================================
 
+/**
+ * Aspetta che il parser PDF sia pronto facendo polling su /parser-warmup.
+ * Chiama onProgress(secondi) ad ogni tentativo per aggiornare l'UI.
+ * Lancia eccezione se il parser non risponde entro maxWaitMs.
+ */
+const waitForParser = async (onProgress, maxWaitMs = 90000) => {
+  const interval = 4000;
+  const started = Date.now();
+  let elapsed = 0;
+  while (elapsed < maxWaitMs) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "ok") return; // parser pronto
+      }
+    } catch { /* rete non disponibile, riprova */ }
+    elapsed = Date.now() - started;
+    onProgress(Math.round(elapsed / 1000));
+    await new Promise(r => setTimeout(r, interval));
+  }
+  throw new Error("Il servizio di parsing PDF non risponde dopo 90 secondi. Riprovare più tardi.");
+};
+
 const getOrdini = async () => {
   const res = await fetch(`${API_BASE_URL}/api/tools/ordini`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Errore recupero ordini");
@@ -161,6 +187,8 @@ export default function ToolsPage({ onUnauthorized }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState(null); // { type: "ok"|"err", text }
+  const [warmingUp, setWarmingUp] = useState(false);   // parser in avvio
+  const [warmingSeconds, setWarmingSeconds] = useState(0);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
@@ -225,6 +253,20 @@ export default function ToolsPage({ onUnauthorized }) {
   const doUpload = async (file) => {
     setUploadMsg(null);
     setUploading(true);
+    // Warmup: aspetta che il parser sia pronto prima di inviare il PDF
+    try {
+      setWarmingUp(true);
+      setWarmingSeconds(0);
+      await waitForParser((secs) => setWarmingSeconds(secs));
+    } catch (e) {
+      setUploadMsg({ type: "err", text: parseApiError(e.message) });
+      setUploading(false);
+      setWarmingUp(false);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    } finally {
+      setWarmingUp(false);
+    }
     try {
       const res = await uploadPdf(file);
       setUploadMsg({
@@ -275,6 +317,19 @@ export default function ToolsPage({ onUnauthorized }) {
     if (vapRef.current) vapRef.current.value = "";
     setVapMsg(null);
     setUploadingVap(true);
+    // Warmup: aspetta che il parser sia pronto prima di inviare il PDF
+    try {
+      setWarmingUp(true);
+      setWarmingSeconds(0);
+      await waitForParser((secs) => setWarmingSeconds(secs));
+    } catch (e) {
+      setVapMsg({ type: "err", text: parseApiError(e.message) });
+      setUploadingVap(false);
+      setWarmingUp(false);
+      return;
+    } finally {
+      setWarmingUp(false);
+    }
     try {
       const res = await uploadVap(file);
       setVapMsg({
@@ -653,7 +708,7 @@ export default function ToolsPage({ onUnauthorized }) {
           transition: "background 0.15s",
           pointerEvents: uploading ? "none" : "auto",
         }}>
-          {uploading ? "Importazione..." : "Carica Ordine"}
+          {uploading ? (warmingUp ? "Avvio parser..." : "Importazione...") : "Carica Ordine"}
           <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFile} />
         </label>
 
@@ -691,7 +746,7 @@ export default function ToolsPage({ onUnauthorized }) {
         }}
           title="Carica un PDF Verbale di Avanzamento per aggiornare Q.tà Avanzata, Importo Fatturabile e Subappalto"
         >
-          {uploadingVap ? "Elaborazione..." : "Carica Verbale"}
+          {uploadingVap ? (warmingUp ? "Avvio parser..." : "Elaborazione...") : "Carica Verbale"}
           <input ref={vapRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleVap} />
         </label>
 
@@ -841,6 +896,24 @@ export default function ToolsPage({ onUnauthorized }) {
               }}
             >×</button>
           </div>
+        </div>
+      )}
+
+      {/* ── Banner warmup parser ── */}
+      {warmingUp && (
+        <div style={{
+          marginBottom: "16px", padding: "12px 18px", borderRadius: "7px",
+          fontSize: "13px", fontWeight: 500,
+          background: "#fff8e1", color: "#e65100",
+          border: "1px solid #ffcc80",
+          display: "flex", alignItems: "center", gap: "10px",
+        }}>
+          <span style={{ fontSize: "18px", lineHeight: 1 }}>⏳</span>
+          <span>
+            Avvio del servizio di parsing PDF in corso
+            {warmingSeconds > 0 ? ` (${warmingSeconds}s)` : ""}
+            … attendere, il servizio su Render si sta risvegliando.
+          </span>
         </div>
       )}
 
