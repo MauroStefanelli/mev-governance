@@ -545,10 +545,12 @@ public class OrdineConsegnaController : ControllerBase
 
         // ── Formato v2 (template corrente): ODA POS [Cod] Descr [TOW] PREZZO€ QTA IMPORTO€ SI/NO
         // SI/NO può essere seguito da watermark — usiamo \b non $
+        // Importo: accetta qualsiasi formato italiano con virgola decimale
+        //   es. 8.192,00 | 19.329,00 | 192,00 | 1.234.567,89
         var codaReV2 = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
-            @"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€\s*" +
+            @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€\s*" +
             @"(SI|NO)\b",
             RegexOptions.IgnoreCase
         );
@@ -560,7 +562,7 @@ public class OrdineConsegnaController : ControllerBase
             @"(\d[\d.,]*)\s+" +          // QTA (intera o decimale, senza €)
             @"(\d[\d,]*)\s*€\s+" +       // Prezzo unitario €
             @"\d[\d.,]*\s*€\s+" +        // Totale avanzato € (da ignorare)
-            @"(\d[\d.,]*)\s*€",          // di cui Fatturabile € (= importo che ci interessa)
+            @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€",  // di cui Fatturabile €
             RegexOptions.IgnoreCase
         );
 
