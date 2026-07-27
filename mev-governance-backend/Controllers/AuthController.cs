@@ -174,6 +174,30 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Utente eliminato" });
     }
 
+    // ============================================================
+    // PUT /api/auth/users/{id}/role — cambia ruolo utente
+    // ============================================================
+    [HttpPut("users/{id}/role")]
+    [Authorize]
+    public IActionResult UpdateUserRole(int id, [FromBody] UpdateRoleRequest request)
+    {
+        if (!User.IsInRole("Admin"))
+            return Forbid();
+
+        var validRoles = new[] { "Admin", "Editor" };
+        if (!validRoles.Contains(request.Role))
+            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor");
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null)
+            return NotFound("Utente non trovato");
+
+        user.Role = request.Role;
+        _db.SaveChanges();
+
+        return Ok(new { id = user.Id, username = user.Username, role = user.Role });
+    }
+
     [HttpPost("users")]
     [Authorize]
     public IActionResult CreateUser([FromBody] CreateUserRequest request)
@@ -353,3 +377,4 @@ public record CreateUserRequest(
 // ============================================================
 public record LoginRequest(string Username, string Password);
 public record RefreshRequest(string RefreshToken);
+public record UpdateRoleRequest(string Role);

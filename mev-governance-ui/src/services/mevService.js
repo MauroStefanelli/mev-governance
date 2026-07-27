@@ -318,6 +318,19 @@ export const deleteUser = async (id) => {
   return response.json();
 };
 
+export const updateUserRole = async (id, role) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/role`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ role })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const getUserAccessLogSafe = async (username) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/editor-logins`, {
     headers: authHeaders()

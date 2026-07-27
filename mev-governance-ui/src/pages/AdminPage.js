@@ -7,7 +7,8 @@ import {
   toggleEmailUser, 
   resetPassword, 
   deleteUser, 
-  getUserAccessLog 
+  getUserAccessLog,
+  updateUserRole,
 } from "../services/mevService";
 
 
@@ -36,6 +37,7 @@ function AdminPage() {
   const [success, setSuccess] = useState("");
   const [accessLogModal, setAccessLogModal] = useState(null); // { userId, username, fullName, logs: [] }
   const [accessLogLoading, setAccessLogLoading] = useState(false);
+  const [savingRole, setSavingRole] = useState({}); // { [userId]: true/false }
 
   const formatDateTime = (iso) => {
 
@@ -106,6 +108,20 @@ function AdminPage() {
       setUsers((prev) => prev.map((u) => u.id === id ? { ...u, sendEmail: result.sendEmail } : u));
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleChangeRole = async (id, newRole) => {
+    setSavingRole((prev) => ({ ...prev, [id]: true }));
+    setError("");
+    try {
+      const result = await updateUserRole(id, newRole);
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: result.role } : u));
+      notify(`Ruolo aggiornato: ${result.role}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingRole((prev) => ({ ...prev, [id]: false }));
     }
   };
 
@@ -249,7 +265,24 @@ function AdminPage() {
               <td><strong>{u.username}</strong></td>
               <td>{u.fullName}</td>
               <td>{u.email}</td>
-              <td>{u.role}</td>
+              <td>
+                <select
+                  value={u.role}
+                  disabled={savingRole[u.id]}
+                  onChange={(e) => handleChangeRole(u.id, e.target.value)}
+                  style={{
+                    padding: "3px 6px", border: "1px solid #ccc", borderRadius: "4px",
+                    fontSize: "12px", cursor: savingRole[u.id] ? "wait" : "pointer",
+                    background: u.role === "Admin" ? "#fff3cd" : "#f8f9fa",
+                    color: u.role === "Admin" ? "#856404" : "#333",
+                    fontWeight: 600,
+                    opacity: savingRole[u.id] ? 0.6 : 1,
+                  }}
+                >
+                  <option value="Editor">Editor</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </td>
               <td style={{ textAlign: "center" }}>
                 <span style={{
                   padding: "2px 8px", borderRadius: "12px", fontSize: "12px",
