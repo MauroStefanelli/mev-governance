@@ -36,7 +36,7 @@ services:
       - JWT_KEY=MEV-Governance-SuperSecretKey-2025-Capgemini!
       - JWT_ISSUER=mev-governance
       - JWT_AUDIENCE=mev-governance-ui
-      - DATABASE_PATH=/data/mev.db
+      - DATABASE_DIRECT_URL=Host=postgres;Port=5432;Database=MEV-Governance;Username=mev_user;Password=Mev2025!
       - PDF_PARSER_URL=http://pdf-parser:8765
     volumes:
       - /share/Public/mev-data:/data
@@ -50,6 +50,8 @@ services:
     build:
       context: ./mev-governance-ui
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://localhost:8081
     image: mev-frontend:latest
     container_name: mev-frontend
     restart: unless-stopped
