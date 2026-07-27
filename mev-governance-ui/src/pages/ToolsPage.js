@@ -721,20 +721,33 @@ export default function ToolsPage({ onUnauthorized }) {
           onClick={() => setShowPdfPanel(true)}
           disabled={pdfGroups.length === 0}
           style={{
-            display: "inline-flex", alignItems: "center", gap: "6px",
-            padding: "8px 14px", borderRadius: "7px",
-            background: pdfGroups.length === 0 ? "#f1f3f4" : "#fff8e1",
-            color: pdfGroups.length === 0 ? "#aaa" : "#e65100",
-            border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#ffcc80"}`,
-            fontWeight: 600, fontSize: "13px", cursor: pdfGroups.length === 0 ? "default" : "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "8px 14px",
+            borderRadius: "7px",
+            background: pdfGroups.length === 0 ? "#f1f3f4" : "#0078D4",
+            color: pdfGroups.length === 0 ? "#aaa" : "#ffffff",
+            border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#0078D4"}`,
+            fontWeight: 600,
+            fontSize: "13px",
+            cursor: pdfGroups.length === 0 ? "default" : "pointer",
           }}
         >
           Ordini Caricati
           {pdfGroups.length > 0 && (
-            <span style={{
-              background: "#e65100", color: "white", borderRadius: "10px",
-              padding: "1px 7px", fontSize: "11px", fontWeight: 700,
-            }}>{pdfGroups.length}</span>
+            <span
+              style={{
+                background: "#ffffff",
+                color: "#0078D4",
+                borderRadius: "10px",
+                padding: "1px 7px",
+                fontSize: "11px",
+                fontWeight: 700,
+              }}
+            >
+              {pdfGroups.length}
+            </span>
           )}
         </button>
 
