@@ -7,7 +7,7 @@ on:
 
 jobs:
 
-  frontend:
+  frontend-render:
     runs-on: ubuntu-latest
 
     permissions:
@@ -31,6 +31,35 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/maurostefanelli/mev-governance-frontend:latest
+          build-args: |
+            REACT_APP_API_URL=https://mev-governance-backend.onrender.com
+
+  frontend-qnap:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./mev-governance-ui
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/maurostefanelli/mev-governance-frontend:qnap
+          build-args: |
+            REACT_APP_API_URL=http://192.168.1.144:4000
 
   backend:
     runs-on: ubuntu-latest
@@ -83,3 +112,4 @@ jobs:
           platforms: linux/amd64,linux/arm64
           provenance: false
           tags: ghcr.io/maurostefanelli/mev-pdf-parser:latest
+

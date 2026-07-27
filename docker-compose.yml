@@ -13,10 +13,7 @@ services:
       - "5432:5432"
 
   pdf-parser:
-    build:
-      context: .
-      dockerfile: ./mev-pdf-parser/Dockerfile
-    image: mev-pdf-parser:latest
+    image: ghcr.io/maurostefanelli/mev-pdf-parser:latest
     container_name: mev-pdf-parser
     restart: unless-stopped
     environment:
@@ -25,10 +22,7 @@ services:
       - "8765:8765"
 
   backend:
-    build:
-      context: ./mev-governance-backend
-      dockerfile: Dockerfile
-    image: mev-backend:latest
+    image: ghcr.io/maurostefanelli/mev-governance-backend:latest
     container_name: mev-backend
     restart: unless-stopped
     environment:
@@ -47,12 +41,7 @@ services:
       - pdf-parser
 
   frontend:
-    build:
-      context: ./mev-governance-ui
-      dockerfile: Dockerfile
-      args:
-        - REACT_APP_API_URL=http://localhost:8081
-    image: mev-frontend:latest
+    image: ghcr.io/maurostefanelli/mev-governance-frontend:qnap
     container_name: mev-frontend
     restart: unless-stopped
     ports:
