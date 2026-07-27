@@ -726,8 +726,8 @@ export default function ToolsPage({ onUnauthorized }) {
             gap: "6px",
             padding: "8px 14px",
             borderRadius: "7px",
-            background: pdfGroups.length === 0 ? "#f1f3f4" : "#0078D4",
-            color: pdfGroups.length === 0 ? "#aaa" : "#ffffff",
+            background: pdfGroups.length === 0 ? "#f1f3f4" : "#f3f9ff",
+            color: pdfGroups.length === 0 ? "#aaa" : "##0078D4",
             border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#0078D4"}`,
             fontWeight: 600,
             fontSize: "13px",
@@ -738,8 +738,8 @@ export default function ToolsPage({ onUnauthorized }) {
           {pdfGroups.length > 0 && (
             <span
               style={{
-                background: "#ffffff",
-                color: "#0078D4",
+                background: "#0078D4",
+                color: "#ffffff",
                 borderRadius: "10px",
                 padding: "1px 7px",
                 fontSize: "11px",
