@@ -49,6 +49,7 @@ var allowedOrigins = new List<string>
     "https://mev-governance-frontend.onrender.com",
     "http://localhost:3000",
     "http://localhost:8082",
+    "http://192.168.1.144:3000",
 };
 
 // Permette di aggiungere origini aggiuntive via variabile d'ambiente
@@ -272,9 +273,9 @@ using (var scope = app.Services.CreateScope())
         db.Database.ExecuteSqlRaw(@"
             DO $$ BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.columns
-                           WHERE table_name='AppUsers' AND column_name='IsActive'
+                           WHERE table_name='Users' AND column_name='IsActive'
                            AND data_type='integer') THEN
-                    ALTER TABLE ""AppUsers""
+                    ALTER TABLE ""Users""
                         ALTER COLUMN ""IsActive""  TYPE BOOLEAN USING ""IsActive""::boolean,
                         ALTER COLUMN ""SendEmail"" TYPE BOOLEAN USING ""SendEmail""::boolean;
                 END IF;
@@ -286,16 +287,15 @@ using (var scope = app.Services.CreateScope())
     // Seed admin — usa SQL raw per evitare problemi di tipo boolean con EF su PostgreSQL
     try
     {
-        var exists = db.Database.ExecuteSqlRaw(@"SELECT 1 FROM ""AppUsers"" LIMIT 1") >= 0
-                     && db.Users.Any();
+        var exists = db.Users.Any();
         if (!exists)
         {
             var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
             var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
             db.Database.ExecuteSqlRaw(@"
-                INSERT INTO ""AppUsers"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+                INSERT INTO ""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
                 SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{0},'Admin',true,false
-                WHERE NOT EXISTS (SELECT 1 FROM ""AppUsers"")
+                WHERE NOT EXISTS (SELECT 1 FROM ""Users"")
             ", hash);
         }
     }
