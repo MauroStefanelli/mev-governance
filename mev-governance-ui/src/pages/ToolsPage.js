@@ -727,7 +727,7 @@ export default function ToolsPage({ onUnauthorized }) {
             padding: "8px 14px",
             borderRadius: "7px",
             background: pdfGroups.length === 0 ? "#f1f3f4" : "#f3f9ff",
-            color: pdfGroups.length === 0 ? "#aaa" : "##0078D4",
+            color: pdfGroups.length === 0 ? "#aaa" : "#0078D4",
             border: `1px solid ${pdfGroups.length === 0 ? "#dadce0" : "#0078D4"}`,
             fontWeight: 600,
             fontSize: "13px",
