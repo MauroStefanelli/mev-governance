@@ -59,7 +59,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ghcr.io/maurostefanelli/mev-governance-frontend:qnap
           build-args: |
-            REACT_APP_API_URL=http://192.168.1.144:8081
+            REACT_APP_API_URL=http://192.168.1.144:4000
 
   backend:
     runs-on: ubuntu-latest
