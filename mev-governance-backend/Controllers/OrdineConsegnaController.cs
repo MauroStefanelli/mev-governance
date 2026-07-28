@@ -32,10 +32,15 @@ public class OrdineConsegnaController : ControllerBase
     //   { status: "ok" }      → parser già attivo
     //   { status: "warming" } → parser ancora in avvio
     // Il frontend fa polling su questo endpoint finché ottiene "ok".
+    // Se SKIP_PARSER_WARMUP=true (es. QNAP locale) risponde subito ok senza chiamare il parser.
     // ============================================================
     [HttpGet("parser-warmup")]
     public async Task<IActionResult> ParserWarmup()
     {
+        // Su ambienti locali (QNAP) il parser non va mai in sleep: skip warmup
+        if (Environment.GetEnvironmentVariable("SKIP_PARSER_WARMUP") == "true")
+            return Ok(new { status = "ok" });
+
         try
         {
             var client = _httpClientFactory.CreateClient();

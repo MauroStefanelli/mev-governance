@@ -32,6 +32,7 @@ services:
       - JWT_AUDIENCE=mev-governance-ui
       - DATABASE_DIRECT_URL=Host=postgres;Port=5432;Database=MEV-Governance;Username=mev_user;Password=Mev2025!
       - PDF_PARSER_URL=http://pdf-parser:8000
+      - SKIP_PARSER_WARMUP=true
     volumes:
       - /share/Public/mev-data:/data
     ports:
