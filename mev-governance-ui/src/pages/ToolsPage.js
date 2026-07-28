@@ -640,6 +640,9 @@ export default function ToolsPage({ onUnauthorized }) {
     return s + (isNaN(n) ? 0 : n);
   }, 0);
 
+  // Da fatturare = Totale Ordinato - Totale Fatturato
+  const daFatturare = totaleOrdinato - totaleFatturato;
+
   const fmtEuro = (n) => fmtItIT(n);
 
   // ============================================================
@@ -688,6 +691,29 @@ export default function ToolsPage({ onUnauthorized }) {
               </div>
               <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
                 € {fmtEuro(totaleFatturato)}
+              </div>
+              {search && (
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
+                  su {filtered.length} righe filtrate
+                </div>
+              )}
+            </div>
+            {/* Da Fatturare */}
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-end",
+              background: daFatturare < 0
+                ? "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)"
+                : "linear-gradient(135deg, #d97706 0%, #92400e 100%)",
+              borderRadius: "10px", padding: "12px 22px",
+              boxShadow: daFatturare < 0
+                ? "0 2px 8px rgba(220,38,38,0.25)"
+                : "0 2px 8px rgba(217,119,6,0.25)",
+            }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>
+                Da Fatturare
+              </div>
+              <div style={{ fontSize: "22px", fontWeight: 800, color: "white", letterSpacing: "0.3px" }}>
+                € {fmtEuro(daFatturare)}
               </div>
               {search && (
                 <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
