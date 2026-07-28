@@ -43,5 +43,8 @@ public class MevItem
     public string PRelease { get; set; } = "";
     public decimal PImporto { get; set; }
     public string? PNote { get; set; }
+
+    // Importo BDO editabile (pre-popolato da OrdinatoBdo all'import, modificabile dalla UI)
+    public decimal ImportoBdo { get; set; }
 }
 

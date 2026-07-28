@@ -6,4 +6,5 @@ public class UpdateMevRequest
     public string PRelease { get; set; } = "";
     public decimal PImporto { get; set; }
     public string? PNote { get; set; }
+    public decimal ImportoBdo { get; set; }
 }

@@ -177,13 +177,14 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [loading, setLoading] = useState(true);
   const [savedRows, setSavedRows] = useState({});
   const [editingImporto, setEditingImporto] = useState({});
+  const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
   const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
   const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [], importoExcel: [] };
+    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], capgemini: [], iet: [], subco: [], importoExcel: [] };
     if (!saved) return defaults;
     const parsed = JSON.parse(saved);
     return { ...defaults, ...parsed };
@@ -207,7 +208,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], rda: [], capgemini: [], iet: [], subco: [], importoExcel: [] });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], capgemini: [], iet: [], subco: [], importoExcel: [] });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -237,13 +238,13 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   ];
 
   // RDA: include "(vuoto)" se esistono righe con RDA vuoto/null
-  const hasEmptyRda = rows.some(
-    (r) => !r.rda || String(r.rda).trim() === ""
+  const hasEmptyOda = rows.some(
+    (r) => !r.bc || String(r.bc).trim() === ""
   );
 
-  const rdaOptions = [
-    ...buildOptions("rda"),
-    ...(hasEmptyRda ? ["(vuoto)"] : []),
+  const odaOptions = [
+    ...buildOptions("bc"),
+    ...(hasEmptyOda ? ["(vuoto)"] : []),
   ];
 
 
@@ -255,16 +256,11 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     return filters.stato.includes(String(val));
   };
 
-  const matchRda = (r) => {
-    if (filters.rda.length === 0) return true;
-
-    const val = r.rda ?? "";
-
-    if (!String(val).trim() && filters.rda.includes("(vuoto)")) {
-      return true;
-    }
-
-    return filters.rda.includes(String(val));
+  const matchOda = (r) => {
+    if (filters.oda.length === 0) return true;
+    const val = r.bc ?? "";
+    if (!String(val).trim() && filters.oda.includes("(vuoto)")) return true;
+    return filters.oda.includes(String(val));
   };
 
 
@@ -273,7 +269,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     (filters.applicativo.length === 0 || filters.applicativo.includes(String(r.applicativo))) &&
     matchStato(r) &&
     (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
-    matchRda(r) &&
+    matchOda(r) &&
     (filters.pAnno.length === 0 || filters.pAnno.includes(String(r.pAnno))) &&
     (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
     (filters.capgemini.length === 0 || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
@@ -305,6 +301,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       const updatedItem = await updateMev(row.id, {
         pAnno: Number(row.pAnno), pRelease: row.pRelease,
         pImporto: Number(row.pImporto), pNote: row.pNote,
+        importoBdo: Number(row.importoBdo ?? row.ordinatoBdo ?? 0),
       });
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? { ...r, ...updatedItem } : r))
@@ -443,19 +440,19 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
+              <th style={{ padding: "4px 6px" }}>{/* Importo BDO */}</th>
               <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "RDA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
+              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "Importo BDO", "P Note", "Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
               ))}
             </tr>
@@ -511,7 +508,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                     ) : null}
                   </td>
 
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.rda ?? ""}</td>
+                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.bc ?? ""}</td>
 
                   <td style={{ ...TD, textAlign: "center" }}>{r.capgemini?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.capgemini ?? "")}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{r.iet?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.iet ?? "")}</td>
@@ -534,17 +531,17 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, textAlign: "right" }}>
                     <input
                       type="text"
-                      value={editingImporto[r.id] !== undefined ? editingImporto[r.id] : formatEuro(r.pImporto)}
-                      onFocus={() => setEditingImporto((prev) => ({ ...prev, [r.id]: r.pImporto ?? "" }))}
-                      onChange={(e) => setEditingImporto((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro(r.importoBdo ?? r.ordinatoBdo ?? 0)}
+                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: r.importoBdo ?? r.ordinatoBdo ?? "" }))}
+                      onChange={(e) => setEditingBdo((prev) => ({ ...prev, [r.id]: e.target.value }))}
                       onBlur={(e) => {
                         let raw = e.target.value.trim();
                         if (raw.includes(".") && raw.includes(",")) raw = raw.replace(/\./g, "").replace(",", ".");
                         else raw = raw.replace(",", ".");
                         raw = raw.replace(/[^\d.]/g, "");
                         const value = isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
-                        handleChange(r.id, "pImporto", value);
-                        setEditingImporto((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
+                        handleChange(r.id, "importoBdo", value);
+                        setEditingBdo((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
                       }}
                       style={inputStyle({
                         width: "120px", textAlign: "right",

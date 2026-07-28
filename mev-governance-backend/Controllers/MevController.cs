@@ -53,6 +53,7 @@ public class MevController : BaseController
         item.PRelease = request.PRelease;
         item.PImporto = request.PImporto;
         item.PNote    = request.PNote;
+        item.ImportoBdo = request.ImportoBdo;
 
         _db.SaveChanges();
 
@@ -322,7 +323,8 @@ public class MevController : BaseController
                     Subco = subco,
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
-                    PImporto = importo
+                    PImporto = importo,
+                    ImportoBdo = ordinatoBdo
                 };
                 _db.MevItems.Add(item);
             }
