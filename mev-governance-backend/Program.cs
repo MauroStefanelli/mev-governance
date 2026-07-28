@@ -211,6 +211,9 @@ using (var scope = app.Services.CreateScope())
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
                     ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""Subappalto"" TEXT NOT NULL DEFAULT '';
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='MevItems' AND column_name='ImportoBdo') THEN
+                    ALTER TABLE ""MevItems"" ADD COLUMN ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+                END IF;
             END $$;
         ");
     }
