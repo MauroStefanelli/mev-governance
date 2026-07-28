@@ -39,8 +39,8 @@ public class OrdineConsegnaController : ControllerBase
         try
         {
             var client = _httpClientFactory.CreateClient();
-            // Timeout breve: se il parser non risponde in 5s è ancora in cold start
-            client.Timeout = TimeSpan.FromSeconds(5);
+            // Timeout 15s: sufficiente sia per Render cold start che per QNAP
+            client.Timeout = TimeSpan.FromSeconds(15);
             var response = await client.GetAsync($"{_pdfParserUrl}/health");
             if (response.IsSuccessStatusCode)
                 return Ok(new { status = "ok" });
