@@ -193,6 +193,7 @@ export default function ToolsPage({ onUnauthorized }) {
   const [uploadMsg, setUploadMsg] = useState(null); // { type: "ok"|"err", text }
   const [warmingUp, setWarmingUp] = useState(false);   // parser in avvio
   const [warmingSeconds, setWarmingSeconds] = useState(0);
+  const [parserStatus, setParserStatus] = useState(null); // null | "waking" | "ok" | "err"
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
@@ -235,6 +236,19 @@ export default function ToolsPage({ onUnauthorized }) {
   };
 
   useEffect(() => { load(); }, []); // eslint-disable-line
+
+  // ── Sveglia parser (keep-alive manuale) ──────────────────────
+  const handleWakeParser = async () => {
+    setParserStatus("waking");
+    try {
+      await waitForParser(() => {}, 90000);
+      setParserStatus("ok");
+      setTimeout(() => setParserStatus(null), 4000);
+    } catch {
+      setParserStatus("err");
+      setTimeout(() => setParserStatus(null), 5000);
+    }
+  };
 
   // ── Debug PDF ────────────────────────────────────────────────
   const handleDebug = async (e) => {
@@ -832,7 +846,32 @@ export default function ToolsPage({ onUnauthorized }) {
           Esporta in Excel
         </button>
 
-        {/* 8. Debug — gruppo compatto: toggle + DBG PDF + DBG VAP */}
+        {/* 8. Sveglia Parser */}
+        <button
+          onClick={handleWakeParser}
+          disabled={parserStatus === "waking"}
+          title="Sveglia il servizio di parsing PDF su Render (cold start)"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "6px",
+            padding: "8px 14px", borderRadius: "7px",
+            background: parserStatus === "ok" ? "#e6f4ea"
+                      : parserStatus === "err" ? "#fce8e6"
+                      : parserStatus === "waking" ? "#fff8e1"
+                      : "#f1f3f4",
+            color: parserStatus === "ok" ? "#1e8e3e"
+                 : parserStatus === "err" ? "#c5221f"
+                 : parserStatus === "waking" ? "#e65100"
+                 : "#555",
+            border: `1px solid ${parserStatus === "ok" ? "#a8d5b5" : parserStatus === "err" ? "#f5c6c4" : parserStatus === "waking" ? "#ffcc80" : "#dadce0"}`,
+            fontWeight: 600, fontSize: "13px",
+            cursor: parserStatus === "waking" ? "wait" : "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          {parserStatus === "waking" ? "⏳ Avvio..." : parserStatus === "ok" ? "✔ Parser pronto" : parserStatus === "err" ? "✗ Non risponde" : "⚡ Sveglia Parser"}
+        </button>
+
+        {/* 9. Debug — gruppo compatto: toggle + DBG PDF + DBG VAP */}
         <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
           <button
             onClick={() => setShowDebugTools(v => !v)}
