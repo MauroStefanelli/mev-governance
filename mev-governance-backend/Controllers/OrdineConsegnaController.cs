@@ -258,7 +258,10 @@ public class OrdineConsegnaController : ControllerBase
 
             await _db.SaveChangesAsync();
 
-            // ── Salva il verbale nel registro ──
+            // ── Salva il verbale nel registro con i dati grezzi delle righe ──
+            var datiRigheJson = System.Text.Json.JsonSerializer.Serialize(
+                righe.Select(r => new { r.oda, r.pos, r.qta, r.importo, r.subappalto })
+            );
             _db.VerbaliAvanzamento.Add(new VerbaleAvanzamento
             {
                 NomePdf         = file.FileName,
@@ -266,7 +269,8 @@ public class OrdineConsegnaController : ControllerBase
                 RigheElaborate  = righe.Count,
                 RigheAggiornate = aggiornati,
                 CaricatoIl      = DateTime.UtcNow,
-                CaricatoDa      = username
+                CaricatoDa      = username,
+                DatiRigheJson   = datiRigheJson
             });
             await _db.SaveChangesAsync();
 
@@ -416,6 +420,8 @@ public class OrdineConsegnaController : ControllerBase
 
     // ============================================================
     // DELETE /api/tools/verbali/{id}
+    // Elimina il verbale e ricalcola i campi VAP di tutte le righe
+    // riapplicando i verbali rimanenti in ordine cronologico
     // ============================================================
     [HttpDelete("verbali/{id}")]
     public async Task<IActionResult> DeleteVerbale(int id)
@@ -423,45 +429,105 @@ public class OrdineConsegnaController : ControllerBase
         var item = await _db.VerbaliAvanzamento.FindAsync(id);
         if (item == null) return NotFound();
 
-        var mese = item.MeseAvanzamento;
+        // ── Rimuove il verbale ──
+        _db.VerbaliAvanzamento.Remove(item);
+        await _db.SaveChangesAsync();
 
-        // ── Controlla se ci sono altri verbali con lo stesso mese ──
-        var altriVerbaliStessoMese = _db.VerbaliAvanzamento
-            .Any(v => v.Id != id && v.MeseAvanzamento == mese);
+        // ── Azzera tutti i campi VAP su OrdiniConsegna ──
+        var tutteLeRighe = _db.OrdiniConsegna.ToList();
+        foreach (var r in tutteLeRighe)
+        {
+            r.MeseAvanzamento    = "";
+            r.QtaAvanzata        = "";
+            r.ImportoFatturabile = "";
+            r.Subappalto         = "";
+        }
+        await _db.SaveChangesAsync();
 
-        // ── Aggiorna le righe OrdiniConsegna che contengono questo mese ──
-        var righeConMese = _db.OrdiniConsegna
-            .Where(r => r.MeseAvanzamento != null && r.MeseAvanzamento.Contains(mese))
+        // ── Riapplica tutti i verbali rimanenti in ordine cronologico ──
+        var verbaliRimanenti = _db.VerbaliAvanzamento
+            .OrderBy(v => v.CaricatoIl)
             .ToList();
 
-        foreach (var riga in righeConMese)
+        int righeResettate = tutteLeRighe.Count;
+        foreach (var verbale in verbaliRimanenti)
         {
-            var mesi = riga.MeseAvanzamento.Split('/').Select(m => m.Trim()).ToList();
+            if (string.IsNullOrEmpty(verbale.DatiRigheJson)) continue;
 
-            if (mesi.Count <= 1)
+            List<VapRigaDto>? righe = null;
+            try { righe = System.Text.Json.JsonSerializer.Deserialize<List<VapRigaDto>>(verbale.DatiRigheJson); }
+            catch { continue; }
+            if (righe == null) continue;
+
+            ApplicaRigheVap(verbale.MeseAvanzamento, righe);
+        }
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Verbale eliminato e dati ricalcolati", righeResettate });
+    }
+
+    // DTO per deserializzare le righe VAP salvate in JSON
+    private record VapRigaDto(string oda, string pos, string qta, string importo, string subappalto);
+
+    // Applica le righe di un verbale agli OrdiniConsegna (stessa logica di UploadVap)
+    private void ApplicaRigheVap(string meseAvanzamento, List<VapRigaDto> righe)
+    {
+        foreach (var (oda, pos, qta, importo, subappalto) in righe.Select(r => (r.oda, r.pos, r.qta, r.importo, r.subappalto)))
+        {
+            List<OrdineConsegnaItem> records;
+            if (string.IsNullOrEmpty(pos))
             {
-                // Riga ha solo questo mese: resetta tutti i campi VAP
-                riga.MeseAvanzamento    = "";
-                riga.QtaAvanzata        = "";
-                riga.ImportoFatturabile = "";
-                riga.Subappalto         = "";
+                records = _db.OrdiniConsegna.Where(r => r.NumeroOrdine == oda).ToList();
             }
             else
             {
-                // Riga ha più mesi: rimuovi solo questo mese dal concatenato
-                // Non possiamo ricostruire i valori parziali — azzeriamo comunque
-                // i campi numerici e aggiorniamo il mese
-                var mesiRimanenti = mesi.Where(m => !m.Equals(mese, StringComparison.OrdinalIgnoreCase)).ToList();
-                riga.MeseAvanzamento    = string.Join("/", mesiRimanenti);
-                riga.QtaAvanzata        = "";
-                riga.ImportoFatturabile = "";
-                riga.Subappalto         = "";
+                int posInt = int.TryParse(pos, out var p) ? p : -1;
+                records = _db.OrdiniConsegna
+                    .Where(r => r.NumeroOrdine == oda)
+                    .ToList()
+                    .Where(r => int.TryParse(r.Art, out var a) && a == posInt)
+                    .ToList();
+            }
+
+            foreach (var rec in records)
+            {
+                bool hasDati = !string.IsNullOrWhiteSpace(rec.MeseAvanzamento)
+                               && rec.MeseAvanzamento != meseAvanzamento;
+
+                if (hasDati)
+                {
+                    var mesiEsistenti = rec.MeseAvanzamento.Split('/').Select(m => m.Trim()).ToList();
+                    if (!mesiEsistenti.Contains(meseAvanzamento.Trim(), StringComparer.OrdinalIgnoreCase))
+                        rec.MeseAvanzamento = rec.MeseAvanzamento.Trim() + "/" + meseAvanzamento.Trim();
+
+                    static decimal ParseImp(string? s)
+                    {
+                        if (string.IsNullOrWhiteSpace(s)) return 0m;
+                        s = s.Trim();
+                        if (s.Contains(',')) s = s.Replace(".", "").Replace(",", ".");
+                        return decimal.TryParse(s, System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0m;
+                    }
+
+                    var qtaVecchia = decimal.TryParse(rec.QtaAvanzata?.Replace(",", "."),
+                        System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out var qv) ? qv : 0m;
+                    var qtaNuova = decimal.TryParse(qta?.Replace(",", "."),
+                        System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out var qn) ? qn : 0m;
+                    rec.QtaAvanzata = (qtaVecchia + qtaNuova).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    rec.ImportoFatturabile = (ParseImp(rec.ImportoFatturabile) + ParseImp(importo))
+                        .ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    rec.MeseAvanzamento    = meseAvanzamento;
+                    rec.QtaAvanzata        = qta;
+                    rec.ImportoFatturabile = importo;
+                    rec.Subappalto         = subappalto;
+                }
             }
         }
-
-        _db.VerbaliAvanzamento.Remove(item);
-        await _db.SaveChangesAsync();
-        return Ok(new { message = "Verbale eliminato", righeResettate = righeConMese.Count });
     }
 
     // ============================================================

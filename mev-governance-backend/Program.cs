@@ -261,11 +261,26 @@ using (var scope = app.Services.CreateScope())
                 ""RigheElaborate""   INTEGER NOT NULL DEFAULT 0,
                 ""RigheAggiornate""  INTEGER NOT NULL DEFAULT 0,
                 ""CaricatoIl""       TIMESTAMP NOT NULL DEFAULT NOW(),
-                ""CaricatoDa""       TEXT NOT NULL DEFAULT ''
+                ""CaricatoDa""       TEXT NOT NULL DEFAULT '',
+                ""DatiRigheJson""    TEXT NULL
             );
         ");
     }
     catch (Exception ex) { Console.Error.WriteLine($"[CREATE VerbaliAvanzamento ERROR] {ex.Message}"); }
+
+    // Aggiunge DatiRigheJson se non esiste (verbali già presenti nel DB)
+    try
+    {
+        db.Database.ExecuteSqlRaw(@"
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_name='VerbaliAvanzamento' AND column_name='DatiRigheJson') THEN
+                    ALTER TABLE ""VerbaliAvanzamento"" ADD COLUMN ""DatiRigheJson"" TEXT NULL;
+                END IF;
+            END $$;
+        ");
+    }
+    catch (Exception ex) { Console.Error.WriteLine($"[ALTER VerbaliAvanzamento ERROR] {ex.Message}"); }
 
     // Fix tipo colonne boolean su PostgreSQL (le migration SQLite le creano come INTEGER)
     try

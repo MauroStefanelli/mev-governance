@@ -13,4 +13,8 @@ public class VerbaleAvanzamento
     public int    RigheAggiornate { get; set; }
     public DateTime CaricatoIl   { get; set; } = DateTime.UtcNow;
     public string CaricatoDa     { get; set; } = "";
+
+    // Righe parsate in formato JSON: [{oda, pos, qta, importo, subappalto}, ...]
+    // Usato per ricalcolare i campi VAP senza ricaricare il PDF
+    public string? DatiRigheJson  { get; set; }
 }
