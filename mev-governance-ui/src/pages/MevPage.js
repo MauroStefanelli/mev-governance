@@ -315,7 +315,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       const updatedItem = await updateMev(row.id, {
         pAnno: Number(row.pAnno), pRelease: row.pRelease,
         pImporto: Number(row.pImporto), pNote: row.pNote,
-        importoBdo: Number(row.importoBdo ?? row.ordinatoBdo ?? 0),
+        importoBdo: Number(row.importoBdo && row.importoBdo !== 0 ? row.importoBdo : (row.ordinatoBdo ?? 0)),
       });
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? { ...r, ...updatedItem } : r))
@@ -547,8 +547,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, textAlign: "right" }}>
                     <input
                       type="text"
-                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro(r.importoBdo ?? r.ordinatoBdo ?? 0)}
-                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: r.importoBdo ?? r.ordinatoBdo ?? "" }))}
+                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro((r.importoBdo && r.importoBdo !== 0) ? r.importoBdo : (r.ordinatoBdo ?? 0))}
+                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: (r.importoBdo && r.importoBdo !== 0) ? r.importoBdo : (r.ordinatoBdo ?? "") }))}
                       onChange={(e) => setEditingBdo((prev) => ({ ...prev, [r.id]: e.target.value }))}
                       onBlur={(e) => {
                         let raw = e.target.value.trim();

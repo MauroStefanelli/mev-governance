@@ -214,6 +214,8 @@ using (var scope = app.Services.CreateScope())
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='MevItems' AND column_name='ImportoBdo') THEN
                     ALTER TABLE ""MevItems"" ADD COLUMN ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
                 END IF;
+                -- Backfill: copia OrdinatoBdo in ImportoBdo per le righe dove ImportoBdo è ancora 0
+                UPDATE ""MevItems"" SET ""ImportoBdo"" = ""OrdinatoBdo"" WHERE ""ImportoBdo"" = 0 AND ""OrdinatoBdo"" <> 0;
             END $$;
         ");
     }
