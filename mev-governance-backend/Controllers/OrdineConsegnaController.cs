@@ -560,6 +560,16 @@ public class OrdineConsegnaController : ControllerBase
             RegexOptions.IgnoreCase
         );
 
+        // ── Formato v3 (senza SI/NO inline): ODA POS [Cod] Descr [TOW] PREZZO€ QTA IMPORTO€
+        // Es: 0,36 € 6000,00 2.164,20 €
+        // Subappalto lasciato vuoto
+        var codaReV3 = new Regex(
+            @"(\d[\d,]*)\s*€\s+" +                              // Prezzo unitario €
+            @"(\d[\d.,]*)\s+" +                                 // QTA
+            @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€",     // Importo fatturabile €
+            RegexOptions.IgnoreCase
+        );
+
         // ── Formato v1 (template vecchio): ODA POS [Cod] Descr QTA PREZZO€ TOTALE€ FATTURABILE€
         // Non c'è SI/NO inline — subappalto lasciato vuoto
         // Struttura coda: QTA  PREZZO€  TOTALE€  FATTURABILE€
@@ -595,12 +605,24 @@ public class OrdineConsegnaController : ControllerBase
                 continue;
             }
 
-            // Fallback formato v1 (template vecchio, senza SI/NO inline)
+            // Fallback formato v1 (template vecchio, 4 valori numerici)
             var codaM1 = codaReV1.Match(b);
             if (codaM1.Success)
             {
                 var qta     = codaM1.Groups[1].Value;
                 var importo = codaM1.Groups[3].Value;
+                righe.Add((oda, pos == "0" ? "" : pos, qta, importo, ""));
+                continue;
+            }
+
+            // Fallback formato v3 (3 valori: PREZZO€ QTA IMPORTO€, senza SI/NO)
+            var codaMatchesV3 = codaReV3.Matches(b);
+            if (codaMatchesV3.Count > 0)
+            {
+                // Prende l'ultimo match — è quello più vicino alla fine del blocco
+                var codaM3  = codaMatchesV3[codaMatchesV3.Count - 1];
+                var qta     = codaM3.Groups[2].Value;
+                var importo = codaM3.Groups[3].Value;
                 righe.Add((oda, pos == "0" ? "" : pos, qta, importo, ""));
             }
         }
