@@ -406,34 +406,53 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
               const tot = rows.filter(r => r.towContratto === c).reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0);
               const active = selectedContratto === c;
               return (
-                <div key={c} style={{ position: "relative", display: "inline-flex", alignItems: "stretch" }}>
-                  <button onClick={() => setSelectedContratto(c)} style={{
-                    padding: "12px 22px", borderRadius: active ? "12px 0 0 12px" : "12px", cursor: "pointer", textAlign: "left",
+                <div
+                  key={c}
+                  style={{
+                    display: "flex", flexDirection: "column",
+                    borderRadius: "14px", overflow: "hidden",
                     border: active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
-                    borderRight: active ? "1px solid rgba(255,255,255,0.3)" : "2px solid #e2e8f0",
-                    background: active ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "#f8fafc",
-                    color: active ? "#fff" : "#374151",
-                    boxShadow: active ? "0 6px 16px rgba(26,115,232,0.28)" : "0 1px 3px rgba(0,0,0,0.04)",
+                    boxShadow: active ? "0 6px 20px rgba(26,115,232,0.22)" : "0 1px 4px rgba(0,0,0,0.06)",
+                    background: active ? "linear-gradient(145deg,#1a73e8 0%,#1557b0 100%)" : "#fff",
                     transition: "all 0.18s",
-                    minWidth: "120px",
+                    minWidth: "150px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {/* Area cliccabile principale */}
+                  <div
+                    onClick={() => setSelectedContratto(c)}
+                    style={{ padding: "14px 18px 10px", flex: 1 }}
+                  >
+                    <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "-0.2px", color: active ? "#fff" : "#0f172a" }}>{c}</div>
+                    <div style={{ fontSize: "12px", marginTop: "4px", fontWeight: 600, color: active ? "rgba(255,255,255,0.75)" : "#64748b" }}>{formatEuro(tot)}</div>
+                  </div>
+                  {/* Separatore + bottone elimina */}
+                  <div style={{
+                    borderTop: active ? "1px solid rgba(255,255,255,0.2)" : "1px solid #f1f5f9",
+                    padding: "6px 10px",
+                    display: "flex", justifyContent: "flex-end",
                   }}>
-                    <div style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.2px" }}>{c}</div>
-                    <div style={{ fontSize: "11px", marginTop: "3px", opacity: active ? 0.85 : 0.55, fontWeight: 600 }}>{formatEuro(tot)}</div>
-                  </button>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDelete(c); }}
-                    title={`Elimina contratto ${c}`}
-                    style={{
-                      padding: "0 10px", cursor: "pointer", fontSize: "13px",
-                      border: active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
-                      borderLeft: "none",
-                      borderRadius: "0 12px 12px 0",
-                      background: active ? "rgba(255,255,255,0.15)" : "#fef2f2",
-                      color: active ? "rgba(255,255,255,0.85)" : "#dc2626",
-                      transition: "all 0.18s",
-                      lineHeight: 1,
-                    }}
-                  >✕</button>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDelete(c); }}
+                      title={`Elimina contratto ${c}`}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "4px",
+                        padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
+                        fontSize: "11px", fontWeight: 600,
+                        background: active ? "rgba(255,255,255,0.15)" : "#f1f5f9",
+                        color: active ? "rgba(255,255,255,0.8)" : "#64748b",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = active ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active ? "#fff" : "#dc2626"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active ? "rgba(255,255,255,0.8)" : "#64748b"; }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                      </svg>
+                      Elimina
+                    </button>
+                  </div>
                 </div>
               );
             })}
