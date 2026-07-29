@@ -1,5 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, deleteConsumoTowContratto } from "../services/mevService";
+
+const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
 
 const TOW_KEYS = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6"];
 
@@ -320,20 +322,35 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
   const [showNewContratto, setShowNewContratto] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
+  const [dragOver, setDragOver] = useState(null); // nome contratto su cui si sta trascinando
+  const dragItem = useRef(null);   // nome contratto che si sta trascinando
+
+  // Applica l'ordine salvato in localStorage ai contratti
+  const applyOrder = useCallback((tipi) => {
+    try {
+      const saved = localStorage.getItem(CONTRATTI_ORDER_KEY);
+      if (!saved) return tipi;
+      const order = JSON.parse(saved);
+      const sorted = order.filter(c => tipi.includes(c));
+      const newOnes = tipi.filter(c => !sorted.includes(c));
+      return [...sorted, ...newOnes];
+    } catch { return tipi; }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
       const data = await getConsumoTow();
       setRows(data);
-      const tipi = [...new Set(data.map(r => r.towContratto).filter(Boolean))].sort();
-      setContratti(tipi);
-      setSelectedContratto(prev => prev || tipi[0] || "");
+      const tipi = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
+      const ordered = applyOrder(tipi);
+      setContratti(ordered);
+      setSelectedContratto(prev => prev || ordered[0] || "");
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
       else setError("Errore nel caricamento dei dati");
     } finally { setLoading(false); }
-  }, []); // eslint-disable-line
+  }, [applyOrder]); // eslint-disable-line
 
   useEffect(() => { load(); }, [load]);
 
@@ -349,7 +366,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     setRows(prev => [...prev, ...newRows]);
     const contratto = newRows[0]?.towContratto;
     if (contratto) {
-      setContratti(prev => [...new Set([...prev, contratto])].sort());
+      setContratti(prev => {
+        const next = prev.includes(contratto) ? prev : [...prev, contratto];
+        localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
+        return next;
+      });
       setSelectedContratto(contratto);
     }
     setSuccessMsg(`Contratto "${contratto}" creato con ${newRows.length} TOW`);
@@ -361,7 +382,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     try {
       await deleteConsumoTowContratto(nome);
       setRows(prev => prev.filter(r => r.towContratto !== nome));
-      setContratti(prev => prev.filter(c => c !== nome));
+      setContratti(prev => {
+        const next = prev.filter(c => c !== nome);
+        localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
+        return next;
+      });
       setSelectedContratto(prev => {
         const remaining = contratti.filter(c => c !== nome);
         return remaining[0] || "";
@@ -405,31 +430,50 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
             {contratti.map(c => {
               const tot = rows.filter(r => r.towContratto === c).reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0);
               const active = selectedContratto === c;
+              const isDragOver = dragOver === c;
               return (
                 <div
                   key={c}
+                  draggable
+                  onDragStart={() => handleDragStart(c)}
+                  onDragOver={e => handleDragOver(e, c)}
+                  onDrop={() => handleDrop(c)}
+                  onDragEnd={handleDragEnd}
                   style={{
                     display: "flex", flexDirection: "column",
                     borderRadius: "14px", overflow: "hidden",
-                    border: active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
+                    border: isDragOver ? "2px dashed #1a73e8" : active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
                     boxShadow: active ? "0 6px 20px rgba(26,115,232,0.22)" : "0 1px 4px rgba(0,0,0,0.06)",
-                    background: active ? "linear-gradient(145deg,#1a73e8 0%,#1557b0 100%)" : "#fff",
-                    transition: "all 0.18s",
+                    background: isDragOver ? "#eff6ff" : active ? "linear-gradient(145deg,#1a73e8 0%,#1557b0 100%)" : "#fff",
+                    transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
                     minWidth: "150px",
-                    cursor: "pointer",
+                    cursor: "grab",
+                    opacity: dragItem.current === c ? 0.5 : 1,
+                    transform: isDragOver ? "scale(1.03)" : "scale(1)",
                   }}
                 >
-                  {/* Area cliccabile principale */}
+                  {/* Maniglia drag in alto + area click */}
                   <div
                     onClick={() => setSelectedContratto(c)}
-                    style={{ padding: "14px 18px 10px", flex: 1 }}
+                    style={{ padding: "14px 18px 10px", flex: 1, userSelect: "none" }}
                   >
-                    <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "-0.2px", color: active ? "#fff" : "#0f172a" }}>{c}</div>
-                    <div style={{ fontSize: "12px", marginTop: "4px", fontWeight: 600, color: active ? "rgba(255,255,255,0.75)" : "#64748b" }}>{formatEuro(tot)}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                      {/* Icona grip */}
+                      <svg width="10" height="14" viewBox="0 0 10 14" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
+                        <circle cx="3" cy="2" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
+                        <circle cx="7" cy="2" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
+                        <circle cx="3" cy="7" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
+                        <circle cx="7" cy="7" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
+                        <circle cx="3" cy="12" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
+                        <circle cx="7" cy="12" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
+                      </svg>
+                      <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "-0.2px", color: active && !isDragOver ? "#fff" : "#0f172a" }}>{c}</div>
+                    </div>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: active && !isDragOver ? "rgba(255,255,255,0.75)" : "#64748b", paddingLeft: "16px" }}>{formatEuro(tot)}</div>
                   </div>
                   {/* Separatore + bottone elimina */}
                   <div style={{
-                    borderTop: active ? "1px solid rgba(255,255,255,0.2)" : "1px solid #f1f5f9",
+                    borderTop: active && !isDragOver ? "1px solid rgba(255,255,255,0.2)" : "1px solid #f1f5f9",
                     padding: "6px 10px",
                     display: "flex", justifyContent: "flex-end",
                   }}>
@@ -440,12 +484,12 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                         display: "flex", alignItems: "center", gap: "4px",
                         padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
                         fontSize: "11px", fontWeight: 600,
-                        background: active ? "rgba(255,255,255,0.15)" : "#f1f5f9",
-                        color: active ? "rgba(255,255,255,0.8)" : "#64748b",
+                        background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9",
+                        color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b",
                         transition: "background 0.15s",
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = active ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active ? "#fff" : "#dc2626"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active ? "rgba(255,255,255,0.8)" : "#64748b"; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active && !isDragOver ? "#fff" : "#dc2626"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b"; }}
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -575,7 +619,25 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
                       if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                       const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                      return (
+  // ── Drag & drop handlers ────────────────────────────────────────────────────
+  const handleDragStart = (c) => { dragItem.current = c; };
+  const handleDragOver  = (e, c) => { e.preventDefault(); setDragOver(c); };
+  const handleDragEnd   = () => { dragItem.current = null; setDragOver(null); };
+  const handleDrop      = (c) => {
+    if (!dragItem.current || dragItem.current === c) return;
+    setContratti(prev => {
+      const next = [...prev];
+      const fromIdx = next.indexOf(dragItem.current);
+      const toIdx   = next.indexOf(c);
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, dragItem.current);
+      localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
+      return next;
+    });
+    setDragOver(null);
+  };
+
+  return (
                         <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>
                           {f.group === "euro" ? formatEuro(tot) : formatQta(tot)}
                         </td>
