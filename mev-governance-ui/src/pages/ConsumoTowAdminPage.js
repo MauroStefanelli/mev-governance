@@ -158,6 +158,7 @@ function NewContrattoModal({ onClose, onCreated }) {
             <tbody>
               {TOW_KEYS.map((tow, idx) => {
                 const sub = parsedQta[tow] * parsedValori[tow];
+                return (
                   <tr key={tow} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
                     <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: "13px", color: "#334155" }}>
                       <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px" }}>{tow}</span>
