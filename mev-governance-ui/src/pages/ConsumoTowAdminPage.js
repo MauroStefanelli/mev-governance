@@ -637,6 +637,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
                       if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                       const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                      return (
                         <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>
                           {f.group === "euro" ? formatEuro(tot) : formatQta(tot)}
                         </td>
