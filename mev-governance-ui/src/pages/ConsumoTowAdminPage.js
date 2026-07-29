@@ -399,20 +399,32 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
   };
 
   // ── Drag & drop handlers ────────────────────────────────────────────────────
-  const handleDragStart = (c) => { dragItem.current = c; };
-  const handleDragOver  = (e, c) => { e.preventDefault(); setDragOver(c); };
+  const handleDragStart = (e, c) => {
+    dragItem.current = c;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", c);
+  };
+  const handleDragOver  = (e, c) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOver !== c) setDragOver(c);
+  };
   const handleDragEnd   = () => { dragItem.current = null; setDragOver(null); };
-  const handleDrop      = (c) => {
-    if (!dragItem.current || dragItem.current === c) return;
+  const handleDrop      = (e, c) => {
+    e.preventDefault();
+    const from = dragItem.current || e.dataTransfer.getData("text/plain");
+    if (!from || from === c) { setDragOver(null); return; }
     setContratti(prev => {
       const next = [...prev];
-      const fromIdx = next.indexOf(dragItem.current);
+      const fromIdx = next.indexOf(from);
       const toIdx   = next.indexOf(c);
+      if (fromIdx === -1 || toIdx === -1) return prev;
       next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, dragItem.current);
+      next.splice(toIdx, 0, from);
       localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
       return next;
     });
+    dragItem.current = null;
     setDragOver(null);
   };
 
@@ -453,21 +465,19 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                 <div
                   key={c}
                   draggable
-                  onDragStart={() => handleDragStart(c)}
+                  onDragStart={e => handleDragStart(e, c)}
                   onDragOver={e => handleDragOver(e, c)}
-                  onDrop={() => handleDrop(c)}
+                  onDrop={e => handleDrop(e, c)}
                   onDragEnd={handleDragEnd}
                   style={{
                     display: "flex", flexDirection: "column",
                     borderRadius: "14px", overflow: "hidden",
                     border: isDragOver ? "2px dashed #1a73e8" : active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
-                    boxShadow: active ? "0 6px 20px rgba(26,115,232,0.22)" : "0 1px 4px rgba(0,0,0,0.06)",
+                    boxShadow: isDragOver ? "0 0 0 3px rgba(26,115,232,0.18)" : active ? "0 6px 20px rgba(26,115,232,0.22)" : "0 1px 4px rgba(0,0,0,0.06)",
                     background: isDragOver ? "#eff6ff" : active ? "linear-gradient(145deg,#1a73e8 0%,#1557b0 100%)" : "#fff",
                     transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
                     minWidth: "150px",
                     cursor: "grab",
-                    opacity: dragItem.current === c ? 0.5 : 1,
-                    transform: isDragOver ? "scale(1.03)" : "scale(1)",
                   }}
                 >
                   {/* Maniglia drag in alto + area click */}
