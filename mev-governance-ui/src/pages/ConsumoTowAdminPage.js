@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { getConsumoTow, updateConsumoTow, createConsumoTow } from "../services/mevService";
+import { getConsumoTow, updateConsumoTow, createConsumoTow, deleteConsumoTowContratto } from "../services/mevService";
 
 const TOW_KEYS = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6"];
 
@@ -87,23 +87,25 @@ const TD = (align = "right", extra = {}) => ({
 // ── Modale Nuovo Contratto ────────────────────────────────────────────────────
 function NewContrattoModal({ onClose, onCreated }) {
   const [nomeContratto, setNomeContratto] = useState("");
-  const [valori, setValori] = useState(() => Object.fromEntries(TOW_KEYS.map(k => [k, ""])));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [valori, setValori]   = useState(() => Object.fromEntries(TOW_KEYS.map(k => [k, ""])));
+  const [qta, setQta]         = useState(() => Object.fromEntries(TOW_KEYS.map(k => [k, ""])));
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState("");
 
   const setValore = (tow, val) => setValori(p => ({ ...p, [tow]: val }));
+  const setQtaVal = (tow, val) => setQta(p => ({ ...p, [tow]: val }));
 
-  const parsedValori = Object.fromEntries(
-    TOW_KEYS.map(k => [k, parseNum(valori[k])])
-  );
+  const parsedValori = Object.fromEntries(TOW_KEYS.map(k => [k, parseNum(valori[k])]));
+  const parsedQta    = Object.fromEntries(TOW_KEYS.map(k => [k, parseNum(qta[k])]));
 
-  const valoreTotale = TOW_KEYS.reduce((s, k) => s + (parsedValori[k] || 0), 0);
+  // Valore Totale = somma di (QTA × ValoreUnitario) per ogni TOW
+  const valoreTotale = TOW_KEYS.reduce((s, k) => s + parsedQta[k] * parsedValori[k], 0);
 
   const handleSave = async () => {
     if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto."); return; }
     setSaving(true); setError("");
     try {
-      const newRows = await createConsumoTow(nomeContratto.trim(), parsedValori);
+      const newRows = await createConsumoTow(nomeContratto.trim(), parsedValori, parsedQta);
       onCreated(newRows);
       onClose();
     } catch (e) { setError(e.message || "Errore durante la creazione"); }
@@ -117,13 +119,13 @@ function NewContrattoModal({ onClose, onCreated }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "560px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "660px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* Header */}
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>Inserisci nome e valori unitari per i 6 TOW</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>Inserisci nome, QTA e valore € per ciascun TOW</div>
           </div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center" }}>✕</button>
         </div>
@@ -135,38 +137,61 @@ function NewContrattoModal({ onClose, onCreated }) {
           {/* Nome contratto */}
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Nome Contratto</div>
-            <input
-              style={inputBase}
-              placeholder="es. Contratto-XYZ"
-              value={nomeContratto}
-              onChange={e => setNomeContratto(e.target.value)}
-              autoFocus
-            />
+            <input style={inputBase} placeholder="es. Contratto-XYZ" value={nomeContratto} onChange={e => setNomeContratto(e.target.value)} autoFocus />
           </div>
 
-          {/* Valori unitari TOW */}
+          {/* Tabella TOW: QTA + Valore € + subtotale */}
           <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #eff6ff" }}>
-            Valore Unitario per TOW
+            TOW — Quantità e Valore Unitario
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
-            {TOW_KEYS.map(tow => (
-              <div key={tow}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{tow}</div>
-                <input
-                  style={{ ...inputBase, textAlign: "right" }}
-                  placeholder="0,00"
-                  value={valori[tow]}
-                  onChange={e => setValore(tow, e.target.value)}
-                  onBlur={e => setValore(tow, formatForInput(parseNum(e.target.value), "euro"))}
-                />
-              </div>
-            ))}
-          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>TOW</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>QTA</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>Valore €</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>Subtotale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TOW_KEYS.map((tow, idx) => {
+                const sub = parsedQta[tow] * parsedValori[tow];
+                return (
+                  <tr key={tow} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: "13px", color: "#334155" }}>
+                      <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px" }}>{tow}</span>
+                    </td>
+                    <td style={{ padding: "6px 12px" }}>
+                      <input
+                        style={{ ...inputBase, textAlign: "right", width: "110px" }}
+                        placeholder="0"
+                        value={qta[tow]}
+                        onChange={e => setQtaVal(tow, e.target.value)}
+                        onBlur={e => setQtaVal(tow, formatForInput(parseNum(e.target.value), "qta"))}
+                      />
+                    </td>
+                    <td style={{ padding: "6px 12px" }}>
+                      <input
+                        style={{ ...inputBase, textAlign: "right", width: "140px" }}
+                        placeholder="0,00"
+                        value={valori[tow]}
+                        onChange={e => setValore(tow, e.target.value)}
+                        onBlur={e => setValore(tow, formatForInput(parseNum(e.target.value), "euro"))}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: sub > 0 ? "#059669" : "#94a3b8" }}>
+                      {formatEuro(sub)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
           {/* Valore Totale calcolato */}
           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (somma TOW)</span>
-            <span style={{ fontSize: "18px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotale)}</span>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (Σ QTA × Valore€)</span>
+            <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotale)}</span>
           </div>
         </div>
 
@@ -331,6 +356,23 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     setTimeout(() => setSuccessMsg(""), 4000);
   };
 
+  const handleDelete = async (nome) => {
+    if (!window.confirm(`Eliminare definitivamente il contratto "${nome}" e tutti i suoi TOW?`)) return;
+    try {
+      await deleteConsumoTowContratto(nome);
+      setRows(prev => prev.filter(r => r.towContratto !== nome));
+      setContratti(prev => prev.filter(c => c !== nome));
+      setSelectedContratto(prev => {
+        const remaining = contratti.filter(c => c !== nome);
+        return remaining[0] || "";
+      });
+      setSuccessMsg(`Contratto "${nome}" eliminato.`);
+      setTimeout(() => setSuccessMsg(""), 3500);
+    } catch (e) {
+      setError(e.message || "Errore durante l'eliminazione");
+    }
+  };
+
   return (
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
@@ -364,18 +406,35 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
               const tot = rows.filter(r => r.towContratto === c).reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0);
               const active = selectedContratto === c;
               return (
-                <button key={c} onClick={() => setSelectedContratto(c)} style={{
-                  padding: "12px 22px", borderRadius: "12px", cursor: "pointer", textAlign: "left",
-                  border: active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
-                  background: active ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "#f8fafc",
-                  color: active ? "#fff" : "#374151",
-                  boxShadow: active ? "0 6px 16px rgba(26,115,232,0.28)" : "0 1px 3px rgba(0,0,0,0.04)",
-                  transition: "all 0.18s",
-                  minWidth: "120px",
-                }}>
-                  <div style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.2px" }}>{c}</div>
-                  <div style={{ fontSize: "11px", marginTop: "3px", opacity: active ? 0.85 : 0.55, fontWeight: 600 }}>{formatEuro(tot)}</div>
-                </button>
+                <div key={c} style={{ position: "relative", display: "inline-flex", alignItems: "stretch" }}>
+                  <button onClick={() => setSelectedContratto(c)} style={{
+                    padding: "12px 22px", borderRadius: active ? "12px 0 0 12px" : "12px", cursor: "pointer", textAlign: "left",
+                    border: active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
+                    borderRight: active ? "1px solid rgba(255,255,255,0.3)" : "2px solid #e2e8f0",
+                    background: active ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "#f8fafc",
+                    color: active ? "#fff" : "#374151",
+                    boxShadow: active ? "0 6px 16px rgba(26,115,232,0.28)" : "0 1px 3px rgba(0,0,0,0.04)",
+                    transition: "all 0.18s",
+                    minWidth: "120px",
+                  }}>
+                    <div style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.2px" }}>{c}</div>
+                    <div style={{ fontSize: "11px", marginTop: "3px", opacity: active ? 0.85 : 0.55, fontWeight: 600 }}>{formatEuro(tot)}</div>
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDelete(c); }}
+                    title={`Elimina contratto ${c}`}
+                    style={{
+                      padding: "0 10px", cursor: "pointer", fontSize: "13px",
+                      border: active ? "2px solid #1a73e8" : "2px solid #e2e8f0",
+                      borderLeft: "none",
+                      borderRadius: "0 12px 12px 0",
+                      background: active ? "rgba(255,255,255,0.15)" : "#fef2f2",
+                      color: active ? "rgba(255,255,255,0.85)" : "#dc2626",
+                      transition: "all 0.18s",
+                      lineHeight: 1,
+                    }}
+                  >✕</button>
+                </div>
               );
             })}
           </div>

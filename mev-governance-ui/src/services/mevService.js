@@ -462,11 +462,24 @@ export const updateConsumoTow = async (id, data) => {
   return response.json();
 };
 
-export const createConsumoTow = async (towContratto, valoriUnitari) => {
+export const createConsumoTow = async (towContratto, valoriUnitari, qta) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ towContratto, valoriUnitari })
+    body: JSON.stringify({ towContratto, valoriUnitari, qta })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const deleteConsumoTowContratto = async (nome) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/contratto/${encodeURIComponent(nome)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
   });
   if (response.status === 401) throw new Error("401");
   if (!response.ok) {

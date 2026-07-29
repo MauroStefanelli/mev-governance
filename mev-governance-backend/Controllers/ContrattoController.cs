@@ -468,6 +468,22 @@ public class ContrattoController : BaseController
     }
 
     // ============================================================
+    // DELETE /api/contratti/consumo-tow/contratto/{nome}
+    // Elimina tutte le righe di un contratto (solo Admin)
+    // ============================================================
+    [HttpDelete("consumo-tow/contratto/{nome}")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult DeleteConsumoTowContratto(string nome)
+    {
+        var rows = _db.ConsumoTow.Where(r => r.TowContratto == nome).ToList();
+        if (rows.Count == 0)
+            return NotFound($"Contratto '{nome}' non trovato.");
+        _db.ConsumoTow.RemoveRange(rows);
+        _db.SaveChanges();
+        return Ok(new { deleted = rows.Count, towContratto = nome });
+    }
+
+    // ============================================================
     // POST /api/contratti/consumo-tow
     // Crea un nuovo contratto con i TOW TOW02.1 … TOW02.6 (solo Admin)
     // ============================================================
@@ -486,13 +502,14 @@ public class ContrattoController : BaseController
         var tows = new[] { "TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6" };
         var newRows = tows.Select(t =>
         {
-            var vu = request.ValoriUnitari.TryGetValue(t, out var v) ? v : 0m;
+            var vu  = request.ValoriUnitari.TryGetValue(t, out var v)  ? v  : 0m;
+            var qta = request.Qta.TryGetValue(t, out var q)            ? q  : 0m;
             return new ConsumoTow
             {
                 Tow            = t,
                 TowContratto   = request.TowContratto,
                 ValoreUnitario = vu,
-                ValoreTotale   = vu, // inizialmente uguale al valore unitario
+                ValoreTotale   = vu * qta,
             };
         }).ToList();
 
@@ -671,6 +688,8 @@ public class ConsumoTowUpdateDto
 public class CreateConsumoTowRequest
 {
     public string TowContratto { get; set; } = "";
-    // Chiave = nome TOW (es. "TOW02.1"), Valore = valore unitario
+    // Chiave = nome TOW (es. "TOW02.1"), Valore = valore unitario €
     public Dictionary<string, decimal> ValoriUnitari { get; set; } = new();
+    // Chiave = nome TOW, Valore = quantità TOW
+    public Dictionary<string, decimal> Qta { get; set; } = new();
 }
