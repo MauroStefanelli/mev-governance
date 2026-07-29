@@ -158,7 +158,6 @@ function NewContrattoModal({ onClose, onCreated }) {
             <tbody>
               {TOW_KEYS.map((tow, idx) => {
                 const sub = parsedQta[tow] * parsedValori[tow];
-                return (
                   <tr key={tow} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
                     <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: "13px", color: "#334155" }}>
                       <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px" }}>{tow}</span>
@@ -398,6 +397,24 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     }
   };
 
+  // ── Drag & drop handlers ────────────────────────────────────────────────────
+  const handleDragStart = (c) => { dragItem.current = c; };
+  const handleDragOver  = (e, c) => { e.preventDefault(); setDragOver(c); };
+  const handleDragEnd   = () => { dragItem.current = null; setDragOver(null); };
+  const handleDrop      = (c) => {
+    if (!dragItem.current || dragItem.current === c) return;
+    setContratti(prev => {
+      const next = [...prev];
+      const fromIdx = next.indexOf(dragItem.current);
+      const toIdx   = next.indexOf(c);
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, dragItem.current);
+      localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
+      return next;
+    });
+    setDragOver(null);
+  };
+
   return (
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
@@ -619,25 +636,6 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
                       if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                       const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-  // ── Drag & drop handlers ────────────────────────────────────────────────────
-  const handleDragStart = (c) => { dragItem.current = c; };
-  const handleDragOver  = (e, c) => { e.preventDefault(); setDragOver(c); };
-  const handleDragEnd   = () => { dragItem.current = null; setDragOver(null); };
-  const handleDrop      = (c) => {
-    if (!dragItem.current || dragItem.current === c) return;
-    setContratti(prev => {
-      const next = [...prev];
-      const fromIdx = next.indexOf(dragItem.current);
-      const toIdx   = next.indexOf(c);
-      next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, dragItem.current);
-      localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
-      return next;
-    });
-    setDragOver(null);
-  };
-
-  return (
                         <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>
                           {f.group === "euro" ? formatEuro(tot) : formatQta(tot)}
                         </td>
