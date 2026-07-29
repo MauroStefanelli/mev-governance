@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { getConsumoTow, updateConsumoTow } from "../services/mevService";
+import { getConsumoTow, updateConsumoTow, createConsumoTow } from "../services/mevService";
+
+const TOW_KEYS = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6"];
 
 const formatEuro = (v) => {
   const n = Number(v);
@@ -81,6 +83,104 @@ const TD = (align = "right", extra = {}) => ({
   color: "#374151",
   ...extra,
 });
+
+// ── Modale Nuovo Contratto ────────────────────────────────────────────────────
+function NewContrattoModal({ onClose, onCreated }) {
+  const [nomeContratto, setNomeContratto] = useState("");
+  const [valori, setValori] = useState(() => Object.fromEntries(TOW_KEYS.map(k => [k, ""])));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const setValore = (tow, val) => setValori(p => ({ ...p, [tow]: val }));
+
+  const parsedValori = Object.fromEntries(
+    TOW_KEYS.map(k => [k, parseNum(valori[k])])
+  );
+
+  const valoreTotale = TOW_KEYS.reduce((s, k) => s + (parsedValori[k] || 0), 0);
+
+  const handleSave = async () => {
+    if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto."); return; }
+    setSaving(true); setError("");
+    try {
+      const newRows = await createConsumoTow(nomeContratto.trim(), parsedValori);
+      onCreated(newRows);
+      onClose();
+    } catch (e) { setError(e.message || "Errore durante la creazione"); }
+    finally { setSaving(false); }
+  };
+
+  const inputBase = {
+    padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0",
+    fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none",
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "560px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>Inserisci nome e valori unitari per i 6 TOW</div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center" }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}>
+          {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "13px" }}>{error}</div>}
+
+          {/* Nome contratto */}
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Nome Contratto</div>
+            <input
+              style={inputBase}
+              placeholder="es. Contratto-XYZ"
+              value={nomeContratto}
+              onChange={e => setNomeContratto(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {/* Valori unitari TOW */}
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #eff6ff" }}>
+            Valore Unitario per TOW
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
+            {TOW_KEYS.map(tow => (
+              <div key={tow}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{tow}</div>
+                <input
+                  style={{ ...inputBase, textAlign: "right" }}
+                  placeholder="0,00"
+                  value={valori[tow]}
+                  onChange={e => setValore(tow, e.target.value)}
+                  onBlur={e => setValore(tow, formatForInput(parseNum(e.target.value), "euro"))}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Valore Totale calcolato */}
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (somma TOW)</span>
+            <span style={{ fontSize: "18px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotale)}</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
+          <button onClick={onClose} style={{ padding: "8px 22px", borderRadius: "8px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: saving ? "#6ee7b7" : "#10b981", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+            {saving ? "Creazione..." : "Crea Contratto"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Modale ────────────────────────────────────────────────────────────────────
 function EditModal({ row, onClose, onSaved }) {
@@ -192,6 +292,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
   const [contratti, setContratti] = useState([]);
   const [selectedContratto, setSelectedContratto] = useState("");
   const [editRow, setEditRow] = useState(null);
+  const [showNewContratto, setShowNewContratto] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
 
@@ -219,6 +320,17 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     setTimeout(() => setSuccessMsg(""), 3500);
   };
 
+  const handleCreated = (newRows) => {
+    setRows(prev => [...prev, ...newRows]);
+    const contratto = newRows[0]?.towContratto;
+    if (contratto) {
+      setContratti(prev => [...new Set([...prev, contratto])].sort());
+      setSelectedContratto(contratto);
+    }
+    setSuccessMsg(`Contratto "${contratto}" creato con ${newRows.length} TOW`);
+    setTimeout(() => setSuccessMsg(""), 4000);
+  };
+
   return (
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
@@ -229,6 +341,12 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
           <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
           <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Seleziona un contratto per visualizzare e modificare</p>
         </div>
+        <button
+          onClick={() => setShowNewContratto(true)}
+          style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: "#10b981", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(16,185,129,0.3)", letterSpacing: "0.2px" }}
+        >
+          + Nuovo Contratto
+        </button>
       </div>
 
       {/* Messaggi */}
@@ -395,6 +513,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
       )}
 
       {editRow && <EditModal row={editRow} onClose={() => setEditRow(null)} onSaved={handleSaved} />}
+      {showNewContratto && <NewContrattoModal onClose={() => setShowNewContratto(false)} onCreated={handleCreated} />}
     </div>
   );
 }

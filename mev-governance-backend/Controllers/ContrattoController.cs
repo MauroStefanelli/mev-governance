@@ -468,6 +468,40 @@ public class ContrattoController : BaseController
     }
 
     // ============================================================
+    // POST /api/contratti/consumo-tow
+    // Crea un nuovo contratto con i TOW TOW02.1 … TOW02.6 (solo Admin)
+    // ============================================================
+    [HttpPost("consumo-tow")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult CreateConsumoTow([FromBody] CreateConsumoTowRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.TowContratto))
+            return BadRequest("Il nome del contratto è obbligatorio.");
+
+        // Impedisce duplicati
+        bool exists = _db.ConsumoTow.Any(r => r.TowContratto == request.TowContratto);
+        if (exists)
+            return Conflict($"Il contratto '{request.TowContratto}' esiste già.");
+
+        var tows = new[] { "TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6" };
+        var newRows = tows.Select(t =>
+        {
+            var vu = request.ValoriUnitari.TryGetValue(t, out var v) ? v : 0m;
+            return new ConsumoTow
+            {
+                Tow            = t,
+                TowContratto   = request.TowContratto,
+                ValoreUnitario = vu,
+                ValoreTotale   = vu, // inizialmente uguale al valore unitario
+            };
+        }).ToList();
+
+        _db.ConsumoTow.AddRange(newRows);
+        _db.SaveChanges();
+        return Ok(newRows);
+    }
+
+    // ============================================================
     // PUT /api/contratti/consumo-tow/:id
     // Aggiorna una riga ConsumoTow (solo Admin)
     // ============================================================
@@ -632,4 +666,11 @@ public class ConsumoTowUpdateDto
     public decimal CollaudoApprovato { get; set; }
     public decimal CollaudoOrdinato { get; set; }
     public decimal CollaudoFatturato { get; set; }
+}
+
+public class CreateConsumoTowRequest
+{
+    public string TowContratto { get; set; } = "";
+    // Chiave = nome TOW (es. "TOW02.1"), Valore = valore unitario
+    public Dictionary<string, decimal> ValoriUnitari { get; set; } = new();
 }
