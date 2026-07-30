@@ -221,141 +221,26 @@ using (var scope = app.Services.CreateScope())
     try
     {
         db.Database.Migrate(); // applica tutte le migration pendenti
+        Console.WriteLine("[MIGRATE] Migration completata.");
     }
     catch (Exception ex)
     {
         Console.Error.WriteLine($"[MIGRATE ERROR] {ex.Message}");
-        // Non crashare: il blocco SQL idempotente sotto copre i casi mancanti
-        try { db.Database.EnsureCreated(); } catch (Exception ex2) {
-            Console.Error.WriteLine($"[ENSURECREATED ERROR] {ex2.Message}");
-        }
     }
-
-    // Aggiunge colonne mancanti in modo idempotente (PostgreSQL)
-    // sch è già validato (solo [a-zA-Z0-9_]) quindi l'interpolazione è sicura
-#pragma warning disable EF1002
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='AppSettings' AND column_name='LogoutMinutes') THEN
-                    ALTER TABLE ""{sch}"".""AppSettings"" ADD COLUMN ""LogoutMinutes"" INTEGER NOT NULL DEFAULT 60;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='MeseAvanzamento') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""MeseAvanzamento"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='QtaAvanzata') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""QtaAvanzata"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='ImportoFatturabile') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""Subappalto"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='MevItems' AND column_name='ImportoBdo') THEN
-                    ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
-                END IF;
-                UPDATE ""{sch}"".""MevItems"" SET ""ImportoBdo"" = ""OrdinatoBdo"" WHERE ""ImportoBdo"" = 0 AND ""OrdinatoBdo"" <> 0;
-            END $$;
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[ALTER COLUMNS ERROR] {ex.Message}"); }
-
-    // Crea OrdiniConsegna se non esiste (con tutte le colonne)
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            CREATE TABLE IF NOT EXISTS ""{sch}"".""OrdiniConsegna"" (
-                ""Id""                   SERIAL PRIMARY KEY,
-                ""NumeroOrdine""         TEXT NOT NULL DEFAULT '',
-                ""Data""                 TEXT NOT NULL DEFAULT '',
-                ""DataConsegna""         TEXT NOT NULL DEFAULT '',
-                ""RifContratto""         TEXT NOT NULL DEFAULT '',
-                ""Art""                  TEXT NOT NULL DEFAULT '',
-                ""Codice""               TEXT NOT NULL DEFAULT '',
-                ""Descrizione""          TEXT NOT NULL DEFAULT '',
-                ""TipoAtt""              TEXT NOT NULL DEFAULT '',
-                ""Quantita""             TEXT NOT NULL DEFAULT '',
-                ""Um""                   TEXT NOT NULL DEFAULT '',
-                ""PrezzoNetto""          TEXT NOT NULL DEFAULT '',
-                ""Importo""              TEXT NOT NULL DEFAULT '',
-                ""NumeroRda""            TEXT NOT NULL DEFAULT '',
-                ""Iniziativa""           TEXT NOT NULL DEFAULT '',
-                ""Ap""                   TEXT NOT NULL DEFAULT '',
-                ""Contratto""            TEXT NOT NULL DEFAULT '',
-                ""NomePdf""              TEXT NOT NULL DEFAULT '',
-                ""ImportatoIl""          TIMESTAMP NOT NULL DEFAULT NOW(),
-                ""ImportatoDA""          TEXT NOT NULL DEFAULT '',
-                ""MeseAvanzamento""      TEXT NOT NULL DEFAULT '',
-                ""QtaAvanzata""          TEXT NOT NULL DEFAULT '',
-                ""ImportoFatturabile""   TEXT NOT NULL DEFAULT '',
-                ""Subappalto""           TEXT NOT NULL DEFAULT ''
-            );
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[CREATE OrdiniConsegna ERROR] {ex.Message}"); }
-
-    // Crea VerbaliAvanzamento se non esiste
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            CREATE TABLE IF NOT EXISTS ""{sch}"".""VerbaliAvanzamento"" (
-                ""Id""               SERIAL PRIMARY KEY,
-                ""NomePdf""          TEXT NOT NULL DEFAULT '',
-                ""MeseAvanzamento""  TEXT NOT NULL DEFAULT '',
-                ""RigheElaborate""   INTEGER NOT NULL DEFAULT 0,
-                ""RigheAggiornate""  INTEGER NOT NULL DEFAULT 0,
-                ""CaricatoIl""       TIMESTAMP NOT NULL DEFAULT NOW(),
-                ""CaricatoDa""       TEXT NOT NULL DEFAULT '',
-                ""DatiRigheJson""    TEXT NULL
-            );
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[CREATE VerbaliAvanzamento ERROR] {ex.Message}"); }
-
-    // Aggiunge DatiRigheJson se non esiste
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                               WHERE table_schema='{sch}' AND table_name='VerbaliAvanzamento' AND column_name='DatiRigheJson') THEN
-                    ALTER TABLE ""{sch}"".""VerbaliAvanzamento"" ADD COLUMN ""DatiRigheJson"" TEXT NULL;
-                END IF;
-            END $$;
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[ALTER VerbaliAvanzamento ERROR] {ex.Message}"); }
-
-    // Fix tipo colonne boolean su PostgreSQL
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            DO $$ BEGIN
-                IF EXISTS (SELECT 1 FROM information_schema.columns
-                           WHERE table_schema='{sch}' AND table_name='Users' AND column_name='IsActive'
-                           AND data_type='integer') THEN
-                    ALTER TABLE ""{sch}"".""Users""
-                        ALTER COLUMN ""IsActive""  TYPE BOOLEAN USING ""IsActive""::boolean,
-                        ALTER COLUMN ""SendEmail"" TYPE BOOLEAN USING ""SendEmail""::boolean;
-                END IF;
-            END $$;
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[FIX BOOLEAN COLUMNS ERROR] {ex.Message}"); }
 
     // Seed admin — inserisce MSTEFANE se non esiste, aggiorna la password se esiste già
+#pragma warning disable EF1002
     try
     {
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
         var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         db.Database.ExecuteSqlRaw($@"
             INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
-            SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,0
+            SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,false
             WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE');
             UPDATE ""{sch}"".""Users"" SET ""PasswordHash""={{0}} WHERE ""Username""='MSTEFANE';
         ", hash, hash);
+        Console.WriteLine("[SEED] Utente MSTEFANE pronto.");
     }
     catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
 #pragma warning restore EF1002
