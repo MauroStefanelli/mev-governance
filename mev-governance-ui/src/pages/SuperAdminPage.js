@@ -97,11 +97,11 @@ export default function SuperAdminPage() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1a73e8", marginBottom: 20 }}>Gestione Ambienti</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1a73e8", marginBottom: 20 }}>Gestione Contratti</h2>
 
-      {/* Crea nuovo ambiente */}
+      {/* Crea nuovo contratto */}
       <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Crea nuovo ambiente</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Crea nuovo Contratto</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div>
             <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Codice Contratto *</div>
@@ -135,9 +135,9 @@ export default function SuperAdminPage() {
         </div>
       </div>
 
-      {/* Lista ambienti */}
+      {/* Lista contratti */}
       <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Ambienti esistenti</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Contratti Esistenti</div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>

@@ -325,6 +325,81 @@ function App() {
             MEV Governance
           </span>
 
+          {/* Selettore Contratto — sempre visibile accanto al titolo */}
+          {ambienti.length === 1 && (
+            <span style={{
+              color: "rgba(255,255,255,0.9)", fontSize: "13px", fontWeight: 600,
+              borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px",
+              background: "rgba(255,255,255,0.12)", padding: "4px 10px",
+              borderRadius: "6px", border: "1px solid rgba(255,255,255,0.25)",
+            }}>
+              {ambienti[0].codiceContratto}
+            </span>
+          )}
+          {ambienti.length > 1 && (
+            <div style={{ position: "relative", marginLeft: "4px" }}>
+              <button
+                onClick={() => setShowAmbienteMenu(!showAmbienteMenu)}
+                disabled={switchingAmbiente}
+                style={{
+                  background: "rgba(255,255,255,0.15)",
+                  color: "white",
+                  border: "1px solid rgba(255,255,255,0.4)",
+                  cursor: switchingAmbiente ? "wait" : "pointer",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: "6px",
+                }}
+              >
+                <span style={{ fontSize: "10px", opacity: 0.7 }}>Contratto</span>
+                <span>
+                  {switchingAmbiente
+                    ? "..."
+                    : ambienti.find(a => a.id === ambienteId)?.codiceContratto || ambienteId}
+                </span>
+                <span style={{ fontSize: "10px" }}>{showAmbienteMenu ? "▲" : "▼"}</span>
+              </button>
+              {showAmbienteMenu && (
+                <div style={{
+                  position: "absolute", top: "34px", left: 0,
+                  background: "white",
+                  borderRadius: "8px", minWidth: "240px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid #dadce0",
+                }}>
+                  <div style={{ padding: "8px 12px", fontSize: "11px", color: "#888", borderBottom: "1px solid #f1f3f4" }}>
+                    Cambia contratto
+                  </div>
+                  {ambienti.map(a => (
+                    <div
+                      key={a.id}
+                      onClick={() => handleSwitchAmbiente(a.id)}
+                      style={{
+                        padding: "10px 14px",
+                        cursor: a.id === ambienteId ? "default" : "pointer",
+                        background: a.id === ambienteId ? "#e8f0fe" : "transparent",
+                        borderBottom: "1px solid #f1f3f4",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "#f1f3f4"; }}
+                      onMouseLeave={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: a.id === ambienteId ? "#1a73e8" : "#333" }}>
+                        {a.codiceContratto}
+                        {a.id === ambienteId && <span style={{ marginLeft: 6, fontSize: "11px", color: "#1a73e8" }}>▶ attivo</span>}
+                      </div>
+                      {a.descrizione && (
+                        <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{a.descrizione}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Descrizione ambiente — modificabile da Admin/SuperAdmin con click */}
           {descrizioneAttiva && !editingDesc && (
             <span
@@ -491,7 +566,7 @@ function App() {
                     { id: "admin",      label: "Utenti" },
                     { id: "consumotow", label: "TOW Contratti" },
                     { id: "dbconfig",   label: "Configurazione" },
-                    { id: "superadmin", label: "Gestione Ambienti" },
+                    { id: "superadmin", label: "Gestione Contratti" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -517,71 +592,6 @@ function App() {
             </div>
           )}
         </nav>
-
-        {/* Selettore Ambiente (visibile se ci sono più ambienti disponibili) */}
-        {ambienti.length > 1 && (
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => setShowAmbienteMenu(!showAmbienteMenu)}
-              disabled={switchingAmbiente}
-              style={{
-                background: "rgba(255,255,255,0.15)",
-                color: "white",
-                border: "1px solid rgba(255,255,255,0.4)",
-                cursor: switchingAmbiente ? "wait" : "pointer",
-                padding: "5px 12px",
-                borderRadius: "6px",
-                fontSize: "12px",
-                fontWeight: 600,
-                display: "flex", alignItems: "center", gap: "6px",
-              }}
-            >
-              <span style={{ fontSize: "10px", opacity: 0.7 }}>Contratto</span>
-              <span>
-                {switchingAmbiente
-                  ? "..."
-                  : ambienti.find(a => a.id === ambienteId)?.codiceContratto || ambienteId}
-              </span>
-              <span style={{ fontSize: "10px" }}>{showAmbienteMenu ? "▲" : "▼"}</span>
-            </button>
-            {showAmbienteMenu && (
-              <div style={{
-                position: "absolute", top: "38px", right: 0,
-                background: "white",
-                borderRadius: "8px", minWidth: "240px",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
-                border: "1px solid #dadce0",
-              }}>
-                <div style={{ padding: "8px 12px", fontSize: "11px", color: "#888", borderBottom: "1px solid #f1f3f4" }}>
-                  Cambia contratto
-                </div>
-                {ambienti.map(a => (
-                  <div
-                    key={a.id}
-                    onClick={() => handleSwitchAmbiente(a.id)}
-                    style={{
-                      padding: "10px 14px",
-                      cursor: a.id === ambienteId ? "default" : "pointer",
-                      background: a.id === ambienteId ? "#e8f0fe" : "transparent",
-                      borderBottom: "1px solid #f1f3f4",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "#f1f3f4"; }}
-                    onMouseLeave={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: a.id === ambienteId ? "#1a73e8" : "#333" }}>
-                      {a.codiceContratto}
-                      {a.id === ambienteId && <span style={{ marginLeft: 6, fontSize: "11px", color: "#1a73e8" }}>▶ attivo</span>}
-                    </div>
-                    {a.descrizione && (
-                      <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{a.descrizione}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Utente + cambio password + logout */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
