@@ -11,86 +11,40 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "LastLogin",
-                table: "Users",
-                type: "TEXT",
-                nullable: true);
+            // Colonne DateTime su Users — TIMESTAMPTZ invece di TEXT
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastLogin""          TIMESTAMPTZ NULL;
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastLogout""         TIMESTAMPTZ NULL;
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""RefreshToken""       TEXT NULL;
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""RefreshTokenExpiry"" TIMESTAMPTZ NULL;
+            ");
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "LastLogout",
-                table: "Users",
-                type: "TEXT",
-                nullable: true);
+            // Colonne MevItems
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Cap""   TEXT NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Iet""   TEXT NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Subco"" TEXT NULL;
+            ");
 
-            migrationBuilder.AddColumn<string>(
-                name: "RefreshToken",
-                table: "Users",
-                type: "TEXT",
-                nullable: true);
+            // Colonne ConsumoTow — NUMERIC invece di TEXT
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""TowApprovati"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+                ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""TowImpegnati"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+                ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""TowResidui""   NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ");
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "RefreshTokenExpiry",
-                table: "Users",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Cap",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Iet",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Subco",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "TowApprovati",
-                table: "ConsumoTow",
-                type: "TEXT",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "TowImpegnati",
-                table: "ConsumoTow",
-                type: "TEXT",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "TowResidui",
-                table: "ConsumoTow",
-                type: "TEXT",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.CreateTable(
-                name: "UserAccessLogs",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Username = table.Column<string>(type: "TEXT", nullable: false),
-                    FullName = table.Column<string>(type: "TEXT", nullable: false),
-                    Role = table.Column<string>(type: "TEXT", nullable: false),
-                    LoginAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    LogoutAt = table.Column<DateTime>(type: "TEXT", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserAccessLogs", x => x.Id);
-                });
+            // UserAccessLogs — SERIAL per Id, TIMESTAMPTZ per date
+            migrationBuilder.Sql(@"
+                CREATE TABLE IF NOT EXISTS ""UserAccessLogs"" (
+                    ""Id""       SERIAL PRIMARY KEY,
+                    ""UserId""   INTEGER NOT NULL,
+                    ""Username"" TEXT NOT NULL DEFAULT '',
+                    ""FullName"" TEXT NOT NULL DEFAULT '',
+                    ""Role""     TEXT NOT NULL DEFAULT '',
+                    ""LoginAt""  TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""LogoutAt"" TIMESTAMPTZ NULL
+                );
+            ");
         }
 
         /// <inheritdoc />
