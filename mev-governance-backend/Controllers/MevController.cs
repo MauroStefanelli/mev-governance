@@ -81,7 +81,7 @@ public class MevController : BaseController
     // ============================================================
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "AdminOrSuper")]
     public IActionResult UploadExcel(IFormFile file)
     {
         if (file == null || file.Length == 0)

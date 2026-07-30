@@ -571,3 +571,17 @@ export const removeUtenteAmbiente = async (ambienteId, userId) => {
   return response.json();
 };
 
+export const updateDescrizioneAmbiente = async (ambienteId, descrizione) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/descrizione`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ descrizione })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json(); // { id, codiceContratto, descrizione }
+};
+

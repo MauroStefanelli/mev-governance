@@ -9,7 +9,7 @@ import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente } from "./services/mevService";
 
 function App() {
   const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
@@ -36,6 +36,10 @@ function App() {
   const [ambienteId, setAmbienteId]     = useState(() => parseInt(localStorage.getItem("ambienteId") || "0", 10));
   const [showAmbienteMenu, setShowAmbienteMenu] = useState(false);
   const [switchingAmbiente, setSwitchingAmbiente] = useState(false);
+
+  // Modifica descrizione ambiente inline
+  const [editingDesc, setEditingDesc]   = useState(false);
+  const [descValue, setDescValue]       = useState("");
 
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
@@ -175,7 +179,26 @@ function App() {
     }
   };
 
-  if (!token) return <LoginPage onLogin={handleLogin} />;
+  // ── Salva descrizione ambiente ───────────────────────────────────────────────
+  const handleSaveDesc = async () => {
+    try {
+      const updated = await updateDescrizioneAmbiente(ambienteId, descValue);
+      // Aggiorna la lista ambienti in memoria e localStorage
+      const nuoviAmbienti = ambienti.map(a =>
+        a.id === ambienteId ? { ...a, descrizione: updated.descrizione } : a
+      );
+      setAmbienti(nuoviAmbienti);
+      localStorage.setItem("ambienti", JSON.stringify(nuoviAmbienti));
+    } catch (e) {
+      alert("Errore salvataggio descrizione: " + e.message);
+    } finally {
+      setEditingDesc(false);
+    }
+  };
+
+  // Helper: descrizione dell'ambiente attivo
+  const ambienteAttivo = ambienti.find(a => a.id === ambienteId);
+  const descrizioneAttiva = ambienteAttivo?.descrizione || "";
 
   /*const navItems = [
     { id: "mev",               label: "MEV" },
@@ -207,7 +230,7 @@ function App() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         height: "56px", position: "sticky", top: 0, zIndex: 100,
       }}>
-        {/* Logo + titolo */}
+        {/* Logo + titolo + descrizione ambiente */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <img
             src="/logo_poste.svg"
@@ -217,9 +240,51 @@ function App() {
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
             MEV Governance
           </span>
+
+          {/* Descrizione ambiente — modificabile da Admin/SuperAdmin con click */}
+          {descrizioneAttiva && !editingDesc && (
+            <span
+              title={["Admin","SuperAdmin"].includes(role) ? "Clicca per modificare il nome del progetto" : ""}
+              onClick={() => {
+                if (["Admin","SuperAdmin"].includes(role)) {
+                  setDescValue(descrizioneAttiva);
+                  setEditingDesc(true);
+                }
+              }}
+              style={{
+                color: "rgba(255,255,255,0.85)", fontSize: "13px", fontWeight: 500,
+                borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px",
+                cursor: ["Admin","SuperAdmin"].includes(role) ? "pointer" : "default",
+                maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {descrizioneAttiva}
+              {["Admin","SuperAdmin"].includes(role) && (
+                <span style={{ marginLeft: 5, fontSize: "11px", opacity: 0.6 }}>✏️</span>
+              )}
+            </span>
+          )}
+          {editingDesc && (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+              <input
+                autoFocus
+                value={descValue}
+                onChange={e => setDescValue(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSaveDesc(); if (e.key === "Escape") setEditingDesc(false); }}
+                style={{
+                  padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.5)",
+                  background: "rgba(255,255,255,0.15)", color: "white", fontSize: "13px",
+                  width: "220px", outline: "none",
+                }}
+              />
+              <button onClick={handleSaveDesc} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 4, color: "white", cursor: "pointer", padding: "3px 8px", fontSize: "12px" }}>✓</button>
+              <button onClick={() => setEditingDesc(false)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: "14px" }}>✕</button>
+            </span>
+          )}
+
           {lastAlign && (
             <span style={{
-              color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: 400,
+              color: "rgba(255,255,255,0.65)", fontSize: "12px", fontWeight: 400,
               borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px"
             }}>
               Aggiornato: {new Date(lastAlign).toLocaleString("it-IT", {

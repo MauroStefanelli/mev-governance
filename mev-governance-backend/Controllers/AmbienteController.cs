@@ -95,6 +95,33 @@ public class AmbienteController : ControllerBase
     }
 
     // ----------------------------------------------------------------
+    // PATCH /api/ambienti/{id}/descrizione  — accessibile anche agli Admin
+    // Body: { "descrizione": "Nuovo nome progetto" }
+    // ----------------------------------------------------------------
+    [HttpPatch("{id}/descrizione")]
+    public IActionResult UpdateDescrizione(int id, [FromBody] DescrizioneRequest req)
+    {
+        // SuperAdmin può modificare qualsiasi ambiente
+        // Admin può modificare solo gli ambienti a cui è associato
+        var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
+        if (userRole != "SuperAdmin")
+        {
+            var hasAccess = _db.UserAmbienti.Any(ua => ua.UserId == userId && ua.AmbienteId == id);
+            if (!hasAccess) return Forbid();
+        }
+
+        var a = _db.Ambienti.FirstOrDefault(x => x.Id == id);
+        if (a == null) return NotFound();
+
+        a.Descrizione = req.Descrizione ?? "";
+        _db.SaveChanges();
+
+        return Ok(new { a.Id, a.CodiceContratto, a.Descrizione });
+    }
+
+    // ----------------------------------------------------------------
     // DELETE /api/ambienti/{id}  (soft-delete: IsActive = false)
     // ----------------------------------------------------------------
     [HttpDelete("{id}")]
@@ -156,7 +183,7 @@ public class AmbienteController : ControllerBase
         if (_db.UserAmbienti.Any(ua => ua.UserId == req.UserId && ua.AmbienteId == id))
             return BadRequest("L'utente è già associato a questo ambiente.");
 
-        var validRoles = new[] { "Admin", "Editor" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin" };
         if (!validRoles.Contains(req.Ruolo))
             return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor");
 
@@ -191,3 +218,4 @@ public class AmbienteController : ControllerBase
 // ----------------------------------------------------------------
 public record AmbienteRequest(string CodiceContratto, string Descrizione, bool? IsActive = null);
 public record UserAmbienteRequest(int UserId, string Ruolo);
+public record DescrizioneRequest(string? Descrizione);

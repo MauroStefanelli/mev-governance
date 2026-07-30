@@ -422,7 +422,7 @@ public class ContrattoController : BaseController
     // GET /api/contratti/debug-tow   — diagnostica temporanea
     // ============================================================
     [HttpGet("debug-tow")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "AdminOrSuper")]
     public IActionResult DebugTow()
     {
         try
@@ -490,7 +490,7 @@ public class ContrattoController : BaseController
     // Elimina tutte le righe di un contratto (solo Admin)
     // ============================================================
     [HttpDelete("consumo-tow/contratto/{nome}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "AdminOrSuper")]
     public IActionResult DeleteConsumoTowContratto(string nome)
     {
         var ambienteId = GetAmbienteId();
@@ -507,7 +507,7 @@ public class ContrattoController : BaseController
     // Crea un nuovo contratto con i TOW TOW02.1 … TOW02.6 (solo Admin)
     // ============================================================
     [HttpPost("consumo-tow")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "AdminOrSuper")]
     public IActionResult CreateConsumoTow([FromBody] CreateConsumoTowRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.TowContratto))
@@ -543,7 +543,7 @@ public class ContrattoController : BaseController
     // Aggiorna una riga ConsumoTow (solo Admin)
     // ============================================================
     [HttpPut("consumo-tow/{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "AdminOrSuper")]
     public IActionResult UpdateConsumoTow(int id, [FromBody] ConsumoTowUpdateDto dto)
     {
         var ambienteId = GetAmbienteId();

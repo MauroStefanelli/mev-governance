@@ -191,7 +191,12 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // SuperAdmin ha tutti i permessi di Admin, più i propri
+    options.AddPolicy("AdminOrSuper", policy =>
+        policy.RequireRole("Admin", "SuperAdmin"));
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -249,10 +254,11 @@ using (var scope = app.Services.CreateScope())
             WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE');
             UPDATE ""{sch}"".""Users"" SET ""PasswordHash""={{0}} WHERE ""Username""='MSTEFANE';
 
-            -- Seed SuperAdmin
+            -- Seed SuperAdmin (inserisce se non esiste, e corregge sempre il ruolo)
             INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
             SELECT 'SUPERADMIN','Super Amministratore','superadmin@mev-governance.local',{{1}},'SuperAdmin',true,false
             WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='SUPERADMIN');
+            UPDATE ""{sch}"".""Users"" SET ""Role""='SuperAdmin' WHERE ""Username""='SUPERADMIN';
 
             -- Seed Ambiente 4490015980
             INSERT INTO ""{sch}"".""Ambienti"" (""CodiceContratto"",""Descrizione"",""IsActive"",""CreatedAt"")

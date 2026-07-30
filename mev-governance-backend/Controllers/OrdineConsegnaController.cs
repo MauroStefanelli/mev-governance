@@ -12,7 +12,7 @@ namespace MevGovernanceBackend.Controllers;
 
 [ApiController]
 [Route("api/tools")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "AdminOrSuper")]
 public class OrdineConsegnaController : BaseController
 {
     private readonly AppDbContext _db;
