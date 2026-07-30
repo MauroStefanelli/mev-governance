@@ -25,7 +25,7 @@ services:
       - key: JWT_AUDIENCE
         value: mev-governance-ui-dev
       - key: ADMIN_PASSWORD
-        generateValue: true
+        value: Admin2025!
       - key: DATABASE_DIRECT_URL
         sync: false
         # Imposta manualmente su Render: Settings → Database su Supabase → Direct connection URI
