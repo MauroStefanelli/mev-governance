@@ -59,9 +59,9 @@ function App() {
     }
   }, [token]);
 
-  // ── Polling accessi Editor ogni 10s (solo Admin) ──────────────────────────
+  // ── Polling accessi Editor ogni 10s (Admin e SuperAdmin) ────────────────────
   useEffect(() => {
-    if (!token || role !== "Admin") return;
+    if (!token || !["Admin","SuperAdmin"].includes(role)) return;
 
     lastPollRef.current = new Date().toISOString();
 
@@ -100,18 +100,18 @@ function App() {
   };
 
   const handleLogout = async () => {
-    // sendBeacon garantisce la chiamata anche durante unmount/chiusura pagina
-    const token = localStorage.getItem("jwt");
-    if (token) {
+    const tok = localStorage.getItem("jwt");
+    if (tok) {
       try {
         await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/logout`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${tok}` },
           keepalive: true,
         });
       } catch { /* ignora errori di rete */ }
     }
-    ["jwt", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
+    // Pulisce TUTTO il localStorage relativo alla sessione, compreso refreshToken
+    ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole("");
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
     setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
@@ -382,7 +382,8 @@ function App() {
               <button
                 onClick={() => setShowAdminMenu(!showAdminMenu)}
                 style={{
-                  background: ["superadmin"].includes(page) ? "rgba(255,255,255,0.22)" : "transparent",
+                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin"].includes(page)
+                    ? "rgba(255,255,255,0.22)" : "transparent",
                   color: "white",
                   border: "1px solid transparent",
                   cursor: "pointer",
@@ -391,7 +392,7 @@ function App() {
                   fontSize: "13px",
                 }}
               >
-                SuperAdmin {showAdminMenu ? "▲" : "▼"}
+                Admin {showAdminMenu ? "▲" : "▼"}
               </button>
               {showAdminMenu && (
                 <div style={{
@@ -402,6 +403,10 @@ function App() {
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
                   {[
+                    { id: "tools",      label: "Caricamento Ordini" },
+                    { id: "admin",      label: "Utenti" },
+                    { id: "consumotow", label: "TOW Contratti" },
+                    { id: "dbconfig",   label: "Configurazione" },
                     { id: "superadmin", label: "Gestione Ambienti" },
                   ].map(({ id, label }) => (
                     <div
@@ -581,10 +586,10 @@ function App() {
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
-        {page === "admin"             && role === "Admin" && <AdminPage />}
-        {page === "dbconfig"          && role === "Admin" && <DbConfigPage />}
-        {page === "tools"             && role === "Admin" && <ToolsPage onUnauthorized={handleLogout} />}
-        {page === "consumotow"        && role === "Admin" && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
+        {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
+        {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
+        {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleLogout} />}
+        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
         {page === "superadmin"        && role === "SuperAdmin" && <SuperAdminPage />}
       </main>
 
