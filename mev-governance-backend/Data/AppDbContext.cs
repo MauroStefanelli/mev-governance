@@ -1,13 +1,17 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using MevGovernanceBackend.Models;
 
 namespace MevGovernanceBackend.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options)
+    private readonly string _schema;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration configuration)
         : base(options)
     {
+        _schema = configuration["DB_SCHEMA"] ?? "public";
     }
 
     public DbSet<MevItem> MevItems => Set<MevItem>();
@@ -22,8 +26,11 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Lo schema viene iniettato tramite l'opzione HasDefaultSchema configurata in Program.cs.
-        // Su prod lo schema è "public" (default PostgreSQL), su dev è "dev".
+        // Imposta lo schema di default: "public" per prod, "dev" per sviluppo.
+        // Questo fa sì che tutte le tabelle vengano create/cercate nello schema corretto.
+        if (_schema != "public")
+            modelBuilder.HasDefaultSchema(_schema);
+
         base.OnModelCreating(modelBuilder);
     }
 }
