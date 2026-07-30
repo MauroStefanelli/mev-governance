@@ -147,13 +147,17 @@ static string ParsePostgresUrl(string url)
     var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
     var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
 
-    // SSL: abilitato per connessioni dirette Supabase (db.xxx.supabase.co)
-    // disabilitato per pooler interno (aws-0-*.pooler.supabase.com) e connessioni locali
-    var sslMode = host.Contains(".supabase.co") && !host.Contains("pooler")
+    // SSL: abilitato per qualsiasi host Supabase (direct e pooler), disabilitato per locale
+    var isSupabase = host.Contains(".supabase.co") || host.Contains(".supabase.com");
+    var sslMode = isSupabase
         ? "SSL Mode=Require;Trust Server Certificate=true"
         : "SSL Mode=Disable";
 
-    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}";
+    // Disabilita il pooling lato Npgsql per il Session Pooler di Supabase
+    // (il pooler gestisce lui le connessioni; il Transaction Pooler non supporta prepared statements)
+    var noPool = host.Contains("pooler") ? ";No Reset On Close=true;Maximum Pool Size=5" : "";
+
+    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}{noPool}";
     // return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
 }
 
