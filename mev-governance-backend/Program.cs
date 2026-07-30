@@ -352,9 +352,10 @@ using (var scope = app.Services.CreateScope())
         var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         db.Database.ExecuteSqlRaw($@"
             INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
-            VALUES ('MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,0)
-            ON CONFLICT (""Username"") DO UPDATE SET ""PasswordHash"" = EXCLUDED.""PasswordHash""
-        ", hash);
+            SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,0
+            WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE');
+            UPDATE ""{sch}"".""Users"" SET ""PasswordHash""={{0}} WHERE ""Username""='MSTEFANE';
+        ", hash, hash);
     }
     catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
 #pragma warning restore EF1002
