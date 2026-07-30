@@ -5,7 +5,7 @@ services:
     name: mev-pdf-parser-dev
     runtime: docker
     dockerfilePath: ./mev-pdf-parser/Dockerfile
-    dockerContext: .
+    dockerContext: ./mev-pdf-parser
     branch: develop
     plan: free
 
