@@ -77,6 +77,8 @@ var databaseUrl = (Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
 
 // Schema PostgreSQL: "public" per prod (default), "dev" per sviluppo
 var dbSchema = (Environment.GetEnvironmentVariable("DB_SCHEMA") ?? "public").Trim().ToLower();
+// Rende lo schema disponibile come IConfiguration per il DbContext
+builder.Configuration["DB_SCHEMA"] = dbSchema;
 var isPostgres = false;
 
 if (DbConfigConnectionString != null && DbConfigIsPostgres)
@@ -84,8 +86,7 @@ if (DbConfigConnectionString != null && DbConfigIsPostgres)
     isPostgres = true;
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(DbConfigConnectionString,
-            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema))
-        .HasDefaultSchema(dbSchema == "public" ? null : dbSchema));  // null = default postgres (public)
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema)));
 }
 else if (DbConfigConnectionString != null)
 {
@@ -103,8 +104,7 @@ else if (!string.IsNullOrEmpty(databaseUrl))
 
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(connStr,
-            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema))
-        .HasDefaultSchema(dbSchema == "public" ? null : dbSchema));
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema)));
 }
 else
 {
@@ -195,13 +195,19 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+    // Valida lo schema: accetta solo lettere, numeri e underscore (no SQL injection)
+    var sch = System.Text.RegularExpressions.Regex.IsMatch(dbSchema, @"^[a-zA-Z0-9_]+$")
+        ? dbSchema : "public";
+
     // Se siamo su PostgreSQL e lo schema non è "public", lo creiamo prima delle migration
-    if (isPostgres && dbSchema != "public")
+    if (isPostgres && sch != "public")
     {
         try
         {
-            db.Database.ExecuteSqlRaw($"CREATE SCHEMA IF NOT EXISTS \"{dbSchema}\";");
-            Console.WriteLine($"[SCHEMA] Schema '{dbSchema}' pronto.");
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($"CREATE SCHEMA IF NOT EXISTS \"{sch}\";");
+#pragma warning restore EF1002
+            Console.WriteLine($"[SCHEMA] Schema '{sch}' pronto.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[SCHEMA ERROR] {ex.Message}"); }
     }
@@ -220,7 +226,8 @@ using (var scope = app.Services.CreateScope())
     }
 
     // Aggiunge colonne mancanti in modo idempotente (PostgreSQL)
-    var sch = dbSchema; // schema corrente (public o dev)
+    // sch è già validato (solo [a-zA-Z0-9_]) quindi l'interpolazione è sicura
+#pragma warning disable EF1002
     try
     {
         db.Database.ExecuteSqlRaw($@"
@@ -348,6 +355,7 @@ using (var scope = app.Services.CreateScope())
         }
     }
     catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
+#pragma warning restore EF1002
 }
 
 app.UseSwagger();
