@@ -98,7 +98,7 @@ else if (!string.IsNullOrEmpty(databaseUrl))
     isPostgres = true;
     string connStr;
     if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
-        connStr = ParsePostgresUrl(databaseUrl);
+        connStr = ParsePostgresUrl(databaseUrl, dbSchema);
     else
         connStr = databaseUrl;
 
@@ -116,7 +116,7 @@ else
 
 // Parsing manuale della URL postgresql:// senza usare System.Uri
 // (Uri.UserInfo può perdere la password in certi casi)
-static string ParsePostgresUrl(string url)
+static string ParsePostgresUrl(string url, string schema = "public")
 {
     // Rimuove il prefisso postgres:// o postgresql://
     var s = url;
@@ -157,8 +157,10 @@ static string ParsePostgresUrl(string url)
     // (il pooler gestisce lui le connessioni; il Transaction Pooler non supporta prepared statements)
     var noPool = host.Contains("pooler") ? ";No Reset On Close=true;Maximum Pool Size=5" : "";
 
-    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}{noPool}";
-    // return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+    // Search Path: forza lo schema corretto (dev o public) per migration e query
+    var searchPath = schema != "public" ? $";Search Path={schema},public" : "";
+
+    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}{noPool}{searchPath}";
 }
 
 // ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
