@@ -10,11 +10,9 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<bool>(
-                name: "SendEmail",
-                table: "Users",
-                nullable: false,
-                defaultValue: false);
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""SendEmail"" BOOLEAN NOT NULL DEFAULT false;
+            ");
         }
 
         /// <inheritdoc />
