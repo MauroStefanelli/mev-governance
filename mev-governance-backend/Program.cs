@@ -345,20 +345,16 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Console.Error.WriteLine($"[FIX BOOLEAN COLUMNS ERROR] {ex.Message}"); }
 
-    // Seed admin
+    // Seed admin — inserisce MSTEFANE se non esiste, aggiorna la password se esiste già
     try
     {
-        var exists = db.Users.Any();
-        if (!exists)
-        {
-            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
-            var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
-            db.Database.ExecuteSqlRaw($@"
-                INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
-                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,0
-                WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"")
-            ", hash);
-        }
+        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
+        var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+        db.Database.ExecuteSqlRaw($@"
+            INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+            VALUES ('MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,0)
+            ON CONFLICT (""Username"") DO UPDATE SET ""PasswordHash"" = EXCLUDED.""PasswordHash""
+        ", hash);
     }
     catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
 #pragma warning restore EF1002
