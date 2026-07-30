@@ -355,7 +355,7 @@ using (var scope = app.Services.CreateScope())
             var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
             db.Database.ExecuteSqlRaw($@"
                 INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
-                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,false
+                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,0
                 WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"")
             ", hash);
         }
