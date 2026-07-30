@@ -140,7 +140,13 @@ static string ParsePostgresUrl(string url)
     var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
     var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
 
-    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Disable";
+    // SSL: abilitato per connessioni dirette Supabase (db.xxx.supabase.co)
+    // disabilitato per pooler interno (aws-0-*.pooler.supabase.com) e connessioni locali
+    var sslMode = host.Contains(".supabase.co") && !host.Contains("pooler")
+        ? "SSL Mode=Require;Trust Server Certificate=true"
+        : "SSL Mode=Disable";
+
+    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}";
     // return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
 }
 
