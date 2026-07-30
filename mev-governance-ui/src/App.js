@@ -12,10 +12,14 @@ import SuperAdminPage from "./pages/SuperAdminPage";
 import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente } from "./services/mevService";
 
 function App() {
-  const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
-  const [username, setUsername]     = useState(localStorage.getItem("XUSER") || "");
-  const [fullName, setFullName]     = useState(localStorage.getItem("fullName") || "");
-  const [role, setRole]             = useState(localStorage.getItem("role") || "");
+  // ── Stato autenticazione ─────────────────────────────────────────────────────
+  // Inizializzato a "" — viene popolato dopo la verifica del token al mount
+  const [token, setToken]       = useState("");
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole]         = useState("");
+  // true finché non abbiamo verificato se la sessione salvata è ancora valida
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [page, setPage]             = useState("mev");
   const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
   const [filteredRows, setFilteredRows] = useState([]);
@@ -45,6 +49,72 @@ function App() {
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
   const lastPollRef = React.useRef(null); // timestamp ISO dell'ultimo poll
 
+  // ── Bootstrap: verifica sessione salvata al mount ───────────────────────────
+  useEffect(() => {
+    const bootstrap = async () => {
+      const savedJwt     = localStorage.getItem("jwt");
+      const savedRefresh = localStorage.getItem("refreshToken");
+
+      // Decodifica payload JWT senza librerie (base64url → JSON)
+      const decodeJwt = (t) => {
+        try {
+          const payload = t.split(".")[1];
+          return JSON.parse(atob(payload.replace(/-/g,"+").replace(/_/g,"/")));
+        } catch { return null; }
+      };
+
+      const isExpired = (t) => {
+        const p = decodeJwt(t);
+        if (!p || !p.exp) return true;
+        return p.exp * 1000 < Date.now();
+      };
+
+      // Funzione di ripristino sessione da localStorage
+      const restoreSession = (jwt) => {
+        const p = decodeJwt(jwt);
+        setToken(jwt);
+        setUsername(p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || localStorage.getItem("XUSER") || "");
+        setFullName(p?.fullName || localStorage.getItem("fullName") || "");
+        setRole(p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || localStorage.getItem("role") || "");
+        try { setAmbienti(JSON.parse(localStorage.getItem("ambienti") || "[]")); } catch {}
+        setAmbienteId(parseInt(localStorage.getItem("ambienteId") || "0", 10));
+      };
+
+      if (savedJwt && !isExpired(savedJwt)) {
+        // JWT ancora valido: ripristina sessione direttamente
+        restoreSession(savedJwt);
+      } else if (savedRefresh) {
+        // JWT scaduto ma refresh disponibile: prova a rinnovare
+        try {
+          const res = await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken: savedRefresh, currentToken: savedJwt || null }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("jwt", data.token);
+            localStorage.setItem("refreshToken", data.refreshToken);
+            restoreSession(data.token);
+          } else {
+            // Refresh fallito: pulisce tutto → mostra login
+            ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+          }
+        } catch {
+          ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+        }
+      } else {
+        // Nessuna sessione valida: pulisce eventuali residui
+        ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+      }
+
+      setBootstrapping(false);
+    };
+
+    bootstrap();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Dati iniziali dopo login/restore ────────────────────────────────────────
   useEffect(() => {
     if (token) {
       getMevList().then(setRows).catch(() => {});
@@ -52,7 +122,6 @@ function App() {
       getAppSettings().then(s => {
         if (s.logoutMinutes > 0) setIdleTimeoutMs(s.logoutMinutes * 60 * 1000);
       }).catch(() => {});
-      // Warm-up silenzioso del parser PDF (cold start Render free)
       fetch(`${process.env.REACT_APP_API_URL || ""}/api/tools/parser-warmup`, {
         headers: { Authorization: `Bearer ${token}` }
       }).catch(() => {});
@@ -84,6 +153,12 @@ function App() {
   }, [token, role]); // eslint-disable-line
 
   const handleLogin = (data) => {
+    localStorage.setItem("jwt",         data.token);
+    localStorage.setItem("refreshToken",data.refreshToken);
+    localStorage.setItem("XUSER",       data.username);
+    localStorage.setItem("fullName",    data.fullName);
+    localStorage.setItem("role",        data.role);
+
     setToken(data.token);
     setUsername(data.username);
     setFullName(data.fullName);
@@ -93,7 +168,7 @@ function App() {
     const activeId = data.ambienteId || 0;
     setAmbienti(ambientiList);
     setAmbienteId(activeId);
-    localStorage.setItem("ambienti", JSON.stringify(ambientiList));
+    localStorage.setItem("ambienti",   JSON.stringify(ambientiList));
     localStorage.setItem("ambienteId", String(activeId));
 
     setPage("mev");
@@ -220,6 +295,15 @@ function App() {
     { id: "contratti_interni", label: "Ordini" },
     { id: "chart", label: "Grafici" },
   ];
+
+  // Aspetta la verifica della sessione prima di rendere qualsiasi cosa
+  if (bootstrapping) return (
+    <div style={{ minHeight: "100vh", background: "#f8f9fa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#888", fontSize: "14px" }}>Caricamento...</div>
+    </div>
+  );
+
+  if (!token) return <LoginPage onLogin={handleLogin} />;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f9fa" }}>
