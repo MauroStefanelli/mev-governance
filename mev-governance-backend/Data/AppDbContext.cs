@@ -23,11 +23,11 @@ public class AppDbContext : DbContext
     public DbSet<UserAccessLog> UserAccessLogs => Set<UserAccessLog>();
     public DbSet<OrdineConsegnaItem> OrdiniConsegna => Set<OrdineConsegnaItem>();
     public DbSet<VerbaleAvanzamento> VerbaliAvanzamento => Set<VerbaleAvanzamento>();
+    public DbSet<Ambiente> Ambienti => Set<Ambiente>();
+    public DbSet<UserAmbiente> UserAmbienti => Set<UserAmbiente>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Imposta lo schema di default: "public" per prod, "dev" per sviluppo.
-        // Questo fa sì che tutte le tabelle vengano create/cercate nello schema corretto.
         if (_schema != "public")
             modelBuilder.HasDefaultSchema(_schema);
 

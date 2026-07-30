@@ -13,7 +13,7 @@ namespace MevGovernanceBackend.Controllers;
 [ApiController]
 [Route("api/tools")]
 [Authorize(Roles = "Admin")]
-public class OrdineConsegnaController : ControllerBase
+public class OrdineConsegnaController : BaseController
 {
     private readonly AppDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -63,8 +63,10 @@ public class OrdineConsegnaController : ControllerBase
     [HttpGet("ordini")]
     public IActionResult GetOrdini()
     {
+        var ambienteId = GetAmbienteId();
         var items = _db.OrdiniConsegna
             .AsNoTracking()
+            .Where(x => x.AmbienteId == ambienteId)
             .OrderByDescending(x => x.ImportatoIl)
             .ToList();
 
@@ -85,6 +87,7 @@ public class OrdineConsegnaController : ControllerBase
             return BadRequest("Il file deve essere un PDF");
 
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
+        var ambienteId = GetAmbienteId();
 
         try
         {
@@ -127,7 +130,8 @@ public class OrdineConsegnaController : ControllerBase
                     Contratto    = Get("contratto"),
                     NomePdf      = file.FileName,
                     ImportatoIl  = DateTime.UtcNow,
-                    ImportatoDA  = username
+                    ImportatoDA  = username,
+                    AmbienteId   = ambienteId,
                 });
             }
 
@@ -164,6 +168,7 @@ public class OrdineConsegnaController : ControllerBase
             return BadRequest("Il file deve essere un PDF");
 
         var username = User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
+        var ambienteId = GetAmbienteId();
 
         try
         {
@@ -179,8 +184,6 @@ public class OrdineConsegnaController : ControllerBase
                 return BadRequest("Nessuna riga di avanzamento trovata nel PDF. Verificare il formato del verbale.");
 
             // ── Aggiorna le righe corrispondenti in OrdiniConsegna ──
-            // Il campo Art nel DB è zero-padded a 4 cifre (es. "0010")
-            // mentre pos dal VAP è stripped (es. "10") — confrontiamo numericamente
             int aggiornati = 0;
             foreach (var (oda, pos, qta, importo, subappalto) in righe)
             {
@@ -188,16 +191,14 @@ public class OrdineConsegnaController : ControllerBase
                 if (string.IsNullOrEmpty(pos))
                 {
                     records = _db.OrdiniConsegna
-                        .Where(r => r.NumeroOrdine == oda)
+                        .Where(r => r.NumeroOrdine == oda && r.AmbienteId == ambienteId)
                         .ToList();
                 }
                 else
                 {
-                    // Carica tutte le righe dell'ODA e filtra in memoria confrontando
-                    // il valore numerico dell'Art (gestisce "0010" vs "10", "10" vs "10", ecc.)
                     int posInt = int.TryParse(pos, out var p) ? p : -1;
                     records = _db.OrdiniConsegna
-                        .Where(r => r.NumeroOrdine == oda)
+                        .Where(r => r.NumeroOrdine == oda && r.AmbienteId == ambienteId)
                         .ToList()
                         .Where(r => int.TryParse(r.Art, out var a) && a == posInt)
                         .ToList();
@@ -270,7 +271,8 @@ public class OrdineConsegnaController : ControllerBase
                 RigheAggiornate = aggiornati,
                 CaricatoIl      = DateTime.UtcNow,
                 CaricatoDa      = username,
-                DatiRigheJson   = datiRigheJson
+                DatiRigheJson   = datiRigheJson,
+                AmbienteId      = ambienteId,
             });
             await _db.SaveChangesAsync();
 
@@ -411,8 +413,10 @@ public class OrdineConsegnaController : ControllerBase
     [HttpGet("verbali")]
     public IActionResult GetVerbali()
     {
+        var ambienteId = GetAmbienteId();
         var list = _db.VerbaliAvanzamento
             .AsNoTracking()
+            .Where(x => x.AmbienteId == ambienteId)
             .OrderByDescending(x => x.CaricatoIl)
             .ToList();
         return Ok(list);
@@ -426,15 +430,16 @@ public class OrdineConsegnaController : ControllerBase
     [HttpDelete("verbali/{id}")]
     public async Task<IActionResult> DeleteVerbale(int id)
     {
+        var ambienteId = GetAmbienteId();
         var item = await _db.VerbaliAvanzamento.FindAsync(id);
-        if (item == null) return NotFound();
+        if (item == null || item.AmbienteId != ambienteId) return NotFound();
 
         // ── Rimuove il verbale ──
         _db.VerbaliAvanzamento.Remove(item);
         await _db.SaveChangesAsync();
 
-        // ── Azzera tutti i campi VAP su OrdiniConsegna ──
-        var tutteLeRighe = _db.OrdiniConsegna.ToList();
+        // ── Azzera tutti i campi VAP su OrdiniConsegna per questo ambiente ──
+        var tutteLeRighe = _db.OrdiniConsegna.Where(r => r.AmbienteId == ambienteId).ToList();
         foreach (var r in tutteLeRighe)
         {
             r.MeseAvanzamento    = "";
@@ -446,6 +451,7 @@ public class OrdineConsegnaController : ControllerBase
 
         // ── Riapplica tutti i verbali rimanenti in ordine cronologico ──
         var verbaliRimanenti = _db.VerbaliAvanzamento
+            .Where(v => v.AmbienteId == ambienteId)
             .OrderBy(v => v.CaricatoIl)
             .ToList();
 
@@ -459,7 +465,7 @@ public class OrdineConsegnaController : ControllerBase
             catch { continue; }
             if (righe == null) continue;
 
-            ApplicaRigheVap(verbale.MeseAvanzamento, righe);
+            ApplicaRigheVap(verbale.MeseAvanzamento, righe, ambienteId);
         }
         await _db.SaveChangesAsync();
 
@@ -470,20 +476,20 @@ public class OrdineConsegnaController : ControllerBase
     private record VapRigaDto(string oda, string pos, string qta, string importo, string subappalto);
 
     // Applica le righe di un verbale agli OrdiniConsegna (stessa logica di UploadVap)
-    private void ApplicaRigheVap(string meseAvanzamento, List<VapRigaDto> righe)
+    private void ApplicaRigheVap(string meseAvanzamento, List<VapRigaDto> righe, int ambienteId)
     {
         foreach (var (oda, pos, qta, importo, subappalto) in righe.Select(r => (r.oda, r.pos, r.qta, r.importo, r.subappalto)))
         {
             List<OrdineConsegnaItem> records;
             if (string.IsNullOrEmpty(pos))
             {
-                records = _db.OrdiniConsegna.Where(r => r.NumeroOrdine == oda).ToList();
+                records = _db.OrdiniConsegna.Where(r => r.NumeroOrdine == oda && r.AmbienteId == ambienteId).ToList();
             }
             else
             {
                 int posInt = int.TryParse(pos, out var p) ? p : -1;
                 records = _db.OrdiniConsegna
-                    .Where(r => r.NumeroOrdine == oda)
+                    .Where(r => r.NumeroOrdine == oda && r.AmbienteId == ambienteId)
                     .ToList()
                     .Where(r => int.TryParse(r.Art, out var a) && a == posInt)
                     .ToList();
@@ -727,8 +733,9 @@ public class OrdineConsegnaController : ControllerBase
     [HttpDelete("ordini/{id}")]
     public async Task<IActionResult> DeleteOrdine(int id)
     {
+        var ambienteId = GetAmbienteId();
         var item = await _db.OrdiniConsegna.FindAsync(id);
-        if (item == null) return NotFound();
+        if (item == null || item.AmbienteId != ambienteId) return NotFound();
         _db.OrdiniConsegna.Remove(item);
         await _db.SaveChangesAsync();
         return Ok(new { message = "Riga eliminata" });
@@ -740,8 +747,9 @@ public class OrdineConsegnaController : ControllerBase
     [HttpDelete("ordini/by-pdf/{nomePdf}")]
     public async Task<IActionResult> DeleteByPdf(string nomePdf)
     {
+        var ambienteId = GetAmbienteId();
         var items = _db.OrdiniConsegna
-            .Where(x => x.NomePdf == nomePdf)
+            .Where(x => x.NomePdf == nomePdf && x.AmbienteId == ambienteId)
             .ToList();
 
         if (items.Count == 0) return NotFound();
@@ -756,8 +764,10 @@ public class OrdineConsegnaController : ControllerBase
     [HttpGet("export")]
     public IActionResult ExportExcel()
     {
+        var ambienteId = GetAmbienteId();
         var items = _db.OrdiniConsegna
             .AsNoTracking()
+            .Where(x => x.AmbienteId == ambienteId)
             .OrderByDescending(x => x.ImportatoIl)
             .ThenBy(x => x.NumeroOrdine)
             .ToList();
@@ -860,6 +870,7 @@ public class OrdineConsegnaController : ControllerBase
 
         var items = _db.OrdiniConsegna
             .AsNoTracking()
+            .Where(x => x.AmbienteId == GetAmbienteId())
             .OrderByDescending(x => x.ImportatoIl)
             .ThenBy(x => x.NumeroOrdine)
             .ToList();

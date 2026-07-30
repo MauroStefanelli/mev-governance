@@ -239,14 +239,37 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
-        var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+        var adminHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+        var saHash = BCrypt.Net.BCrypt.HashPassword("SA-Capgemini2026!");
+
         db.Database.ExecuteSqlRaw($@"
+            -- Seed MSTEFANE (Admin)
             INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
             SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,false
             WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE');
             UPDATE ""{sch}"".""Users"" SET ""PasswordHash""={{0}} WHERE ""Username""='MSTEFANE';
-        ", hash, hash);
-        Console.WriteLine("[SEED] Utente MSTEFANE pronto.");
+
+            -- Seed SuperAdmin
+            INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+            SELECT 'SUPERADMIN','Super Amministratore','superadmin@mev-governance.local',{{1}},'SuperAdmin',true,false
+            WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='SUPERADMIN');
+
+            -- Seed Ambiente 4490015980
+            INSERT INTO ""{sch}"".""Ambienti"" (""CodiceContratto"",""Descrizione"",""IsActive"",""CreatedAt"")
+            SELECT '4490015980','Contratto principale',true,now()
+            WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Ambienti"" WHERE ""CodiceContratto""='4490015980');
+
+            -- Associa MSTEFANE all'ambiente come Admin
+            INSERT INTO ""{sch}"".""UserAmbienti"" (""UserId"",""AmbienteId"",""Ruolo"")
+            SELECT u.""Id"", a.""Id"", 'Admin'
+            FROM ""{sch}"".""Users"" u, ""{sch}"".""Ambienti"" a
+            WHERE u.""Username""='MSTEFANE' AND a.""CodiceContratto""='4490015980'
+            AND NOT EXISTS (
+                SELECT 1 FROM ""{sch}"".""UserAmbienti"" ua
+                WHERE ua.""UserId""=u.""Id"" AND ua.""AmbienteId""=a.""Id""
+            );
+        ", adminHash, saHash);
+        Console.WriteLine("[SEED] Utenti e Ambiente pronti.");
     }
     catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
 #pragma warning restore EF1002

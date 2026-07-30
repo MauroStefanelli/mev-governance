@@ -32,14 +32,17 @@ public class ContrattoController : BaseController
     {
         try
         {
+            var ambienteId = GetAmbienteId();
             var contratti = _db.Contratti
                 .AsNoTracking()
+                .Where(c => c.AmbienteId == ambienteId)
                 .OrderBy(c => c.RifContratto)
                 .ToList();
 
             var mevItems = _db.MevItems
                 .AsNoTracking()
-                .Where(m => m.Contratto != null && m.Contratto != "" &&
+                .Where(m => m.AmbienteId == ambienteId &&
+                            m.Contratto != null && m.Contratto != "" &&
                             m.Bc != null && m.Bc != "")
                 .OrderBy(m => m.AnnoCompetenza).ThenBy(m => m.Bc).ThenBy(m => m.ExcelOrder)
                 .ToList();
@@ -119,19 +122,22 @@ public class ContrattoController : BaseController
     {
         try
         {
+            var ambienteId = GetAmbienteId();
             var contratti = _db.Contratti
                 .AsNoTracking()
+                .Where(c => c.AmbienteId == ambienteId)
                 .OrderBy(c => c.RifContratto)
                 .ToList();
 
             var buoni = _db.BuoniConsegna
                 .AsNoTracking()
+                .Where(b => b.AmbienteId == ambienteId)
                 .OrderBy(b => b.Oda)
                 .ToList();
 
             var mevItems = _db.MevItems
                 .AsNoTracking()
-                .Where(m => m.Bc != null && m.Bc != "")
+                .Where(m => m.AmbienteId == ambienteId && m.Bc != null && m.Bc != "")
                 .ToList();
 
             var result = contratti.Select(c => new
@@ -196,6 +202,13 @@ public class ContrattoController : BaseController
     [HttpPost("align")]
     public IActionResult Align()
     {
+        var ambienteId = GetAmbienteId();
+        return AlignInternal(ambienteId);
+    }
+
+    /// <summary>Chiamato anche da MevController durante l'allineamento globale.</summary>
+    public IActionResult AlignInternal(int ambienteId)
+    {
         try
         {
             var dataDir  = GetDataDir();
@@ -227,10 +240,9 @@ public class ContrattoController : BaseController
             if (contrattoHeaderRow == null)
                 return BadRequest("Intestazione 'RIF. Contratto' non trovata nel foglio CONTRATTO.");
 
-            ImportContratti(ws, contrattoHeaderRow);
+            ImportContratti(ws, contrattoHeaderRow, ambienteId);
 
             // ── Import tabella BUONI_CONSEGNA ─────────────────────────────────
-            // Cerca la riga intestazione con "ODA"
             var buoniHeaderRow = range.RowsUsed()
                 .FirstOrDefault(r =>
                     r.Cells().Any(c =>
@@ -238,10 +250,9 @@ public class ContrattoController : BaseController
                             .Equals("ODA", StringComparison.OrdinalIgnoreCase)));
 
             if (buoniHeaderRow != null)
-                ImportBuoniConsegna(ws, buoniHeaderRow);
+                ImportBuoniConsegna(ws, buoniHeaderRow, ambienteId);
 
             // ── Import tabella ConsumoTOW ─────────────────────────────────────
-            // Cerca la riga intestazione con "TOW" + "Valore Totale" + "Impegnato"
             var towHeaderRow = range.RowsUsed()
                 .FirstOrDefault(r =>
                     r.Cells().Any(c => c.GetString().Trim().Equals("TOW",          StringComparison.OrdinalIgnoreCase)) &&
@@ -250,8 +261,8 @@ public class ContrattoController : BaseController
 
             if (towHeaderRow != null)
             {
-                ImportConsumoTow(ws, towHeaderRow);
-                Console.WriteLine($"[TOW] Header trovato a riga {towHeaderRow.RowNumber()}, righe importate: {_db.ConsumoTow.Local.Count}");
+                ImportConsumoTow(ws, towHeaderRow, ambienteId);
+                Console.WriteLine($"[TOW] Header trovato a riga {towHeaderRow.RowNumber()}");
             }
             else
             {
@@ -263,9 +274,9 @@ public class ContrattoController : BaseController
             return Ok(new
             {
                 message          = "Contratti allineati",
-                count            = _db.Contratti.Count(),
-                countBuoni       = _db.BuoniConsegna.Count(),
-                countTow         = _db.ConsumoTow.Count(),
+                count            = _db.Contratti.Count(c => c.AmbienteId == ambienteId),
+                countBuoni       = _db.BuoniConsegna.Count(b => b.AmbienteId == ambienteId),
+                countTow         = _db.ConsumoTow.Count(t => t.AmbienteId == ambienteId),
             });
         }
         catch (Exception ex)
@@ -276,7 +287,7 @@ public class ContrattoController : BaseController
     }
 
     // ── Metodo privato: import tabella CONTRATTO ──────────────────────────────
-    private void ImportContratti(IXLWorksheet ws, IXLRangeRow headerRow)
+    private void ImportContratti(IXLWorksheet ws, IXLRangeRow headerRow, int ambienteId)
     {
         var columnMap = BuildColumnMap(headerRow);
         var dataRows  = ReadTableRows(ws, headerRow, "RIF. Contratto");
@@ -290,6 +301,7 @@ public class ContrattoController : BaseController
         }
 
         var existing = _db.Contratti
+            .Where(c => c.AmbienteId == ambienteId)
             .AsEnumerable()
             .GroupBy(c => c.RifContratto, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
@@ -342,6 +354,7 @@ public class ContrattoController : BaseController
                     DaOrdinare    = Dec(row, "Da Ordinare"),
                     Avanzato      = Dec(row, "Avanzato"),
                     DaAvanzare    = Dec(row, "Da avanzare"),
+                    AmbienteId    = ambienteId,
                 });
             }
         }
@@ -351,7 +364,7 @@ public class ContrattoController : BaseController
     }
 
     // ── Metodo privato: import tabella BUONI_CONSEGNA ─────────────────────────
-    private void ImportBuoniConsegna(IXLWorksheet ws, IXLRangeRow headerRow)
+    private void ImportBuoniConsegna(IXLWorksheet ws, IXLRangeRow headerRow, int ambienteId)
     {
         var columnMap = BuildColumnMap(headerRow);
         var dataRows  = ReadTableRows(ws, headerRow, "ODA");
@@ -365,6 +378,7 @@ public class ContrattoController : BaseController
         }
 
         var existing = _db.BuoniConsegna
+            .Where(b => b.AmbienteId == ambienteId)
             .AsEnumerable()
             .GroupBy(b => b.Oda, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
@@ -395,6 +409,7 @@ public class ContrattoController : BaseController
                     Importo      = Dec(row, "Importo"),
                     Avanzato     = Dec(row, "Avanzato"),
                     DaAvanzare   = Dec(row, "Da Avanzare"),
+                    AmbienteId   = ambienteId,
                 });
             }
         }
@@ -458,7 +473,10 @@ public class ContrattoController : BaseController
     {
         try
         {
-            var rows = _db.ConsumoTow.AsNoTracking().OrderBy(t => t.Tow).ToList();
+            var ambienteId = GetAmbienteId();
+            var rows = _db.ConsumoTow.AsNoTracking()
+                .Where(t => t.AmbienteId == ambienteId)
+                .OrderBy(t => t.Tow).ToList();
             return Ok(rows);
         }
         catch (Exception ex)
@@ -475,7 +493,8 @@ public class ContrattoController : BaseController
     [Authorize(Roles = "Admin")]
     public IActionResult DeleteConsumoTowContratto(string nome)
     {
-        var rows = _db.ConsumoTow.Where(r => r.TowContratto == nome).ToList();
+        var ambienteId = GetAmbienteId();
+        var rows = _db.ConsumoTow.Where(r => r.TowContratto == nome && r.AmbienteId == ambienteId).ToList();
         if (rows.Count == 0)
             return NotFound($"Contratto '{nome}' non trovato.");
         _db.ConsumoTow.RemoveRange(rows);
@@ -494,8 +513,8 @@ public class ContrattoController : BaseController
         if (string.IsNullOrWhiteSpace(request.TowContratto))
             return BadRequest("Il nome del contratto è obbligatorio.");
 
-        // Impedisce duplicati
-        bool exists = _db.ConsumoTow.Any(r => r.TowContratto == request.TowContratto);
+        var ambienteId = GetAmbienteId();
+        bool exists = _db.ConsumoTow.Any(r => r.TowContratto == request.TowContratto && r.AmbienteId == ambienteId);
         if (exists)
             return Conflict($"Il contratto '{request.TowContratto}' esiste già.");
 
@@ -510,6 +529,7 @@ public class ContrattoController : BaseController
                 TowContratto   = request.TowContratto,
                 ValoreUnitario = vu,
                 ValoreTotale   = vu * qta,
+                AmbienteId     = ambienteId,
             };
         }).ToList();
 
@@ -526,7 +546,8 @@ public class ContrattoController : BaseController
     [Authorize(Roles = "Admin")]
     public IActionResult UpdateConsumoTow(int id, [FromBody] ConsumoTowUpdateDto dto)
     {
-        var row = _db.ConsumoTow.FirstOrDefault(r => r.Id == id);
+        var ambienteId = GetAmbienteId();
+        var row = _db.ConsumoTow.FirstOrDefault(r => r.Id == id && r.AmbienteId == ambienteId);
         if (row == null) return NotFound($"Riga ConsumoTow con Id={id} non trovata");
 
         row.Tow                = dto.Tow;
@@ -549,7 +570,7 @@ public class ContrattoController : BaseController
     }
 
     // ── Metodo privato: import tabella ConsumoTOW ─────────────────────────────
-    private void ImportConsumoTow(IXLWorksheet ws, IXLRangeRow headerRow)
+    private void ImportConsumoTow(IXLWorksheet ws, IXLRangeRow headerRow, int ambienteId)
     {
         var columnMap = BuildColumnMap(headerRow);
         Console.WriteLine($"[TOW] ColumnMap keys: {string.Join(", ", columnMap.Keys)}");
@@ -586,8 +607,8 @@ public class ContrattoController : BaseController
         int headerRowNum = headerRow.RowNumber();
         int lastRowNum   = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
 
-        // Svuota e ricarica sempre
-        _db.ConsumoTow.RemoveRange(_db.ConsumoTow.ToList());
+        // Svuota e ricarica sempre (solo per questo ambiente)
+        _db.ConsumoTow.RemoveRange(_db.ConsumoTow.Where(t => t.AmbienteId == ambienteId).ToList());
 
         int count = 0;
         for (int rn = headerRowNum + 1; rn <= lastRowNum; rn++)
@@ -611,8 +632,8 @@ public class ContrattoController : BaseController
                 TowResidui        = GetDec(row, colTowResidui),
                 CollaudoApprovato = GetDec(row, colCollaudoApprovato),
                 CollaudoOrdinato  = GetDec(row, colCollaudoOrdinato),
-                CollaudoFatturato = GetDec(row, colCollaudoFatturato)
-
+                CollaudoFatturato = GetDec(row, colCollaudoFatturato),
+                AmbienteId        = ambienteId,
             });
             count++;
         }

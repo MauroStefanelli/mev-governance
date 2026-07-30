@@ -8,7 +8,8 @@ import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings } from "./services/mevService";
+import SuperAdminPage from "./pages/SuperAdminPage";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente } from "./services/mevService";
 
 function App() {
   const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
@@ -27,6 +28,14 @@ function App() {
   const [pwdSaving, setPwdSaving]   = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
+
+  // Ambienti
+  const [ambienti, setAmbienti]         = useState(() => {
+    try { return JSON.parse(localStorage.getItem("ambienti") || "[]"); } catch { return []; }
+  });
+  const [ambienteId, setAmbienteId]     = useState(() => parseInt(localStorage.getItem("ambienteId") || "0", 10));
+  const [showAmbienteMenu, setShowAmbienteMenu] = useState(false);
+  const [switchingAmbiente, setSwitchingAmbiente] = useState(false);
 
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
@@ -75,6 +84,14 @@ function App() {
     setUsername(data.username);
     setFullName(data.fullName);
     setRole(data.role);
+
+    const ambientiList = data.ambienti || [];
+    const activeId = data.ambienteId || 0;
+    setAmbienti(ambientiList);
+    setAmbienteId(activeId);
+    localStorage.setItem("ambienti", JSON.stringify(ambientiList));
+    localStorage.setItem("ambienteId", String(activeId));
+
     setPage("mev");
   };
 
@@ -90,10 +107,31 @@ function App() {
         });
       } catch { /* ignora errori di rete */ }
     }
-    ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
+    ["jwt", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole("");
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
-    setEditorAlerts([]);
+    setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
+  };
+
+  // ── Cambio ambiente ──────────────────────────────────────────────────────────
+  const handleSwitchAmbiente = async (id) => {
+    if (id === ambienteId || switchingAmbiente) return;
+    setSwitchingAmbiente(true);
+    setShowAmbienteMenu(false);
+    try {
+      const data = await switchAmbiente(id);
+      localStorage.setItem("jwt", data.token);
+      localStorage.setItem("ambienteId", String(data.ambienteId));
+      setToken(data.token);
+      setAmbienteId(data.ambienteId);
+      // Ricarica i dati MEV per il nuovo ambiente
+      getMevList().then(setRows).catch(() => {});
+      getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
+    } catch (e) {
+      alert("Errore cambio ambiente: " + e.message);
+    } finally {
+      setSwitchingAmbiente(false);
+    }
   };
 
   // ── Logout automatico dopo inattività (minuti configurabili dal DB) ──────────
@@ -273,7 +311,123 @@ function App() {
               )}
             </div>
           )}
+
+          {role === "SuperAdmin" && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowAdminMenu(!showAdminMenu)}
+                style={{
+                  background: ["superadmin"].includes(page) ? "rgba(255,255,255,0.22)" : "transparent",
+                  color: "white",
+                  border: "1px solid transparent",
+                  cursor: "pointer",
+                  padding: "6px 16px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              >
+                SuperAdmin {showAdminMenu ? "▲" : "▼"}
+              </button>
+              {showAdminMenu && (
+                <div style={{
+                  position: "absolute", top: "38px", right: 0,
+                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+                  borderRadius: "8px", minWidth: "180px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}>
+                  {[
+                    { id: "superadmin", label: "Gestione Ambienti" },
+                  ].map(({ id, label }) => (
+                    <div
+                      key={id}
+                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
+                      style={{
+                        padding: "8px 16px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: page === id ? 600 : 400,
+                        color: "white",
+                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
+
+        {/* Selettore Ambiente (visibile se ci sono più ambienti disponibili) */}
+        {ambienti.length > 1 && (
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowAmbienteMenu(!showAmbienteMenu)}
+              disabled={switchingAmbiente}
+              style={{
+                background: "rgba(255,255,255,0.15)",
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.4)",
+                cursor: switchingAmbiente ? "wait" : "pointer",
+                padding: "5px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                display: "flex", alignItems: "center", gap: "6px",
+              }}
+            >
+              <span style={{ fontSize: "10px", opacity: 0.7 }}>Contratto</span>
+              <span>
+                {switchingAmbiente
+                  ? "..."
+                  : ambienti.find(a => a.id === ambienteId)?.codiceContratto || ambienteId}
+              </span>
+              <span style={{ fontSize: "10px" }}>{showAmbienteMenu ? "▲" : "▼"}</span>
+            </button>
+            {showAmbienteMenu && (
+              <div style={{
+                position: "absolute", top: "38px", right: 0,
+                background: "white",
+                borderRadius: "8px", minWidth: "240px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                border: "1px solid #dadce0",
+              }}>
+                <div style={{ padding: "8px 12px", fontSize: "11px", color: "#888", borderBottom: "1px solid #f1f3f4" }}>
+                  Cambia contratto
+                </div>
+                {ambienti.map(a => (
+                  <div
+                    key={a.id}
+                    onClick={() => handleSwitchAmbiente(a.id)}
+                    style={{
+                      padding: "10px 14px",
+                      cursor: a.id === ambienteId ? "default" : "pointer",
+                      background: a.id === ambienteId ? "#e8f0fe" : "transparent",
+                      borderBottom: "1px solid #f1f3f4",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "#f1f3f4"; }}
+                    onMouseLeave={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: a.id === ambienteId ? "#1a73e8" : "#333" }}>
+                      {a.codiceContratto}
+                      {a.id === ambienteId && <span style={{ marginLeft: 6, fontSize: "11px", color: "#1a73e8" }}>▶ attivo</span>}
+                    </div>
+                    {a.descrizione && (
+                      <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{a.descrizione}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Utente + cambio password + logout */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -366,6 +520,7 @@ function App() {
         {page === "dbconfig"          && role === "Admin" && <DbConfigPage />}
         {page === "tools"             && role === "Admin" && <ToolsPage onUnauthorized={handleLogout} />}
         {page === "consumotow"        && role === "Admin" && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
+        {page === "superadmin"        && role === "SuperAdmin" && <SuperAdminPage />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}

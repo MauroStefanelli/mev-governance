@@ -22,6 +22,7 @@ public class ConsumoTow
     public decimal CollaudoOrdinato { get; set; }
     public decimal CollaudoFatturato { get; set; }
 
+    public int AmbienteId { get; set; }
 }
 
 

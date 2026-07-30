@@ -15,7 +15,10 @@ const tryRefreshToken = async () => {
     const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({
+        refreshToken,
+        currentToken: localStorage.getItem("jwt") || null
+      }),
     });
     if (!res.ok) return false;
     const data = await res.json();
@@ -486,6 +489,85 @@ export const deleteConsumoTowContratto = async (nome) => {
     const text = await response.text();
     throw new Error(text);
   }
+  return response.json();
+};
+
+// ── Ambienti ─────────────────────────────────────────────────────────────────
+
+export const getMyAmbienti = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/my-ambienti`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore recupero ambienti");
+  return response.json();
+};
+
+export const switchAmbiente = async (ambienteId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/switch-ambiente`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ ambienteId })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json(); // { token, ambienteId }
+};
+
+// ── SuperAdmin: gestione ambienti ────────────────────────────────────────────
+
+export const getAllAmbienti = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore recupero ambienti");
+  return response.json();
+};
+
+export const createAmbiente = async (codiceContratto, descrizione) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ codiceContratto, descrizione })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const getAmbientiUtenti = async (ambienteId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti`, {
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore recupero utenti ambiente");
+  return response.json();
+};
+
+export const addUtenteAmbiente = async (ambienteId, userId, ruolo) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ userId, ruolo })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const removeUtenteAmbiente = async (ambienteId, userId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti/${userId}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore rimozione utente da ambiente");
   return response.json();
 };
 

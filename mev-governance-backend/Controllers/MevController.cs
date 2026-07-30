@@ -31,8 +31,10 @@ public class MevController : BaseController
     
     public IActionResult GetMev()
     {
+        var ambienteId = GetAmbienteId();
         var items = _db.MevItems
             .AsNoTracking()
+            .Where(m => m.AmbienteId == ambienteId)
             .OrderBy(m => m.ExcelOrder)
             .ToList();
 
@@ -45,7 +47,8 @@ public class MevController : BaseController
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateMev(int id, [FromBody] UpdateMevRequest request)
     {
-        var item = _db.MevItems.FirstOrDefault(x => x.Id == id);
+        var ambienteId = GetAmbienteId();
+        var item = _db.MevItems.FirstOrDefault(x => x.Id == id && x.AmbienteId == ambienteId);
         if (item == null)
             return NotFound();
 
@@ -115,10 +118,11 @@ public class MevController : BaseController
             if (!System.IO.File.Exists(uploadedPath))
                 return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
 
-            var mevResult = ImportFromExcelFile(uploadedPath);
+            var ambienteId = GetAmbienteId();
+            var mevResult = ImportFromExcelFile(uploadedPath, ambienteId);
 
             // Allinea anche i contratti dallo stesso file
-            var contrattoResult = _contrattoCtrl.Align();
+            var contrattoResult = _contrattoCtrl.AlignInternal(ambienteId);
 
             // Salva timestamp ultimo align
             var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
@@ -170,7 +174,7 @@ public class MevController : BaseController
     // ============================================================
     // METODO PRIVATO: import da Excel
     // ============================================================
-    private IActionResult ImportFromExcelFile(string excelPath)
+    private IActionResult ImportFromExcelFile(string excelPath, int ambienteId)
     {
         try
         {
@@ -208,8 +212,9 @@ public class MevController : BaseController
         var dataRows = ws.RowsUsed()
             .Where(r => r.RowNumber() > headerRow.RowNumber());
 
-        // Costruisco un dizionario delle righe esistenti per ExcelId
+        // Costruisco un dizionario delle righe esistenti per ExcelId (filtrato per ambiente)
         var existingItems = _db.MevItems
+            .Where(x => x.AmbienteId == ambienteId)
             .ToDictionary(x => x.ExcelId, x => x);
 
         var excelIds = new List<string>();
@@ -324,7 +329,8 @@ public class MevController : BaseController
                     PAnno = GetInt("Anno Competenza"),
                     PRelease = GetString("Release"),
                     PImporto = importo,
-                    ImportoBdo = ordinatoBdo
+                    ImportoBdo = ordinatoBdo,
+                    AmbienteId = ambienteId
                 };
                 _db.MevItems.Add(item);
             }
@@ -381,8 +387,10 @@ public class MevController : BaseController
 
         // DATI
 
+        var ambienteId = GetAmbienteId();
         var items = _db.MevItems
             .AsNoTracking()
+            .Where(x => x.AmbienteId == ambienteId)
             .OrderBy(x => x.ExcelOrder)
             .ToList();
 

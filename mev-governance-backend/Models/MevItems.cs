@@ -46,5 +46,8 @@ public class MevItem
 
     // Importo BDO editabile (pre-popolato da OrdinatoBdo all'import, modificabile dalla UI)
     public decimal ImportoBdo { get; set; }
+
+    // Ambiente di appartenenza (0 = non assegnato, backfill a 4490015980)
+    public int AmbienteId { get; set; }
 }
 
