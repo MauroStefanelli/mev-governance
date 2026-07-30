@@ -37,6 +37,8 @@ services:
         value: https://mev-pdf-parser-dev.onrender.com
       - key: ASPNETCORE_ENVIRONMENT
         value: Development
+      - key: DB_SCHEMA
+        value: dev
 
   # ── Frontend React (dev) ──────────────────────────────────────────────────────
   - type: web

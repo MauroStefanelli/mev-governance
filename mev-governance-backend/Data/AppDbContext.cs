@@ -19,4 +19,11 @@ public class AppDbContext : DbContext
     public DbSet<UserAccessLog> UserAccessLogs => Set<UserAccessLog>();
     public DbSet<OrdineConsegnaItem> OrdiniConsegna => Set<OrdineConsegnaItem>();
     public DbSet<VerbaleAvanzamento> VerbaliAvanzamento => Set<VerbaleAvanzamento>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Lo schema viene iniettato tramite l'opzione HasDefaultSchema configurata in Program.cs.
+        // Su prod lo schema è "public" (default PostgreSQL), su dev è "dev".
+        base.OnModelCreating(modelBuilder);
+    }
 }

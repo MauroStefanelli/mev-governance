@@ -73,12 +73,19 @@ builder.Services.AddCors(options =>
 // ✅ DB
 var databaseUrl = (Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
                ?? Environment.GetEnvironmentVariable("DATABASE_URL"))
-               ?.Trim(); // rimuove spazi, newline e altri caratteri invisibili
+               ?.Trim();
+
+// Schema PostgreSQL: "public" per prod (default), "dev" per sviluppo
+var dbSchema = (Environment.GetEnvironmentVariable("DB_SCHEMA") ?? "public").Trim().ToLower();
+var isPostgres = false;
 
 if (DbConfigConnectionString != null && DbConfigIsPostgres)
 {
+    isPostgres = true;
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(DbConfigConnectionString));
+        options.UseNpgsql(DbConfigConnectionString,
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema))
+        .HasDefaultSchema(dbSchema == "public" ? null : dbSchema));  // null = default postgres (public)
 }
 else if (DbConfigConnectionString != null)
 {
@@ -87,17 +94,17 @@ else if (DbConfigConnectionString != null)
 }
 else if (!string.IsNullOrEmpty(databaseUrl))
 {
+    isPostgres = true;
     string connStr;
     if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
-    {
         connStr = ParsePostgresUrl(databaseUrl);
-    }
     else
-    {
         connStr = databaseUrl;
-    }
+
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(connStr));
+        options.UseNpgsql(connStr,
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema))
+        .HasDefaultSchema(dbSchema == "public" ? null : dbSchema));
 }
 else
 {
@@ -187,6 +194,18 @@ app.UseCors("FrontendPolicy");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    // Se siamo su PostgreSQL e lo schema non è "public", lo creiamo prima delle migration
+    if (isPostgres && dbSchema != "public")
+    {
+        try
+        {
+            db.Database.ExecuteSqlRaw($"CREATE SCHEMA IF NOT EXISTS \"{dbSchema}\";");
+            Console.WriteLine($"[SCHEMA] Schema '{dbSchema}' pronto.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[SCHEMA ERROR] {ex.Message}"); }
+    }
+
     try
     {
         db.Database.Migrate(); // applica tutte le migration pendenti
@@ -201,30 +220,30 @@ using (var scope = app.Services.CreateScope())
     }
 
     // Aggiunge colonne mancanti in modo idempotente (PostgreSQL)
+    var sch = dbSchema; // schema corrente (public o dev)
     try
     {
-        db.Database.ExecuteSqlRaw(@"
+        db.Database.ExecuteSqlRaw($@"
             DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='AppSettings' AND column_name='LogoutMinutes') THEN
-                    ALTER TABLE ""AppSettings"" ADD COLUMN ""LogoutMinutes"" INTEGER NOT NULL DEFAULT 60;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='AppSettings' AND column_name='LogoutMinutes') THEN
+                    ALTER TABLE ""{sch}"".""AppSettings"" ADD COLUMN ""LogoutMinutes"" INTEGER NOT NULL DEFAULT 60;
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='MeseAvanzamento') THEN
-                    ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""MeseAvanzamento"" TEXT NOT NULL DEFAULT '';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='MeseAvanzamento') THEN
+                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""MeseAvanzamento"" TEXT NOT NULL DEFAULT '';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='QtaAvanzata') THEN
-                    ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""QtaAvanzata"" TEXT NOT NULL DEFAULT '';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='QtaAvanzata') THEN
+                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""QtaAvanzata"" TEXT NOT NULL DEFAULT '';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='ImportoFatturabile') THEN
-                    ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='ImportoFatturabile') THEN
+                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
-                    ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""Subappalto"" TEXT NOT NULL DEFAULT '';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
+                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""Subappalto"" TEXT NOT NULL DEFAULT '';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='MevItems' AND column_name='ImportoBdo') THEN
-                    ALTER TABLE ""MevItems"" ADD COLUMN ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='MevItems' AND column_name='ImportoBdo') THEN
+                    ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
                 END IF;
-                -- Backfill: copia OrdinatoBdo in ImportoBdo per le righe dove ImportoBdo è ancora 0
-                UPDATE ""MevItems"" SET ""ImportoBdo"" = ""OrdinatoBdo"" WHERE ""ImportoBdo"" = 0 AND ""OrdinatoBdo"" <> 0;
+                UPDATE ""{sch}"".""MevItems"" SET ""ImportoBdo"" = ""OrdinatoBdo"" WHERE ""ImportoBdo"" = 0 AND ""OrdinatoBdo"" <> 0;
             END $$;
         ");
     }
@@ -233,8 +252,8 @@ using (var scope = app.Services.CreateScope())
     // Crea OrdiniConsegna se non esiste (con tutte le colonne)
     try
     {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""OrdiniConsegna"" (
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""OrdiniConsegna"" (
                 ""Id""                   SERIAL PRIMARY KEY,
                 ""NumeroOrdine""         TEXT NOT NULL DEFAULT '',
                 ""Data""                 TEXT NOT NULL DEFAULT '',
@@ -267,8 +286,8 @@ using (var scope = app.Services.CreateScope())
     // Crea VerbaliAvanzamento se non esiste
     try
     {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""VerbaliAvanzamento"" (
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""VerbaliAvanzamento"" (
                 ""Id""               SERIAL PRIMARY KEY,
                 ""NomePdf""          TEXT NOT NULL DEFAULT '',
                 ""MeseAvanzamento""  TEXT NOT NULL DEFAULT '',
@@ -282,29 +301,29 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Console.Error.WriteLine($"[CREATE VerbaliAvanzamento ERROR] {ex.Message}"); }
 
-    // Aggiunge DatiRigheJson se non esiste (verbali già presenti nel DB)
+    // Aggiunge DatiRigheJson se non esiste
     try
     {
-        db.Database.ExecuteSqlRaw(@"
+        db.Database.ExecuteSqlRaw($@"
             DO $$ BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                               WHERE table_name='VerbaliAvanzamento' AND column_name='DatiRigheJson') THEN
-                    ALTER TABLE ""VerbaliAvanzamento"" ADD COLUMN ""DatiRigheJson"" TEXT NULL;
+                               WHERE table_schema='{sch}' AND table_name='VerbaliAvanzamento' AND column_name='DatiRigheJson') THEN
+                    ALTER TABLE ""{sch}"".""VerbaliAvanzamento"" ADD COLUMN ""DatiRigheJson"" TEXT NULL;
                 END IF;
             END $$;
         ");
     }
     catch (Exception ex) { Console.Error.WriteLine($"[ALTER VerbaliAvanzamento ERROR] {ex.Message}"); }
 
-    // Fix tipo colonne boolean su PostgreSQL (le migration SQLite le creano come INTEGER)
+    // Fix tipo colonne boolean su PostgreSQL
     try
     {
-        db.Database.ExecuteSqlRaw(@"
+        db.Database.ExecuteSqlRaw($@"
             DO $$ BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.columns
-                           WHERE table_name='Users' AND column_name='IsActive'
+                           WHERE table_schema='{sch}' AND table_name='Users' AND column_name='IsActive'
                            AND data_type='integer') THEN
-                    ALTER TABLE ""Users""
+                    ALTER TABLE ""{sch}"".""Users""
                         ALTER COLUMN ""IsActive""  TYPE BOOLEAN USING ""IsActive""::boolean,
                         ALTER COLUMN ""SendEmail"" TYPE BOOLEAN USING ""SendEmail""::boolean;
                 END IF;
@@ -313,7 +332,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex) { Console.Error.WriteLine($"[FIX BOOLEAN COLUMNS ERROR] {ex.Message}"); }
 
-    // Seed admin — usa SQL raw per evitare problemi di tipo boolean con EF su PostgreSQL
+    // Seed admin
     try
     {
         var exists = db.Users.Any();
@@ -321,10 +340,10 @@ using (var scope = app.Services.CreateScope())
         {
             var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
             var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
-            db.Database.ExecuteSqlRaw(@"
-                INSERT INTO ""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
-                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{0},'Admin',true,false
-                WHERE NOT EXISTS (SELECT 1 FROM ""Users"")
+            db.Database.ExecuteSqlRaw($@"
+                INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,false
+                WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"")
             ", hash);
         }
     }
