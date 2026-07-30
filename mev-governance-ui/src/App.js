@@ -197,14 +197,14 @@ function App() {
     if (id === ambienteId || switchingAmbiente) return;
     setSwitchingAmbiente(true);
     setShowAmbienteMenu(false);
+    // Azzera subito i dati visibili per non mostrare quelli del contratto precedente
+    setRows([]); setFilteredRows([]);
     try {
       const data = await switchAmbiente(id);
       localStorage.setItem("jwt", data.token);
       localStorage.setItem("ambienteId", String(data.ambienteId));
       setToken(data.token);
       setAmbienteId(data.ambienteId);
-      // Ricarica i dati MEV per il nuovo ambiente
-      getMevList().then(setRows).catch(() => {});
       getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
     } catch (e) {
       alert("Errore cambio ambiente: " + e.message);
@@ -676,10 +676,10 @@ function App() {
       )}
 
       <main style={{ padding: "0" }}>
-        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} />}
-        {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} />}
+        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
-        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
+        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
         {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
         {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
         {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleLogout} />}
