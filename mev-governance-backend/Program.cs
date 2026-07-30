@@ -169,6 +169,11 @@ var jwtIssuer  = Environment.GetEnvironmentVariable("JWT_ISSUER")   ?? builder.C
 var jwtAudience= Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"]!;
 Console.WriteLine($"[JWT] Issuer={jwtIssuer} Audience={jwtAudience}");
 
+// Sovrascrive i valori in IConfiguration così AuthController li legge correttamente
+builder.Configuration["Jwt:Key"]      = jwtKey;
+builder.Configuration["Jwt:Issuer"]   = jwtIssuer;
+builder.Configuration["Jwt:Audience"] = jwtAudience;
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
