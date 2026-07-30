@@ -1,0 +1,48 @@
+services:
+
+  # ── PDF Parser (dev) ──────────────────────────────────────────────────────────
+  - type: web
+    name: mev-pdf-parser-dev
+    runtime: docker
+    dockerfilePath: ./mev-pdf-parser/Dockerfile
+    dockerContext: .
+    branch: develop
+    plan: free
+
+  # ── Backend ASP.NET Core (dev) ────────────────────────────────────────────────
+  - type: web
+    name: mev-governance-backend-dev
+    runtime: docker
+    dockerfilePath: ./mev-governance-backend/Dockerfile
+    dockerContext: ./mev-governance-backend
+    branch: develop
+    plan: free
+    envVars:
+      - key: JWT_KEY
+        generateValue: true
+      - key: JWT_ISSUER
+        value: mev-governance-dev
+      - key: JWT_AUDIENCE
+        value: mev-governance-ui-dev
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: DATABASE_DIRECT_URL
+        sync: false          # da impostare manualmente su Render con il DB dev
+      - key: CORS_ORIGINS
+        value: https://mev-governance-frontend-dev.onrender.com
+      - key: PDF_PARSER_URL
+        value: https://mev-pdf-parser-dev.onrender.com
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Development
+
+  # ── Frontend React (dev) ──────────────────────────────────────────────────────
+  - type: web
+    name: mev-governance-frontend-dev
+    runtime: docker
+    dockerfilePath: ./mev-governance-ui/Dockerfile
+    dockerContext: ./mev-governance-ui
+    branch: develop
+    plan: free
+    buildArgs:
+      - key: REACT_APP_API_URL
+        value: https://mev-governance-backend-dev.onrender.com

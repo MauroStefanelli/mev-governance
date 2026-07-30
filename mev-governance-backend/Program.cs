@@ -47,9 +47,12 @@ if (File.Exists(dbConfigFile))
 var allowedOrigins = new List<string>
 {
     "https://mev-governance-frontend.onrender.com",
+    "https://mev-governance-frontend-dev.onrender.com",
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://localhost:8082",
     "http://192.168.1.144:3000",
+    "http://192.168.1.144:3001",
 };
 
 // Permette di aggiungere origini aggiuntive via variabile d'ambiente

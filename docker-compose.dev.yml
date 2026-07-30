@@ -1,0 +1,51 @@
+services:
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: mev-postgres-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=MEV-Governance-Dev
+      - POSTGRES_USER=mev_user
+      - POSTGRES_PASSWORD=Mev2025Dev!
+    volumes:
+      - /share/Public/mev-data-dev/pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  pdf-parser-dev:
+    image: ghcr.io/maurostefanelli/mev-pdf-parser:dev
+    container_name: mev-pdf-parser-dev
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+    ports:
+      - "5003:8000"
+
+  backend-dev:
+    image: ghcr.io/maurostefanelli/mev-governance-backend:dev
+    container_name: mev-backend-dev
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - JWT_KEY=MEV-Governance-Dev-SecretKey-2025-Capgemini!
+      - JWT_ISSUER=mev-governance-dev
+      - JWT_AUDIENCE=mev-governance-ui-dev
+      - DATABASE_DIRECT_URL=Host=postgres-dev;Port=5432;Database=MEV-Governance-Dev;Username=mev_user;Password=Mev2025Dev!
+      - PDF_PARSER_URL=http://pdf-parser-dev:8000
+      - SKIP_PARSER_WARMUP=true
+    volumes:
+      - /share/Public/mev-data-dev:/data
+    ports:
+      - "4001:5000"
+    depends_on:
+      - postgres-dev
+      - pdf-parser-dev
+
+  frontend-dev:
+    image: ghcr.io/maurostefanelli/mev-governance-frontend:qnap-dev
+    container_name: mev-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend-dev
