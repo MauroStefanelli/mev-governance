@@ -27,7 +27,10 @@ services:
       - key: ADMIN_PASSWORD
         generateValue: true
       - key: DATABASE_DIRECT_URL
-        sync: false          # da impostare manualmente su Render con il DB dev
+        sync: false
+        # Imposta manualmente su Render con la connessione DIRETTA Supabase (non pooler):
+        # postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/MEV-Governance-Dev
+        # Per creare il DB: Supabase SQL Editor → CREATE DATABASE "MEV-Governance-Dev";
       - key: CORS_ORIGINS
         value: https://mev-governance-frontend-dev.onrender.com
       - key: PDF_PARSER_URL
