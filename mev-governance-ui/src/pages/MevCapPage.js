@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   getMevList, updateMev, alignMevData, exportMev, uploadExcel
 } from "../services/mevService";
@@ -146,7 +146,11 @@ function EditModal({ row, onClose, onSave }) {
   const [form, setForm] = useState({ ...row });
   const [saving, setSaving] = useState(false);
 
-  const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+  // useCallback garantisce che `set` non cambi identità ad ogni render
+  // => ModalField non viene mai rimontato => il focus sull'input non si perde
+  const set = useCallback((field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -154,8 +158,6 @@ function EditModal({ row, onClose, onSave }) {
     catch (e) { alert(`Errore salvataggio: ${e.message}`); }
     finally { setSaving(false); }
   };
-
-  const F = (props) => <ModalField {...props} form={form} onChange={set} />;
 
   return (
     <div style={{
@@ -180,60 +182,60 @@ function EditModal({ row, onClose, onSave }) {
 
         {/* Sezione: Identificazione */}
         <ModalSection title="Identificazione">
-          <F label="ID Excel"    field="excelId"     readOnly width="calc(10% - 8px)" />
-          <F label="GoTo"        field="goTo"         readOnly width="calc(12% - 8px)" />
-          <F label="Applicativo" field="applicativo"  readOnly width="calc(18% - 8px)" />
-          <F label="X ORDINE"    field="xOrdine"      readOnly width="calc(20% - 8px)" />
-          <F label="Descrizione" field="descrizione"  readOnly width="calc(40% - 8px)" />
+          <ModalField label="ID Excel"    field="excelId"     readOnly form={form} onChange={set} width="calc(10% - 8px)" />
+          <ModalField label="GoTo"        field="goTo"         readOnly form={form} onChange={set} width="calc(12% - 8px)" />
+          <ModalField label="Applicativo" field="applicativo"  readOnly form={form} onChange={set} width="calc(18% - 8px)" />
+          <ModalField label="X ORDINE"    field="xOrdine"      readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Descrizione" field="descrizione"  readOnly form={form} onChange={set} width="calc(40% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Responsabili */}
         <ModalSection title="Responsabili">
-          <F label="PM Poste"        field="pmPoste"       width="calc(25% - 8px)" />
-          <F label="PM CAP"          field="pmCap"         width="calc(25% - 8px)" />
-          <F label="Anno Competenza" field="annoCompetenza" readOnly width="calc(15% - 8px)" />
-          <F label="Release Excel"   field="releaseExcel"  readOnly width="calc(20% - 8px)" />
-          <F label="Recupero"        field="recupero"      width="calc(15% - 8px)" />
+          <ModalField label="PM Poste"        field="pmPoste"        form={form} onChange={set} width="calc(25% - 8px)" />
+          <ModalField label="PM CAP"           field="pmCap"          form={form} onChange={set} width="calc(25% - 8px)" />
+          <ModalField label="Anno Competenza"  field="annoCompetenza" readOnly form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="Release Excel"    field="releaseExcel"   readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Recupero"         field="recupero"       form={form} onChange={set} width="calc(15% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Stato e Contratto */}
         <ModalSection title="Stato e Contratto">
-          <F label="Stato"          field="stato"         width="calc(20% - 8px)" />
-          <F label="Tipo Contratto" field="tipoContratto" width="calc(15% - 8px)" />
-          <F label="BC"             field="bc"            width="calc(20% - 8px)" />
-          <F label="Contratto"      field="contratto"     width="calc(15% - 8px)" />
-          <F label="RDA"            field="rda"           width="calc(15% - 8px)" />
-          <F label="AT ID"          field="atId"          width="calc(15% - 8px)" />
+          <ModalField label="Stato"           field="stato"         form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Tipo Contratto"  field="tipoContratto" form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="BC"              field="bc"            form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Contratto"       field="contratto"     form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="RDA"             field="rda"           form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="AT ID"           field="atId"          form={form} onChange={set} width="calc(15% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Importi */}
         <ModalSection title="Importi">
-          <F label="Importo Fornitura" field="importoExcel"             readOnly width="calc(20% - 8px)" />
-          <F label="Importo Scontato"  field="importoFornituraScontato" readOnly width="calc(20% - 8px)" />
-          <F label="Ordinato (BdO)"    field="ordinatoBdo"              readOnly width="calc(20% - 8px)" />
-          <F label="Fatturato"         field="fatturato"                readOnly width="calc(20% - 8px)" />
-          <F label="Residuo Fatt."     field="residuoFatturabile"       readOnly width="calc(20% - 8px)" />
+          <ModalField label="Importo Fornitura" field="importoExcel"             readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Importo Scontato"  field="importoFornituraScontato" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Ordinato (BdO)"    field="ordinatoBdo"              readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Fatturato"         field="fatturato"                readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Residuo Fatt."     field="residuoFatturabile"       readOnly form={form} onChange={set} width="calc(20% - 8px)" />
         </ModalSection>
 
         {/* Sezione: TOW */}
         <ModalSection title="TOW (gg/qty)">
-          <F label="TOW02.1"  field="tow021"   type="number" width="calc(16% - 8px)" />
-          <F label="TOW02.2"  field="tow022"   type="number" width="calc(16% - 8px)" />
-          <F label="TOW02.3"  field="tow023"   type="number" width="calc(16% - 8px)" />
-          <F label="TOW02.4"  field="tow024"   type="number" width="calc(16% - 8px)" />
-          <F label="TOW02.5"  field="tow025"   type="number" width="calc(16% - 8px)" />
-          <F label="TOW02.6"  field="tow026"   type="number" width="calc(16% - 8px)" />
-          <F label="Totale TOW" field="towTotale" readOnly   width="calc(20% - 8px)" />
+          <ModalField label="TOW02.1"   field="tow021"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
+          <ModalField label="TOW02.2"   field="tow022"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
+          <ModalField label="TOW02.3"   field="tow023"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
+          <ModalField label="TOW02.4"   field="tow024"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
+          <ModalField label="TOW02.5"   field="tow025"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
+          <ModalField label="TOW02.6"   field="tow026"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
+          <ModalField label="Totale TOW" field="towTotale" readOnly     form={form} onChange={set} width="calc(20% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Extra */}
         <ModalSection title="Extra">
-          <F label="Accantonato" field="accantonato" type="number" width="calc(15% - 8px)" />
-          <F label="NEL"         field="nel"         width="calc(15% - 8px)" />
-          <F label="In Vita"     field="inVita"      width="calc(15% - 8px)" />
-          <F label="CM"          field="cm"          width="calc(15% - 8px)" />
-          <F label="SUBCO"       field="subco"       width="calc(20% - 8px)" />
-          <F label="TBD"         field="tbd"         width="calc(20% - 8px)" />
+          <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="SUBCO"       field="subco"       form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(20% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Note Excel */}
@@ -247,10 +249,10 @@ function EditModal({ row, onClose, onSave }) {
 
         {/* Sezione: PMO */}
         <ModalSection title="PMO">
-          <F label="P Anno"      field="pAnno"     type="number" width="calc(12% - 8px)" />
-          <F label="P Release"   field="pRelease"              width="calc(20% - 8px)" />
-          <F label="P Importo"   field="pImporto"  type="number" width="calc(20% - 8px)" />
-          <F label="Importo BDO" field="importoBdo" type="number" width="calc(20% - 8px)" />
+          <ModalField label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
+          <ModalField label="P Release"   field="pRelease"               form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="P Importo"   field="pImporto"   type="number" form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Importo BDO" field="importoBdo" type="number" form={form} onChange={set} width="calc(20% - 8px)" />
           <div style={{ width: "calc(28% - 8px)" }}>
             <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
             <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
