@@ -250,7 +250,7 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""Sconto"" numeric NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""IsCatalogo"" boolean NOT NULL DEFAULT false;
             ");
-            // Converte IsCatalogo da integer a boolean se fu creata con tipo sbagliato
+            // Converte IsCatalogo da integer a boolean (DROP DEFAULT → CAST → SET DEFAULT)
             db.Database.ExecuteSqlRaw($@"
                 DO $$
                 BEGIN
@@ -261,12 +261,13 @@ using (var scope = app.Services.CreateScope())
                       AND column_name  = 'IsCatalogo'
                       AND data_type    = 'integer'
                   ) THEN
-                    ALTER TABLE ""{sch}"".""ConsumoTow""
-                      ALTER COLUMN ""IsCatalogo"" TYPE boolean USING (""IsCatalogo""::boolean);
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""IsCatalogo"" DROP DEFAULT;
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""IsCatalogo"" TYPE boolean USING (""IsCatalogo""::integer::boolean);
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""IsCatalogo"" SET DEFAULT false;
                   END IF;
                 END$$;
             ");
-            // Converte Sconto da TEXT a numeric se fu creata con tipo sbagliato
+            // Converte Sconto da TEXT a numeric (DROP DEFAULT → CAST → SET DEFAULT)
             db.Database.ExecuteSqlRaw($@"
                 DO $$
                 BEGIN
@@ -277,8 +278,9 @@ using (var scope = app.Services.CreateScope())
                       AND column_name  = 'Sconto'
                       AND data_type    = 'text'
                   ) THEN
-                    ALTER TABLE ""{sch}"".""ConsumoTow""
-                      ALTER COLUMN ""Sconto"" TYPE numeric USING (""Sconto""::numeric);
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""Sconto"" DROP DEFAULT;
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""Sconto"" TYPE numeric USING (""Sconto""::numeric);
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""Sconto"" SET DEFAULT 0;
                   END IF;
                 END$$;
             ");
@@ -337,6 +339,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok("MEV Backend is running....."));
+app.MapGet("/version", () => Results.Ok(new { commit = "0fed4fe", built = DateTime.UtcNow.ToString("o") }));
 app.MapControllers();
 
 app.Run();
