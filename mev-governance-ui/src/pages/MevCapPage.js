@@ -121,6 +121,26 @@ const inputStyle = (extra = {}) => ({
   boxSizing: "border-box", ...extra,
 });
 
+// ── Field e Section: definiti FUORI dalla modale per evitare re-mount ad ogni render ──
+const ModalField = ({ label, field, type, readOnly, width, form, onChange }) => (
+  <div style={{ marginBottom: "12px", width: width || "100%" }}>
+    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+    {readOnly
+      ? <div style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", background: "#f8f9fa", color: "#888", minHeight: "32px" }}>{form[field] ?? ""}</div>
+      : <input value={form[field] ?? ""} type={type || "text"}
+          onChange={(e) => onChange(field, e.target.value)}
+          style={inputStyle()} />
+    }
+  </div>
+);
+
+const ModalSection = ({ title, children }) => (
+  <div style={{ marginBottom: "18px" }}>
+    <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", borderBottom: "2px solid #e8f0fe", paddingBottom: "4px" }}>{title}</div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0 16px" }}>{children}</div>
+  </div>
+);
+
 // ── Modale di modifica ────────────────────────────────────────────────────────
 function EditModal({ row, onClose, onSave }) {
   const [form, setForm] = useState({ ...row });
@@ -135,24 +155,7 @@ function EditModal({ row, onClose, onSave }) {
     finally { setSaving(false); }
   };
 
-  const Field = ({ label, field, type = "text", readOnly = false, width = "100%" }) => (
-    <div style={{ marginBottom: "12px", width }}>
-      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
-      {readOnly
-        ? <div style={{ ...inputStyle(), background: "#f8f9fa", color: "#888" }}>{form[field] ?? ""}</div>
-        : <input value={form[field] ?? ""} type={type}
-            onChange={(e) => set(field, e.target.value)}
-            style={inputStyle()} />
-      }
-    </div>
-  );
-
-  const Section = ({ title, children }) => (
-    <div style={{ marginBottom: "18px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", borderBottom: "2px solid #e8f0fe", paddingBottom: "4px" }}>{title}</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0 16px" }}>{children}</div>
-    </div>
-  );
+  const F = (props) => <ModalField {...props} form={form} onChange={set} />;
 
   return (
     <div style={{
@@ -176,84 +179,84 @@ function EditModal({ row, onClose, onSave }) {
         </div>
 
         {/* Sezione: Identificazione */}
-        <Section title="Identificazione">
-          <Field label="ID Excel" field="excelId" readOnly width="calc(10% - 8px)" />
-          <Field label="GoTo" field="goTo" readOnly width="calc(12% - 8px)" />
-          <Field label="Applicativo" field="applicativo" readOnly width="calc(18% - 8px)" />
-          <Field label="X ORDINE" field="xOrdine" readOnly width="calc(20% - 8px)" />
-          <Field label="Descrizione" field="descrizione" readOnly width="calc(40% - 8px)" />
-        </Section>
+        <ModalSection title="Identificazione">
+          <F label="ID Excel"    field="excelId"     readOnly width="calc(10% - 8px)" />
+          <F label="GoTo"        field="goTo"         readOnly width="calc(12% - 8px)" />
+          <F label="Applicativo" field="applicativo"  readOnly width="calc(18% - 8px)" />
+          <F label="X ORDINE"    field="xOrdine"      readOnly width="calc(20% - 8px)" />
+          <F label="Descrizione" field="descrizione"  readOnly width="calc(40% - 8px)" />
+        </ModalSection>
 
         {/* Sezione: Responsabili */}
-        <Section title="Responsabili">
-          <Field label="PM Poste" field="pmPoste" width="calc(25% - 8px)" />
-          <Field label="PM CAP" field="pmCap" width="calc(25% - 8px)" />
-          <Field label="Anno Competenza" field="annoCompetenza" type="number" readOnly width="calc(15% - 8px)" />
-          <Field label="Release Excel" field="releaseExcel" readOnly width="calc(20% - 8px)" />
-          <Field label="Recupero" field="recupero" width="calc(15% - 8px)" />
-        </Section>
+        <ModalSection title="Responsabili">
+          <F label="PM Poste"        field="pmPoste"       width="calc(25% - 8px)" />
+          <F label="PM CAP"          field="pmCap"         width="calc(25% - 8px)" />
+          <F label="Anno Competenza" field="annoCompetenza" readOnly width="calc(15% - 8px)" />
+          <F label="Release Excel"   field="releaseExcel"  readOnly width="calc(20% - 8px)" />
+          <F label="Recupero"        field="recupero"      width="calc(15% - 8px)" />
+        </ModalSection>
 
         {/* Sezione: Stato e Contratto */}
-        <Section title="Stato e Contratto">
-          <Field label="Stato" field="stato" width="calc(20% - 8px)" />
-          <Field label="Tipo Contratto" field="tipoContratto" width="calc(15% - 8px)" />
-          <Field label="BC" field="bc" width="calc(20% - 8px)" />
-          <Field label="Contratto" field="contratto" width="calc(15% - 8px)" />
-          <Field label="RDA" field="rda" width="calc(15% - 8px)" />
-          <Field label="AT ID" field="atId" width="calc(15% - 8px)" />
-        </Section>
+        <ModalSection title="Stato e Contratto">
+          <F label="Stato"          field="stato"         width="calc(20% - 8px)" />
+          <F label="Tipo Contratto" field="tipoContratto" width="calc(15% - 8px)" />
+          <F label="BC"             field="bc"            width="calc(20% - 8px)" />
+          <F label="Contratto"      field="contratto"     width="calc(15% - 8px)" />
+          <F label="RDA"            field="rda"           width="calc(15% - 8px)" />
+          <F label="AT ID"          field="atId"          width="calc(15% - 8px)" />
+        </ModalSection>
 
         {/* Sezione: Importi */}
-        <Section title="Importi">
-          <Field label="Importo Fornitura" field="importoExcel" readOnly width="calc(20% - 8px)" />
-          <Field label="Importo Scontato" field="importoFornituraScontato" readOnly width="calc(20% - 8px)" />
-          <Field label="Ordinato (BdO)" field="ordinatoBdo" readOnly width="calc(20% - 8px)" />
-          <Field label="Fatturato" field="fatturato" readOnly width="calc(20% - 8px)" />
-          <Field label="Residuo Fatt." field="residuoFatturabile" readOnly width="calc(20% - 8px)" />
-        </Section>
+        <ModalSection title="Importi">
+          <F label="Importo Fornitura" field="importoExcel"             readOnly width="calc(20% - 8px)" />
+          <F label="Importo Scontato"  field="importoFornituraScontato" readOnly width="calc(20% - 8px)" />
+          <F label="Ordinato (BdO)"    field="ordinatoBdo"              readOnly width="calc(20% - 8px)" />
+          <F label="Fatturato"         field="fatturato"                readOnly width="calc(20% - 8px)" />
+          <F label="Residuo Fatt."     field="residuoFatturabile"       readOnly width="calc(20% - 8px)" />
+        </ModalSection>
 
         {/* Sezione: TOW */}
-        <Section title="TOW (gg/qty)">
-          <Field label="TOW02.1" field="tow021" type="number" width="calc(16% - 8px)" />
-          <Field label="TOW02.2" field="tow022" type="number" width="calc(16% - 8px)" />
-          <Field label="TOW02.3" field="tow023" type="number" width="calc(16% - 8px)" />
-          <Field label="TOW02.4" field="tow024" type="number" width="calc(16% - 8px)" />
-          <Field label="TOW02.5" field="tow025" type="number" width="calc(16% - 8px)" />
-          <Field label="TOW02.6" field="tow026" type="number" width="calc(16% - 8px)" />
-          <Field label="Totale TOW" field="towTotale" readOnly width="calc(20% - 8px)" />
-        </Section>
+        <ModalSection title="TOW (gg/qty)">
+          <F label="TOW02.1"  field="tow021"   type="number" width="calc(16% - 8px)" />
+          <F label="TOW02.2"  field="tow022"   type="number" width="calc(16% - 8px)" />
+          <F label="TOW02.3"  field="tow023"   type="number" width="calc(16% - 8px)" />
+          <F label="TOW02.4"  field="tow024"   type="number" width="calc(16% - 8px)" />
+          <F label="TOW02.5"  field="tow025"   type="number" width="calc(16% - 8px)" />
+          <F label="TOW02.6"  field="tow026"   type="number" width="calc(16% - 8px)" />
+          <F label="Totale TOW" field="towTotale" readOnly   width="calc(20% - 8px)" />
+        </ModalSection>
 
         {/* Sezione: Extra */}
-        <Section title="Extra">
-          <Field label="Accantonato" field="accantonato" type="number" width="calc(15% - 8px)" />
-          <Field label="NEL" field="nel" width="calc(15% - 8px)" />
-          <Field label="In Vita" field="inVita" width="calc(15% - 8px)" />
-          <Field label="CM" field="cm" width="calc(15% - 8px)" />
-          <Field label="SUBCO" field="subco" width="calc(20% - 8px)" />
-          <Field label="TBD" field="tbd" width="calc(20% - 8px)" />
-        </Section>
+        <ModalSection title="Extra">
+          <F label="Accantonato" field="accantonato" type="number" width="calc(15% - 8px)" />
+          <F label="NEL"         field="nel"         width="calc(15% - 8px)" />
+          <F label="In Vita"     field="inVita"      width="calc(15% - 8px)" />
+          <F label="CM"          field="cm"          width="calc(15% - 8px)" />
+          <F label="SUBCO"       field="subco"       width="calc(20% - 8px)" />
+          <F label="TBD"         field="tbd"         width="calc(20% - 8px)" />
+        </ModalSection>
 
         {/* Sezione: Note Excel */}
-        <Section title="Note Excel">
+        <ModalSection title="Note Excel">
           <div style={{ width: "100%" }}>
             <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Note</label>
             <textarea value={form.noteExcel ?? ""} onChange={(e) => set("noteExcel", e.target.value)}
               style={{ ...inputStyle(), minHeight: "80px", resize: "vertical" }} />
           </div>
-        </Section>
+        </ModalSection>
 
         {/* Sezione: PMO */}
-        <Section title="PMO (editabili)">
-          <Field label="P Anno" field="pAnno" type="number" width="calc(12% - 8px)" />
-          <Field label="P Release" field="pRelease" width="calc(20% - 8px)" />
-          <Field label="P Importo" field="pImporto" type="number" width="calc(20% - 8px)" />
-          <Field label="Importo BDO" field="importoBdo" type="number" width="calc(20% - 8px)" />
+        <ModalSection title="PMO">
+          <F label="P Anno"      field="pAnno"     type="number" width="calc(12% - 8px)" />
+          <F label="P Release"   field="pRelease"              width="calc(20% - 8px)" />
+          <F label="P Importo"   field="pImporto"  type="number" width="calc(20% - 8px)" />
+          <F label="Importo BDO" field="importoBdo" type="number" width="calc(20% - 8px)" />
           <div style={{ width: "calc(28% - 8px)" }}>
             <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
             <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
               style={{ ...inputStyle(), minHeight: "60px", resize: "vertical" }} />
           </div>
-        </Section>
+        </ModalSection>
 
         {/* Azioni */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
@@ -473,21 +476,26 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
         {role === "Admin" && (
           <>
-            <input id="upload-excel" type="file" accept=".xlsx" style={{ display: "none" }}
+            <input id="upload-excel-cap" type="file" accept=".xlsx" style={{ display: "none" }}
               onChange={async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 try {
                   await uploadExcel(file);
-                  alert("File caricato. Clicca 'Allinea Dati' per importare.");
+                  alert("File caricato sul server come MEV_LAST.xlsx.\nClicca 'Allinea Dati' per importare i dati.");
                 } catch (err) { alert(`Errore caricamento: ${err.message}`); }
                 e.target.value = "";
               }} />
-            <label htmlFor="upload-excel" style={{ ...btn("ghost"), cursor: "pointer" }}>
+            <label htmlFor="upload-excel-cap" style={{ ...btn("ghost"), cursor: "pointer" }}>
               Carica Excel
             </label>
           </>
         )}
+
+        {/* Info: da dove viene il file */}
+        <div style={{ fontSize: "11px", color: "#888", padding: "4px 8px", background: "#f8f9fa", borderRadius: "6px", border: "1px solid #e8eaed", maxWidth: "280px" }}>
+          <strong style={{ color: "#555" }}>Allinea Dati</strong> usa l'ultimo file caricato con "Carica Excel" (MEV_LAST.xlsx sul server). Le modifiche PMO vengono preservate.
+        </div>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>
           <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
@@ -630,7 +638,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.capgemini)}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.iet)}</td>
-                  <td style={{ ...TD, fontSize: "12px" }}>{r.subco ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.subco)}</td>
 
                   {/* TOW */}
                   <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow021)}</td>
