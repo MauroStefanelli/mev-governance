@@ -425,8 +425,24 @@ function EditModal({ row, onClose, onSaved, isBase, baseRows }) {
     try {
       let payload;
       if (isBase) {
-        payload = { tow: form.tow, towContratto: form.towContratto };
-        FIELDS.forEach(f => { payload[f.key] = parseNum(form[f.key]); });
+        payload = {
+          // Preserva tutti i campi originali, sovrascrive solo quelli editati
+          tow: form.tow, towContratto: form.towContratto,
+          approvato:       parseNum(form.approvato),
+          ordinatiRda:     parseNum(form.ordinatiRda),
+          impegnato:       parseNum(form.impegnato),
+          residuo:         parseNum(form.residuo),
+          valoreUnitario:  parseNum(form.valoreUnitario),
+          valoreTotale:    parseNum(form.valoreTotale),
+          towApprovati:    parseNum(form.towApprovati),
+          towImpegnati:    parseNum(form.towImpegnati),
+          towResidui:      parseNum(form.towResidui),
+          collaudoApprovato:  parseNum(form.collaudoApprovato),
+          collaudoOrdinato:   parseNum(form.collaudoOrdinato),
+          collaudoFatturato:  parseNum(form.collaudoFatturato),
+          sconto:          row.sconto ?? 0,
+          isCatalogo:      row.isCatalogo ?? false,
+        };
       } else {
         payload = {
           tow: row.tow,
@@ -435,6 +451,17 @@ function EditModal({ row, onClose, onSaved, isBase, baseRows }) {
           towApprovati: qtaFiglioNum,
           valoreUnitario: valoreScontato,
           valoreTotale: valoreTotaleFiglio,
+          // Preserva i campi non editabili
+          approvato:          row.approvato ?? 0,
+          ordinatiRda:        row.ordinatiRda ?? 0,
+          impegnato:          row.impegnato ?? 0,
+          residuo:            row.residuo ?? 0,
+          towImpegnati:       row.towImpegnati ?? 0,
+          towResidui:         row.towResidui ?? 0,
+          collaudoApprovato:  row.collaudoApprovato ?? 0,
+          collaudoOrdinato:   row.collaudoOrdinato ?? 0,
+          collaudoFatturato:  row.collaudoFatturato ?? 0,
+          isCatalogo:         row.isCatalogo ?? false,
         };
       }
       const updated = await updateConsumoTow(row.id, payload);
@@ -644,7 +671,8 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
   const handleSave = async () => {
     setSaving(true); setError("");
     try {
-      const results = await Promise.all(righe.map(r => {
+      const results = await Promise.all(righe.map((r, idx) => {
+        const orig = towRows[idx]; // riga originale dal DB per preservare i campi non editati
         let payload;
         if (isBase) {
           const vt = calcolaValore(r);
@@ -654,10 +682,21 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
           payload = {
             tow: r.tow,
             towContratto: contratto,
-            valoreUnitario: parseNum(r.valoreUnitario),
-            valoreTotale: vt,
-            towApprovati: qtaNum,
-            isCatalogo: r.isCatalogo,
+            valoreUnitario:     parseNum(r.valoreUnitario),
+            valoreTotale:       vt,
+            towApprovati:       qtaNum,
+            isCatalogo:         r.isCatalogo,
+            // Preserva campi contabili non editabili
+            approvato:          orig.approvato ?? 0,
+            ordinatiRda:        orig.ordinatiRda ?? 0,
+            impegnato:          orig.impegnato ?? 0,
+            residuo:            orig.residuo ?? 0,
+            towImpegnati:       orig.towImpegnati ?? 0,
+            towResidui:         orig.towResidui ?? 0,
+            collaudoApprovato:  orig.collaudoApprovato ?? 0,
+            collaudoOrdinato:   orig.collaudoOrdinato ?? 0,
+            collaudoFatturato:  orig.collaudoFatturato ?? 0,
+            sconto:             0,
           };
         } else {
           const base = getBaseValore(r.tow);
@@ -668,11 +707,21 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
           payload = {
             tow: r.tow,
             towContratto: contratto,
-            sconto: sc,
-            valoreUnitario: scontato,
-            valoreTotale: vt,
-            towApprovati: qtaCalc,
-            isCatalogo: r.isCatalogo,
+            sconto:             sc,
+            valoreUnitario:     scontato,
+            valoreTotale:       vt,
+            towApprovati:       qtaCalc,
+            isCatalogo:         r.isCatalogo,
+            // Preserva campi contabili non editabili
+            approvato:          orig.approvato ?? 0,
+            ordinatiRda:        orig.ordinatiRda ?? 0,
+            impegnato:          orig.impegnato ?? 0,
+            residuo:            orig.residuo ?? 0,
+            towImpegnati:       orig.towImpegnati ?? 0,
+            towResidui:         orig.towResidui ?? 0,
+            collaudoApprovato:  orig.collaudoApprovato ?? 0,
+            collaudoOrdinato:   orig.collaudoOrdinato ?? 0,
+            collaudoFatturato:  orig.collaudoFatturato ?? 0,
           };
         }
         return updateConsumoTow(r.id, payload);
@@ -1099,22 +1148,34 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
             {contratti.length === 0 ? (
               <div
                 onClick={() => setShowNewContratto("base")}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", minWidth: "150px", minHeight: "100px", borderRadius: "14px", border: "2px dashed #93c5fd", background: "#f0f9ff", cursor: "pointer", padding: "18px", transition: "border 0.15s, background 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.border = "2px dashed #1a73e8"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "#f0f9ff"; e.currentTarget.style.border = "2px dashed #93c5fd"; }}
+                style={{ display: "flex", flexDirection: "column", minWidth: "150px", borderRadius: "14px", border: "2px dashed #93c5fd", background: "#f0f9ff", cursor: "pointer", overflow: "hidden", transition: "border 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.borderColor = "#1a73e8"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#f0f9ff"; e.currentTarget.style.borderColor = "#93c5fd"; }}
               >
-                <div style={{ fontSize: "24px", color: "#1a73e8", lineHeight: 1 }}>+</div>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#1a73e8", textAlign: "center" }}>Nuovo Contratto BASE</div>
+                <div style={{ flex: 1, padding: "14px 18px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px" }}>
+                  <div style={{ fontSize: "22px", color: "#1a73e8", lineHeight: 1, fontWeight: 300 }}>+</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a73e8" }}>Nuovo BASE</div>
+                  <div style={{ fontSize: "11px", color: "#93c5fd" }}>Primo contratto</div>
+                </div>
+                <div style={{ borderTop: "1px solid #bfdbfe", padding: "6px 10px", display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#1a73e8" }}>Crea →</span>
+                </div>
               </div>
             ) : (
               <div
                 onClick={() => setShowNewContratto("figlio")}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", minWidth: "150px", minHeight: "100px", borderRadius: "14px", border: "2px dashed #6ee7b7", background: "#f0fdf4", cursor: "pointer", padding: "18px", transition: "border 0.15s, background 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#d1fae5"; e.currentTarget.style.border = "2px dashed #10b981"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "#f0fdf4"; e.currentTarget.style.border = "2px dashed #6ee7b7"; }}
+                style={{ display: "flex", flexDirection: "column", minWidth: "150px", borderRadius: "14px", border: "2px dashed #6ee7b7", background: "#f0fdf4", cursor: "pointer", overflow: "hidden", transition: "border 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#d1fae5"; e.currentTarget.style.borderColor = "#10b981"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#f0fdf4"; e.currentTarget.style.borderColor = "#6ee7b7"; }}
               >
-                <div style={{ fontSize: "24px", color: "#10b981", lineHeight: 1 }}>+</div>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", textAlign: "center" }}>Nuovo Contratto</div>
+                <div style={{ flex: 1, padding: "14px 18px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px" }}>
+                  <div style={{ fontSize: "22px", color: "#10b981", lineHeight: 1, fontWeight: 300 }}>+</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#10b981" }}>Nuovo Contratto</div>
+                  <div style={{ fontSize: "11px", color: "#6ee7b7" }}>Basato su BASE</div>
+                </div>
+                <div style={{ borderTop: "1px solid #a7f3d0", padding: "6px 10px", display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#10b981" }}>Crea →</span>
+                </div>
               </div>
             )}
           </div>
