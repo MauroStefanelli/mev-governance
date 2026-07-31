@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  getMevList, updateMev, alignMevData, exportMev, uploadExcel
+  getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
 
@@ -122,14 +122,20 @@ const inputStyle = (extra = {}) => ({
 });
 
 // ── Field e Section: definiti FUORI dalla modale per evitare re-mount ad ogni render ──
-const ModalField = ({ label, field, type, readOnly, width, form, onChange }) => (
+const ModalField = ({ label, field, type, readOnly, width, form, onChange, options }) => (
   <div style={{ marginBottom: "12px", width: width || "100%" }}>
     <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
     {readOnly
       ? <div style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", background: "#f8f9fa", color: "#888", minHeight: "32px" }}>{form[field] ?? ""}</div>
-      : <input value={form[field] ?? ""} type={type || "text"}
-          onChange={(e) => onChange(field, e.target.value)}
-          style={inputStyle()} />
+      : options
+        ? <select value={form[field] ?? ""} onChange={(e) => onChange(field, e.target.value)}
+            style={{ ...inputStyle(), height: "32px", cursor: "pointer" }}>
+            <option value="">-- seleziona --</option>
+            {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        : <input value={form[field] ?? ""} type={type || "text"}
+            onChange={(e) => onChange(field, e.target.value)}
+            style={inputStyle()} />
     }
   </div>
 );
@@ -141,18 +147,34 @@ const ModalSection = ({ title, children }) => (
   </div>
 );
 
-// ── Modale di modifica ────────────────────────────────────────────────────────
-function EditModal({ row, onClose, onSave }) {
-  const [form, setForm] = useState({ ...row });
+// ── Modale di modifica / creazione ───────────────────────────────────────────
+function EditModal({ row, mode, options, onClose, onSave }) {
+  const isCreate = mode === "create";
+
+  const emptyForm = {
+    excelId: "", applicativo: "", descrizione: "", goTo: "", xOrdine: "",
+    pmPoste: "", pmCap: "", annoCompetenza: new Date().getFullYear(), releaseExcel: "",
+    stato: "", tipoContratto: "", importoExcel: 0, recupero: "",
+    bc: "", contratto: "", rda: "", atId: "", nel: "", inVita: "", cm: "",
+    subco: "", tbd: "", accantonato: null,
+    tow021: null, tow022: null, tow023: null, tow024: null, tow025: null, tow026: null,
+    noteExcel: "", pAnno: new Date().getFullYear(), pRelease: "", pImporto: 0,
+    pNote: "", importoBdo: 0,
+  };
+
+  const [form, setForm] = useState(isCreate ? emptyForm : { ...row });
   const [saving, setSaving] = useState(false);
 
-  // useCallback garantisce che `set` non cambi identità ad ogni render
-  // => ModalField non viene mai rimontato => il focus sull'input non si perde
   const set = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
 
   const handleSave = async () => {
+    if (isCreate) {
+      if (!form.excelId?.trim()) { alert("ID Excel obbligatorio"); return; }
+      if (!form.applicativo?.trim()) { alert("Applicativo obbligatorio"); return; }
+      if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
+    }
     setSaving(true);
     try { await onSave(form); onClose(); }
     catch (e) { alert(`Errore salvataggio: ${e.message}`); }
@@ -172,36 +194,40 @@ function EditModal({ row, onClose, onSave }) {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
           <div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>Modifica MEV</div>
-            <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>
-              ID {row.excelId} &mdash; {row.applicativo} &mdash; {row.descrizione}
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>
+              {isCreate ? "Nuova riga MEV" : "Modifica MEV"}
             </div>
+            {!isCreate && (
+              <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>
+                ID {row.excelId} &mdash; {row.applicativo} &mdash; {row.descrizione}
+              </div>
+            )}
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "#888", lineHeight: 1 }}>x</button>
         </div>
 
         {/* Sezione: Identificazione */}
         <ModalSection title="Identificazione">
-          <ModalField label="ID Excel"    field="excelId"     readOnly form={form} onChange={set} width="calc(10% - 8px)" />
-          <ModalField label="GoTo"        field="goTo"         readOnly form={form} onChange={set} width="calc(12% - 8px)" />
-          <ModalField label="Applicativo" field="applicativo"  readOnly form={form} onChange={set} width="calc(18% - 8px)" />
-          <ModalField label="X ORDINE"    field="xOrdine"      readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Descrizione" field="descrizione"  readOnly form={form} onChange={set} width="calc(40% - 8px)" />
+          <ModalField label="ID Excel *"   field="excelId"     readOnly={!isCreate} form={form} onChange={set} width="calc(10% - 8px)" />
+          <ModalField label="GoTo"         field="goTo"         readOnly={!isCreate} form={form} onChange={set} width="calc(12% - 8px)" />
+          <ModalField label="Applicativo *" field="applicativo" readOnly={!isCreate} options={isCreate ? options.applicativo : undefined} form={form} onChange={set} width="calc(18% - 8px)" />
+          <ModalField label="X ORDINE"     field="xOrdine"      readOnly={!isCreate} form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Descrizione *" field="descrizione" readOnly={!isCreate} form={form} onChange={set} width="calc(40% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Responsabili */}
         <ModalSection title="Responsabili">
-          <ModalField label="PM Poste"        field="pmPoste"        form={form} onChange={set} width="calc(25% - 8px)" />
-          <ModalField label="PM CAP"           field="pmCap"          form={form} onChange={set} width="calc(25% - 8px)" />
-          <ModalField label="Anno Competenza"  field="annoCompetenza" readOnly form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="Release Excel"    field="releaseExcel"   readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="PM Poste"        field="pmPoste"        options={options.pmPoste}       form={form} onChange={set} width="calc(25% - 8px)" />
+          <ModalField label="PM CAP"           field="pmCap"          options={options.pmCap}         form={form} onChange={set} width="calc(25% - 8px)" />
+          <ModalField label="Anno Competenza"  field="annoCompetenza" options={options.annoCompetenza} form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="Release"          field="releaseExcel"   options={options.releaseExcel}  form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Recupero"         field="recupero"       form={form} onChange={set} width="calc(15% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Stato e Contratto */}
         <ModalSection title="Stato e Contratto">
-          <ModalField label="Stato"           field="stato"         form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Tipo Contratto"  field="tipoContratto" form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="Stato"           field="stato"         options={options.stato}         form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Tipo Contratto"  field="tipoContratto" options={options.tipoContratto} form={form} onChange={set} width="calc(15% - 8px)" />
           <ModalField label="BC"              field="bc"            form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Contratto"       field="contratto"     form={form} onChange={set} width="calc(15% - 8px)" />
           <ModalField label="RDA"             field="rda"           form={form} onChange={set} width="calc(15% - 8px)" />
@@ -210,7 +236,7 @@ function EditModal({ row, onClose, onSave }) {
 
         {/* Sezione: Importi */}
         <ModalSection title="Importi">
-          <ModalField label="Importo Fornitura" field="importoExcel"             readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Importo Fornitura" field="importoExcel"             readOnly={!isCreate} type="number" form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Importo Scontato"  field="importoFornituraScontato" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Ordinato (BdO)"    field="ordinatoBdo"              readOnly form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Fatturato"         field="fatturato"                readOnly form={form} onChange={set} width="calc(20% - 8px)" />
@@ -249,10 +275,10 @@ function EditModal({ row, onClose, onSave }) {
 
         {/* Sezione: PMO */}
         <ModalSection title="PMO">
-          <ModalField label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
-          <ModalField label="P Release"   field="pRelease"               form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="P Importo"   field="pImporto"   type="number" form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Importo BDO" field="importoBdo" type="number" form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="P Anno"      field="pAnno"      type="number"                          form={form} onChange={set} width="calc(12% - 8px)" />
+          <ModalField label="P Release"   field="pRelease"   options={options.releaseExcel}         form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="P Importo"   field="pImporto"   type="number"                          form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Importo BDO" field="importoBdo" type="number"                          form={form} onChange={set} width="calc(20% - 8px)" />
           <div style={{ width: "calc(28% - 8px)" }}>
             <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
             <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
@@ -263,8 +289,8 @@ function EditModal({ row, onClose, onSave }) {
         {/* Azioni */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
           <button style={btn("ghost")} onClick={onClose}>Annulla</button>
-          <button style={btn("primary")} onClick={handleSave} disabled={saving}>
-            {saving ? "Salvataggio..." : "Salva modifiche"}
+          <button style={btn(isCreate ? "success" : "primary")} onClick={handleSave} disabled={saving}>
+            {saving ? "Salvataggio..." : isCreate ? "Crea riga" : "Salva modifiche"}
           </button>
         </div>
       </div>
@@ -278,8 +304,13 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [loading, setLoading] = useState(true);
   const [aligning, setAligning] = useState(false);
   const [editRow, setEditRow] = useState(null);
+  const [createModal, setCreateModal] = useState(false);
   const [savedRows, setSavedRows] = useState({});
   const [notePopover, setNotePopover] = useState(null);
+  const [mevOptions, setMevOptions] = useState({
+    applicativo: [], pmPoste: [], pmCap: [], annoCompetenza: [],
+    releaseExcel: [], stato: [], tipoContratto: [],
+  });
   const role = localStorage.getItem("role") || "";
 
   const defaultFilters = {
@@ -301,9 +332,18 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     setRows([]);
     onRowsChange?.([]);
     try {
-      const data = await getMevList();
+      const [data, opts] = await Promise.all([getMevList(), getMevOptions()]);
       setRows(data);
       onRowsChange?.(data);
+      setMevOptions({
+        applicativo:    opts.applicativo    || [],
+        pmPoste:        opts.pmPoste        || [],
+        pmCap:          opts.pmCap          || [],
+        annoCompetenza: opts.annoCompetenza || [],
+        releaseExcel:   opts.releaseExcel   || [],
+        stato:          opts.stato          || [],
+        tipoContratto:  opts.tipoContratto  || [],
+      });
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
     } finally { setLoading(false); }
@@ -408,6 +448,49 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     setTimeout(() => setSavedRows((prev) => ({ ...prev, [form.id]: false })), 2000);
   };
 
+  // ── Crea nuova riga ───────────────────────────────────────────────────────
+  const handleCreateSave = async (form) => {
+    const newItem = await createMev({
+      excelId:       form.excelId?.trim(),
+      applicativo:   form.applicativo,
+      descrizione:   form.descrizione,
+      goTo:          form.goTo,
+      xOrdine:       form.xOrdine,
+      pmPoste:       form.pmPoste,
+      pmCap:         form.pmCap,
+      annoCompetenza: Number(form.annoCompetenza) || 0,
+      releaseExcel:  form.releaseExcel,
+      stato:         form.stato,
+      tipoContratto: form.tipoContratto,
+      importoExcel:  Number(form.importoExcel) || 0,
+      recupero:      form.recupero,
+      noteExcel:     form.noteExcel,
+      bc:            form.bc,
+      contratto:     form.contratto,
+      rda:           form.rda,
+      atId:          form.atId,
+      nel:           form.nel,
+      inVita:        form.inVita,
+      cm:            form.cm,
+      subco:         form.subco,
+      tbd:           form.tbd,
+      accantonato:   form.accantonato != null ? Number(form.accantonato) : null,
+      tow021:        form.tow021 != null ? Number(form.tow021) : null,
+      tow022:        form.tow022 != null ? Number(form.tow022) : null,
+      tow023:        form.tow023 != null ? Number(form.tow023) : null,
+      tow024:        form.tow024 != null ? Number(form.tow024) : null,
+      tow025:        form.tow025 != null ? Number(form.tow025) : null,
+      tow026:        form.tow026 != null ? Number(form.tow026) : null,
+      pAnno:         Number(form.pAnno) || 0,
+      pRelease:      form.pRelease ?? "",
+      pImporto:      Number(form.pImporto) || 0,
+      pNote:         form.pNote,
+      importoBdo:    Number(form.importoBdo) || 0,
+    });
+    setRows((prev) => [...prev, newItem]);
+    onRowsChange?.([...rows, newItem]);
+  };
+
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#666", fontSize: "15px" }}>
@@ -498,6 +581,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         <div style={{ fontSize: "11px", color: "#888", padding: "4px 8px", background: "#f8f9fa", borderRadius: "6px", border: "1px solid #e8eaed", maxWidth: "280px" }}>
           <strong style={{ color: "#555" }}>Allinea Dati</strong> usa l'ultimo file caricato con "Carica Excel" (MEV_LAST.xlsx sul server). Le modifiche PMO vengono preservate.
         </div>
+
+        <button style={btn("success")} onClick={() => setCreateModal(true)}>
+          + Nuova riga
+        </button>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>
           <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
@@ -690,8 +777,21 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       {editRow && (
         <EditModal
           row={editRow}
+          mode="edit"
+          options={mevOptions}
           onClose={() => setEditRow(null)}
           onSave={handleModalSave}
+        />
+      )}
+
+      {/* Modale crea nuova riga */}
+      {createModal && (
+        <EditModal
+          row={null}
+          mode="create"
+          options={mevOptions}
+          onClose={() => setCreateModal(false)}
+          onSave={handleCreateSave}
         />
       )}
     </div>

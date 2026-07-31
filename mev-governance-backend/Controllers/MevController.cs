@@ -188,6 +188,112 @@ public class MevController : BaseController
     }
 
     // ============================================================
+    // GET /api/mev/options  — valori distinti per i dropdown
+    // ============================================================
+    [HttpGet("options")]
+    public IActionResult GetOptions()
+    {
+        var ambienteId = GetAmbienteId();
+
+        var items = _db.MevItems
+            .AsNoTracking()
+            .Where(m => m.AmbienteId == ambienteId)
+            .ToList();
+
+        static IEnumerable<string> Distinct(IEnumerable<string?> source) =>
+            source
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(v => v);
+
+        return Ok(new
+        {
+            applicativo   = Distinct(items.Select(i => i.Applicativo)),
+            pmPoste       = Distinct(items.Select(i => i.PmPoste)),
+            pmCap         = Distinct(items.Select(i => i.PmCap)),
+            annoCompetenza = items.Select(i => i.AnnoCompetenza)
+                                  .Where(a => a > 0)
+                                  .Distinct()
+                                  .OrderBy(a => a)
+                                  .Select(a => a.ToString()),
+            releaseExcel  = Distinct(items.Select(i => i.ReleaseExcel)),
+            stato         = new[] { "Approvato", "In analisi / Stima", "In approvazione", "Sospeso", "Eliminato" },
+            tipoContratto = new[] { "BASE", "QDO" },
+        });
+    }
+
+    // ============================================================
+    // POST /api/mev  — crea una nuova riga MEV manualmente
+    // ============================================================
+    [HttpPost]
+    public IActionResult CreateMev([FromBody] CreateMevRequest request)
+    {
+        var ambienteId = GetAmbienteId();
+
+        // ExcelId univoco per questo ambiente
+        if (string.IsNullOrWhiteSpace(request.ExcelId))
+            return BadRequest("ExcelId obbligatorio");
+
+        if (_db.MevItems.Any(x => x.ExcelId == request.ExcelId && x.AmbienteId == ambienteId))
+            return Conflict($"ExcelId '{request.ExcelId}' già presente in questo ambiente");
+
+        var maxOrder = _db.MevItems
+            .Where(x => x.AmbienteId == ambienteId)
+            .Select(x => (int?)x.ExcelOrder)
+            .Max() ?? 0;
+
+        var item = new MevItem
+        {
+            ExcelOrder              = maxOrder + 1,
+            ExcelId                 = request.ExcelId.Trim(),
+            Applicativo             = request.Applicativo,
+            Descrizione             = request.Descrizione,
+            GoTo                    = request.GoTo ?? "",
+            XOrdine                 = request.XOrdine,
+            PmPoste                 = request.PmPoste,
+            PmCap                   = request.PmCap,
+            AnnoCompetenza          = request.AnnoCompetenza,
+            ReleaseExcel            = request.ReleaseExcel,
+            Stato                   = request.Stato,
+            TipoContratto           = request.TipoContratto,
+            ImportoExcel            = request.ImportoExcel,
+            ImportoFornituraScontato = request.ImportoExcel,
+            Recupero                = request.Recupero,
+            NoteExcel               = request.NoteExcel,
+            Bc                      = request.Bc,
+            Contratto               = request.Contratto,
+            Rda                     = request.Rda,
+            AtId                    = request.AtId,
+            Nel                     = request.Nel,
+            InVita                  = request.InVita,
+            Cm                      = request.Cm,
+            Subco                   = request.Subco,
+            Tbd                     = request.Tbd,
+            Accantonato             = request.Accantonato,
+            Tow021                  = request.Tow021,
+            Tow022                  = request.Tow022,
+            Tow023                  = request.Tow023,
+            Tow024                  = request.Tow024,
+            Tow025                  = request.Tow025,
+            Tow026                  = request.Tow026,
+            TowTotale               = (request.Tow021 ?? 0) + (request.Tow022 ?? 0) + (request.Tow023 ?? 0)
+                                    + (request.Tow024 ?? 0) + (request.Tow025 ?? 0) + (request.Tow026 ?? 0),
+            PAnno                   = request.PAnno,
+            PRelease                = request.PRelease,
+            PImporto                = request.PImporto,
+            PNote                   = request.PNote,
+            ImportoBdo              = request.ImportoBdo,
+            AmbienteId              = ambienteId,
+        };
+
+        _db.MevItems.Add(item);
+        _db.SaveChanges();
+
+        return CreatedAtAction(nameof(GetMev), new { }, item);
+    }
+
+    // ============================================================
     // GET /api/mev/ping
     // ============================================================
     [HttpGet("ping")]
