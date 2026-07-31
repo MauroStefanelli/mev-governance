@@ -479,6 +479,22 @@ export const createConsumoTow = async (towContratto, valoriUnitari, qta) => {
   return response.json();
 };
 
+// Crea un contratto figlio (non-BASE): il backend calcola i valori unitari
+// applicando la % di sconto ai valori del contratto BASE
+export const createConsumoTowFiglio = async (towContratto, sconto, qta) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/figlio`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ towContratto, sconto, qta })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const deleteConsumoTowContratto = async (nome) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/contratto/${encodeURIComponent(nome)}`, {
     method: "DELETE",
