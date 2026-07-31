@@ -190,13 +190,17 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
 
 // ── Modale Nuovo Contratto Figlio (non-BASE) ──────────────────────────────────
 function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
+  const { pos, onMouseDown } = useDrag();
   const baseTowNames = [...new Set(baseRows.map(r => r.tow))];
 
   const [nomeContratto, setNomeContratto] = useState("");
   const [sconto, setSconto]               = useState("");
-  // Per ogni TOW: qta (N° TOW) oppure subtotale (catalogo), e flag catalogo
+  // Per ogni TOW: qta (N° TOW) oppure subtotale (catalogo), e flag catalogo ereditato da BASE
   const [towData, setTowData] = useState(() =>
-    Object.fromEntries(baseTowNames.map(k => [k, { qta: "", subtotale: "", isCatalogo: false }]))
+    Object.fromEntries(baseTowNames.map(k => {
+      const baseRow = baseRows.find(r => r.tow === k);
+      return [k, { qta: "", subtotale: "", isCatalogo: !!(baseRow?.isCatalogo) }];
+    }))
   );
   const [saving, setSaving]               = useState(false);
   const [error, setError]                 = useState("");
@@ -224,18 +228,16 @@ function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
     if (scontoNum < 0 || scontoNum > 100) { setError("La percentuale di sconto deve essere tra 0 e 100."); return; }
     setSaving(true); setError("");
     try {
+      // qta: per righe catalogo passa l'importo €; il backend divide per val.scontato
       const qtaByName = Object.fromEntries(baseTowNames.map(k => {
         const d = towData[k];
-        if (d.isCatalogo) {
-          const valSc = getValoreScontato(k);
-          return [k, valSc > 0 ? parseNum(d.subtotale) / valSc : 0];
-        }
+        if (d.isCatalogo) return [k, parseNum(d.subtotale)];
         return [k, parseNum(d.qta)];
       }));
-      const subtotaliCatalogo = Object.fromEntries(
-        baseTowNames.filter(k => towData[k].isCatalogo).map(k => [k, parseNum(towData[k].subtotale)])
+      const isCatalogoMap = Object.fromEntries(
+        baseTowNames.map(k => [k, !!towData[k].isCatalogo])
       );
-      const newRows = await createConsumoTowFiglio(nomeContratto.trim(), scontoNum, qtaByName, subtotaliCatalogo);
+      const newRows = await createConsumoTowFiglio(nomeContratto.trim(), scontoNum, qtaByName, isCatalogoMap);
       onCreated(newRows);
       onClose();
     } catch (e) { setError(e.message || "Errore durante la creazione"); }
@@ -246,16 +248,36 @@ function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
   const totaleScontato = baseTowNames.reduce((s, k) => s + getSubtotale(k), 0);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "800px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflow: "auto" }}>
+      <div
+        style={{
+          background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          width: "100%", maxWidth: "800px", display: "flex", flexDirection: "column", overflow: "hidden",
+          position: "relative",
+          transform: `translate(${pos.x}px, ${pos.y}px)`,
+        }}
+      >
+        {/* Header — draggable */}
+        <div
+          onMouseDown={onMouseDown}
+          style={{
+            padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0",
+            background: "linear-gradient(135deg,#10b981 0%,#059669 100%)",
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            cursor: "grab",
+          }}
+        >
           <div>
             <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>Inserisci % di sconto e N° TOW (o Subtotale se Catalogo) — i valori vengono calcolati dal Contratto BASE</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>
+              Trascina per spostare • Inserisci % sconto e N° TOW (o € Catalogo) — valori calcolati dal BASE
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center" }}>✕</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center", flexShrink: 0 }}>✕</button>
         </div>
-        <div style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", overflowX: "auto", padding: "20px 24px", flex: 1, maxHeight: "65vh" }}>
           {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "13px" }}>{error}</div>}
 
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "14px", marginBottom: "20px" }}>
@@ -275,15 +297,23 @@ function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
           <div style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #f0fdf4" }}>
             TOW — Valori Calcolati
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginBottom: "20px" }}>
+            <colgroup>
+              <col style={{ width: "110px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "130px" }} />
+              <col style={{ width: "80px" }} />
+              <col style={{ width: "150px" }} />
+              <col style={{ width: "130px" }} />
+            </colgroup>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
                 <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>TOW</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. BASE €</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. Scontato €</th>
                 <th style={{ padding: "8px 12px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Catalogo</th>
-                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>N° TOW / Subtotale</th>
-                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Subtotale</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>N° TOW / € Catalogo</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore Totale</th>
               </tr>
             </thead>
             <tbody>
@@ -308,19 +338,19 @@ function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
                         style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#10b981" }}
                       />
                     </td>
-                    {/* N° TOW o Subtotale */}
+                    {/* N° TOW o € Catalogo */}
                     <td style={{ padding: "6px 12px" }}>
                       {d.isCatalogo ? (
                         <input
-                          style={{ ...inputBase, textAlign: "right", width: "140px", padding: "7px 10px" }}
-                          placeholder="Subtotale €"
+                          style={{ ...inputBase, textAlign: "right", padding: "7px 10px" }}
+                          placeholder="€ Catalogo"
                           value={d.subtotale}
                           onChange={e => setTowField(tow, "subtotale", e.target.value)}
                           onBlur={e => setTowField(tow, "subtotale", formatForInput(parseNum(e.target.value), "euro"))}
                         />
                       ) : (
                         <input
-                          style={{ ...inputBase, textAlign: "right", width: "110px", padding: "7px 10px" }}
+                          style={{ ...inputBase, textAlign: "right", padding: "7px 10px" }}
                           placeholder="0"
                           value={d.qta}
                           onChange={e => setTowField(tow, "qta", e.target.value)}
@@ -335,10 +365,12 @@ function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
             </tbody>
           </table>
           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (calcolato con sconto {scontoNum}%)</span>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (sconto {scontoNum}%)</span>
             <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(totaleScontato)}</span>
           </div>
         </div>
+
+        {/* Footer */}
         <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
           <button onClick={onClose} style={{ padding: "8px 22px", borderRadius: "8px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
           <button onClick={handleSave} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: saving ? "#6ee7b7" : "#10b981", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
@@ -531,17 +563,52 @@ function EditModal({ row, onClose, onSaved, isBase, baseRows }) {
   );
 }
 
+// ── Hook drag per finestre modali spostabili ─────────────────────────────────
+function useDrag(initialPos = { x: 0, y: 0 }) {
+  const [pos, setPos] = useState(initialPos);
+  const dragging = useRef(false);
+  const start    = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const onMouseDown = (e) => {
+    if (e.target.closest("button,input,select,textarea")) return;
+    dragging.current = true;
+    start.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging.current) return;
+      setPos({
+        x: start.current.px + e.clientX - start.current.mx,
+        y: start.current.py + e.clientY - start.current.my,
+      });
+    };
+    const onUp = () => { dragging.current = false; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  return { pos, onMouseDown };
+}
+
 // ── Modale Modifica Contratto (tutte le righe TOW di un contratto) ────────────
-// Per BASE: Nome TOW, Valore Unitario, QTA → Valore Totale calcolato
-// Per figlio: Nome TOW (readonly), Valore BASE (readonly), % Sconto, N° TOW → Valore Totale calcolato
 function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onSaved }) {
-  // Stato locale per ogni riga TOW
+  const { pos, onMouseDown } = useDrag();
+
+  // QTA corretta: valoreTotale / valoreUnitario (arrotondata)
+  const calcQtaFromRow = (r) => {
+    if (r.valoreUnitario > 0) return Math.round((r.valoreTotale || 0) / r.valoreUnitario);
+    return r.towApprovati ?? 0;
+  };
+
   const [righe, setRighe] = useState(() =>
     towRows.map(r => ({
       id: r.id,
       tow: r.tow || "",
       valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
-      qta: formatForInput(r.towApprovati ?? (r.valoreUnitario > 0 ? Math.round((r.valoreTotale || 0) / r.valoreUnitario) : 0), "qta"),
+      qta: formatForInput(calcQtaFromRow(r), "qta"),
       sconto: formatForInput(r.sconto ?? 0, "qta"),
       subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
       isCatalogo: !!(r.isCatalogo),
@@ -561,6 +628,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
 
   const calcolaValore = (riga) => {
     if (isBase) {
+      if (riga.isCatalogo) return parseNum(riga.subtotale);
       return parseNum(riga.valoreUnitario) * parseNum(riga.qta);
     } else {
       const base = getBaseValore(riga.tow);
@@ -579,12 +647,17 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
       const results = await Promise.all(righe.map(r => {
         let payload;
         if (isBase) {
+          const vt = calcolaValore(r);
+          const qtaNum = r.isCatalogo
+            ? (parseNum(r.valoreUnitario) > 0 ? vt / parseNum(r.valoreUnitario) : 0)
+            : parseNum(r.qta);
           payload = {
             tow: r.tow,
             towContratto: contratto,
             valoreUnitario: parseNum(r.valoreUnitario),
-            valoreTotale: calcolaValore(r),
-            towApprovati: parseNum(r.qta),
+            valoreTotale: vt,
+            towApprovati: qtaNum,
+            isCatalogo: r.isCatalogo,
           };
         } else {
           const base = getBaseValore(r.tow);
@@ -610,42 +683,72 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
     finally { setSaving(false); }
   };
 
-  const inp = { padding: "6px 9px", borderRadius: "6px", border: "1px solid #dadce0", fontSize: "12px", width: "100%", boxSizing: "border-box", outline: "none" };
-  const ro  = { ...inp, background: "#f1f5f9", color: "#64748b", cursor: "not-allowed" };
+  const inp = { padding: "6px 9px", borderRadius: "6px", border: "1px solid #dadce0", fontSize: "12px", boxSizing: "border-box", outline: "none" };
+
+  // Larghezze colonne fisse per allineamento preciso
+  const colW = isBase
+    ? ["160px", "140px", "100px", "100px", "120px", "130px"]   // Nome, Val.Unit., Catalogo, N°TOW/€Cat, VT
+    : ["130px", "120px", "90px",  "120px", "80px",  "130px", "130px"]; // Nome, BASE, Sconto, Scontato, Catalogo, N°TOW/€Cat, VT
+
+  const thStyle = (align = "right", w) => ({
+    padding: "8px 10px", textAlign: align, fontSize: "11px", fontWeight: 700,
+    color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0",
+    background: "#f8fafc", whiteSpace: "nowrap",
+    ...(w ? { width: w, minWidth: w } : {}),
+  });
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "860px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-        {/* Header */}
-        <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #e2e8f0", background: isBase ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflow: "auto" }}>
+      <div
+        style={{
+          background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          width: "100%", maxWidth: isBase ? "820px" : "950px",
+          display: "flex", flexDirection: "column", overflow: "hidden",
+          position: "relative",
+          transform: `translate(${pos.x}px, ${pos.y}px)`,
+          userSelect: "auto",
+        }}
+      >
+        {/* Header — draggable */}
+        <div
+          onMouseDown={onMouseDown}
+          style={{
+            padding: "18px 24px 14px", borderBottom: "1px solid #e2e8f0",
+            background: isBase ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "linear-gradient(135deg,#10b981 0%,#059669 100%)",
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            cursor: "grab",
+          }}
+        >
           <div>
             <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>
               Modifica Contratto — {contratto}
               {isBase && <span style={{ marginLeft: 8, fontSize: "11px", background: "rgba(255,255,255,0.25)", borderRadius: "5px", padding: "2px 8px" }}>BASE</span>}
             </div>
             <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>
-              {isBase ? "Modifica Nome TOW, Valore Unitario e Quantità" : "Modifica % Sconto e N° TOW — valori calcolati dal BASE"}
+              {isBase ? "Trascina per spostare • Modifica Nome TOW, Valore Unitario, Quantità e Catalogo" : "Trascina per spostare • Modifica % Sconto, N° TOW e Catalogo"}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center" }}>✕</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center", flexShrink: 0 }}>✕</button>
         </div>
 
         {/* Body */}
-        <div style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}>
+        <div style={{ overflowY: "auto", overflowX: "auto", padding: "20px 24px", flex: 1, maxHeight: "65vh" }}>
           {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px", fontSize: "13px" }}>{error}</div>}
 
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={{ borderCollapse: "collapse", tableLayout: "fixed", width: "100%" }}>
+            <colgroup>
+              {(isBase ? colW : colW).map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: "8px 10px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Nome TOW</th>
-                {!isBase && <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. BASE €</th>}
-                {isBase  && <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore Unit. €</th>}
-                {!isBase && <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>% Sconto</th>}
-                {!isBase && <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. Scontato €</th>}
-                {!isBase && <th style={{ padding: "8px 10px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Catalogo</th>}
-                <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>{isBase ? "QTA" : "N° TOW / Subtotale"}</th>
-                <th style={{ padding: "8px 10px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore Totale</th>
+                <th style={thStyle("left")}>Nome TOW</th>
+                {!isBase && <th style={thStyle("right")}>Val. BASE €</th>}
+                {isBase  && <th style={thStyle("right")}>Valore Unit. €</th>}
+                {!isBase && <th style={thStyle("right", "90px")}>% Sconto</th>}
+                {!isBase && <th style={{ ...thStyle("right"), color: "#059669" }}>Val. Scontato €</th>}
+                <th style={thStyle("center")}>Catalogo</th>
+                <th style={thStyle("right")}>{isBase ? "N° TOW / € Catalogo" : "N° TOW / € Catalogo"}</th>
+                <th style={thStyle("right")}>Valore Totale</th>
               </tr>
             </thead>
             <tbody>
@@ -657,10 +760,10 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
                 return (
                   <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
                     {/* Nome TOW */}
-                    <td style={{ padding: "6px 10px" }}>
+                    <td style={{ padding: "6px 10px", overflow: "hidden" }}>
                       {isBase
-                        ? <input style={{ ...inp, width: "120px", fontWeight: 700 }} value={r.tow} onChange={e => setRiga(idx, "tow", e.target.value)} />
-                        : <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px", fontSize: "12px", fontWeight: 700 }}>{r.tow}</span>
+                        ? <input style={{ ...inp, width: "100%", fontWeight: 700 }} value={r.tow} onChange={e => setRiga(idx, "tow", e.target.value)} />
+                        : <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px", fontSize: "12px", fontWeight: 700, display: "inline-block" }}>{r.tow}</span>
                       }
                     </td>
                     {/* Val BASE (figlio) */}
@@ -668,7 +771,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
                     {/* Valore unitario (BASE) */}
                     {isBase && (
                       <td style={{ padding: "6px 10px" }}>
-                        <input style={{ ...inp, textAlign: "right", width: "120px" }} value={r.valoreUnitario}
+                        <input style={{ ...inp, textAlign: "right", width: "100%" }} value={r.valoreUnitario}
                           onChange={e => setRiga(idx, "valoreUnitario", e.target.value)}
                           onBlur={e => setRiga(idx, "valoreUnitario", formatForInput(parseNum(e.target.value), "euro"))} />
                       </td>
@@ -677,34 +780,28 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
                     {!isBase && (
                       <td style={{ padding: "6px 10px" }}>
                         <div style={{ position: "relative" }}>
-                          <input style={{ ...inp, textAlign: "right", width: "90px", paddingRight: "22px" }} value={r.sconto}
+                          <input style={{ ...inp, textAlign: "right", width: "100%", paddingRight: "20px" }} value={r.sconto}
                             onChange={e => setRiga(idx, "sconto", e.target.value)}
                             onBlur={e => setRiga(idx, "sconto", formatForInput(parseNum(e.target.value.replace(",",".")), "qta"))} />
-                          <span style={{ position: "absolute", right: "7px", top: "50%", transform: "translateY(-50%)", fontSize: "11px", color: "#64748b", pointerEvents: "none" }}>%</span>
+                          <span style={{ position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)", fontSize: "11px", color: "#64748b", pointerEvents: "none" }}>%</span>
                         </div>
                       </td>
                     )}
                     {/* Val Scontato (figlio) */}
                     {!isBase && <td style={{ padding: "6px 10px", textAlign: "right", fontSize: "12px", fontWeight: 600, color: "#059669" }}>{formatEuro(scontato)}</td>}
-                    {/* Flag Catalogo (figlio) */}
-                    {!isBase && (
-                      <td style={{ padding: "6px 10px", textAlign: "center" }}>
-                        <input type="checkbox" checked={r.isCatalogo} onChange={e => setRiga(idx, "isCatalogo", e.target.checked)}
-                          style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#10b981" }} />
-                      </td>
-                    )}
-                    {/* QTA / N°TOW / Subtotale */}
+                    {/* Flag Catalogo */}
+                    <td style={{ padding: "6px 10px", textAlign: "center" }}>
+                      <input type="checkbox" checked={r.isCatalogo} onChange={e => setRiga(idx, "isCatalogo", e.target.checked)}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#10b981" }} />
+                    </td>
+                    {/* N° TOW o € Catalogo */}
                     <td style={{ padding: "6px 10px" }}>
-                      {isBase ? (
-                        <input style={{ ...inp, textAlign: "right", width: "90px" }} value={r.qta}
-                          onChange={e => setRiga(idx, "qta", e.target.value)}
-                          onBlur={e => setRiga(idx, "qta", formatForInput(parseNum(e.target.value), "qta"))} />
-                      ) : r.isCatalogo ? (
-                        <input style={{ ...inp, textAlign: "right", width: "120px" }} value={r.subtotale} placeholder="Subtotale €"
+                      {r.isCatalogo ? (
+                        <input style={{ ...inp, textAlign: "right", width: "100%" }} value={r.subtotale} placeholder="€ Catalogo"
                           onChange={e => setRiga(idx, "subtotale", e.target.value)}
                           onBlur={e => setRiga(idx, "subtotale", formatForInput(parseNum(e.target.value), "euro"))} />
                       ) : (
-                        <input style={{ ...inp, textAlign: "right", width: "90px" }} value={r.qta} placeholder="N° TOW"
+                        <input style={{ ...inp, textAlign: "right", width: "100%" }} value={r.qta} placeholder="N° TOW"
                           onChange={e => setRiga(idx, "qta", e.target.value)}
                           onBlur={e => setRiga(idx, "qta", formatForInput(parseNum(e.target.value), "qta"))} />
                       )}
@@ -1024,10 +1121,6 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                         background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9",
                         color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b",
                         transition: "background 0.15s",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active && !isDragOver ? "#fff" : "#dc2626"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b"; }}
-                    >
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active && !isDragOver ? "#fff" : "#dc2626"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b"; }}

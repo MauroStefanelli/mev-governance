@@ -503,6 +503,77 @@ public class ContrattoController : BaseController
     }
 
     // ============================================================
+    // POST /api/contratti/consumo-tow/figlio
+    // Crea un contratto figlio partendo dai TOW del contratto BASE,
+    // applicando uno sconto globale e le quantità/importi indicati.
+    // ============================================================
+    [HttpPost("consumo-tow/figlio")]
+    [Authorize(Policy = "AdminOrSuper")]
+    public IActionResult CreateConsumoTowFiglio([FromBody] CreateConsumoTowFiglioRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.TowContratto))
+            return BadRequest("Il nome del contratto è obbligatorio.");
+        if (request.Sconto < 0 || request.Sconto > 100)
+            return BadRequest("La percentuale di sconto deve essere compresa tra 0 e 100.");
+
+        var ambienteId = GetAmbienteId();
+
+        bool exists = _db.ConsumoTow.Any(r => r.TowContratto == request.TowContratto && r.AmbienteId == ambienteId);
+        if (exists)
+            return Conflict($"Il contratto '{request.TowContratto}' esiste già.");
+
+        // Legge i TOW del contratto BASE (IsBase = true)
+        var baseNome = _db.ConsumoTow
+            .Where(r => r.AmbienteId == ambienteId && r.TowContratto != null)
+            .Select(r => r.TowContratto!)
+            .Distinct()
+            .ToList()
+            .FirstOrDefault(n => n.StartsWith("BASE", StringComparison.OrdinalIgnoreCase));
+
+        if (baseNome == null)
+            return BadRequest("Nessun contratto BASE trovato. Importa prima il contratto BASE.");
+
+        var baseRows = _db.ConsumoTow
+            .Where(r => r.TowContratto == baseNome && r.AmbienteId == ambienteId)
+            .ToList();
+
+        var newRows = baseRows.Select(b =>
+        {
+            var scontatoUnitario = b.ValoreUnitario * (1 - request.Sconto / 100m);
+            var isCatalogo = request.IsCatalogo.TryGetValue(b.Tow, out var cat) && cat;
+            decimal qta, vt;
+
+            if (isCatalogo)
+            {
+                // Importo fisso a catalogo
+                vt  = request.Qta.TryGetValue(b.Tow, out var q) ? q : 0m;
+                qta = scontatoUnitario > 0 ? vt / scontatoUnitario : 0m;
+            }
+            else
+            {
+                qta = request.Qta.TryGetValue(b.Tow, out var q) ? q : 0m;
+                vt  = scontatoUnitario * qta;
+            }
+
+            return new ConsumoTow
+            {
+                Tow            = b.Tow,
+                TowContratto   = request.TowContratto,
+                ValoreUnitario = scontatoUnitario,
+                ValoreTotale   = vt,
+                TowApprovati   = qta,
+                Sconto         = request.Sconto,
+                IsCatalogo     = isCatalogo,
+                AmbienteId     = ambienteId,
+            };
+        }).ToList();
+
+        _db.ConsumoTow.AddRange(newRows);
+        _db.SaveChanges();
+        return Ok(newRows);
+    }
+
+    // ============================================================
     // POST /api/contratti/consumo-tow
     // Crea un nuovo contratto con i TOW TOW02.1 … TOW02.6 (solo Admin)
     // ============================================================
@@ -564,6 +635,8 @@ public class ContrattoController : BaseController
         row.CollaudoApprovato  = dto.CollaudoApprovato;
         row.CollaudoOrdinato   = dto.CollaudoOrdinato;
         row.CollaudoFatturato  = dto.CollaudoFatturato;
+        row.Sconto             = dto.Sconto;
+        row.IsCatalogo         = dto.IsCatalogo;
 
         _db.SaveChanges();
         return Ok(row);
@@ -704,6 +777,8 @@ public class ConsumoTowUpdateDto
     public decimal CollaudoApprovato { get; set; }
     public decimal CollaudoOrdinato { get; set; }
     public decimal CollaudoFatturato { get; set; }
+    public decimal Sconto { get; set; }
+    public bool IsCatalogo { get; set; }
 }
 
 public class CreateConsumoTowRequest
@@ -713,4 +788,19 @@ public class CreateConsumoTowRequest
     public Dictionary<string, decimal> ValoriUnitari { get; set; } = new();
     // Chiave = nome TOW, Valore = quantità TOW
     public Dictionary<string, decimal> Qta { get; set; } = new();
+}
+
+public class CreateConsumoTowFiglioRequest
+{
+    public string TowContratto { get; set; } = "";
+    /// <summary>% sconto globale da applicare al valore BASE</summary>
+    public decimal Sconto { get; set; }
+    /// <summary>
+    /// Chiave = nome TOW.
+    /// Per righe non-catalogo: valore = N° TOW (quantità).
+    /// Per righe catalogo: valore = importo € totale a catalogo.
+    /// </summary>
+    public Dictionary<string, decimal> Qta { get; set; } = new();
+    /// <summary>Chiave = nome TOW, Valore = true se la voce è a catalogo</summary>
+    public Dictionary<string, bool> IsCatalogo { get; set; } = new();
 }
