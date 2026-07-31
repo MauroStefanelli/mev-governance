@@ -1026,33 +1026,6 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
       {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>⚠ {error}</div>}
       {successMsg && <div style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>✓ {successMsg}</div>}
 
-      {/* ── KPI Globali (tutti i contratti) ── */}
-      {!loading && rows.length > 0 && (() => {
-        const kpis = [
-          { label: "Valore Totale",  key: "valoreTotale", color: "#1e293b", bg: "#f8fafc" },
-          { label: "Approvato",      key: "approvato",    color: "#1a73e8", bg: "#eff6ff" },
-          { label: "Ordinato",       key: "ordinatiRda",  color: "#10b981", bg: "#f0fdf4" },
-          { label: "Impegnato",      key: "impegnato",    color: "#f59e0b", bg: "#fffbeb" },
-          { label: "Residuo",        key: "residuo",      color: "#f97316", bg: "#fff7ed" },
-        ];
-        return (
-          <div style={{ marginBottom: "24px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>Totale Tutti i Contratti</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px" }}>
-              {kpis.map(k => {
-                const tot = rows.reduce((s, r) => s + (Number(r[k.key]) || 0), 0);
-                return (
-                  <div key={k.key} style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "14px 16px", borderTop: `4px solid ${k.color}`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{k.label}</div>
-                    <div style={{ fontSize: "14px", fontWeight: 800, color: k.color }}>{formatEuro(tot)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
       {/* ── Selezione contratto ── */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratti</div>
@@ -1239,21 +1212,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     })}
                   </div>
 
-                  {/* ── Dettaglio TOW (espanso) ── */}
+                  {/* ── Dettaglio TOW (espanso) — inizia sotto il nome contratto ── */}
                   {expanded && (
                     <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-                      {/* Toolbar dettaglio */}
-                      <div style={{ padding: "8px 56px 8px 56px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e2e8f0" }}>
-                        <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Dettaglio TOW — {c}</span>
-                        <button
-                          onClick={e => { e.stopPropagation(); setShowCollaudo(v => !v); }}
-                          style={{ padding: "4px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, cursor: "pointer", border: showCollaudo ? "1.5px solid #1a73e8" : "1.5px solid #cbd5e1", background: showCollaudo ? "#eff6ff" : "#fff", color: showCollaudo ? "#1a73e8" : "#64748b" }}
-                        >
-                          {showCollaudo ? "▼ Nascondi Collaudo" : "▶ Mostra Collaudo"}
-                        </button>
-                      </div>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                      <div style={{ overflowX: "auto", paddingLeft: "44px" }}>
+                        <table style={{ width: "calc(100% - 44px)", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                           <thead>
                             <tr>
                               <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
@@ -1303,6 +1266,33 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                 </div>
               );
             })}
+
+            {/* ── Riga TOTALE CONTRATTI ── */}
+            {contratti.length > 0 && (() => {
+              const allRows = rows.filter(r => contratti.includes(r.towContratto));
+              return (
+                <div style={{
+                  display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)",
+                  alignItems: "center", padding: "0 12px",
+                  background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)",
+                  borderTop: "2px solid #1e293b",
+                }}>
+                  <div />
+                  <div style={{ padding: "14px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
+                    <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{contratti.length} contratti · {allRows.length} TOW</span>
+                  </div>
+                  {COLS.map(col => {
+                    const tot = allRows.reduce((s, r) => s + (Number(r[col.key]) || 0), 0);
+                    return (
+                      <div key={col.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: col.key === "valoreTotale" ? "#fff" : col.color, filter: col.key === "valoreTotale" ? "none" : "brightness(1.4)" }}>
+                        {formatEuro(tot)}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
