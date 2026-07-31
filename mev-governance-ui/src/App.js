@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import MevPage from "./pages/MevPage";
+import MevCapPage from "./pages/MevCapPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import DbConfigPage from "./pages/DbConfigPage";
@@ -290,7 +291,8 @@ function App() {
 
 
   const navItems = [
-    { id: "mev", label: "MEV" },
+    { id: "mev",     label: "MEV" },
+    { id: "mevcap",  label: "MEV-CAP" },
     { id: "contratti", label: "Contratti" },
     { id: "contratti_interni", label: "Ordini" },
     { id: "chart", label: "Grafici" },
@@ -677,6 +679,7 @@ function App() {
 
       <main style={{ padding: "0" }}>
         {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "mevcap"            && <MevCapPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
