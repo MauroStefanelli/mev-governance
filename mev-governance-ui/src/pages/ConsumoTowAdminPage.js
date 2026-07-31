@@ -967,31 +967,10 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
       {/* ── Titolo ── */}
-      <div style={{ marginBottom: "24px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-        <div>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Logistica Lotto 2</div>
-          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
-          <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Seleziona un contratto per visualizzare e modificare</p>
-        </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          {contratti.length === 0 ? (
-            <button
-              onClick={() => setShowNewContratto("base")}
-              style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: "#1a73e8", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(26,115,232,0.3)", letterSpacing: "0.2px" }}
-            >
-              + Nuovo Contratto BASE
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => setShowNewContratto("figlio")}
-                style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: "#10b981", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(16,185,129,0.3)", letterSpacing: "0.2px" }}
-              >
-                + Nuovo Contratto
-              </button>
-            </>
-          )}
-        </div>
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Logistica Lotto 2</div>
+        <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
+        <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
       </div>
 
       {/* Messaggi */}
@@ -1027,13 +1006,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
 
       {/* ── Selezione contratto ── */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratto</div>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratti</div>
         {loading ? (
           <div style={{ color: "#94a3b8", fontSize: "13px" }}>Caricamento...</div>
         ) : (
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-start" }}>
             {contratti.map((c, cIdx) => {
               const isBaseCard = cIdx === 0;
+              // Mostra badge BASE solo se il nome del contratto non è già "BASE"
+              const showBaseBadge = isBaseCard && c.toUpperCase() !== "BASE";
               const tot = rows.filter(r => r.towContratto === c).reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0);
               const active = selectedContratto === c;
               const isDragOver = dragOver === c;
@@ -1056,13 +1037,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     cursor: "grab",
                   }}
                 >
-                  {/* Maniglia drag in alto + area click */}
                   <div
                     onClick={() => setSelectedContratto(c)}
                     style={{ padding: "14px 18px 10px", flex: 1, userSelect: "none" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                      {/* Icona grip */}
                       <svg width="10" height="14" viewBox="0 0 10 14" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
                         <circle cx="3" cy="2" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
                         <circle cx="7" cy="2" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
@@ -1072,37 +1051,25 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                         <circle cx="7" cy="12" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
                       </svg>
                       <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "-0.2px", color: active && !isDragOver ? "#fff" : "#0f172a" }}>{c}</div>
-                    </div>
-                    {isBaseCard && (
-                      <div style={{ paddingLeft: "16px", marginBottom: "4px" }}>
+                      {showBaseBadge && (
                         <span style={{
                           fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
                           background: active && !isDragOver ? "rgba(255,255,255,0.25)" : "#dbeafe",
                           color: active && !isDragOver ? "#fff" : "#1d4ed8",
                           borderRadius: "5px", padding: "2px 7px",
                         }}>BASE</span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: active && !isDragOver ? "rgba(255,255,255,0.75)" : "#64748b", paddingLeft: "16px" }}>{formatEuro(tot)}</div>
                   </div>
-                  {/* Separatore + bottoni Modifica / Elimina */}
                   <div style={{
                     borderTop: active && !isDragOver ? "1px solid rgba(255,255,255,0.2)" : "1px solid #f1f5f9",
-                    padding: "6px 10px",
-                    display: "flex", justifyContent: "flex-end", gap: "6px",
+                    padding: "6px 10px", display: "flex", justifyContent: "flex-end", gap: "6px",
                   }}>
-                    {/* Modifica */}
                     <button
                       onClick={e => { e.stopPropagation(); setEditContratto(c); }}
                       title={`Modifica contratto ${c}`}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "4px",
-                        padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
-                        fontSize: "11px", fontWeight: 600,
-                        background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#eff6ff",
-                        color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#1a73e8",
-                        transition: "background 0.15s",
-                      }}
+                      style={{ display: "flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 600, background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#eff6ff", color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#1a73e8", transition: "background 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.3)" : "#dbeafe"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#eff6ff"; }}
                     >
@@ -1111,18 +1078,10 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                       </svg>
                       Modifica
                     </button>
-                    {/* Elimina */}
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(c); }}
                       title={`Elimina contratto ${c}`}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "4px",
-                        padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
-                        fontSize: "11px", fontWeight: 600,
-                        background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9",
-                        color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b",
-                        transition: "background 0.15s",
-                      }}
+                      style={{ display: "flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 600, background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9", color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b", transition: "background 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active && !isDragOver ? "#fff" : "#dc2626"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b"; }}
                     >
@@ -1135,6 +1094,29 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                 </div>
               );
             })}
+
+            {/* ── Card "+ Nuovo Contratto" ── */}
+            {contratti.length === 0 ? (
+              <div
+                onClick={() => setShowNewContratto("base")}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", minWidth: "150px", minHeight: "100px", borderRadius: "14px", border: "2px dashed #93c5fd", background: "#f0f9ff", cursor: "pointer", padding: "18px", transition: "border 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.border = "2px dashed #1a73e8"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#f0f9ff"; e.currentTarget.style.border = "2px dashed #93c5fd"; }}
+              >
+                <div style={{ fontSize: "24px", color: "#1a73e8", lineHeight: 1 }}>+</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#1a73e8", textAlign: "center" }}>Nuovo Contratto BASE</div>
+              </div>
+            ) : (
+              <div
+                onClick={() => setShowNewContratto("figlio")}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", minWidth: "150px", minHeight: "100px", borderRadius: "14px", border: "2px dashed #6ee7b7", background: "#f0fdf4", cursor: "pointer", padding: "18px", transition: "border 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#d1fae5"; e.currentTarget.style.border = "2px dashed #10b981"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#f0fdf4"; e.currentTarget.style.border = "2px dashed #6ee7b7"; }}
+              >
+                <div style={{ fontSize: "24px", color: "#10b981", lineHeight: 1 }}>+</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", textAlign: "center" }}>Nuovo Contratto</div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1151,20 +1133,19 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
         return (
           <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
             {/* Header colonne */}
-            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px) 90px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "0 12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)", background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "0 12px" }}>
               <div />
               <div style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Contratto</div>
               {COLS.map(c => (
                 <div key={c.key} style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: c.color, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>{c.label}</div>
               ))}
-              <div style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>QTA</div>
             </div>
 
             {contratti.map((c, cIdx) => {
               const cRows   = rows.filter(r => r.towContratto === c);
               const isBase  = cIdx === 0;
+              const showBaseBadge = isBase && c.toUpperCase() !== "BASE";
               const expanded = expandedContratto === c;
-              const totQta  = cRows.reduce((s, r) => s + (r.valoreUnitario > 0 ? Math.round(r.valoreTotale / r.valoreUnitario) : 0), 0);
 
               return (
                 <div key={c} style={{ borderBottom: "1px solid #f1f5f9" }}>
@@ -1172,7 +1153,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                   <div
                     onClick={() => setExpandedContratto(expanded ? null : c)}
                     style={{
-                      display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px) 90px",
+                      display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)",
                       alignItems: "center", padding: "0 12px", cursor: "pointer",
                       background: expanded ? "#eff6ff" : "#fff",
                       transition: "background 0.15s",
@@ -1185,7 +1166,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     {/* Nome contratto */}
                     <div style={{ padding: "12px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "14px", fontWeight: 800, color: expanded ? "#1a73e8" : "#0f172a" }}>{c}</span>
-                      {isBase && <span style={{ fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: "5px", padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.4px" }}>BASE</span>}
+                      {showBaseBadge && <span style={{ fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: "5px", padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.4px" }}>BASE</span>}
                       <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cRows.length} TOW</span>
                     </div>
                     {/* Valori aggregati */}
@@ -1195,7 +1176,6 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                         <div key={col.key} style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: col.key === "valoreTotale" ? 800 : 600, color: col.color }}>{formatEuro(tot)}</div>
                       );
                     })}
-                    <div style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748b" }}>{totQta > 0 ? formatQta(totQta) : "—"}</div>
                   </div>
 
                   {/* ── Dettaglio TOW (espanso) ── */}
