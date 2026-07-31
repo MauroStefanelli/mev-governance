@@ -13,7 +13,7 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "Accantonato",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
@@ -31,7 +31,7 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "ImportoFornituraScontato",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: false,
                 defaultValue: 0m);
 
@@ -50,7 +50,7 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "OffertaEuro",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
@@ -86,7 +86,7 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "ResiduoFatturabile",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: false,
                 defaultValue: 0m);
 
@@ -117,43 +117,43 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<decimal>(
                 name: "Tow021",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "Tow022",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "Tow023",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "Tow024",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "Tow025",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "Tow026",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "TowTotale",
                 table: "MevItems",
-                type: "TEXT",
+                type: "NUMERIC",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
