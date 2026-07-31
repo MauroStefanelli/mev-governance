@@ -13,14 +13,14 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsCatalogo",
                 table: "ConsumoTow",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 defaultValue: false);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "Sconto",
                 table: "ConsumoTow",
-                type: "TEXT",
+                type: "numeric",
                 nullable: false,
                 defaultValue: 0m);
         }

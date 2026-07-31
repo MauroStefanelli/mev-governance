@@ -240,6 +240,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     // Patch di sicurezza: aggiunge colonne mancanti se la migration non le ha create
+    // e converte IsCatalogo da integer a boolean se necessario (SQLite→Postgres mismatch)
     if (isPostgres)
     {
         try
@@ -249,8 +250,40 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""Sconto"" numeric NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""IsCatalogo"" boolean NOT NULL DEFAULT false;
             ");
+            // Converte IsCatalogo da integer a boolean se fu creata con tipo sbagliato
+            db.Database.ExecuteSqlRaw($@"
+                DO $$
+                BEGIN
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = '{sch}'
+                      AND table_name   = 'ConsumoTow'
+                      AND column_name  = 'IsCatalogo'
+                      AND data_type    = 'integer'
+                  ) THEN
+                    ALTER TABLE ""{sch}"".""ConsumoTow""
+                      ALTER COLUMN ""IsCatalogo"" TYPE boolean USING (""IsCatalogo""::boolean);
+                  END IF;
+                END$$;
+            ");
+            // Converte Sconto da TEXT a numeric se fu creata con tipo sbagliato
+            db.Database.ExecuteSqlRaw($@"
+                DO $$
+                BEGIN
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = '{sch}'
+                      AND table_name   = 'ConsumoTow'
+                      AND column_name  = 'Sconto'
+                      AND data_type    = 'text'
+                  ) THEN
+                    ALTER TABLE ""{sch}"".""ConsumoTow""
+                      ALTER COLUMN ""Sconto"" TYPE numeric USING (""Sconto""::numeric);
+                  END IF;
+                END$$;
+            ");
 #pragma warning restore EF1002
-            Console.WriteLine("[PATCH] Colonne Sconto/IsCatalogo verificate.");
+            Console.WriteLine("[PATCH] Colonne Sconto/IsCatalogo verificate e corrette.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
     }
