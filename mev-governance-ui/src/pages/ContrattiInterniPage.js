@@ -17,7 +17,7 @@ const TD = (align = "left", extra = {}) => ({
   verticalAlign: "middle", whiteSpace: "nowrap", textAlign: align, ...extra,
 });
 
-function ContrattiPage({ onUnauthorized, ambienteId }) {
+function ContrattiPage({ onUnauthorized }) {
   const [contratti, setContratti]         = useState([]);
   const [loading, setLoading]             = useState(true);
   const [openContratti, setOpenContratti] = useState({});
@@ -26,7 +26,6 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
 
   const load = async () => {
     setLoading(true);
-    setContratti([]);
     try {
       const data = await getContratti();
       setContratti(data);
@@ -37,7 +36,7 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
     }
   };
 
-  useEffect(() => { load(); }, [ambienteId]); // eslint-disable-line
+  useEffect(() => { load(); }, []); // eslint-disable-line
 
   const toggleContratto = (id) =>
     setOpenContratti((p) => ({ ...p, [id]: !p[id] }));

@@ -31,10 +31,8 @@ public class MevController : BaseController
     
     public IActionResult GetMev()
     {
-        var ambienteId = GetAmbienteId();
         var items = _db.MevItems
             .AsNoTracking()
-            .Where(m => m.AmbienteId == ambienteId)
             .OrderBy(m => m.ExcelOrder)
             .ToList();
 
@@ -47,41 +45,15 @@ public class MevController : BaseController
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateMev(int id, [FromBody] UpdateMevRequest request)
     {
-        var ambienteId = GetAmbienteId();
-        var item = _db.MevItems.FirstOrDefault(x => x.Id == id && x.AmbienteId == ambienteId);
+        var item = _db.MevItems.FirstOrDefault(x => x.Id == id);
         if (item == null)
             return NotFound();
 
-        // Campi PMO
-        item.PAnno      = request.PAnno;
-        item.PRelease   = request.PRelease;
-        item.PImporto   = request.PImporto;
-        item.PNote      = request.PNote;
+        item.PAnno    = request.PAnno;
+        item.PRelease = request.PRelease;
+        item.PImporto = request.PImporto;
+        item.PNote    = request.PNote;
         item.ImportoBdo = request.ImportoBdo;
-
-        // Campi Excel editabili dalla modale
-        if (request.Stato      != null) item.Stato      = request.Stato;
-        if (request.PmPoste    != null) item.PmPoste    = request.PmPoste;
-        if (request.PmCap      != null) item.PmCap      = request.PmCap;
-        if (request.TipoContratto != null) item.TipoContratto = request.TipoContratto;
-        if (request.Recupero   != null) item.Recupero   = request.Recupero;
-        if (request.Subco      != null) item.Subco      = request.Subco;
-        if (request.Tbd        != null) item.Tbd        = request.Tbd;
-        if (request.Bc         != null) item.Bc         = request.Bc;
-        if (request.Contratto  != null) item.Contratto  = request.Contratto;
-        if (request.Rda        != null) item.Rda        = request.Rda;
-        if (request.AtId       != null) item.AtId       = request.AtId;
-        if (request.Tow021     != null) item.Tow021     = request.Tow021;
-        if (request.Tow022     != null) item.Tow022     = request.Tow022;
-        if (request.Tow023     != null) item.Tow023     = request.Tow023;
-        if (request.Tow024     != null) item.Tow024     = request.Tow024;
-        if (request.Tow025     != null) item.Tow025     = request.Tow025;
-        if (request.Tow026     != null) item.Tow026     = request.Tow026;
-        if (request.Accantonato!= null) item.Accantonato= request.Accantonato;
-        if (request.Nel        != null) item.Nel        = request.Nel;
-        if (request.InVita     != null) item.InVita     = request.InVita;
-        if (request.Cm         != null) item.Cm         = request.Cm;
-        if (request.NoteExcel  != null) item.NoteExcel  = request.NoteExcel;
 
         _db.SaveChanges();
 
@@ -106,7 +78,7 @@ public class MevController : BaseController
     // ============================================================
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
-    [Authorize(Policy = "AdminOrSuper")]
+    [Authorize(Roles = "Admin")]
     public IActionResult UploadExcel(IFormFile file)
     {
         if (file == null || file.Length == 0)
@@ -143,11 +115,10 @@ public class MevController : BaseController
             if (!System.IO.File.Exists(uploadedPath))
                 return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
 
-            var ambienteId = GetAmbienteId();
-            var mevResult = ImportFromExcelFile(uploadedPath, ambienteId);
+            var mevResult = ImportFromExcelFile(uploadedPath);
 
             // Allinea anche i contratti dallo stesso file
-            var contrattoResult = _contrattoCtrl.AlignInternal(ambienteId);
+            var contrattoResult = _contrattoCtrl.Align();
 
             // Salva timestamp ultimo align
             var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
@@ -199,7 +170,7 @@ public class MevController : BaseController
     // ============================================================
     // METODO PRIVATO: import da Excel
     // ============================================================
-    private IActionResult ImportFromExcelFile(string excelPath, int ambienteId)
+    private IActionResult ImportFromExcelFile(string excelPath)
     {
         try
         {
@@ -237,9 +208,8 @@ public class MevController : BaseController
         var dataRows = ws.RowsUsed()
             .Where(r => r.RowNumber() > headerRow.RowNumber());
 
-        // Costruisco un dizionario delle righe esistenti per ExcelId (filtrato per ambiente)
+        // Costruisco un dizionario delle righe esistenti per ExcelId
         var existingItems = _db.MevItems
-            .Where(x => x.AmbienteId == ambienteId)
             .ToDictionary(x => x.ExcelId, x => x);
 
         var excelIds = new List<string>();
@@ -271,48 +241,23 @@ public class MevController : BaseController
                 return v;
             }
 
-            string goTo        = GetString("GoTo");
+            string goTo = GetString("GoTo");
             string applicativo = GetString("Applicativo");
-            string xOrdine     = GetString("X ORDINE");
             string descrizione = GetString("Descrizione");
-            string pmPoste     = GetString("PM POSTE");
-            string pmCap       = GetString("PM CAP");
-            string stato       = GetString("Stato");
-            decimal importo    = GetDecimal("Importo Fornitura");
-            string tipoContratto = GetString("Tipo Contratto");
-            decimal importoScontato = GetDecimal("Importo Fornitura scontato ");
-            string excelId     = GetString("ID");
-            string noteExcel   = GetString("Note");
-            string recupero    = GetString("Recupero");
-            string subco       = GetString("SUBCO");
-            string tbd         = GetString("TBD");
-            string bc          = GetString("BC");
-            string contratto   = GetString("Contratto");
-            string atId        = GetString("AT ID");
-            decimal? tow021    = columnMap.ContainsKey("TOW02.1") ? (decimal?)GetDecimal("TOW02.1") : null;
-            decimal? tow022    = columnMap.ContainsKey("TOW02.2") ? (decimal?)GetDecimal("TOW02.2") : null;
-            decimal? tow023    = columnMap.ContainsKey("TOW02.3") ? (decimal?)GetDecimal("TOW02.3") : null;
-            decimal? tow024    = columnMap.ContainsKey("TOW02.4") ? (decimal?)GetDecimal("TOW02.4") : null;
-            decimal? tow025    = columnMap.ContainsKey("TOW02.5") ? (decimal?)GetDecimal("TOW02.5") : null;
-            decimal? tow026    = columnMap.ContainsKey("TOW02.6") ? (decimal?)GetDecimal("TOW02.6") : null;
-            decimal towTotale  = GetDecimal("Totale");
+            string stato = GetString("Stato");
+            decimal importo = GetDecimal("Importo Fornitura");
+            string excelId = GetString("ID");
+            string noteExcel = GetString("Note");
+            string bc = GetString("BC");
+            string contratto = GetString("Tipo Contratto");
+            string atId = GetString("AT ID");
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
-            decimal fatturato  = GetDecimal("Fatturato");
-            decimal residuo    = GetDecimal("Residuo fatturabile");
-            string tabellaOfferta = GetString("Tabella Offerta");
-            string powerAppsId = GetString("__PowerAppsId__");
-            string subcoNome   = GetString("Nome");
-            decimal? offertaEuro = columnMap.ContainsKey("Offerta (€)") ? (decimal?)GetDecimal("Offerta (€)") : null;
-            string po          = GetString("PO");
-            string docOfferta  = GetString("Documento Offerta");
-            decimal? accantonato = columnMap.ContainsKey("Accantonato") ? (decimal?)GetDecimal("Accantonato") : null;
-            string nel         = GetString("NEL");
-            string inVita      = GetString("In Vita");
-            string cm          = GetString("CM");
+            decimal fatturato = GetDecimal("Fatturato");
             string releaseExcel = GetString("Release");
-            string rda         = GetString("RDA");
-            string cap         = GetString("Capgemini");
-            string iet         = GetString("IET");
+            string rda = GetString("RDA");
+            string cap = GetString("Capgemini");
+            string iet = GetString("IET");
+            string subco = GetString("Subco");
 
             // SKIP / STOP riga "TOTALE" — ferma l'import
             if (
@@ -333,104 +278,53 @@ public class MevController : BaseController
             if (existingItems.TryGetValue(excelId, out var existing))
             {
                 // Aggiorna solo i campi Excel, preserva i campi PMO
-                existing.ExcelOrder             = excelOrder++;
-                existing.GoTo                   = goTo;
-                existing.Applicativo            = applicativo;
-                existing.XOrdine                = xOrdine;
-                existing.Descrizione            = descrizione;
-                existing.PmPoste                = pmPoste;
-                existing.PmCap                  = pmCap;
-                existing.Stato                  = stato;
-                existing.AnnoCompetenza         = GetInt("Anno Competenza");
-                existing.ReleaseExcel           = releaseExcel;
-                existing.Capgemini              = cap;
-                existing.Iet                    = iet;
-                existing.ImportoExcel           = importo;
-                existing.TipoContratto          = tipoContratto;
-                existing.ImportoFornituraScontato = importoScontato;
-                existing.NoteExcel              = noteExcel;
-                existing.Recupero               = recupero;
-                existing.Subco                  = subco;
-                existing.Tbd                    = tbd;
-                existing.Bc                     = bc;
-                existing.Contratto              = contratto;
-                existing.AtId                   = atId;
-                existing.Rda                    = rda;
-                existing.Tow021                 = tow021;
-                existing.Tow022                 = tow022;
-                existing.Tow023                 = tow023;
-                existing.Tow024                 = tow024;
-                existing.Tow025                 = tow025;
-                existing.Tow026                 = tow026;
-                existing.TowTotale              = towTotale;
-                existing.OrdinatoBdo            = ordinatoBdo;
-                existing.Fatturato              = fatturato;
-                existing.ResiduoFatturabile     = residuo;
-                existing.TabellaOfferta         = tabellaOfferta;
-                existing.PowerAppsId            = powerAppsId;
-                existing.SubcoNome              = subcoNome;
-                existing.OffertaEuro            = offertaEuro;
-                existing.Po                     = po;
-                existing.DocumentoOfferta       = docOfferta;
-                existing.Accantonato            = accantonato;
-                existing.Nel                    = nel;
-                existing.InVita                 = inVita;
-                existing.Cm                     = cm;
+                existing.ExcelOrder = excelOrder++;
+                existing.GoTo = goTo;
+                existing.Applicativo = applicativo;
+                existing.Descrizione = descrizione;
+                existing.Stato = GetString("Stato");
+                existing.AnnoCompetenza = GetInt("Anno Competenza");
+                existing.ImportoExcel = importo;
+                existing.NoteExcel = noteExcel;
+                existing.Bc = bc;
+                existing.Contratto = contratto;
+                existing.AtId = atId;
+                existing.OrdinatoBdo = ordinatoBdo;
+                existing.Fatturato = fatturato;
+                existing.ReleaseExcel = releaseExcel;
+                existing.Rda = rda;
+                existing.Capgemini = cap;
+                existing.Iet = iet;
+                existing.Subco = subco;
             }
             else
             {
                 // Nuova riga: inserisce con valori PMO di default dall'Excel
                 var item = new MevItem
                 {
-                    ExcelOrder              = excelOrder++,
-                    ExcelId                 = excelId,
-                    GoTo                    = goTo,
-                    Applicativo             = applicativo,
-                    XOrdine                 = xOrdine,
-                    Descrizione             = descrizione,
-                    PmPoste                 = pmPoste,
-                    PmCap                   = pmCap,
-                    Stato                   = stato,
-                    AnnoCompetenza          = GetInt("Anno Competenza"),
-                    ReleaseExcel            = releaseExcel,
-                    Capgemini               = cap,
-                    Iet                     = iet,
-                    ImportoExcel            = importo,
-                    TipoContratto           = tipoContratto,
-                    ImportoFornituraScontato = importoScontato,
-                    NoteExcel               = noteExcel,
-                    Recupero                = recupero,
-                    Subco                   = subco,
-                    Tbd                     = tbd,
-                    Bc                      = bc,
-                    Contratto               = contratto,
-                    AtId                    = atId,
-                    Rda                     = rda,
-                    Tow021                  = tow021,
-                    Tow022                  = tow022,
-                    Tow023                  = tow023,
-                    Tow024                  = tow024,
-                    Tow025                  = tow025,
-                    Tow026                  = tow026,
-                    TowTotale               = towTotale,
-                    OrdinatoBdo             = ordinatoBdo,
-                    Fatturato               = fatturato,
-                    ResiduoFatturabile      = residuo,
-                    TabellaOfferta          = tabellaOfferta,
-                    PowerAppsId             = powerAppsId,
-                    SubcoNome               = subcoNome,
-                    OffertaEuro             = offertaEuro,
-                    Po                      = po,
-                    DocumentoOfferta        = docOfferta,
-                    Accantonato             = accantonato,
-                    Nel                     = nel,
-                    InVita                  = inVita,
-                    Cm                      = cm,
-                    PAnno                   = GetInt("Anno Competenza"),
-                    PRelease                = releaseExcel,
-                    PImporto                = importo,
-                    ImportoBdo              = ordinatoBdo,
-                    AmbienteId              = ambienteId
+                    ExcelOrder = excelOrder++,
+                    ExcelId = excelId,
+                    GoTo = goTo,
+                    Applicativo = applicativo,
+                    Descrizione = descrizione,
+                    Stato = GetString("Stato"),
+                    AnnoCompetenza = GetInt("Anno Competenza"),
+                    ImportoExcel = importo,
+                    NoteExcel = noteExcel,
+                    Bc = bc,
+                    Contratto = contratto,
+                    AtId = atId,
+                    OrdinatoBdo = ordinatoBdo,
+                    Fatturato = fatturato,
+                    ReleaseExcel = releaseExcel,
+                    Rda = rda,
+                    Capgemini = cap,
+                    Iet = iet,
+                    Subco = subco,
+                    PAnno = GetInt("Anno Competenza"),
+                    PRelease = GetString("Release"),
+                    PImporto = importo,
+                    ImportoBdo = ordinatoBdo
                 };
                 _db.MevItems.Add(item);
             }
@@ -487,10 +381,8 @@ public class MevController : BaseController
 
         // DATI
 
-        var ambienteId = GetAmbienteId();
         var items = _db.MevItems
             .AsNoTracking()
-            .Where(x => x.AmbienteId == ambienteId)
             .OrderBy(x => x.ExcelOrder)
             .ToList();
 

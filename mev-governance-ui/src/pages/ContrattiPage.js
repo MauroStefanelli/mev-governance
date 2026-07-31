@@ -1034,14 +1034,13 @@ function ConsumoTowSection({ towRows }) {
 
 
 // ── Pagina ────────────────────────────────────────────────────────────────────
-function ContrattiPage({ onUnauthorized, ambienteId }) {
+function ContrattiPage({ onUnauthorized }) {
   const [towRows, setTowRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setTowRows([]);
       try {
         const tow = await getConsumoTow();
         setTowRows(tow);
@@ -1051,7 +1050,7 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
         setLoading(false);
       }
     })();
-  }, [ambienteId]); // eslint-disable-line
+  }, []); // eslint-disable-line
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#666", fontSize: "15px" }}>

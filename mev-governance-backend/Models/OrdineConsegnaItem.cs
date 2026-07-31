@@ -37,6 +37,4 @@ public class OrdineConsegnaItem
     public string QtaAvanzata        { get; set; } = "";
     public string ImportoFatturabile { get; set; } = "";
     public string Subappalto         { get; set; } = "";
-
-    public int AmbienteId { get; set; }
 }

@@ -48,11 +48,7 @@ public class AuthController : ControllerBase
             LoginAt = DateTime.UtcNow,
         });
 
-        // Recupera gli ambienti accessibili all'utente
-        var ambienti = GetAmbientiForUser(user);
-        var defaultAmbienteId = ambienti.FirstOrDefault()?.Id ?? 0;
-
-        var token = GenerateToken(user, defaultAmbienteId);
+        var token = GenerateToken(user);
 
         var refreshToken = GenerateRefreshToken();
         user.RefreshToken = refreshToken;
@@ -66,66 +62,8 @@ public class AuthController : ControllerBase
             refreshToken,
             username = user.Username,
             fullName = user.FullName,
-            role = user.Role,
-            ambienti,
-            ambienteId = defaultAmbienteId
+            role = user.Role
         });
-    }
-
-    // ============================================================
-    // GET /api/auth/my-ambienti
-    // ============================================================
-    [HttpGet("my-ambienti")]
-    [Authorize]
-    public IActionResult GetMyAmbienti()
-    {
-        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var user = _db.Users.FirstOrDefault(u => u.Id == userId);
-        if (user == null) return Unauthorized();
-
-        return Ok(GetAmbientiForUser(user));
-    }
-
-    // ============================================================
-    // POST /api/auth/switch-ambiente
-    // Genera un nuovo token con un ambienteId diverso
-    // ============================================================
-    [HttpPost("switch-ambiente")]
-    [Authorize]
-    public IActionResult SwitchAmbiente([FromBody] SwitchAmbienteRequest request)
-    {
-        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var user = _db.Users.FirstOrDefault(u => u.Id == userId);
-        if (user == null) return Unauthorized();
-
-        var ambienti = GetAmbientiForUser(user);
-        if (!ambienti.Any(a => a.Id == request.AmbienteId))
-            return Forbid();
-
-        var newToken = GenerateToken(user, request.AmbienteId);
-        return Ok(new { token = newToken, ambienteId = request.AmbienteId });
-    }
-
-    // Helper: restituisce gli ambienti visibili all'utente
-    private List<AmbienteDto> GetAmbientiForUser(AppUser user)
-    {
-        // SuperAdmin vede tutti gli ambienti attivi
-        if (user.Role == "SuperAdmin")
-        {
-            return _db.Ambienti
-                .Where(a => a.IsActive)
-                .OrderBy(a => a.CodiceContratto)
-                .Select(a => new AmbienteDto(a.Id, a.CodiceContratto, a.Descrizione))
-                .ToList();
-        }
-
-        // Gli altri vedono solo gli ambienti a cui sono associati
-        return (from ua in _db.UserAmbienti
-                join a in _db.Ambienti on ua.AmbienteId equals a.Id
-                where ua.UserId == user.Id && a.IsActive
-                orderby a.CodiceContratto
-                select new AmbienteDto(a.Id, a.CodiceContratto, a.Descrizione))
-               .ToList();
     }
 
     // ============================================================
@@ -141,21 +79,7 @@ public class AuthController : ControllerBase
         if (user == null || user.RefreshTokenExpiry == null || user.RefreshTokenExpiry < DateTime.UtcNow)
             return Unauthorized("Refresh token non valido");
 
-        // Preserva l'ambienteId corrente dal vecchio token (se presente)
-        var currentAmbienteId = 0;
-        if (request.CurrentToken != null)
-        {
-            try
-            {
-                var handler = new JwtSecurityTokenHandler();
-                var jwt = handler.ReadJwtToken(request.CurrentToken);
-                var claim = jwt.Claims.FirstOrDefault(c => c.Type == "ambienteId");
-                if (claim != null) currentAmbienteId = int.Parse(claim.Value);
-            }
-            catch { /* ignora token malformato */ }
-        }
-
-        var newJwt = GenerateToken(user, currentAmbienteId);
+        var newJwt = GenerateToken(user);
         var newRefresh = GenerateRefreshToken();
 
         user.RefreshToken = newRefresh;
@@ -208,7 +132,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult GetUsers()
     {
-        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin"))
             return Forbid();
 
         var users = _db.Users
@@ -236,7 +160,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult DeleteUser(int id)
     {
-        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin"))
             return Forbid();
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
@@ -257,12 +181,12 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult UpdateUserRole(int id, [FromBody] UpdateRoleRequest request)
     {
-        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin" };
+        var validRoles = new[] { "Admin", "Editor" };
         if (!validRoles.Contains(request.Role))
-            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor");
+            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor");
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null)
@@ -278,7 +202,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult CreateUser([FromBody] CreateUserRequest request)
     {
-        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin"))
             return Forbid();
 
         if (_db.Users.Any(u => u.Username == request.Username))
@@ -311,7 +235,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult GetEditorLogins([FromQuery] DateTime? since)
     {
-        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin"))
             return Forbid();
 
         var query = _db.Users
@@ -341,7 +265,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult GetUserAccessLog(int id)
     {
-        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin"))
             return Forbid();
 
         var logs = _db.UserAccessLogs
@@ -361,7 +285,7 @@ public class AuthController : ControllerBase
     // ============================================================
     // GENERATE JWT
     // ============================================================
-    private string GenerateToken(AppUser user, int ambienteId = 0)
+    private string GenerateToken(AppUser user)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -373,8 +297,7 @@ public class AuthController : ControllerBase
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
             new Claim(ClaimTypes.Role, user.Role),
-            new Claim("fullName", user.FullName),
-            new Claim("ambienteId", ambienteId.ToString())
+            new Claim("fullName", user.FullName)
         };
 
         var token = new JwtSecurityToken(
@@ -453,7 +376,5 @@ public record CreateUserRequest(
 // DTO
 // ============================================================
 public record LoginRequest(string Username, string Password);
-public record RefreshRequest(string RefreshToken, string? CurrentToken = null);
+public record RefreshRequest(string RefreshToken);
 public record UpdateRoleRequest(string Role);
-public record SwitchAmbienteRequest(int AmbienteId);
-public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);

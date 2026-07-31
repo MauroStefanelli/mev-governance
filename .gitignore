@@ -12,10 +12,3 @@ mev-governance-backend/mev.db-wal
 mev-governance-ui/node_modules/
 mev-governance-ui/build/
 mev-governance-ui/.env.production
-
-# ── bcrypt-test ───────────────────────────────
-bcrypt-test/bin/
-bcrypt-test/obj/
-
-# ── Deploy artifacts ──────────────────────────
-*.tar.gz

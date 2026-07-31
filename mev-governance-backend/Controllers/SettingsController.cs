@@ -10,7 +10,7 @@ namespace MevGovernanceBackend.Controllers;
 
 [ApiController]
 [Route("api/settings")]
-[Authorize(Policy = "AdminOrSuper")]
+[Authorize(Roles = "Admin")]
 public class SettingsController : ControllerBase
 {
     private const string ConfigFile = "/data/db-config.json";

@@ -17,6 +17,4 @@ public class Contratto
     public decimal DaOrdinare { get; set; }
     public decimal Avanzato { get; set; }
     public decimal DaAvanzare { get; set; }
-
-    public int AmbienteId { get; set; }
 }

@@ -19,11 +19,11 @@ namespace mevgovernancebackend.Migrations
 DO $$
 BEGIN
     -- ── Fix ConsumoTow ──────────────────────────────────────────
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name = 'ConsumoTow') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ConsumoTow') THEN
         -- Verifica se Id ha già una sequence (SERIAL)
         IF NOT EXISTS (
             SELECT 1 FROM information_schema.columns
-            WHERE table_schema=current_schema() AND table_name = 'ConsumoTow'
+            WHERE table_name = 'ConsumoTow'
               AND column_name = 'Id'
               AND column_default LIKE 'nextval%'
         ) THEN
@@ -32,7 +32,7 @@ BEGIN
         END IF;
     END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name = 'ConsumoTow') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ConsumoTow') THEN
         CREATE TABLE ""ConsumoTow"" (
             ""Id""           SERIAL          PRIMARY KEY,
             ""Voce""         TEXT            NOT NULL DEFAULT '',
@@ -45,10 +45,10 @@ BEGIN
     END IF;
 
     -- ── Fix AppSettings ─────────────────────────────────────────
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name = 'AppSettings') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'AppSettings') THEN
         IF NOT EXISTS (
             SELECT 1 FROM information_schema.columns
-            WHERE table_schema=current_schema() AND table_name = 'AppSettings'
+            WHERE table_name = 'AppSettings'
               AND column_name = 'Id'
               AND column_default LIKE 'nextval%'
         ) THEN
@@ -56,7 +56,7 @@ BEGIN
         END IF;
     END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name = 'AppSettings') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'AppSettings') THEN
         CREATE TABLE ""AppSettings"" (
             ""Id""          SERIAL      PRIMARY KEY,
             ""LastAlignAt"" TIMESTAMPTZ NULL

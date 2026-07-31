@@ -17,6 +17,4 @@ public class VerbaleAvanzamento
     // Righe parsate in formato JSON: [{oda, pos, qta, importo, subappalto}, ...]
     // Usato per ricalcolare i campi VAP senza ricaricare il PDF
     public string? DatiRigheJson  { get; set; }
-
-    public int AmbienteId { get; set; }
 }

@@ -15,10 +15,7 @@ const tryRefreshToken = async () => {
     const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        refreshToken,
-        currentToken: localStorage.getItem("jwt") || null
-      }),
+      body: JSON.stringify({ refreshToken }),
     });
     if (!res.ok) return false;
     const data = await res.json();
@@ -479,22 +476,6 @@ export const createConsumoTow = async (towContratto, valoriUnitari, qta) => {
   return response.json();
 };
 
-// Crea un contratto figlio (non-BASE): il backend calcola i valori unitari
-// applicando la % di sconto ai valori del contratto BASE
-export const createConsumoTowFiglio = async (towContratto, sconto, qta, isCatalogo = {}) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/figlio`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ towContratto, sconto, qta, isCatalogo })
-  });
-  if (response.status === 401) throw new Error("401");
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text);
-  }
-  return response.json();
-};
-
 export const deleteConsumoTowContratto = async (nome) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/contratto/${encodeURIComponent(nome)}`, {
     method: "DELETE",
@@ -506,98 +487,5 @@ export const deleteConsumoTowContratto = async (nome) => {
     throw new Error(text);
   }
   return response.json();
-};
-
-// ── Ambienti ─────────────────────────────────────────────────────────────────
-
-export const getMyAmbienti = async () => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/my-ambienti`, {
-    headers: authHeaders()
-  });
-  if (response.status === 401) throw new Error("401");
-  if (!response.ok) throw new Error("Errore recupero ambienti");
-  return response.json();
-};
-
-export const switchAmbiente = async (ambienteId) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/switch-ambiente`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ ambienteId })
-  });
-  if (response.status === 401) throw new Error("401");
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text);
-  }
-  return response.json(); // { token, ambienteId }
-};
-
-// ── SuperAdmin: gestione ambienti ────────────────────────────────────────────
-
-export const getAllAmbienti = async () => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti`, {
-    headers: authHeaders()
-  });
-  if (response.status === 401) throw new Error("401");
-  if (!response.ok) throw new Error("Errore recupero ambienti");
-  return response.json();
-};
-
-export const createAmbiente = async (codiceContratto, descrizione) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ codiceContratto, descrizione })
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text);
-  }
-  return response.json();
-};
-
-export const getAmbientiUtenti = async (ambienteId) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti`, {
-    headers: authHeaders()
-  });
-  if (!response.ok) throw new Error("Errore recupero utenti ambiente");
-  return response.json();
-};
-
-export const addUtenteAmbiente = async (ambienteId, userId, ruolo) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ userId, ruolo })
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text);
-  }
-  return response.json();
-};
-
-export const removeUtenteAmbiente = async (ambienteId, userId) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti/${userId}`, {
-    method: "DELETE",
-    headers: authHeaders()
-  });
-  if (!response.ok) throw new Error("Errore rimozione utente da ambiente");
-  return response.json();
-};
-
-export const updateDescrizioneAmbiente = async (ambienteId, descrizione) => {
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/descrizione`, {
-    method: "PATCH",
-    headers: authHeaders(),
-    body: JSON.stringify({ descrizione })
-  });
-  if (response.status === 401) throw new Error("401");
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text);
-  }
-  return response.json(); // { id, codiceContratto, descrizione }
 };
 

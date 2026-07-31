@@ -12,7 +12,7 @@ public class AppUser
     public string Email { get; set; } = "";
     public string PasswordHash { get; set; } = "";
 
-    // SuperAdmin | Admin | Editor
+    // Admin | Editor
     public string Role         { get; set; } = "Editor";
 
     public bool   IsActive     { get; set; } = true;
