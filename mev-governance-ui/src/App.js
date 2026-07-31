@@ -8,13 +8,18 @@ import ContrattiPage from "./pages/ContrattiPage";
 import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings } from "./services/mevService";
+import SuperAdminPage from "./pages/SuperAdminPage";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente } from "./services/mevService";
 
 function App() {
-  const [token, setToken]           = useState(localStorage.getItem("jwt") || "");
-  const [username, setUsername]     = useState(localStorage.getItem("XUSER") || "");
-  const [fullName, setFullName]     = useState(localStorage.getItem("fullName") || "");
-  const [role, setRole]             = useState(localStorage.getItem("role") || "");
+  // ── Stato autenticazione ─────────────────────────────────────────────────────
+  // Inizializzato a "" — viene popolato dopo la verifica del token al mount
+  const [token, setToken]       = useState("");
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole]         = useState("");
+  // true finché non abbiamo verificato se la sessione salvata è ancora valida
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [page, setPage]             = useState("mev");
   const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
   const [filteredRows, setFilteredRows] = useState([]);
@@ -28,10 +33,88 @@ function App() {
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
 
+  // Ambienti
+  const [ambienti, setAmbienti]         = useState(() => {
+    try { return JSON.parse(localStorage.getItem("ambienti") || "[]"); } catch { return []; }
+  });
+  const [ambienteId, setAmbienteId]     = useState(() => parseInt(localStorage.getItem("ambienteId") || "0", 10));
+  const [showAmbienteMenu, setShowAmbienteMenu] = useState(false);
+  const [switchingAmbiente, setSwitchingAmbiente] = useState(false);
+
+  // Modifica descrizione ambiente inline
+  const [editingDesc, setEditingDesc]   = useState(false);
+  const [descValue, setDescValue]       = useState("");
+
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
   const lastPollRef = React.useRef(null); // timestamp ISO dell'ultimo poll
 
+  // ── Bootstrap: verifica sessione salvata al mount ───────────────────────────
+  useEffect(() => {
+    const bootstrap = async () => {
+      const savedJwt     = localStorage.getItem("jwt");
+      const savedRefresh = localStorage.getItem("refreshToken");
+
+      // Decodifica payload JWT senza librerie (base64url → JSON)
+      const decodeJwt = (t) => {
+        try {
+          const payload = t.split(".")[1];
+          return JSON.parse(atob(payload.replace(/-/g,"+").replace(/_/g,"/")));
+        } catch { return null; }
+      };
+
+      const isExpired = (t) => {
+        const p = decodeJwt(t);
+        if (!p || !p.exp) return true;
+        return p.exp * 1000 < Date.now();
+      };
+
+      // Funzione di ripristino sessione da localStorage
+      const restoreSession = (jwt) => {
+        const p = decodeJwt(jwt);
+        setToken(jwt);
+        setUsername(p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || localStorage.getItem("XUSER") || "");
+        setFullName(p?.fullName || localStorage.getItem("fullName") || "");
+        setRole(p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || localStorage.getItem("role") || "");
+        try { setAmbienti(JSON.parse(localStorage.getItem("ambienti") || "[]")); } catch {}
+        setAmbienteId(parseInt(localStorage.getItem("ambienteId") || "0", 10));
+      };
+
+      if (savedJwt && !isExpired(savedJwt)) {
+        // JWT ancora valido: ripristina sessione direttamente
+        restoreSession(savedJwt);
+      } else if (savedRefresh) {
+        // JWT scaduto ma refresh disponibile: prova a rinnovare
+        try {
+          const res = await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken: savedRefresh, currentToken: savedJwt || null }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("jwt", data.token);
+            localStorage.setItem("refreshToken", data.refreshToken);
+            restoreSession(data.token);
+          } else {
+            // Refresh fallito: pulisce tutto → mostra login
+            ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+          }
+        } catch {
+          ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+        }
+      } else {
+        // Nessuna sessione valida: pulisce eventuali residui
+        ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+      }
+
+      setBootstrapping(false);
+    };
+
+    bootstrap();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Dati iniziali dopo login/restore ────────────────────────────────────────
   useEffect(() => {
     if (token) {
       getMevList().then(setRows).catch(() => {});
@@ -39,16 +122,15 @@ function App() {
       getAppSettings().then(s => {
         if (s.logoutMinutes > 0) setIdleTimeoutMs(s.logoutMinutes * 60 * 1000);
       }).catch(() => {});
-      // Warm-up silenzioso del parser PDF (cold start Render free)
       fetch(`${process.env.REACT_APP_API_URL || ""}/api/tools/parser-warmup`, {
         headers: { Authorization: `Bearer ${token}` }
       }).catch(() => {});
     }
   }, [token]);
 
-  // ── Polling accessi Editor ogni 10s (solo Admin) ──────────────────────────
+  // ── Polling accessi Editor ogni 10s (Admin e SuperAdmin) ────────────────────
   useEffect(() => {
-    if (!token || role !== "Admin") return;
+    if (!token || !["Admin","SuperAdmin"].includes(role)) return;
 
     lastPollRef.current = new Date().toISOString();
 
@@ -71,29 +153,64 @@ function App() {
   }, [token, role]); // eslint-disable-line
 
   const handleLogin = (data) => {
+    localStorage.setItem("jwt",         data.token);
+    localStorage.setItem("refreshToken",data.refreshToken);
+    localStorage.setItem("XUSER",       data.username);
+    localStorage.setItem("fullName",    data.fullName);
+    localStorage.setItem("role",        data.role);
+
     setToken(data.token);
     setUsername(data.username);
     setFullName(data.fullName);
     setRole(data.role);
+
+    const ambientiList = data.ambienti || [];
+    const activeId = data.ambienteId || 0;
+    setAmbienti(ambientiList);
+    setAmbienteId(activeId);
+    localStorage.setItem("ambienti",   JSON.stringify(ambientiList));
+    localStorage.setItem("ambienteId", String(activeId));
+
     setPage("mev");
   };
 
   const handleLogout = async () => {
-    // sendBeacon garantisce la chiamata anche durante unmount/chiusura pagina
-    const token = localStorage.getItem("jwt");
-    if (token) {
+    const tok = localStorage.getItem("jwt");
+    if (tok) {
       try {
         await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/logout`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${tok}` },
           keepalive: true,
         });
       } catch { /* ignora errori di rete */ }
     }
-    ["jwt", "XUSER", "fullName", "role"].forEach((k) => localStorage.removeItem(k));
+    // Pulisce TUTTO il localStorage relativo alla sessione, compreso refreshToken
+    ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole("");
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
-    setEditorAlerts([]);
+    setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
+  };
+
+  // ── Cambio ambiente ──────────────────────────────────────────────────────────
+  const handleSwitchAmbiente = async (id) => {
+    if (id === ambienteId || switchingAmbiente) return;
+    setSwitchingAmbiente(true);
+    setShowAmbienteMenu(false);
+    // Azzera subito i dati visibili per non mostrare quelli del contratto precedente
+    setRows([]); setFilteredRows([]);
+    try {
+      const data = await switchAmbiente(id);
+      localStorage.setItem("jwt", data.token);
+      localStorage.setItem("ambienteId", String(data.ambienteId));
+      setToken(data.token);
+      setAmbienteId(data.ambienteId);
+      getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
+    } catch (e) {
+      alert("Errore cambio ambiente: " + e.message);
+    } finally {
+      setSwitchingAmbiente(false);
+    }
   };
 
   // ── Logout automatico dopo inattività (minuti configurabili dal DB) ──────────
@@ -137,7 +254,26 @@ function App() {
     }
   };
 
-  if (!token) return <LoginPage onLogin={handleLogin} />;
+  // ── Salva descrizione ambiente ───────────────────────────────────────────────
+  const handleSaveDesc = async () => {
+    try {
+      const updated = await updateDescrizioneAmbiente(ambienteId, descValue);
+      // Aggiorna la lista ambienti in memoria e localStorage
+      const nuoviAmbienti = ambienti.map(a =>
+        a.id === ambienteId ? { ...a, descrizione: updated.descrizione } : a
+      );
+      setAmbienti(nuoviAmbienti);
+      localStorage.setItem("ambienti", JSON.stringify(nuoviAmbienti));
+    } catch (e) {
+      alert("Errore salvataggio descrizione: " + e.message);
+    } finally {
+      setEditingDesc(false);
+    }
+  };
+
+  // Helper: descrizione dell'ambiente attivo
+  const ambienteAttivo = ambienti.find(a => a.id === ambienteId);
+  const descrizioneAttiva = ambienteAttivo?.descrizione || "";
 
   /*const navItems = [
     { id: "mev",               label: "MEV" },
@@ -160,6 +296,15 @@ function App() {
     { id: "chart", label: "Grafici" },
   ];
 
+  // Aspetta la verifica della sessione prima di rendere qualsiasi cosa
+  if (bootstrapping) return (
+    <div style={{ minHeight: "100vh", background: "#f8f9fa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#888", fontSize: "14px" }}>Caricamento...</div>
+    </div>
+  );
+
+  if (!token) return <LoginPage onLogin={handleLogin} />;
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8f9fa" }}>
       <header style={{
@@ -169,7 +314,7 @@ function App() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         height: "56px", position: "sticky", top: 0, zIndex: 100,
       }}>
-        {/* Logo + titolo */}
+        {/* Logo + titolo + descrizione ambiente */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <img
             src="/logo_poste.svg"
@@ -179,9 +324,126 @@ function App() {
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
             MEV Governance
           </span>
+
+          {/* Selettore Contratto — sempre visibile accanto al titolo */}
+          {ambienti.length === 1 && (
+            <span style={{
+              color: "rgba(255,255,255,0.9)", fontSize: "13px", fontWeight: 600,
+              borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px",
+              background: "rgba(255,255,255,0.12)", padding: "4px 10px",
+              borderRadius: "6px", border: "1px solid rgba(255,255,255,0.25)",
+            }}>
+              {ambienti[0].codiceContratto}
+            </span>
+          )}
+          {ambienti.length > 1 && (
+            <div style={{ position: "relative", marginLeft: "4px" }}>
+              <button
+                onClick={() => setShowAmbienteMenu(!showAmbienteMenu)}
+                disabled={switchingAmbiente}
+                style={{
+                  background: "rgba(255,255,255,0.15)",
+                  color: "white",
+                  border: "1px solid rgba(255,255,255,0.4)",
+                  cursor: switchingAmbiente ? "wait" : "pointer",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: "6px",
+                }}
+              >
+                <span style={{ fontSize: "10px", opacity: 0.7 }}>Contratto</span>
+                <span>
+                  {switchingAmbiente
+                    ? "..."
+                    : ambienti.find(a => a.id === ambienteId)?.codiceContratto || ambienteId}
+                </span>
+                <span style={{ fontSize: "10px" }}>{showAmbienteMenu ? "▲" : "▼"}</span>
+              </button>
+              {showAmbienteMenu && (
+                <div style={{
+                  position: "absolute", top: "34px", left: 0,
+                  background: "white",
+                  borderRadius: "8px", minWidth: "240px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid #dadce0",
+                }}>
+                  <div style={{ padding: "8px 12px", fontSize: "11px", color: "#888", borderBottom: "1px solid #f1f3f4" }}>
+                    Cambia contratto
+                  </div>
+                  {ambienti.map(a => (
+                    <div
+                      key={a.id}
+                      onClick={() => handleSwitchAmbiente(a.id)}
+                      style={{
+                        padding: "10px 14px",
+                        cursor: a.id === ambienteId ? "default" : "pointer",
+                        background: a.id === ambienteId ? "#e8f0fe" : "transparent",
+                        borderBottom: "1px solid #f1f3f4",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "#f1f3f4"; }}
+                      onMouseLeave={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: a.id === ambienteId ? "#1a73e8" : "#333" }}>
+                        {a.codiceContratto}
+                        {a.id === ambienteId && <span style={{ marginLeft: 6, fontSize: "11px", color: "#1a73e8" }}>▶ attivo</span>}
+                      </div>
+                      {a.descrizione && (
+                        <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{a.descrizione}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Descrizione ambiente — modificabile da Admin/SuperAdmin con click */}
+          {descrizioneAttiva && !editingDesc && (
+            <span
+              title={["Admin","SuperAdmin"].includes(role) ? "Clicca per modificare il nome del progetto" : ""}
+              onClick={() => {
+                if (["Admin","SuperAdmin"].includes(role)) {
+                  setDescValue(descrizioneAttiva);
+                  setEditingDesc(true);
+                }
+              }}
+              style={{
+                color: "rgba(255,255,255,0.85)", fontSize: "13px", fontWeight: 500,
+                borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px",
+                cursor: ["Admin","SuperAdmin"].includes(role) ? "pointer" : "default",
+                maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {descrizioneAttiva}
+              {["Admin","SuperAdmin"].includes(role) && (
+                <span style={{ marginLeft: 5, fontSize: "11px", opacity: 0.6 }}>✏️</span>
+              )}
+            </span>
+          )}
+          {editingDesc && (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+              <input
+                autoFocus
+                value={descValue}
+                onChange={e => setDescValue(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSaveDesc(); if (e.key === "Escape") setEditingDesc(false); }}
+                style={{
+                  padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.5)",
+                  background: "rgba(255,255,255,0.15)", color: "white", fontSize: "13px",
+                  width: "220px", outline: "none",
+                }}
+              />
+              <button onClick={handleSaveDesc} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 4, color: "white", cursor: "pointer", padding: "3px 8px", fontSize: "12px" }}>✓</button>
+              <button onClick={() => setEditingDesc(false)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: "14px" }}>✕</button>
+            </span>
+          )}
+
           {lastAlign && (
             <span style={{
-              color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: 400,
+              color: "rgba(255,255,255,0.65)", fontSize: "12px", fontWeight: 400,
               borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px"
             }}>
               Aggiornato: {new Date(lastAlign).toLocaleString("it-IT", {
@@ -249,6 +511,62 @@ function App() {
                     { id: "admin",      label: "Utenti" },
                     { id: "consumotow", label: "TOW Contratti" },
                     { id: "dbconfig",   label: "Configurazione" },
+                  ].map(({ id, label }) => (
+                    <div
+                      key={id}
+                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
+                      style={{
+                        padding: "8px 16px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: page === id ? 600 : 400,
+                        color: "white",
+                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {role === "SuperAdmin" && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowAdminMenu(!showAdminMenu)}
+                style={{
+                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin"].includes(page)
+                    ? "rgba(255,255,255,0.22)" : "transparent",
+                  color: "white",
+                  border: "1px solid transparent",
+                  cursor: "pointer",
+                  padding: "6px 16px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              >
+                Admin {showAdminMenu ? "▲" : "▼"}
+              </button>
+              {showAdminMenu && (
+                <div style={{
+                  position: "absolute", top: "38px", right: 0,
+                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+                  borderRadius: "8px", minWidth: "180px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}>
+                  {[
+                    { id: "tools",      label: "Caricamento Ordini" },
+                    { id: "admin",      label: "Utenti" },
+                    { id: "consumotow", label: "TOW Contratti" },
+                    { id: "dbconfig",   label: "Configurazione" },
+                    { id: "superadmin", label: "Gestione Contratti" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -358,14 +676,15 @@ function App() {
       )}
 
       <main style={{ padding: "0" }}>
-        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} />}
-        {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} />}
+        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
-        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} />}
-        {page === "admin"             && role === "Admin" && <AdminPage />}
-        {page === "dbconfig"          && role === "Admin" && <DbConfigPage />}
-        {page === "tools"             && role === "Admin" && <ToolsPage onUnauthorized={handleLogout} />}
-        {page === "consumotow"        && role === "Admin" && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
+        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
+        {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
+        {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
+        {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleLogout} />}
+        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
+        {page === "superadmin"        && role === "SuperAdmin" && <SuperAdminPage />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}

@@ -98,7 +98,7 @@ else if (!string.IsNullOrEmpty(databaseUrl))
     isPostgres = true;
     string connStr;
     if (databaseUrl.StartsWith("postgres://") || databaseUrl.StartsWith("postgresql://"))
-        connStr = ParsePostgresUrl(databaseUrl);
+        connStr = ParsePostgresUrl(databaseUrl, dbSchema);
     else
         connStr = databaseUrl;
 
@@ -116,7 +116,7 @@ else
 
 // Parsing manuale della URL postgresql:// senza usare System.Uri
 // (Uri.UserInfo può perdere la password in certi casi)
-static string ParsePostgresUrl(string url)
+static string ParsePostgresUrl(string url, string schema = "public")
 {
     // Rimuove il prefisso postgres:// o postgresql://
     var s = url;
@@ -147,20 +147,32 @@ static string ParsePostgresUrl(string url)
     var host = portIdx >= 0 ? hostPort.Substring(0, portIdx) : hostPort;
     var port = portIdx >= 0 ? hostPort.Substring(portIdx + 1) : "5432";
 
-    // SSL: abilitato per connessioni dirette Supabase (db.xxx.supabase.co)
-    // disabilitato per pooler interno (aws-0-*.pooler.supabase.com) e connessioni locali
-    var sslMode = host.Contains(".supabase.co") && !host.Contains("pooler")
+    // SSL: abilitato per qualsiasi host Supabase (direct e pooler), disabilitato per locale
+    var isSupabase = host.Contains(".supabase.co") || host.Contains(".supabase.com");
+    var sslMode = isSupabase
         ? "SSL Mode=Require;Trust Server Certificate=true"
         : "SSL Mode=Disable";
 
-    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}";
-    // return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+    // Disabilita il pooling lato Npgsql per il Session Pooler di Supabase
+    // (il pooler gestisce lui le connessioni; il Transaction Pooler non supporta prepared statements)
+    var noPool = host.Contains("pooler") ? ";No Reset On Close=true;Maximum Pool Size=5" : "";
+
+    // Search Path: forza lo schema corretto (dev o public) per migration e query
+    var searchPath = schema != "public" ? $";Search Path={schema},public" : "";
+
+    return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}{noPool}{searchPath}";
 }
 
 // ✅ JWT — usa variabile d'ambiente JWT_KEY se disponibile (Railway)
 var jwtKey     = Environment.GetEnvironmentVariable("JWT_KEY")      ?? builder.Configuration["Jwt:Key"]!;
 var jwtIssuer  = Environment.GetEnvironmentVariable("JWT_ISSUER")   ?? builder.Configuration["Jwt:Issuer"]!;
 var jwtAudience= Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"]!;
+Console.WriteLine($"[JWT] Issuer={jwtIssuer} Audience={jwtAudience}");
+
+// Sovrascrive i valori in IConfiguration così AuthController li legge correttamente
+builder.Configuration["Jwt:Key"]      = jwtKey;
+builder.Configuration["Jwt:Issuer"]   = jwtIssuer;
+builder.Configuration["Jwt:Audience"] = jwtAudience;
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -179,7 +191,12 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // SuperAdmin ha tutti i permessi di Admin, più i propri
+    options.AddPolicy("AdminOrSuper", policy =>
+        policy.RequireRole("Admin", "SuperAdmin"));
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -215,144 +232,101 @@ using (var scope = app.Services.CreateScope())
     try
     {
         db.Database.Migrate(); // applica tutte le migration pendenti
+        Console.WriteLine("[MIGRATE] Migration completata.");
     }
     catch (Exception ex)
     {
         Console.Error.WriteLine($"[MIGRATE ERROR] {ex.Message}");
-        // Non crashare: il blocco SQL idempotente sotto copre i casi mancanti
-        try { db.Database.EnsureCreated(); } catch (Exception ex2) {
-            Console.Error.WriteLine($"[ENSURECREATED ERROR] {ex2.Message}");
-        }
     }
 
-    // Aggiunge colonne mancanti in modo idempotente (PostgreSQL)
-    // sch è già validato (solo [a-zA-Z0-9_]) quindi l'interpolazione è sicura
+    // Patch di sicurezza: aggiunge colonne mancanti se la migration non le ha create
+    // e converte IsCatalogo da integer a boolean se necessario (SQLite→Postgres mismatch)
+    if (isPostgres)
+    {
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""Sconto"" numeric NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""IsCatalogo"" boolean NOT NULL DEFAULT false;
+            ");
+            // Converte IsCatalogo da integer a boolean (DROP DEFAULT → CAST → SET DEFAULT)
+            db.Database.ExecuteSqlRaw($@"
+                DO $$
+                BEGIN
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = '{sch}'
+                      AND table_name   = 'ConsumoTow'
+                      AND column_name  = 'IsCatalogo'
+                      AND data_type    = 'integer'
+                  ) THEN
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""IsCatalogo"" DROP DEFAULT;
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""IsCatalogo"" TYPE boolean USING (""IsCatalogo""::integer::boolean);
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""IsCatalogo"" SET DEFAULT false;
+                  END IF;
+                END$$;
+            ");
+            // Converte Sconto da TEXT a numeric (DROP DEFAULT → CAST → SET DEFAULT)
+            db.Database.ExecuteSqlRaw($@"
+                DO $$
+                BEGIN
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = '{sch}'
+                      AND table_name   = 'ConsumoTow'
+                      AND column_name  = 'Sconto'
+                      AND data_type    = 'text'
+                  ) THEN
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""Sconto"" DROP DEFAULT;
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""Sconto"" TYPE numeric USING (""Sconto""::numeric);
+                    ALTER TABLE ""{sch}"".""ConsumoTow"" ALTER COLUMN ""Sconto"" SET DEFAULT 0;
+                  END IF;
+                END$$;
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PATCH] Colonne Sconto/IsCatalogo verificate e corrette.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
+    }
+
+    // Seed admin — inserisce MSTEFANE se non esiste, aggiorna la password se esiste già
 #pragma warning disable EF1002
     try
     {
-        db.Database.ExecuteSqlRaw($@"
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='AppSettings' AND column_name='LogoutMinutes') THEN
-                    ALTER TABLE ""{sch}"".""AppSettings"" ADD COLUMN ""LogoutMinutes"" INTEGER NOT NULL DEFAULT 60;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='MeseAvanzamento') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""MeseAvanzamento"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='QtaAvanzata') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""QtaAvanzata"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='ImportoFatturabile') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
-                    ALTER TABLE ""{sch}"".""OrdiniConsegna"" ADD COLUMN ""Subappalto"" TEXT NOT NULL DEFAULT '';
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='{sch}' AND table_name='MevItems' AND column_name='ImportoBdo') THEN
-                    ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
-                END IF;
-                UPDATE ""{sch}"".""MevItems"" SET ""ImportoBdo"" = ""OrdinatoBdo"" WHERE ""ImportoBdo"" = 0 AND ""OrdinatoBdo"" <> 0;
-            END $$;
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[ALTER COLUMNS ERROR] {ex.Message}"); }
+        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
+        var adminHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+        var saHash = BCrypt.Net.BCrypt.HashPassword("SA-Capgemini2026!");
 
-    // Crea OrdiniConsegna se non esiste (con tutte le colonne)
-    try
-    {
         db.Database.ExecuteSqlRaw($@"
-            CREATE TABLE IF NOT EXISTS ""{sch}"".""OrdiniConsegna"" (
-                ""Id""                   SERIAL PRIMARY KEY,
-                ""NumeroOrdine""         TEXT NOT NULL DEFAULT '',
-                ""Data""                 TEXT NOT NULL DEFAULT '',
-                ""DataConsegna""         TEXT NOT NULL DEFAULT '',
-                ""RifContratto""         TEXT NOT NULL DEFAULT '',
-                ""Art""                  TEXT NOT NULL DEFAULT '',
-                ""Codice""               TEXT NOT NULL DEFAULT '',
-                ""Descrizione""          TEXT NOT NULL DEFAULT '',
-                ""TipoAtt""              TEXT NOT NULL DEFAULT '',
-                ""Quantita""             TEXT NOT NULL DEFAULT '',
-                ""Um""                   TEXT NOT NULL DEFAULT '',
-                ""PrezzoNetto""          TEXT NOT NULL DEFAULT '',
-                ""Importo""              TEXT NOT NULL DEFAULT '',
-                ""NumeroRda""            TEXT NOT NULL DEFAULT '',
-                ""Iniziativa""           TEXT NOT NULL DEFAULT '',
-                ""Ap""                   TEXT NOT NULL DEFAULT '',
-                ""Contratto""            TEXT NOT NULL DEFAULT '',
-                ""NomePdf""              TEXT NOT NULL DEFAULT '',
-                ""ImportatoIl""          TIMESTAMP NOT NULL DEFAULT NOW(),
-                ""ImportatoDA""          TEXT NOT NULL DEFAULT '',
-                ""MeseAvanzamento""      TEXT NOT NULL DEFAULT '',
-                ""QtaAvanzata""          TEXT NOT NULL DEFAULT '',
-                ""ImportoFatturabile""   TEXT NOT NULL DEFAULT '',
-                ""Subappalto""           TEXT NOT NULL DEFAULT ''
+            -- Seed MSTEFANE (Admin)
+            INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+            SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,false
+            WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE');
+            UPDATE ""{sch}"".""Users"" SET ""PasswordHash""={{0}} WHERE ""Username""='MSTEFANE';
+
+            -- Seed SuperAdmin (inserisce se non esiste, e corregge sempre il ruolo)
+            INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
+            SELECT 'SUPERADMIN','Super Amministratore','superadmin@mev-governance.local',{{1}},'SuperAdmin',true,false
+            WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"" WHERE ""Username""='SUPERADMIN');
+            UPDATE ""{sch}"".""Users"" SET ""Role""='SuperAdmin' WHERE ""Username""='SUPERADMIN';
+
+            -- Seed Ambiente 4490015980
+            INSERT INTO ""{sch}"".""Ambienti"" (""CodiceContratto"",""Descrizione"",""IsActive"",""CreatedAt"")
+            SELECT '4490015980','Contratto principale',true,now()
+            WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Ambienti"" WHERE ""CodiceContratto""='4490015980');
+
+            -- Associa MSTEFANE all'ambiente come Admin
+            INSERT INTO ""{sch}"".""UserAmbienti"" (""UserId"",""AmbienteId"",""Ruolo"")
+            SELECT u.""Id"", a.""Id"", 'Admin'
+            FROM ""{sch}"".""Users"" u, ""{sch}"".""Ambienti"" a
+            WHERE u.""Username""='MSTEFANE' AND a.""CodiceContratto""='4490015980'
+            AND NOT EXISTS (
+                SELECT 1 FROM ""{sch}"".""UserAmbienti"" ua
+                WHERE ua.""UserId""=u.""Id"" AND ua.""AmbienteId""=a.""Id""
             );
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[CREATE OrdiniConsegna ERROR] {ex.Message}"); }
-
-    // Crea VerbaliAvanzamento se non esiste
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            CREATE TABLE IF NOT EXISTS ""{sch}"".""VerbaliAvanzamento"" (
-                ""Id""               SERIAL PRIMARY KEY,
-                ""NomePdf""          TEXT NOT NULL DEFAULT '',
-                ""MeseAvanzamento""  TEXT NOT NULL DEFAULT '',
-                ""RigheElaborate""   INTEGER NOT NULL DEFAULT 0,
-                ""RigheAggiornate""  INTEGER NOT NULL DEFAULT 0,
-                ""CaricatoIl""       TIMESTAMP NOT NULL DEFAULT NOW(),
-                ""CaricatoDa""       TEXT NOT NULL DEFAULT '',
-                ""DatiRigheJson""    TEXT NULL
-            );
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[CREATE VerbaliAvanzamento ERROR] {ex.Message}"); }
-
-    // Aggiunge DatiRigheJson se non esiste
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                               WHERE table_schema='{sch}' AND table_name='VerbaliAvanzamento' AND column_name='DatiRigheJson') THEN
-                    ALTER TABLE ""{sch}"".""VerbaliAvanzamento"" ADD COLUMN ""DatiRigheJson"" TEXT NULL;
-                END IF;
-            END $$;
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[ALTER VerbaliAvanzamento ERROR] {ex.Message}"); }
-
-    // Fix tipo colonne boolean su PostgreSQL
-    try
-    {
-        db.Database.ExecuteSqlRaw($@"
-            DO $$ BEGIN
-                IF EXISTS (SELECT 1 FROM information_schema.columns
-                           WHERE table_schema='{sch}' AND table_name='Users' AND column_name='IsActive'
-                           AND data_type='integer') THEN
-                    ALTER TABLE ""{sch}"".""Users""
-                        ALTER COLUMN ""IsActive""  TYPE BOOLEAN USING ""IsActive""::boolean,
-                        ALTER COLUMN ""SendEmail"" TYPE BOOLEAN USING ""SendEmail""::boolean;
-                END IF;
-            END $$;
-        ");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[FIX BOOLEAN COLUMNS ERROR] {ex.Message}"); }
-
-    // Seed admin
-    try
-    {
-        var exists = db.Users.Any();
-        if (!exists)
-        {
-            var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin2025!";
-            var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
-            db.Database.ExecuteSqlRaw($@"
-                INSERT INTO ""{sch}"".""Users"" (""Username"",""FullName"",""Email"",""PasswordHash"",""Role"",""IsActive"",""SendEmail"")
-                SELECT 'MSTEFANE','Mauro Stefanelli','mauro.stefanelli@capgemini.com',{{0}},'Admin',true,false
-                WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Users"")
-            ", hash);
-        }
+        ", adminHash, saHash);
+        Console.WriteLine("[SEED] Utenti e Ambiente pronti.");
     }
     catch (Exception ex) { Console.Error.WriteLine($"[SEED ADMIN ERROR] {ex.Message}"); }
 #pragma warning restore EF1002
@@ -365,6 +339,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok("MEV Backend is running....."));
+app.MapGet("/version", () => Results.Ok(new { commit = "0fed4fe", built = DateTime.UtcNow.ToString("o") }));
 app.MapControllers();
 
 app.Run();

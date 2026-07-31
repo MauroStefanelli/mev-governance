@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { getConsumoTow, updateConsumoTow, createConsumoTow, deleteConsumoTowContratto } from "../services/mevService";
+import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
-
-const TOW_KEYS = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6"];
 
 const formatEuro = (v) => {
   const n = Number(v);
@@ -86,114 +84,289 @@ const TD = (align = "right", extra = {}) => ({
   ...extra,
 });
 
-// ── Modale Nuovo Contratto ────────────────────────────────────────────────────
-function NewContrattoModal({ onClose, onCreated }) {
+// ── Modale Nuovo Contratto BASE ───────────────────────────────────────────────
+function NewContrattoBaseModal({ onClose, onCreated }) {
   const [nomeContratto, setNomeContratto] = useState("");
-  const [valori, setValori]   = useState(() => Object.fromEntries(TOW_KEYS.map(k => [k, ""])));
-  const [qta, setQta]         = useState(() => Object.fromEntries(TOW_KEYS.map(k => [k, ""])));
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState("");
+  const [towNames, setTowNames]   = useState(["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"]);
+  const [valori, setValori]       = useState(() => Object.fromEntries(["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"].map(k => [k, ""])));
+  const [qta, setQta]             = useState(() => Object.fromEntries(["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"].map(k => [k, ""])));
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
 
-  const setValore = (tow, val) => setValori(p => ({ ...p, [tow]: val }));
-  const setQtaVal = (tow, val) => setQta(p => ({ ...p, [tow]: val }));
+  const setValore  = (idx, val) => setValori(p  => { const n = { ...p }; n[towNames[idx]] = val; return n; });
+  const setQtaVal  = (idx, val) => setQta(p     => { const n = { ...p }; n[towNames[idx]] = val; return n; });
+  const setTowName = (idx, val) => {
+    setTowNames(prev => {
+      const next = [...prev];
+      const oldKey = next[idx];
+      next[idx] = val;
+      setValori(p  => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
+      setQta(p     => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
+      return next;
+    });
+  };
 
-  const parsedValori = Object.fromEntries(TOW_KEYS.map(k => [k, parseNum(valori[k])]));
-  const parsedQta    = Object.fromEntries(TOW_KEYS.map(k => [k, parseNum(qta[k])]));
-
-  // Valore Totale = somma di (QTA × ValoreUnitario) per ogni TOW
-  const valoreTotale = TOW_KEYS.reduce((s, k) => s + parsedQta[k] * parsedValori[k], 0);
+  const parsedValori = Object.fromEntries(towNames.map(k => [k, parseNum(valori[k])]));
+  const parsedQta    = Object.fromEntries(towNames.map(k => [k, parseNum(qta[k])]));
+  const valoreTotale = towNames.reduce((s, k) => s + parsedQta[k] * parsedValori[k], 0);
 
   const handleSave = async () => {
     if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto."); return; }
+    if (towNames.some(t => !t.trim())) { setError("Tutti i nomi TOW devono essere compilati."); return; }
     setSaving(true); setError("");
     try {
-      const newRows = await createConsumoTow(nomeContratto.trim(), parsedValori, parsedQta);
+      const valoriByName = Object.fromEntries(towNames.map(k => [k, parsedValori[k]]));
+      const qtaByName    = Object.fromEntries(towNames.map(k => [k, parsedQta[k]]));
+      const newRows = await createConsumoTow(nomeContratto.trim(), valoriByName, qtaByName);
       onCreated(newRows);
       onClose();
     } catch (e) { setError(e.message || "Errore durante la creazione"); }
     finally { setSaving(false); }
   };
 
-  const inputBase = {
-    padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0",
-    fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none",
-  };
+  const inputBase = { padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "660px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-        {/* Header */}
-        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "680px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>Inserisci nome, QTA e valore € per ciascun TOW</div>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto BASE</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>Definisci i nomi TOW, le quantità e i valori unitari</div>
           </div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center" }}>✕</button>
         </div>
-
-        {/* Body */}
         <div style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}>
           {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "13px" }}>{error}</div>}
-
-          {/* Nome contratto */}
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Nome Contratto</div>
-            <input style={inputBase} placeholder="es. Contratto-XYZ" value={nomeContratto} onChange={e => setNomeContratto(e.target.value)} autoFocus />
+            <input style={inputBase} placeholder="es. Contratto BASE" value={nomeContratto} onChange={e => setNomeContratto(e.target.value)} autoFocus />
           </div>
-
-          {/* Tabella TOW: QTA + Valore € + subtotale */}
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #eff6ff" }}>
-            TOW — Quantità e Valore Unitario
-          </div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #eff6ff" }}>TOW — Nome, Quantità e Valore Unitario</div>
           <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>TOW</th>
-                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>QTA</th>
-                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>Valore €</th>
-                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.4px", borderBottom: "2px solid #e2e8f0" }}>Subtotale</th>
+                <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Nome TOW</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>QTA</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore €</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Subtotale</th>
               </tr>
             </thead>
             <tbody>
-              {TOW_KEYS.map((tow, idx) => {
+              {towNames.map((tow, idx) => {
                 const sub = parsedQta[tow] * parsedValori[tow];
                 return (
-                  <tr key={tow} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
-                    <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: "13px", color: "#334155" }}>
-                      <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px" }}>{tow}</span>
+                  <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
+                    <td style={{ padding: "6px 12px" }}>
+                      <input style={{ ...inputBase, width: "130px", fontWeight: 700 }} value={tow} onChange={e => setTowName(idx, e.target.value)} placeholder="es. TOW01.2" />
                     </td>
                     <td style={{ padding: "6px 12px" }}>
-                      <input
-                        style={{ ...inputBase, textAlign: "right", width: "110px" }}
-                        placeholder="0"
-                        value={qta[tow]}
-                        onChange={e => setQtaVal(tow, e.target.value)}
-                        onBlur={e => setQtaVal(tow, formatForInput(parseNum(e.target.value), "qta"))}
-                      />
+                      <input style={{ ...inputBase, textAlign: "right", width: "110px" }} placeholder="0" value={qta[tow] ?? ""} onChange={e => setQtaVal(idx, e.target.value)} onBlur={e => setQtaVal(idx, formatForInput(parseNum(e.target.value), "qta"))} />
                     </td>
                     <td style={{ padding: "6px 12px" }}>
-                      <input
-                        style={{ ...inputBase, textAlign: "right", width: "140px" }}
-                        placeholder="0,00"
-                        value={valori[tow]}
-                        onChange={e => setValore(tow, e.target.value)}
-                        onBlur={e => setValore(tow, formatForInput(parseNum(e.target.value), "euro"))}
-                      />
+                      <input style={{ ...inputBase, textAlign: "right", width: "140px" }} placeholder="0,00" value={valori[tow] ?? ""} onChange={e => setValore(idx, e.target.value)} onBlur={e => setValore(idx, formatForInput(parseNum(e.target.value), "euro"))} />
                     </td>
-                    <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: sub > 0 ? "#059669" : "#94a3b8" }}>
-                      {formatEuro(sub)}
-                    </td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: sub > 0 ? "#059669" : "#94a3b8" }}>{formatEuro(sub)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-
-          {/* Valore Totale calcolato */}
           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (Σ QTA × Valore€)</span>
             <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotale)}</span>
+          </div>
+        </div>
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
+          <button onClick={onClose} style={{ padding: "8px 22px", borderRadius: "8px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : "#1a73e8", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+            {saving ? "Creazione..." : "Crea Contratto BASE"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modale Nuovo Contratto Figlio (non-BASE) ──────────────────────────────────
+function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
+  const { pos, onMouseDown } = useDrag();
+  const baseTowNames = [...new Set(baseRows.map(r => r.tow))];
+
+  const [nomeContratto, setNomeContratto] = useState("");
+  const [sconto, setSconto]               = useState("");
+  // Per ogni TOW: qta (N° TOW) oppure subtotale (catalogo), e flag catalogo ereditato da BASE
+  const [towData, setTowData] = useState(() =>
+    Object.fromEntries(baseTowNames.map(k => {
+      const baseRow = baseRows.find(r => r.tow === k);
+      return [k, { qta: "", subtotale: "", isCatalogo: !!(baseRow?.isCatalogo) }];
+    }))
+  );
+  const [saving, setSaving]               = useState(false);
+  const [error, setError]                 = useState("");
+
+  const scontoNum = parseNum(sconto.replace(",", "."));
+
+  const setTowField = (tow, field, val) =>
+    setTowData(p => ({ ...p, [tow]: { ...p[tow], [field]: val } }));
+
+  const getBaseValore = (tow) => {
+    const r = baseRows.find(x => x.tow === tow);
+    return r ? Number(r.valoreUnitario) || 0 : 0;
+  };
+
+  const getValoreScontato = (tow) => getBaseValore(tow) * (1 - scontoNum / 100);
+
+  const getSubtotale = (tow) => {
+    const d = towData[tow];
+    if (d.isCatalogo) return parseNum(d.subtotale);
+    return getValoreScontato(tow) * parseNum(d.qta);
+  };
+
+  const handleSave = async () => {
+    if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto."); return; }
+    if (scontoNum < 0 || scontoNum > 100) { setError("La percentuale di sconto deve essere tra 0 e 100."); return; }
+    setSaving(true); setError("");
+    try {
+      // qta: per righe catalogo passa l'importo €; il backend divide per val.scontato
+      const qtaByName = Object.fromEntries(baseTowNames.map(k => {
+        const d = towData[k];
+        if (d.isCatalogo) return [k, parseNum(d.subtotale)];
+        return [k, parseNum(d.qta)];
+      }));
+      const isCatalogoMap = Object.fromEntries(
+        baseTowNames.map(k => [k, !!towData[k].isCatalogo])
+      );
+      const newRows = await createConsumoTowFiglio(nomeContratto.trim(), scontoNum, qtaByName, isCatalogoMap);
+      onCreated(newRows);
+      onClose();
+    } catch (e) { setError(e.message || "Errore durante la creazione"); }
+    finally { setSaving(false); }
+  };
+
+  const inputBase = { padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none" };
+  const totaleScontato = baseTowNames.reduce((s, k) => s + getSubtotale(k), 0);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflow: "auto" }}>
+      <div
+        style={{
+          background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          width: "100%", maxWidth: "800px", display: "flex", flexDirection: "column", overflow: "hidden",
+          position: "relative",
+          transform: `translate(${pos.x}px, ${pos.y}px)`,
+        }}
+      >
+        {/* Header — draggable */}
+        <div
+          onMouseDown={onMouseDown}
+          style={{
+            padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0",
+            background: "linear-gradient(135deg,#10b981 0%,#059669 100%)",
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            cursor: "grab",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>
+              Trascina per spostare • Inserisci % sconto e N° TOW (o € Catalogo) — valori calcolati dal BASE
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center", flexShrink: 0 }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", overflowX: "auto", padding: "20px 24px", flex: 1, maxHeight: "65vh" }}>
+          {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "13px" }}>{error}</div>}
+
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "14px", marginBottom: "20px" }}>
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Nome Contratto</div>
+              <input style={inputBase} placeholder="es. Contratto-XYZ" value={nomeContratto} onChange={e => setNomeContratto(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>% Sconto sul BASE</div>
+              <div style={{ position: "relative" }}>
+                <input style={{ ...inputBase, textAlign: "right", paddingRight: "28px" }} placeholder="0,00" value={sconto} onChange={e => setSconto(e.target.value)} onBlur={e => setSconto(formatForInput(parseNum(e.target.value.replace(",", ".")), "qta"))} />
+                <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#64748b", pointerEvents: "none" }}>%</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #f0fdf4" }}>
+            TOW — Valori Calcolati
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginBottom: "20px" }}>
+            <colgroup>
+              <col style={{ width: "110px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "130px" }} />
+              <col style={{ width: "80px" }} />
+              <col style={{ width: "150px" }} />
+              <col style={{ width: "130px" }} />
+            </colgroup>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>TOW</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. BASE €</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. Scontato €</th>
+                <th style={{ padding: "8px 12px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Catalogo</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>N° TOW / € Catalogo</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore Totale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {baseTowNames.map((tow, idx) => {
+                const baseVal  = getBaseValore(tow);
+                const valSc    = getValoreScontato(tow);
+                const sub      = getSubtotale(tow);
+                const d        = towData[tow];
+                return (
+                  <tr key={tow} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 700, fontSize: "13px", color: "#334155" }}>
+                      <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px" }}>{tow}</span>
+                    </td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontSize: "13px", color: "#94a3b8" }}>{formatEuro(baseVal)}</td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontSize: "13px", fontWeight: 600, color: "#059669" }}>{formatEuro(valSc)}</td>
+                    {/* Catalogo checkbox */}
+                    <td style={{ padding: "6px 12px", textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={d.isCatalogo}
+                        onChange={e => setTowField(tow, "isCatalogo", e.target.checked)}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#10b981" }}
+                      />
+                    </td>
+                    {/* N° TOW o € Catalogo */}
+                    <td style={{ padding: "6px 12px" }}>
+                      {d.isCatalogo ? (
+                        <input
+                          style={{ ...inputBase, textAlign: "right", padding: "7px 10px" }}
+                          placeholder="€ Catalogo"
+                          value={d.subtotale}
+                          onChange={e => setTowField(tow, "subtotale", e.target.value)}
+                          onBlur={e => setTowField(tow, "subtotale", formatForInput(parseNum(e.target.value), "euro"))}
+                        />
+                      ) : (
+                        <input
+                          style={{ ...inputBase, textAlign: "right", padding: "7px 10px" }}
+                          placeholder="0"
+                          value={d.qta}
+                          onChange={e => setTowField(tow, "qta", e.target.value)}
+                          onBlur={e => setTowField(tow, "qta", formatForInput(parseNum(e.target.value), "qta"))}
+                        />
+                      )}
+                    </td>
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: sub > 0 ? "#059669" : "#94a3b8" }}>{formatEuro(sub)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (sconto {scontoNum}%)</span>
+            <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(totaleScontato)}</span>
           </div>
         </div>
 
@@ -209,100 +382,206 @@ function NewContrattoModal({ onClose, onCreated }) {
   );
 }
 
-// ── Modale ────────────────────────────────────────────────────────────────────
-function EditModal({ row, onClose, onSaved }) {
+// ── Modale Modifica ────────────────────────────────────────────────────────────
+// isBase=true → permette modifica nome TOW + tutti i campi importo
+// isBase=false → nome TOW readonly, valori BASE readonly, editabili solo sconto e QTA
+function EditModal({ row, onClose, onSaved, isBase, baseRows }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Per contratti figlio: sconto e QTA sono i campi editabili
+  const [sconto, setSconto] = useState("");
+  const [qtaFiglio, setQtaFiglio] = useState("");
+
   useEffect(() => {
-    const init = { tow: row.tow || "", towContratto: row.towContratto || "" };
-    FIELDS.forEach(f => { init[f.key] = formatForInput(row[f.key] ?? 0, f.group); });
-    setForm(init);
-  }, [row]);
+    if (isBase) {
+      const init = { tow: row.tow || "", towContratto: row.towContratto || "" };
+      FIELDS.forEach(f => { init[f.key] = formatForInput(row[f.key] ?? 0, f.group); });
+      setForm(init);
+    } else {
+      // Recupera sconto e qta dal record figlio
+      const scontoVal = row.sconto != null ? row.sconto : 0;
+      setSconto(formatForInput(scontoVal, "qta"));
+      setQtaFiglio(formatForInput(row.towApprovati ?? 0, "qta"));
+      const init = { tow: row.tow || "", towContratto: row.towContratto || "" };
+      FIELDS.forEach(f => { init[f.key] = formatForInput(row[f.key] ?? 0, f.group); });
+      setForm(init);
+    }
+  }, [row, isBase]);
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }));
+
+  // Per figlio: valore BASE di questo TOW
+  const baseRow = baseRows ? baseRows.find(r => r.tow === row.tow) : null;
+  const baseValore = baseRow ? Number(baseRow.valoreUnitario) || 0 : 0;
+  const scontoNum = parseNum(sconto.replace(",", "."));
+  const valoreScontato = baseValore * (1 - scontoNum / 100);
+  const qtaFiglioNum = parseNum(qtaFiglio);
+  const valoreTotaleFiglio = valoreScontato * qtaFiglioNum;
 
   const handleSave = async () => {
     setSaving(true); setError("");
     try {
-      const payload = { tow: form.tow, towContratto: form.towContratto };
-      FIELDS.forEach(f => { payload[f.key] = parseNum(form[f.key]); });
+      let payload;
+      if (isBase) {
+        payload = {
+          // Preserva tutti i campi originali, sovrascrive solo quelli editati
+          tow: form.tow, towContratto: form.towContratto,
+          approvato:       parseNum(form.approvato),
+          ordinatiRda:     parseNum(form.ordinatiRda),
+          impegnato:       parseNum(form.impegnato),
+          residuo:         parseNum(form.residuo),
+          valoreUnitario:  parseNum(form.valoreUnitario),
+          valoreTotale:    parseNum(form.valoreTotale),
+          towApprovati:    parseNum(form.towApprovati),
+          towImpegnati:    parseNum(form.towImpegnati),
+          towResidui:      parseNum(form.towResidui),
+          collaudoApprovato:  parseNum(form.collaudoApprovato),
+          collaudoOrdinato:   parseNum(form.collaudoOrdinato),
+          collaudoFatturato:  parseNum(form.collaudoFatturato),
+          sconto:          row.sconto ?? 0,
+          isCatalogo:      row.isCatalogo ?? false,
+        };
+      } else {
+        payload = {
+          tow: row.tow,
+          towContratto: row.towContratto,
+          sconto: scontoNum,
+          towApprovati: qtaFiglioNum,
+          valoreUnitario: valoreScontato,
+          valoreTotale: valoreTotaleFiglio,
+          // Preserva i campi non editabili
+          approvato:          row.approvato ?? 0,
+          ordinatiRda:        row.ordinatiRda ?? 0,
+          impegnato:          row.impegnato ?? 0,
+          residuo:            row.residuo ?? 0,
+          towImpegnati:       row.towImpegnati ?? 0,
+          towResidui:         row.towResidui ?? 0,
+          collaudoApprovato:  row.collaudoApprovato ?? 0,
+          collaudoOrdinato:   row.collaudoOrdinato ?? 0,
+          collaudoFatturato:  row.collaudoFatturato ?? 0,
+          isCatalogo:         row.isCatalogo ?? false,
+        };
+      }
       const updated = await updateConsumoTow(row.id, payload);
       onSaved(updated); onClose();
     } catch (e) { setError(e.message || "Errore durante il salvataggio"); }
     finally { setSaving(false); }
   };
 
-  const inputBase = {
-    padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0",
-    fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none",
-  };
+  const inputBase = { padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none" };
+  const readonlyStyle = { ...inputBase, background: "#f1f5f9", color: "#64748b", cursor: "not-allowed" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
       <div style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", width: "100%", maxWidth: "700px", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* Header modale */}
-        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "flex-start", justifyContent: "space-between", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "flex-start", justifyContent: "space-between", background: isBase ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "linear-gradient(135deg,#10b981 0%,#059669 100%)" }}>
           <div>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Modifica TOW</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>{row.tow} — Contratto {row.towContratto}</div>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>
+              {isBase ? "Modifica TOW — Contratto BASE" : "Modifica TOW — Contratto Figlio"}
+            </div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>{row.tow} — {row.towContratto}</div>
           </div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center" }}>✕</button>
         </div>
 
-        {/* Body modale */}
+        {/* Body */}
         <div style={{ overflowY: "auto", padding: "20px 24px", flex: 1 }}>
           {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "13px" }}>{error}</div>}
 
-          {/* TOW readonly */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
-            {[{ k: "tow", l: "TOW" }, { k: "towContratto", l: "Contratto" }].map(({ k, l }) => (
-              <div key={k}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{l}</div>
-                <input style={{ ...inputBase, background: "#f1f5f9", color: "#64748b", cursor: "not-allowed" }} value={form[k] || ""} readOnly />
+          {isBase ? (
+            <>
+              {/* BASE: nome TOW editabile + contratto readonly */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Nome TOW</div>
+                  <input style={inputBase} value={form.tow || ""} onChange={e => set("tow", e.target.value)} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Contratto</div>
+                  <input style={readonlyStyle} value={form.towContratto || ""} readOnly />
+                </div>
               </div>
-            ))}
-          </div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #eff6ff" }}>Valori Euro</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
+                {FIELDS.filter(f => f.group === "euro").map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{f.label}</div>
+                    <input style={{ ...inputBase, textAlign: "right" }} value={form[f.key] ?? ""} onChange={e => set(f.key, e.target.value)} onBlur={e => set(f.key, formatForInput(parseNum(e.target.value), f.group))} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #f0fdf4" }}>Quantità TOW</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
+                {FIELDS.filter(f => f.group === "qta").map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{f.label}</div>
+                    <input style={{ ...inputBase, textAlign: "right" }} value={form[f.key] ?? ""} onChange={e => set(f.key, e.target.value)} onBlur={e => set(f.key, formatForInput(parseNum(e.target.value), f.group))} />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* FIGLIO: nome TOW e valori BASE in sola lettura, editabili solo sconto e QTA */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Nome TOW</div>
+                  <input style={readonlyStyle} value={form.tow || ""} readOnly />
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>Contratto</div>
+                  <input style={readonlyStyle} value={form.towContratto || ""} readOnly />
+                </div>
+              </div>
 
-          {/* Sezione Euro */}
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #eff6ff" }}>Valori Euro</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
-            {FIELDS.filter(f => f.group === "euro").map(f => (
-              <div key={f.key}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{f.label}</div>
-                <input
-                  style={{ ...inputBase, textAlign: "right" }}
-                  value={form[f.key] ?? ""}
-                  onChange={e => set(f.key, e.target.value)}
-                  onBlur={e => set(f.key, formatForInput(parseNum(e.target.value), f.group))}
-                />
+              {/* Riferimento BASE */}
+              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "12px 16px", marginBottom: "20px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "8px" }}>Riferimento Contratto BASE</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "2px" }}>Valore Unitario BASE</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b" }}>{formatEuro(baseValore)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "2px" }}>Valore Scontato ({scontoNum}%)</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#059669" }}>{formatEuro(valoreScontato)}</div>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Sezione Quantità */}
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #f0fdf4" }}>Quantità TOW</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
-            {FIELDS.filter(f => f.group === "qta").map(f => (
-              <div key={f.key}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>{f.label}</div>
-                <input
-                  style={{ ...inputBase, textAlign: "right" }}
-                  value={form[f.key] ?? ""}
-                  onChange={e => set(f.key, e.target.value)}
-                  onBlur={e => set(f.key, formatForInput(parseNum(e.target.value), f.group))}
-                />
+              {/* Campi editabili figlio */}
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", paddingBottom: "6px", borderBottom: "2px solid #f0fdf4" }}>Parametri Contratto</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>% Sconto sul BASE</div>
+                  <div style={{ position: "relative" }}>
+                    <input style={{ ...inputBase, textAlign: "right", paddingRight: "28px" }} placeholder="0,00" value={sconto} onChange={e => setSconto(e.target.value)} onBlur={e => setSconto(formatForInput(parseNum(e.target.value.replace(",",".")), "qta"))} />
+                    <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#64748b", pointerEvents: "none" }}>%</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" }}>N° TOW</div>
+                  <input style={{ ...inputBase, textAlign: "right" }} placeholder="0" value={qtaFiglio} onChange={e => setQtaFiglio(e.target.value)} onBlur={e => setQtaFiglio(formatForInput(parseNum(e.target.value), "qta"))} />
+                </div>
               </div>
-            ))}
-          </div>
+
+              {/* Totale calcolato */}
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale Calcolato</span>
+                <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotaleFiglio)}</span>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Footer modale */}
+        {/* Footer */}
         <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
           <button onClick={onClose} style={{ padding: "8px 22px", borderRadius: "8px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : "#1a73e8", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : (isBase ? "#1a73e8" : "#10b981"), color: "#fff", fontSize: "13px", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
             {saving ? "Salvataggio..." : "Salva modifiche"}
           </button>
         </div>
@@ -311,19 +590,315 @@ function EditModal({ row, onClose, onSaved }) {
   );
 }
 
-// ── Pagina principale ─────────────────────────────────────────────────────────
+// ── Hook drag per finestre modali spostabili ─────────────────────────────────
+function useDrag(initialPos = { x: 0, y: 0 }) {
+  const [pos, setPos] = useState(initialPos);
+  const dragging = useRef(false);
+  const start    = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const onMouseDown = (e) => {
+    if (e.target.closest("button,input,select,textarea")) return;
+    dragging.current = true;
+    start.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging.current) return;
+      setPos({
+        x: start.current.px + e.clientX - start.current.mx,
+        y: start.current.py + e.clientY - start.current.my,
+      });
+    };
+    const onUp = () => { dragging.current = false; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+
+  return { pos, onMouseDown };
+}
+
+// ── Modale Modifica Contratto (tutte le righe TOW di un contratto) ────────────
+function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onSaved }) {
+  const { pos, onMouseDown } = useDrag();
+
+  // QTA corretta: valoreTotale / valoreUnitario (arrotondata)
+  const calcQtaFromRow = (r) => {
+    if (r.valoreUnitario > 0) return Math.round((r.valoreTotale || 0) / r.valoreUnitario);
+    return r.towApprovati ?? 0;
+  };
+
+  const [righe, setRighe] = useState(() =>
+    towRows.map(r => ({
+      id: r.id,
+      tow: r.tow || "",
+      valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
+      qta: formatForInput(calcQtaFromRow(r), "qta"),
+      sconto: formatForInput(r.sconto ?? 0, "qta"),
+      subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
+      isCatalogo: !!(r.isCatalogo),
+    }))
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
+
+  const setRiga = (idx, field, val) =>
+    setRighe(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r));
+
+  const getBaseValore = (tow) => {
+    if (!baseRows) return 0;
+    const br = baseRows.find(x => x.tow === tow);
+    return br ? Number(br.valoreUnitario) || 0 : 0;
+  };
+
+  const calcolaValore = (riga) => {
+    if (isBase) {
+      if (riga.isCatalogo) return parseNum(riga.subtotale);
+      return parseNum(riga.valoreUnitario) * parseNum(riga.qta);
+    } else {
+      const base = getBaseValore(riga.tow);
+      const sc   = parseNum(riga.sconto);
+      const scontato = base * (1 - sc / 100);
+      if (riga.isCatalogo) return parseNum(riga.subtotale);
+      return scontato * parseNum(riga.qta);
+    }
+  };
+
+  const totalContratto = righe.reduce((s, r) => s + calcolaValore(r), 0);
+
+  const handleSave = async () => {
+    setSaving(true); setError("");
+    try {
+      const results = await Promise.all(righe.map((r, idx) => {
+        const orig = towRows[idx]; // riga originale dal DB per preservare i campi non editati
+        let payload;
+        if (isBase) {
+          const vt = calcolaValore(r);
+          const qtaNum = r.isCatalogo
+            ? (parseNum(r.valoreUnitario) > 0 ? vt / parseNum(r.valoreUnitario) : 0)
+            : parseNum(r.qta);
+          payload = {
+            tow: r.tow,
+            towContratto: contratto,
+            valoreUnitario:     parseNum(r.valoreUnitario),
+            valoreTotale:       vt,
+            towApprovati:       qtaNum,
+            isCatalogo:         r.isCatalogo,
+            // Preserva campi contabili non editabili
+            approvato:          orig.approvato ?? 0,
+            ordinatiRda:        orig.ordinatiRda ?? 0,
+            impegnato:          orig.impegnato ?? 0,
+            residuo:            orig.residuo ?? 0,
+            towImpegnati:       orig.towImpegnati ?? 0,
+            towResidui:         orig.towResidui ?? 0,
+            collaudoApprovato:  orig.collaudoApprovato ?? 0,
+            collaudoOrdinato:   orig.collaudoOrdinato ?? 0,
+            collaudoFatturato:  orig.collaudoFatturato ?? 0,
+            sconto:             0,
+          };
+        } else {
+          const base = getBaseValore(r.tow);
+          const sc   = parseNum(r.sconto);
+          const scontato = base * (1 - sc / 100);
+          const vt = r.isCatalogo ? parseNum(r.subtotale) : scontato * parseNum(r.qta);
+          const qtaCalc = r.isCatalogo ? (scontato > 0 ? vt / scontato : 0) : parseNum(r.qta);
+          payload = {
+            tow: r.tow,
+            towContratto: contratto,
+            sconto:             sc,
+            valoreUnitario:     scontato,
+            valoreTotale:       vt,
+            towApprovati:       qtaCalc,
+            isCatalogo:         r.isCatalogo,
+            // Preserva campi contabili non editabili
+            approvato:          orig.approvato ?? 0,
+            ordinatiRda:        orig.ordinatiRda ?? 0,
+            impegnato:          orig.impegnato ?? 0,
+            residuo:            orig.residuo ?? 0,
+            towImpegnati:       orig.towImpegnati ?? 0,
+            towResidui:         orig.towResidui ?? 0,
+            collaudoApprovato:  orig.collaudoApprovato ?? 0,
+            collaudoOrdinato:   orig.collaudoOrdinato ?? 0,
+            collaudoFatturato:  orig.collaudoFatturato ?? 0,
+          };
+        }
+        return updateConsumoTow(r.id, payload);
+      }));
+      onSaved(results);
+      onClose();
+    } catch (e) { setError(e.message || "Errore durante il salvataggio"); }
+    finally { setSaving(false); }
+  };
+
+  const inp = { padding: "6px 9px", borderRadius: "6px", border: "1px solid #dadce0", fontSize: "12px", boxSizing: "border-box", outline: "none" };
+
+  // Larghezze colonne fisse per allineamento preciso
+  const colW = isBase
+    ? ["160px", "140px", "100px", "100px", "120px", "130px"]   // Nome, Val.Unit., Catalogo, N°TOW/€Cat, VT
+    : ["130px", "120px", "90px",  "120px", "80px",  "130px", "130px"]; // Nome, BASE, Sconto, Scontato, Catalogo, N°TOW/€Cat, VT
+
+  const thStyle = (align = "right", w) => ({
+    padding: "8px 10px", textAlign: align, fontSize: "11px", fontWeight: 700,
+    color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0",
+    background: "#f8fafc", whiteSpace: "nowrap",
+    ...(w ? { width: w, minWidth: w } : {}),
+  });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflow: "auto" }}>
+      <div
+        style={{
+          background: "#fff", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          width: "100%", maxWidth: isBase ? "820px" : "950px",
+          display: "flex", flexDirection: "column", overflow: "hidden",
+          position: "relative",
+          transform: `translate(${pos.x}px, ${pos.y}px)`,
+          userSelect: "auto",
+        }}
+      >
+        {/* Header — draggable */}
+        <div
+          onMouseDown={onMouseDown}
+          style={{
+            padding: "18px 24px 14px", borderBottom: "1px solid #e2e8f0",
+            background: isBase ? "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)" : "linear-gradient(135deg,#10b981 0%,#059669 100%)",
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            cursor: "grab",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>
+              Modifica Contratto — {contratto}
+              {isBase && <span style={{ marginLeft: 8, fontSize: "11px", background: "rgba(255,255,255,0.25)", borderRadius: "5px", padding: "2px 8px" }}>BASE</span>}
+            </div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", marginTop: "3px" }}>
+              {isBase ? "Trascina per spostare • Modifica Nome TOW, Valore Unitario, Quantità e Catalogo" : "Trascina per spostare • Modifica % Sconto, N° TOW e Catalogo"}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "30px", height: "30px", borderRadius: "50%", fontSize: "16px", lineHeight: "30px", textAlign: "center", flexShrink: 0 }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", overflowX: "auto", padding: "20px 24px", flex: 1, maxHeight: "65vh" }}>
+          {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px", fontSize: "13px" }}>{error}</div>}
+
+          <table style={{ borderCollapse: "collapse", tableLayout: "fixed", width: "100%" }}>
+            <colgroup>
+              {(isBase ? colW : colW).map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                <th style={thStyle("left")}>Nome TOW</th>
+                {!isBase && <th style={thStyle("right")}>Val. BASE €</th>}
+                {isBase  && <th style={thStyle("right")}>Valore Unit. €</th>}
+                {!isBase && <th style={thStyle("right", "90px")}>% Sconto</th>}
+                {!isBase && <th style={{ ...thStyle("right"), color: "#059669" }}>Val. Scontato €</th>}
+                <th style={thStyle("center")}>Catalogo</th>
+                <th style={thStyle("right")}>{isBase ? "N° TOW / € Catalogo" : "N° TOW / € Catalogo"}</th>
+                <th style={thStyle("right")}>Valore Totale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {righe.map((r, idx) => {
+                const baseVal   = isBase ? 0 : getBaseValore(r.tow);
+                const scontoNum = parseNum(r.sconto);
+                const scontato  = isBase ? parseNum(r.valoreUnitario) : baseVal * (1 - scontoNum / 100);
+                const vt        = calcolaValore(r);
+                return (
+                  <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
+                    {/* Nome TOW */}
+                    <td style={{ padding: "6px 10px", overflow: "hidden" }}>
+                      {isBase
+                        ? <input style={{ ...inp, width: "100%", fontWeight: 700 }} value={r.tow} onChange={e => setRiga(idx, "tow", e.target.value)} />
+                        : <span style={{ background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px", fontSize: "12px", fontWeight: 700, display: "inline-block" }}>{r.tow}</span>
+                      }
+                    </td>
+                    {/* Val BASE (figlio) */}
+                    {!isBase && <td style={{ padding: "6px 10px", textAlign: "right", fontSize: "12px", color: "#94a3b8" }}>{formatEuro(baseVal)}</td>}
+                    {/* Valore unitario (BASE) */}
+                    {isBase && (
+                      <td style={{ padding: "6px 10px" }}>
+                        <input style={{ ...inp, textAlign: "right", width: "100%" }} value={r.valoreUnitario}
+                          onChange={e => setRiga(idx, "valoreUnitario", e.target.value)}
+                          onBlur={e => setRiga(idx, "valoreUnitario", formatForInput(parseNum(e.target.value), "euro"))} />
+                      </td>
+                    )}
+                    {/* % Sconto (figlio) */}
+                    {!isBase && (
+                      <td style={{ padding: "6px 10px" }}>
+                        <div style={{ position: "relative" }}>
+                          <input style={{ ...inp, textAlign: "right", width: "100%", paddingRight: "20px" }} value={r.sconto}
+                            onChange={e => setRiga(idx, "sconto", e.target.value)}
+                            onBlur={e => setRiga(idx, "sconto", formatForInput(parseNum(e.target.value.replace(",",".")), "qta"))} />
+                          <span style={{ position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)", fontSize: "11px", color: "#64748b", pointerEvents: "none" }}>%</span>
+                        </div>
+                      </td>
+                    )}
+                    {/* Val Scontato (figlio) */}
+                    {!isBase && <td style={{ padding: "6px 10px", textAlign: "right", fontSize: "12px", fontWeight: 600, color: "#059669" }}>{formatEuro(scontato)}</td>}
+                    {/* Flag Catalogo */}
+                    <td style={{ padding: "6px 10px", textAlign: "center" }}>
+                      <input type="checkbox" checked={r.isCatalogo} onChange={e => setRiga(idx, "isCatalogo", e.target.checked)}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#10b981" }} />
+                    </td>
+                    {/* N° TOW o € Catalogo */}
+                    <td style={{ padding: "6px 10px" }}>
+                      {r.isCatalogo ? (
+                        <input style={{ ...inp, textAlign: "right", width: "100%" }} value={r.subtotale} placeholder="€ Catalogo"
+                          onChange={e => setRiga(idx, "subtotale", e.target.value)}
+                          onBlur={e => setRiga(idx, "subtotale", formatForInput(parseNum(e.target.value), "euro"))} />
+                      ) : (
+                        <input style={{ ...inp, textAlign: "right", width: "100%" }} value={r.qta} placeholder="N° TOW"
+                          onChange={e => setRiga(idx, "qta", e.target.value)}
+                          onBlur={e => setRiga(idx, "qta", formatForInput(parseNum(e.target.value), "qta"))} />
+                      )}
+                    </td>
+                    {/* Valore Totale calcolato */}
+                    <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: vt > 0 ? "#059669" : "#94a3b8" }}>{formatEuro(vt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totale complessivo contratto */}
+          <div style={{ marginTop: "16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale Contratto</span>
+            <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(totalContratto)}</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
+          <button onClick={onClose} style={{ padding: "8px 22px", borderRadius: "8px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : (isBase ? "#1a73e8" : "#10b981"), color: "#fff", fontSize: "13px", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+            {saving ? "Salvataggio..." : "Salva modifiche"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function ConsumoTowAdminPage({ onUnauthorized }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [contratti, setContratti] = useState([]);
   const [selectedContratto, setSelectedContratto] = useState("");
+  const [expandedContratto, setExpandedContratto] = useState(null);
   const [editRow, setEditRow] = useState(null);
+  const [editContratto, setEditContratto] = useState(null); // nome contratto da modificare in blocco
   const [showNewContratto, setShowNewContratto] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
-  const [dragOver, setDragOver] = useState(null); // nome contratto su cui si sta trascinando
-  const dragItem = useRef(null);   // nome contratto che si sta trascinando
+  const [dragOver, setDragOver] = useState(null);
+  const dragItem = useRef(null);
+
+  // Il contratto BASE è il primo della lista (indice 0 nell'ordine salvato)
+  const baseContratto = contratti[0] || "";
+  const baseRows = rows.filter(r => r.towContratto === baseContratto);
 
   // Applica l'ordine salvato in localStorage ai contratti
   const applyOrder = useCallback((tipi) => {
@@ -359,6 +934,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
   const handleSaved = (updated) => {
     setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
     setSuccessMsg("Riga aggiornata con successo");
+    setTimeout(() => setSuccessMsg(""), 3500);
+  };
+
+  const handleContrattoSaved = (updatedRows) => {
+    setRows(prev => {
+      const map = Object.fromEntries(updatedRows.map(r => [r.id, r]));
+      return prev.map(r => map[r.id] ?? r);
+    });
+    setSuccessMsg("Contratto aggiornato con successo");
     setTimeout(() => setSuccessMsg(""), 3500);
   };
 
@@ -432,32 +1016,54 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
       {/* ── Titolo ── */}
-      <div style={{ marginBottom: "24px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-        <div>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Logistica Lotto 2</div>
-          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
-          <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Seleziona un contratto per visualizzare e modificare</p>
-        </div>
-        <button
-          onClick={() => setShowNewContratto(true)}
-          style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: "#10b981", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(16,185,129,0.3)", letterSpacing: "0.2px" }}
-        >
-          + Nuovo Contratto
-        </button>
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Logistica Lotto 2</div>
+        <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
+        <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
       </div>
 
       {/* Messaggi */}
       {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>⚠ {error}</div>}
       {successMsg && <div style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>✓ {successMsg}</div>}
 
+      {/* ── KPI Globali (tutti i contratti) ── */}
+      {!loading && rows.length > 0 && (() => {
+        const kpis = [
+          { label: "Valore Totale",  key: "valoreTotale", color: "#1e293b", bg: "#f8fafc" },
+          { label: "Approvato",      key: "approvato",    color: "#1a73e8", bg: "#eff6ff" },
+          { label: "Ordinato",       key: "ordinatiRda",  color: "#10b981", bg: "#f0fdf4" },
+          { label: "Impegnato",      key: "impegnato",    color: "#f59e0b", bg: "#fffbeb" },
+          { label: "Residuo",        key: "residuo",      color: "#f97316", bg: "#fff7ed" },
+        ];
+        return (
+          <div style={{ marginBottom: "24px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px" }}>Totale Tutti i Contratti</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px" }}>
+              {kpis.map(k => {
+                const tot = rows.reduce((s, r) => s + (Number(r[k.key]) || 0), 0);
+                return (
+                  <div key={k.key} style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "14px 16px", borderTop: `4px solid ${k.color}`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{k.label}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: k.color }}>{formatEuro(tot)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Selezione contratto ── */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratto</div>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratti</div>
         {loading ? (
           <div style={{ color: "#94a3b8", fontSize: "13px" }}>Caricamento...</div>
         ) : (
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            {contratti.map(c => {
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-start" }}>
+            {contratti.map((c, cIdx) => {
+              const isBaseCard = cIdx === 0;
+              // Mostra badge BASE solo se il nome del contratto non è già "BASE"
+              const showBaseBadge = isBaseCard && c.toUpperCase() !== "BASE";
               const tot = rows.filter(r => r.towContratto === c).reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0);
               const active = selectedContratto === c;
               const isDragOver = dragOver === c;
@@ -480,13 +1086,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     cursor: "grab",
                   }}
                 >
-                  {/* Maniglia drag in alto + area click */}
                   <div
                     onClick={() => setSelectedContratto(c)}
                     style={{ padding: "14px 18px 10px", flex: 1, userSelect: "none" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                      {/* Icona grip */}
                       <svg width="10" height="14" viewBox="0 0 10 14" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
                         <circle cx="3" cy="2" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
                         <circle cx="7" cy="2" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
@@ -496,26 +1100,37 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                         <circle cx="7" cy="12" r="1.2" fill={active && !isDragOver ? "#fff" : "#64748b"}/>
                       </svg>
                       <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "-0.2px", color: active && !isDragOver ? "#fff" : "#0f172a" }}>{c}</div>
+                      {showBaseBadge && (
+                        <span style={{
+                          fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                          background: active && !isDragOver ? "rgba(255,255,255,0.25)" : "#dbeafe",
+                          color: active && !isDragOver ? "#fff" : "#1d4ed8",
+                          borderRadius: "5px", padding: "2px 7px",
+                        }}>BASE</span>
+                      )}
                     </div>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: active && !isDragOver ? "rgba(255,255,255,0.75)" : "#64748b", paddingLeft: "16px" }}>{formatEuro(tot)}</div>
                   </div>
-                  {/* Separatore + bottone elimina */}
                   <div style={{
                     borderTop: active && !isDragOver ? "1px solid rgba(255,255,255,0.2)" : "1px solid #f1f5f9",
-                    padding: "6px 10px",
-                    display: "flex", justifyContent: "flex-end",
+                    padding: "6px 10px", display: "flex", justifyContent: "flex-end", gap: "6px",
                   }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); setEditContratto(c); }}
+                      title={`Modifica contratto ${c}`}
+                      style={{ display: "flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 600, background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#eff6ff", color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#1a73e8", transition: "background 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.3)" : "#dbeafe"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#eff6ff"; }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                      Modifica
+                    </button>
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(c); }}
                       title={`Elimina contratto ${c}`}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "4px",
-                        padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
-                        fontSize: "11px", fontWeight: 600,
-                        background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9",
-                        color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b",
-                        transition: "background 0.15s",
-                      }}
+                      style={{ display: "flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "6px", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 600, background: active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9", color: active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b", transition: "background 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(239,68,68,0.35)" : "#fee2e2"; e.currentTarget.style.color = active && !isDragOver ? "#fff" : "#dc2626"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = active && !isDragOver ? "rgba(255,255,255,0.15)" : "#f1f5f9"; e.currentTarget.style.color = active && !isDragOver ? "rgba(255,255,255,0.8)" : "#64748b"; }}
                     >
@@ -528,32 +1143,162 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                 </div>
               );
             })}
+
+            {/* ── Card "+ Nuovo Contratto" ── */}
+            {contratti.length === 0 ? (
+              <div
+                onClick={() => setShowNewContratto("base")}
+                style={{ display: "flex", flexDirection: "column", minWidth: "150px", borderRadius: "14px", border: "2px dashed #93c5fd", background: "#f0f9ff", cursor: "pointer", overflow: "hidden", transition: "border 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#dbeafe"; e.currentTarget.style.borderColor = "#1a73e8"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#f0f9ff"; e.currentTarget.style.borderColor = "#93c5fd"; }}
+              >
+                <div style={{ flex: 1, padding: "14px 18px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px" }}>
+                  <div style={{ fontSize: "22px", color: "#1a73e8", lineHeight: 1, fontWeight: 300 }}>+</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a73e8" }}>Nuovo BASE</div>
+                  <div style={{ fontSize: "11px", color: "#93c5fd" }}>Primo contratto</div>
+                </div>
+                <div style={{ borderTop: "1px solid #bfdbfe", padding: "6px 10px", display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#1a73e8" }}>Crea →</span>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => setShowNewContratto("figlio")}
+                style={{ display: "flex", flexDirection: "column", minWidth: "150px", borderRadius: "14px", border: "2px dashed #6ee7b7", background: "#f0fdf4", cursor: "pointer", overflow: "hidden", transition: "border 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#d1fae5"; e.currentTarget.style.borderColor = "#10b981"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#f0fdf4"; e.currentTarget.style.borderColor = "#6ee7b7"; }}
+              >
+                <div style={{ flex: 1, padding: "14px 18px 10px", display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px" }}>
+                  <div style={{ fontSize: "22px", color: "#10b981", lineHeight: 1, fontWeight: 300 }}>+</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#10b981" }}>Nuovo Contratto</div>
+                  <div style={{ fontSize: "11px", color: "#6ee7b7" }}>Basato su BASE</div>
+                </div>
+                <div style={{ borderTop: "1px solid #a7f3d0", padding: "6px 10px", display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#10b981" }}>Crea →</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── KPI cards ── */}
-      {!loading && selectedContratto && (() => {
-        const kpis = [
-          { label: "Valore Totale", key: "valoreTotale", color: "#1e293b", bg: "#f8fafc" },
-          { label: "Approvato",     key: "approvato",    color: "#1a73e8", bg: "#eff6ff" },
-          { label: "Ordinato",      key: "ordinatiRda",  color: "#10b981", bg: "#f0fdf4" },
-          { label: "Impegnato",     key: "impegnato",    color: "#f59e0b", bg: "#fffbeb" },
-          { label: "Residuo",       key: "residuo",      color: "#f97316", bg: "#fff7ed" },
+      {/* ── Tabella collassabile per contratto ── */}
+      {!loading && contratti.length > 0 && (() => {
+        const COLS = [
+          { key: "valoreTotale", label: "Valore Totale", color: "#1e293b" },
+          { key: "approvato",    label: "Approvato",     color: "#1a73e8" },
+          { key: "ordinatiRda",  label: "Ordinato",      color: "#10b981" },
+          { key: "impegnato",    label: "Impegnato",     color: "#f59e0b" },
+          { key: "residuo",      label: "Residuo",       color: "#f97316" },
         ];
         return (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
-            {kpis.map(k => {
-              const tot = filteredRows.reduce((s, r) => s + (Number(r[k.key]) || 0), 0);
-              const perc = kpis[0].key !== k.key && filteredRows.reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0) > 0
-                ? (tot / filteredRows.reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0) * 100).toFixed(1)
-                : null;
+          <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+            {/* Header colonne */}
+            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)", background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "0 12px" }}>
+              <div />
+              <div style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Contratto</div>
+              {COLS.map(c => (
+                <div key={c.key} style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: c.color, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>{c.label}</div>
+              ))}
+            </div>
+
+            {contratti.map((c, cIdx) => {
+              const cRows   = rows.filter(r => r.towContratto === c);
+              const isBase  = cIdx === 0;
+              const showBaseBadge = isBase && c.toUpperCase() !== "BASE";
+              const expanded = expandedContratto === c;
+
               return (
-                <div key={k.key} style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "16px 18px", borderTop: `4px solid ${k.color}`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>{k.label}</div>
-                  <div style={{ fontSize: "14px", fontWeight: 800, color: k.color, letterSpacing: "-0.2px" }}>{formatEuro(tot)}</div>
-                  {perc !== null && (
-                    <div style={{ marginTop: "5px", display: "inline-block", fontSize: "11px", fontWeight: 700, color: k.color, background: k.bg, border: `1px solid ${k.color}33`, borderRadius: "6px", padding: "1px 7px" }}>{perc}%</div>
+                <div key={c} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  {/* ── Riga totale contratto (cliccabile) ── */}
+                  <div
+                    onClick={() => setExpandedContratto(expanded ? null : c)}
+                    style={{
+                      display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)",
+                      alignItems: "center", padding: "0 12px", cursor: "pointer",
+                      background: expanded ? "#eff6ff" : "#fff",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "#f8fafc"; }}
+                    onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "#fff"; }}
+                  >
+                    {/* Freccia expand */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "10px", transition: "transform 0.2s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</div>
+                    {/* Nome contratto */}
+                    <div style={{ padding: "12px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: 800, color: expanded ? "#1a73e8" : "#0f172a" }}>{c}</span>
+                      {showBaseBadge && <span style={{ fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: "5px", padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.4px" }}>BASE</span>}
+                      <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cRows.length} TOW</span>
+                    </div>
+                    {/* Valori aggregati */}
+                    {COLS.map(col => {
+                      const tot = cRows.reduce((s, r) => s + (Number(r[col.key]) || 0), 0);
+                      return (
+                        <div key={col.key} style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: col.key === "valoreTotale" ? 800 : 600, color: col.color }}>{formatEuro(tot)}</div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── Dettaglio TOW (espanso) ── */}
+                  {expanded && (
+                    <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                      {/* Toolbar dettaglio */}
+                      <div style={{ padding: "8px 56px 8px 56px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e2e8f0" }}>
+                        <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Dettaglio TOW — {c}</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); setShowCollaudo(v => !v); }}
+                          style={{ padding: "4px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, cursor: "pointer", border: showCollaudo ? "1.5px solid #1a73e8" : "1.5px solid #cbd5e1", background: showCollaudo ? "#eff6ff" : "#fff", color: showCollaudo ? "#1a73e8" : "#64748b" }}
+                        >
+                          {showCollaudo ? "▼ Nascondi Collaudo" : "▶ Mostra Collaudo"}
+                        </button>
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                          <thead>
+                            <tr>
+                              <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
+                              <th style={{ ...TH("right"), width: "65px" }}>QTA</th>
+                              {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
+                                <th key={f.key} style={{ ...TH("right"), width: f.group === "euro" ? "125px" : "85px", color: f.color }}>{f.label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cRows.map((row, idx) => (
+                              <tr key={row.id}
+                                style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", transition: "background 0.1s" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}
+                              >
+                                <td style={{ ...TD("left"), fontWeight: 700 }}>
+                                  <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
+                                </td>
+                                <td style={{ ...TD("right"), color: "#64748b" }}>
+                                  {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
+                                </td>
+                                {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
+                                  <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                    {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                          {/* Riga totale interna */}
+                          <tfoot>
+                            <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
+                              <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
+                              <td style={TD("right")} />
+                              {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
+                                if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                              })}
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
                   )}
                 </div>
               );
@@ -562,108 +1307,31 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
         );
       })()}
 
-      {/* ── Tabella ── */}
-      {!loading && selectedContratto && (
-        <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-
-          {/* Header tabella */}
-          <div style={{ padding: "16px 22px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafbfc" }}>
-            <div>
-              <span style={{ fontSize: "18px", fontWeight: 700, color: "#0f1012" }}>Contratto </span>
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "#1a73e8" }}>{selectedContratto}</span>
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "#94a3b8", marginLeft: "10px" }}>{filteredRows.length} righe</span>
-            </div>
-            <button
-              onClick={() => setShowCollaudo(v => !v)}
-              style={{
-                padding: "7px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
-                cursor: "pointer", transition: "all 0.15s",
-                border: showCollaudo ? "1.5px solid #1a73e8" : "1.5px solid #cbd5e1",
-                background: showCollaudo ? "#eff6ff" : "#fff",
-                color: showCollaudo ? "#1a73e8" : "#64748b",
-                display: "flex", alignItems: "center", gap: "6px",
-              }}
-            >
-              <span style={{ fontSize: "10px" }}>{showCollaudo ? "▼" : "▶"}</span>
-              {showCollaudo ? "Nascondi Collaudo" : "Mostra Collaudo"}
-            </button>
-          </div>
-
-          {/* Tabella scrollabile */}
-          <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 420px)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
-              <thead>
-                <tr>
-                  <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
-                  <th style={{ ...TH("right"), width: "65px" }}>QTA</th>
-                  {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
-                    <th key={f.key} style={{ ...TH("right"), width: f.group === "euro" ? "125px" : "85px", color: f.color }}>{f.label}</th>
-                  ))}
-                  <th style={{ ...TH("center"), width: "85px" }}>Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).length + 3} style={{ padding: "48px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
-                      Nessuna riga per il contratto selezionato
-                    </td>
-                  </tr>
-                ) : filteredRows.map((row, idx) => (
-                  <tr key={row.id}
-                    style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa", transition: "background 0.1s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}
-                  >
-                    <td style={{ ...TD("left"), fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
-                    </td>
-                    <td style={{ ...TD("right"), color: "#64748b", fontWeight: 500 }}>
-                      {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
-                    </td>
-                    {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
-                      <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
-                        {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
-                      </td>
-                    ))}
-                    <td style={TD("center")}>
-                      <button onClick={() => setEditRow(row)} style={{
-                        padding: "4px 12px", borderRadius: "6px",
-                        border: "1px solid #1a73e8", background: "#eff6ff",
-                        color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer",
-                        letterSpacing: "0.2px",
-                      }}>Modifica</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-
-              {/* Riga totali */}
-              {filteredRows.length > 0 && (
-                <tfoot>
-                  <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                    <td style={{ ...TD("left"), fontWeight: 700, color: "#1e293b", fontSize: "12px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Totale</td>
-                    <td style={TD("right")} />
-                    {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
-                      if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                      const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                      return (
-                        <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>
-                          {f.group === "euro" ? formatEuro(tot) : formatQta(tot)}
-                        </td>
-                      );
-                    })}
-                    <td style={TD("center")} />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </div>
+      {editRow && (
+        <EditModal
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSaved={handleSaved}
+          isBase={editRow.towContratto === baseContratto}
+          baseRows={baseRows}
+        />
       )}
-
-      {editRow && <EditModal row={editRow} onClose={() => setEditRow(null)} onSaved={handleSaved} />}
-      {showNewContratto && <NewContrattoModal onClose={() => setShowNewContratto(false)} onCreated={handleCreated} />}
+      {showNewContratto === "base" && (
+        <NewContrattoBaseModal onClose={() => setShowNewContratto(false)} onCreated={handleCreated} />
+      )}
+      {showNewContratto === "figlio" && (
+        <NewContrattoFiglioModal onClose={() => setShowNewContratto(false)} onCreated={handleCreated} baseRows={baseRows} />
+      )}
+      {editContratto && (
+        <EditContrattoModal
+          contratto={editContratto}
+          towRows={rows.filter(r => r.towContratto === editContratto)}
+          isBase={editContratto === baseContratto}
+          baseRows={baseRows}
+          onClose={() => setEditContratto(null)}
+          onSaved={handleContrattoSaved}
+        />
+      )}
     </div>
   );
 }

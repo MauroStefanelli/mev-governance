@@ -12,16 +12,16 @@ namespace mevgovernancebackend.Migrations
         {
             migrationBuilder.Sql(@"
                 DO $$ BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='MeseAvanzamento') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='OrdiniConsegna' AND column_name='MeseAvanzamento') THEN
                         ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""MeseAvanzamento"" TEXT NOT NULL DEFAULT '';
                     END IF;
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='QtaAvanzata') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='OrdiniConsegna' AND column_name='QtaAvanzata') THEN
                         ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""QtaAvanzata"" TEXT NOT NULL DEFAULT '';
                     END IF;
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='ImportoFatturabile') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='OrdiniConsegna' AND column_name='ImportoFatturabile') THEN
                         ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '';
                     END IF;
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='OrdiniConsegna' AND column_name='Subappalto') THEN
                         ALTER TABLE ""OrdiniConsegna"" ADD COLUMN ""Subappalto"" TEXT NOT NULL DEFAULT '';
                     END IF;
                 END $$;

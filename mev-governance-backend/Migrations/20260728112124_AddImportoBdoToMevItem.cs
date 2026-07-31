@@ -10,18 +10,10 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "DatiRigheJson",
-                table: "VerbaliAvanzamento",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "ImportoBdo",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: false,
-                defaultValue: 0m);
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""VerbaliAvanzamento"" ADD COLUMN IF NOT EXISTS ""DatiRigheJson"" TEXT NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""ImportoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ");
         }
 
         /// <inheritdoc />

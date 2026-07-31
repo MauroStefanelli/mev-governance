@@ -5,7 +5,9 @@ services:
     name: mev-pdf-parser
     runtime: docker
     dockerfilePath: ./mev-pdf-parser/Dockerfile
-    dockerContext: .
+    dockerContext: ./mev-pdf-parser
+    branch: main
+    autoDeploy: true
     plan: free
 
   # ── Backend ASP.NET Core ──────────────────────────────────────────────────────
@@ -14,6 +16,8 @@ services:
     runtime: docker
     dockerfilePath: ./mev-governance-backend/Dockerfile
     dockerContext: ./mev-governance-backend
+    branch: main
+    autoDeploy: true
     plan: free
     envVars:
       - key: JWT_KEY
@@ -37,6 +41,8 @@ services:
     runtime: docker
     dockerfilePath: ./mev-governance-ui/Dockerfile
     dockerContext: ./mev-governance-ui
+    branch: main
+    autoDeploy: true
     plan: free
     buildArgs:
       - key: REACT_APP_API_URL

@@ -17,7 +17,7 @@ namespace mevgovernancebackend.Migrations
                 DO $$
                 BEGIN
                     IF (SELECT data_type FROM information_schema.columns
-                        WHERE table_name='MevItems' AND column_name='OrdinatoBdo') = 'text' THEN
+                        WHERE table_schema=current_schema() AND table_name='MevItems' AND column_name='OrdinatoBdo') = 'text' THEN
                         ALTER TABLE ""MevItems"" ALTER COLUMN ""OrdinatoBdo"" DROP DEFAULT;
                         ALTER TABLE ""MevItems"" ALTER COLUMN ""OrdinatoBdo"" TYPE NUMERIC(18,2) USING ""OrdinatoBdo""::NUMERIC;
                         ALTER TABLE ""MevItems"" ALTER COLUMN ""OrdinatoBdo"" SET DEFAULT 0;
@@ -32,7 +32,7 @@ namespace mevgovernancebackend.Migrations
                     FOREACH col IN ARRAY ARRAY['ImpLordo','Sconto','ImportoNetto','Ordinato','DaOrdinare','Avanzato','DaAvanzare']
                     LOOP
                         IF (SELECT data_type FROM information_schema.columns
-                            WHERE table_name='Contratti' AND column_name=col) = 'text' THEN
+                            WHERE table_schema=current_schema() AND table_name='Contratti' AND column_name=col) = 'text' THEN
                             EXECUTE format('ALTER TABLE ""Contratti"" ALTER COLUMN ""%s"" DROP DEFAULT', col);
                             EXECUTE format('ALTER TABLE ""Contratti"" ALTER COLUMN ""%s"" TYPE NUMERIC(18,2) USING ""%s""::NUMERIC', col, col);
                             EXECUTE format('ALTER TABLE ""Contratti"" ALTER COLUMN ""%s"" SET DEFAULT 0', col);

@@ -11,37 +11,30 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "OrdiniConsegna",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true)
-                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    NumeroOrdine = table.Column<string>(type: "TEXT", nullable: false),
-                    Data = table.Column<string>(type: "TEXT", nullable: false),
-                    DataConsegna = table.Column<string>(type: "TEXT", nullable: false),
-                    RifContratto = table.Column<string>(type: "TEXT", nullable: false),
-                    Art = table.Column<string>(type: "TEXT", nullable: false),
-                    Codice = table.Column<string>(type: "TEXT", nullable: false),
-                    Descrizione = table.Column<string>(type: "TEXT", nullable: false),
-                    TipoAtt = table.Column<string>(type: "TEXT", nullable: false),
-                    Quantita = table.Column<string>(type: "TEXT", nullable: false),
-                    Um = table.Column<string>(type: "TEXT", nullable: false),
-                    PrezzoNetto = table.Column<string>(type: "TEXT", nullable: false),
-                    Importo = table.Column<string>(type: "TEXT", nullable: false),
-                    NumeroRda = table.Column<string>(type: "TEXT", nullable: false),
-                    Iniziativa = table.Column<string>(type: "TEXT", nullable: false),
-                    Ap = table.Column<string>(type: "TEXT", nullable: false),
-                    Contratto = table.Column<string>(type: "TEXT", nullable: false),
-                    NomePdf = table.Column<string>(type: "TEXT", nullable: false),
-                    ImportatoIl = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    ImportatoDA = table.Column<string>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_OrdiniConsegna", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+                CREATE TABLE IF NOT EXISTS ""OrdiniConsegna"" (
+                    ""Id""            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    ""NumeroOrdine""  TEXT NOT NULL DEFAULT '',
+                    ""Data""          TEXT NOT NULL DEFAULT '',
+                    ""DataConsegna""  TEXT NOT NULL DEFAULT '',
+                    ""RifContratto""  TEXT NOT NULL DEFAULT '',
+                    ""Art""           TEXT NOT NULL DEFAULT '',
+                    ""Codice""        TEXT NOT NULL DEFAULT '',
+                    ""Descrizione""   TEXT NOT NULL DEFAULT '',
+                    ""TipoAtt""       TEXT NOT NULL DEFAULT '',
+                    ""Quantita""      TEXT NOT NULL DEFAULT '',
+                    ""Um""            TEXT NOT NULL DEFAULT '',
+                    ""PrezzoNetto""   TEXT NOT NULL DEFAULT '',
+                    ""Importo""       TEXT NOT NULL DEFAULT '',
+                    ""NumeroRda""     TEXT NOT NULL DEFAULT '',
+                    ""Iniziativa""    TEXT NOT NULL DEFAULT '',
+                    ""Ap""            TEXT NOT NULL DEFAULT '',
+                    ""Contratto""     TEXT NOT NULL DEFAULT '',
+                    ""NomePdf""       TEXT NOT NULL DEFAULT '',
+                    ""ImportatoIl""   TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""ImportatoDA""   TEXT NOT NULL DEFAULT ''
+                );
+            ");
         }
 
         /// <inheritdoc />

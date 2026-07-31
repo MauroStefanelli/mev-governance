@@ -22,6 +22,13 @@ public class ConsumoTow
     public decimal CollaudoOrdinato { get; set; }
     public decimal CollaudoFatturato { get; set; }
 
+    /// <summary>% sconto applicato (solo contratti figlio)</summary>
+    public decimal Sconto { get; set; }
+
+    /// <summary>true = voce a catalogo (subtotale fisso, non calcolato da QTA×prezzo)</summary>
+    public bool IsCatalogo { get; set; }
+
+    public int AmbienteId { get; set; }
 }
 
 

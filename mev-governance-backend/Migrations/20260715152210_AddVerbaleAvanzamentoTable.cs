@@ -11,23 +11,17 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "VerbaliAvanzamento",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    NomePdf = table.Column<string>(type: "TEXT", nullable: false),
-                    MeseAvanzamento = table.Column<string>(type: "TEXT", nullable: false),
-                    RigheElaborate = table.Column<int>(type: "INTEGER", nullable: false),
-                    RigheAggiornate = table.Column<int>(type: "INTEGER", nullable: false),
-                    CaricatoIl = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    CaricatoDa = table.Column<string>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_VerbaliAvanzamento", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+                CREATE TABLE IF NOT EXISTS ""VerbaliAvanzamento"" (
+                    ""Id""               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    ""NomePdf""          TEXT NOT NULL DEFAULT '',
+                    ""MeseAvanzamento""  TEXT NOT NULL DEFAULT '',
+                    ""RigheElaborate""   INTEGER NOT NULL DEFAULT 0,
+                    ""RigheAggiornate""  INTEGER NOT NULL DEFAULT 0,
+                    ""CaricatoIl""       TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""CaricatoDa""       TEXT NOT NULL DEFAULT ''
+                );
+            ");
         }
 
         /// <inheritdoc />

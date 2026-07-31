@@ -39,96 +39,41 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
           userSelect: "none",
         }}
       >
-        {label} ▾
+        {label} {"\u25BE"}
       </div>
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            zIndex: 20,
-            background: "white",
-            border: "1px solid #dadce0",
-            borderRadius: "4px",
-            marginTop: "2px",
-            minWidth: "220px",
-            maxHeight: "300px",
-            overflowY: "auto",
-            boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
-          }}
-        >
-          <div
-            style={{
-              position: "sticky",
-              top: 0,
-              zIndex: 2,
-              display: "flex",
-              justifyContent: "space-between",
-              background: "white",
-              borderBottom: "1px solid #dadce0",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-            }}
-          >
-            <div
-              onClick={() => onChange(options.map((o) => String(o)))}
-              style={{
-                padding: "8px 10px",
-                color: "#34a853",
-                cursor: "pointer",
-                fontSize: "11px",
-                fontWeight: 600
-              }}
-            >
-              ✓ Seleziona tutti
+        <div style={{
+          position: "absolute", top: "100%", left: 0, zIndex: 20,
+          background: "white", border: "1px solid #dadce0", borderRadius: "4px",
+          marginTop: "2px", minWidth: "220px", maxHeight: "300px", overflowY: "auto",
+          boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
+        }}>
+          <div style={{
+            position: "sticky", top: 0, zIndex: 2, display: "flex", justifyContent: "space-between",
+            background: "white", borderBottom: "1px solid #dadce0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+          }}>
+            <div onClick={() => onChange(options.map((o) => String(o)))}
+              style={{ padding: "8px 10px", color: "#34a853", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}>
+              Seleziona tutti
             </div>
-
-            <div
-              onClick={() => onChange([])}
-              style={{
-                padding: "8px 10px",
-                color: "#ea4335",
-                cursor: "pointer",
-                fontSize: "11px",
-                fontWeight: 600
-              }}
-            >
-              ✕ Deseleziona tutti
+            <div onClick={() => onChange([])}
+              style={{ padding: "8px 10px", color: "#ea4335", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}>
+              Deseleziona tutti
             </div>
           </div>
-
           {options.map((opt) => (
-            <label
-              key={opt}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "6px 10px",
-                fontSize: "12px",
-                cursor: "pointer",
-                textAlign: "left"
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#f8f9fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "white")
-              }
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(String(opt))}
-                onChange={() => toggle(String(opt))}
-                style={{ cursor: "pointer", margin: 0 }}
-              />
-              <span style={{ textAlign: "left" }}>{formatOption ? formatOption(opt) : opt}</span>
+            <label key={opt} style={{
+              display: "flex", alignItems: "center", gap: "6px", padding: "6px 10px",
+              fontSize: "12px", cursor: "pointer", textAlign: "left"
+            }}>
+              <input type="checkbox" checked={selected.includes(String(opt))} onChange={() => toggle(String(opt))}
+                style={{ cursor: "pointer", margin: 0 }} />
+              <span>{formatOption ? formatOption(opt) : opt}</span>
             </label>
           ))}
         </div>
       )}
-
     </div>
   );
 }
@@ -138,13 +83,19 @@ const formatEuro = (value) => {
   if (value === null || value === undefined || value === "") return "";
   const num = parseFloat(value);
   if (isNaN(num)) return "";
-  return `€ ${fmtItIT(num)}`;
+  return `\u20AC ${fmtItIT(num)}`;
+};
+
+const fmtNum = (v) => {
+  if (v === null || v === undefined || v === "") return "";
+  const n = parseFloat(v);
+  if (isNaN(n)) return "";
+  return fmtItIT(n);
 };
 
 const isScostamento = (excel, pianificato) =>
   excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
 
-// ── Stili condivisi ──────────────────────────────────────────────────────────
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle" };
 
 const btn = (variant = "default") => {
@@ -152,182 +103,219 @@ const btn = (variant = "default") => {
     display: "inline-flex", alignItems: "center", gap: "6px",
     padding: "7px 16px", borderRadius: "6px", fontSize: "13px",
     fontWeight: 600, cursor: "pointer", border: "none",
-    transition: "opacity 0.15s, box-shadow 0.15s",
-    whiteSpace: "nowrap",
+    transition: "opacity 0.15s, box-shadow 0.15s", whiteSpace: "nowrap",
   };
   const variants = {
     primary: { ...base, background: "#1a73e8", color: "#fff", boxShadow: "0 1px 3px rgba(26,115,232,.35)" },
-    danger: { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
-    ghost: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
+    danger:  { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
+    ghost:   { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
     success: { ...base, background: "#34a853", color: "#fff", boxShadow: "0 1px 3px rgba(52,168,83,.35)" },
     default: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
   };
   return variants[variant] || variants.default;
 };
 
-
 const inputStyle = (extra = {}) => ({
-  padding: "5px 8px", border: "1px solid #dadce0", borderRadius: "4px",
-  fontSize: "13px", background: "white", color: "#333", ...extra,
+  padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px",
+  fontSize: "13px", background: "white", color: "#333", width: "100%",
+  boxSizing: "border-box", ...extra,
 });
 
-// ── Componente ───────────────────────────────────────────────────────────────
-function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned }) {
+// ── Modale di modifica ────────────────────────────────────────────────────────
+function EditModal({ row, onClose, onSave }) {
+  const [form, setForm] = useState({ ...row });
+  const [saving, setSaving] = useState(false);
+
+  const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSave(form); onClose(); }
+    catch (e) { alert(`Errore salvataggio: ${e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  const Field = ({ label, field, type = "text", readOnly = false, width = "100%" }) => (
+    <div style={{ marginBottom: "12px", width }}>
+      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+      {readOnly
+        ? <div style={{ ...inputStyle(), background: "#f8f9fa", color: "#888" }}>{form[field] ?? ""}</div>
+        : <input value={form[field] ?? ""} type={type}
+            onChange={(e) => set(field, e.target.value)}
+            style={inputStyle()} />
+      }
+    </div>
+  );
+
+  const Section = ({ title, children }) => (
+    <div style={{ marginBottom: "18px" }}>
+      <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", borderBottom: "2px solid #e8f0fe", paddingBottom: "4px" }}>{title}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0 16px" }}>{children}</div>
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center"
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "white", borderRadius: "12px", boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
+        width: "min(880px, 95vw)", maxHeight: "90vh", overflowY: "auto",
+        padding: "28px 32px", position: "relative"
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>Modifica MEV</div>
+            <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>
+              ID {row.excelId} &mdash; {row.applicativo} &mdash; {row.descrizione}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "#888", lineHeight: 1 }}>x</button>
+        </div>
+
+        {/* Sezione: Identificazione */}
+        <Section title="Identificazione">
+          <Field label="ID Excel" field="excelId" readOnly width="calc(10% - 8px)" />
+          <Field label="GoTo" field="goTo" readOnly width="calc(12% - 8px)" />
+          <Field label="Applicativo" field="applicativo" readOnly width="calc(18% - 8px)" />
+          <Field label="X ORDINE" field="xOrdine" readOnly width="calc(20% - 8px)" />
+          <Field label="Descrizione" field="descrizione" readOnly width="calc(40% - 8px)" />
+        </Section>
+
+        {/* Sezione: Responsabili */}
+        <Section title="Responsabili">
+          <Field label="PM Poste" field="pmPoste" width="calc(25% - 8px)" />
+          <Field label="PM CAP" field="pmCap" width="calc(25% - 8px)" />
+          <Field label="Anno Competenza" field="annoCompetenza" type="number" readOnly width="calc(15% - 8px)" />
+          <Field label="Release Excel" field="releaseExcel" readOnly width="calc(20% - 8px)" />
+          <Field label="Recupero" field="recupero" width="calc(15% - 8px)" />
+        </Section>
+
+        {/* Sezione: Stato e Contratto */}
+        <Section title="Stato e Contratto">
+          <Field label="Stato" field="stato" width="calc(20% - 8px)" />
+          <Field label="Tipo Contratto" field="tipoContratto" width="calc(15% - 8px)" />
+          <Field label="BC" field="bc" width="calc(20% - 8px)" />
+          <Field label="Contratto" field="contratto" width="calc(15% - 8px)" />
+          <Field label="RDA" field="rda" width="calc(15% - 8px)" />
+          <Field label="AT ID" field="atId" width="calc(15% - 8px)" />
+        </Section>
+
+        {/* Sezione: Importi */}
+        <Section title="Importi">
+          <Field label="Importo Fornitura" field="importoExcel" readOnly width="calc(20% - 8px)" />
+          <Field label="Importo Scontato" field="importoFornituraScontato" readOnly width="calc(20% - 8px)" />
+          <Field label="Ordinato (BdO)" field="ordinatoBdo" readOnly width="calc(20% - 8px)" />
+          <Field label="Fatturato" field="fatturato" readOnly width="calc(20% - 8px)" />
+          <Field label="Residuo Fatt." field="residuoFatturabile" readOnly width="calc(20% - 8px)" />
+        </Section>
+
+        {/* Sezione: TOW */}
+        <Section title="TOW (gg/qty)">
+          <Field label="TOW02.1" field="tow021" type="number" width="calc(16% - 8px)" />
+          <Field label="TOW02.2" field="tow022" type="number" width="calc(16% - 8px)" />
+          <Field label="TOW02.3" field="tow023" type="number" width="calc(16% - 8px)" />
+          <Field label="TOW02.4" field="tow024" type="number" width="calc(16% - 8px)" />
+          <Field label="TOW02.5" field="tow025" type="number" width="calc(16% - 8px)" />
+          <Field label="TOW02.6" field="tow026" type="number" width="calc(16% - 8px)" />
+          <Field label="Totale TOW" field="towTotale" readOnly width="calc(20% - 8px)" />
+        </Section>
+
+        {/* Sezione: Extra */}
+        <Section title="Extra">
+          <Field label="Accantonato" field="accantonato" type="number" width="calc(15% - 8px)" />
+          <Field label="NEL" field="nel" width="calc(15% - 8px)" />
+          <Field label="In Vita" field="inVita" width="calc(15% - 8px)" />
+          <Field label="CM" field="cm" width="calc(15% - 8px)" />
+          <Field label="SUBCO" field="subco" width="calc(20% - 8px)" />
+          <Field label="TBD" field="tbd" width="calc(20% - 8px)" />
+        </Section>
+
+        {/* Sezione: Note Excel */}
+        <Section title="Note Excel">
+          <div style={{ width: "100%" }}>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Note</label>
+            <textarea value={form.noteExcel ?? ""} onChange={(e) => set("noteExcel", e.target.value)}
+              style={{ ...inputStyle(), minHeight: "80px", resize: "vertical" }} />
+          </div>
+        </Section>
+
+        {/* Sezione: PMO */}
+        <Section title="PMO (editabili)">
+          <Field label="P Anno" field="pAnno" type="number" width="calc(12% - 8px)" />
+          <Field label="P Release" field="pRelease" width="calc(20% - 8px)" />
+          <Field label="P Importo" field="pImporto" type="number" width="calc(20% - 8px)" />
+          <Field label="Importo BDO" field="importoBdo" type="number" width="calc(20% - 8px)" />
+          <div style={{ width: "calc(28% - 8px)" }}>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
+            <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
+              style={{ ...inputStyle(), minHeight: "60px", resize: "vertical" }} />
+          </div>
+        </Section>
+
+        {/* Azioni */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
+          <button style={btn("ghost")} onClick={onClose}>Annulla</button>
+          <button style={btn("primary")} onClick={handleSave} disabled={saving}>
+            {saving ? "Salvataggio..." : "Salva modifiche"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente principale ─────────────────────────────────────────────────────
+function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned, ambienteId }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [savedRows, setSavedRows] = useState({});
-  const [editingImporto, setEditingImporto] = useState({});
-  const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
-  const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
+  const [editRow, setEditRow] = useState(null);
+  const [savedRows, setSavedRows] = useState({});
+  const [notePopover, setNotePopover] = useState(null);
   const role = localStorage.getItem("role") || "";
+
+  const defaultFilters = {
+    goTo: [], applicativo: [], stato: [], annoCompetenza: [],
+    tipoContratto: [], releaseExcel: [], pmPoste: [], pmCap: [],
+    oda: [], rda: [], capgemini: [], iet: [], subco: [],
+    pAnno: [], pRelease: [], importoExcel: []
+  };
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], capgemini: [], iet: [], subco: [], importoExcel: [] };
-    if (!saved) return defaults;
-    const parsed = JSON.parse(saved);
-    return { ...defaults, ...parsed };
+    if (!saved) return defaultFilters;
+    return { ...defaultFilters, ...JSON.parse(saved) };
   });
 
-  // ── Data load ──────────────────────────────────────────────────────────────
+  // ── Data load ─────────────────────────────────────────────────────────────
   const loadMev = async () => {
     setLoading(true);
+    setRows([]);
+    onRowsChange?.([]);
     try {
       const data = await getMevList();
       setRows(data);
       onRowsChange?.(data);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  useEffect(() => { loadMev(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadMev(); }, [ambienteId]); // eslint-disable-line
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], capgemini: [], iet: [], subco: [], importoExcel: [] });
+    setFilters(defaultFilters);
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
   const handleFilterChange = (field, value) =>
     setFilters((prev) => ({ ...prev, [field]: value }));
 
-  // ── Options ────────────────────────────────────────────────────────────────
-  const buildOptions = (field) =>
-    [...new Set(rows.map((r) => r[field]).filter((v) => v !== null && v !== undefined && v !== ""))].sort();
-
-  const goToOptions = buildOptions("goTo");
-  const applicativoOptions = buildOptions("applicativo");
-  const annoOptions = buildOptions("annoCompetenza");
-  const pAnnoOptions = buildOptions("pAnno");
-  const pReleaseOptions = buildOptions("pRelease");
-  // const rdaOptions         = buildOptions("rda");
-  const capgeminiOptions = buildOptions("capgemini");
-  const ietOptions = buildOptions("iet");
-  const subcoOptions = buildOptions("subco");
-  const importoExcelOptions = [...new Set(rows.map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
-
-  // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
-  const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
-  const statoOptions = [
-    ...buildOptions("stato"),
-    ...(hasEmptyStato ? ["(vuoto)"] : []),
-  ];
-
-  // RDA: include "(vuoto)" se esistono righe con RDA vuoto/null
-  const hasEmptyOda = rows.some(
-    (r) => !r.bc || String(r.bc).trim() === ""
-  );
-
-  const odaOptions = [
-    ...buildOptions("bc"),
-    ...(hasEmptyOda ? ["(vuoto)"] : []),
-  ];
-
-  const hasEmptyRda = rows.some((r) => !r.atId || String(r.atId).trim() === "");
-  const rdaOptions = [
-    ...buildOptions("atId"),
-    ...(hasEmptyRda ? ["(vuoto)"] : []),
-  ];
-
-
-  // ── Filtering ──────────────────────────────────────────────────────────────
-  const matchStato = (r) => {
-    if (filters.stato.length === 0) return true;
-    const val = r.stato ?? "";
-    if (!val.trim() && filters.stato.includes("(vuoto)")) return true;
-    return filters.stato.includes(String(val));
-  };
-
-  const matchOda = (r) => {
-    if (filters.oda.length === 0) return true;
-    const val = r.bc ?? "";
-    if (!String(val).trim() && filters.oda.includes("(vuoto)")) return true;
-    return filters.oda.includes(String(val));
-  };
-
-  const matchRda = (r) => {
-    if (filters.rda.length === 0) return true;
-    const val = r.atId ?? "";
-    if (!String(val).trim() && filters.rda.includes("(vuoto)")) return true;
-    return filters.rda.includes(String(val));
-  };
-
-
-  const filteredRows = rows.filter((r) =>
-    (filters.goTo.length === 0 || filters.goTo.includes(String(r.goTo))) &&
-    (filters.applicativo.length === 0 || filters.applicativo.includes(String(r.applicativo))) &&
-    matchStato(r) &&
-    (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
-    matchOda(r) &&
-    matchRda(r) &&
-    (filters.pAnno.length === 0 || filters.pAnno.includes(String(r.pAnno))) &&
-    (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
-    (filters.capgemini.length === 0 || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
-    (filters.iet.length === 0 || filters.iet.includes(String(r.iet ?? ""))) &&
-    (filters.subco.length === 0 || filters.subco.includes(String(r.subco ?? ""))) &&
-    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
-  );
-
-  const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
-  const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
-  const hasActiveFilters = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : v !== "");
-
-  useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
-
-  // ── Editing ────────────────────────────────────────────────────────────────
-  const handleChange = (rowId, field, value) => {
-    setRows((prev) =>
-      prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r))
-    );
-  };
-
-  const rowsRef = useRef(rows);
-  useEffect(() => { rowsRef.current = rows; }, [rows]);
-
-  const handleSave = async (rowId) => {
-    const row = rowsRef.current.find((r) => r.id === rowId);
-    if (!row) return;
-    try {
-      const updatedItem = await updateMev(row.id, {
-        pAnno: Number(row.pAnno), pRelease: row.pRelease,
-        pImporto: Number(row.pImporto), pNote: row.pNote,
-        importoBdo: Number(row.importoBdo && row.importoBdo !== 0 ? row.importoBdo : (row.ordinatoBdo ?? 0)),
-      });
-      setRows((prev) =>
-        prev.map((r) => (r.id === row.id ? { ...r, ...updatedItem } : r))
-      );
-      setSavedRows((prev) => ({ ...prev, [row.id]: true }));
-      setTimeout(() => setSavedRows((prev) => ({ ...prev, [row.id]: false })), 2000);
-    } catch {
-      alert("Errore salvataggio");
-    }
-  };
-
-  // ── Chiudi popover cliccando fuori ────────────────────────────────────────
+  // ── Chiudi popover note ───────────────────────────────────────────────────
   useEffect(() => {
     if (!notePopover) return;
     const handler = (e) => {
@@ -338,21 +326,122 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     return () => document.removeEventListener("mousedown", handler);
   }, [notePopover]);
 
-  // ── Loading ────────────────────────────────────────────────────────────────
+  // ── Options per filtri ───────────────────────────────────────────────────
+  const buildOptions = (field) =>
+    [...new Set(rows.map((r) => r[field]).filter((v) => v !== null && v !== undefined && v !== ""))].sort();
+
+  const withVuoto = (opts, field) => {
+    const hasEmpty = rows.some((r) => !r[field] || String(r[field]).trim() === "");
+    return [...opts, ...(hasEmpty ? ["(vuoto)"] : [])];
+  };
+
+  const matchField = (r, filterKey, rowField) => {
+    if (filters[filterKey].length === 0) return true;
+    const val = r[rowField] ?? "";
+    if (!String(val).trim() && filters[filterKey].includes("(vuoto)")) return true;
+    return filters[filterKey].includes(String(val));
+  };
+
+  const filteredRows = rows.filter((r) =>
+    matchField(r, "goTo", "goTo") &&
+    matchField(r, "applicativo", "applicativo") &&
+    matchField(r, "stato", "stato") &&
+    matchField(r, "annoCompetenza", "annoCompetenza") &&
+    matchField(r, "tipoContratto", "tipoContratto") &&
+    matchField(r, "releaseExcel", "releaseExcel") &&
+    matchField(r, "pmPoste", "pmPoste") &&
+    matchField(r, "pmCap", "pmCap") &&
+    matchField(r, "oda", "bc") &&
+    matchField(r, "rda", "atId") &&
+    matchField(r, "capgemini", "capgemini") &&
+    matchField(r, "iet", "iet") &&
+    matchField(r, "subco", "subco") &&
+    matchField(r, "pAnno", "pAnno") &&
+    matchField(r, "pRelease", "pRelease") &&
+    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
+  );
+
+  const totCap    = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
+  const totPoste  = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
+  const hasActive = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : !!v);
+
+  useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
+
+  // ── Save da modale ────────────────────────────────────────────────────────
+  const handleModalSave = async (form) => {
+    const updated = await updateMev(form.id, {
+      pAnno:      Number(form.pAnno),
+      pRelease:   form.pRelease ?? "",
+      pImporto:   Number(form.pImporto),
+      pNote:      form.pNote,
+      importoBdo: Number(form.importoBdo ?? 0),
+      stato:      form.stato,
+      pmPoste:    form.pmPoste,
+      pmCap:      form.pmCap,
+      tipoContratto: form.tipoContratto,
+      recupero:   form.recupero,
+      subco:      form.subco,
+      tbd:        form.tbd,
+      bc:         form.bc,
+      contratto:  form.contratto,
+      rda:        form.rda,
+      atId:       form.atId,
+      tow021:     form.tow021 != null ? Number(form.tow021) : null,
+      tow022:     form.tow022 != null ? Number(form.tow022) : null,
+      tow023:     form.tow023 != null ? Number(form.tow023) : null,
+      tow024:     form.tow024 != null ? Number(form.tow024) : null,
+      tow025:     form.tow025 != null ? Number(form.tow025) : null,
+      tow026:     form.tow026 != null ? Number(form.tow026) : null,
+      accantonato: form.accantonato != null ? Number(form.accantonato) : null,
+      nel:        form.nel,
+      inVita:     form.inVita,
+      cm:         form.cm,
+      noteExcel:  form.noteExcel,
+    });
+    setRows((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...updated } : r)));
+    setSavedRows((prev) => ({ ...prev, [form.id]: true }));
+    setTimeout(() => setSavedRows((prev) => ({ ...prev, [form.id]: false })), 2000);
+  };
+
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#666", fontSize: "15px" }}>
       Caricamento MEV...
     </div>
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Helper colonne ────────────────────────────────────────────────────────
+  const TH = ({ children, minW }) => (
+    <th style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW }}>
+      {children}
+    </th>
+  );
+
+  const statoBadge = (stato) => {
+    const map = {
+      "Approvato":       { bg: "#e6f4ea", color: "#2e7d32" },
+      "In approvazione": { bg: "#fff8e1", color: "#e65100" },
+    };
+    const s = map[stato] || { bg: "#f1f3f4", color: "#555" };
+    return (
+      <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "12px", fontSize: "12px", background: s.bg, color: s.color }}>
+        {stato || "(vuoto)"}
+      </span>
+    );
+  };
+
+  const checkMark = (val) =>
+    val?.trim().toLowerCase() === "x"
+      ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>V</span>
+      : (val ?? "");
+
+  // ── Render principale ─────────────────────────────────────────────────────
   return (
     <div style={{ padding: "20px 24px" }}>
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <button
-          style={btn("primary")}
+        <button style={btn("primary")} disabled={aligning}
           onClick={async () => {
             if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
             setAligning(true);
@@ -364,64 +453,44 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               alert(msg);
               onAligned?.();
               await loadMev();
-            } catch (e) {
-              alert(`Errore allineamento:\n${e.message}`);
-            } finally {
-              setAligning(false);
-            }
-          }}
-          disabled={aligning}
-        >
-          {aligning ? "Allineamento..." : "⟳ Allinea Dati"}
+            } catch (e) { alert(`Errore allineamento:\n${e.message}`); }
+            finally { setAligning(false); }
+          }}>
+          {aligning ? "Allineamento..." : "\u27F3 Allinea Dati"}
         </button>
 
         <button style={btn("success")} onClick={async () => {
           try { await exportMev(filteredRows, filters); }
           catch (e) { alert(`Errore export: ${e.message}`); }
         }}>
-          ↓ Esporta Excel
+          Esporta Excel
         </button>
 
-        <button
-          style={{ ...btn("ghost"), opacity: hasActiveFilters ? 1 : 0.5 }}
-          onClick={resetFilters}
-          disabled={!hasActiveFilters}
-        >
-          ✕ Reset filtri
+        <button style={{ ...btn("ghost"), opacity: hasActive ? 1 : 0.5 }}
+          onClick={resetFilters} disabled={!hasActive}>
+          X Reset filtri
         </button>
 
-        {/* Carica Excel — solo Admin */}
         {role === "Admin" && (
           <>
-            <input
-              id="upload-excel"
-              type="file"
-              accept=".xlsx"
-              style={{ display: "none" }}
+            <input id="upload-excel" type="file" accept=".xlsx" style={{ display: "none" }}
               onChange={async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 try {
                   await uploadExcel(file);
                   alert("File caricato. Clicca 'Allinea Dati' per importare.");
-                } catch (err) {
-                  alert(`Errore caricamento: ${err.message}`);
-                }
+                } catch (err) { alert(`Errore caricamento: ${err.message}`); }
                 e.target.value = "";
-              }}
-            />
+              }} />
             <label htmlFor="upload-excel" style={{ ...btn("ghost"), cursor: "pointer" }}>
-              ↑ Carica Excel
+              Carica Excel
             </label>
           </>
         )}
 
-        {/* Totali */}
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>
-          <div style={{
-            background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px",
-            textAlign: "right", minWidth: "160px"
-          }}>
+          <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
             <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot CAP</div>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8" }}>{formatEuro(totCap)}</div>
           </div>
@@ -435,157 +504,148 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
         </div>
       </div>
 
-      {/* ── Contatore righe ── */}
+      {/* Contatore */}
       <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-        {filteredRows.length} righe{hasActiveFilters ? ` (filtrate su ${rows.length} totali)` : ""}
+        {filteredRows.length} righe{hasActive ? ` (filtrate su ${rows.length} totali)` : ""}
       </div>
 
-      {/* ── Tabella ── */}
+      {/* Tabella */}
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            {/* Filtri */}
+            {/* Riga filtri */}
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-              <th style={{ padding: "4px 6px" }}>{/* ID */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Descrizione */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Importo BDO */}</th>
-              <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
-              <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
+              <th style={{ padding: "4px 6px", minWidth: "40px" }}></th>
+              <th style={{ padding: "4px 6px", minWidth: "60px" }}></th>
+              <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "200px" }}></th>
+              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "130px" }}></th>
+              <th style={{ padding: "4px 6px" }}></th>
+              <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("capgemini")} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("iet")} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
+              <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "Importo BDO", "P Note", "Azioni"].map((h) => (
-                <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
-              ))}
+              <TH minW="50px">Azioni</TH>
+              <TH minW="50px">ID</TH>
+              <TH minW="80px">GoTo</TH>
+              <TH minW="110px">Applicativo</TH>
+              <TH minW="200px">Descrizione</TH>
+              <TH minW="100px">PM Poste</TH>
+              <TH minW="100px">PM CAP</TH>
+              <TH minW="60px">Anno</TH>
+              <TH minW="100px">Release</TH>
+              <TH minW="100px">Stato</TH>
+              <TH minW="80px">Tipo Contr.</TH>
+              <TH minW="130px">Importo CAP</TH>
+              <TH minW="60px">Note</TH>
+              <TH minW="120px">ODA (BC)</TH>
+              <TH minW="100px">RDA (AT ID)</TH>
+              <TH minW="60px">CAP</TH>
+              <TH minW="50px">IET</TH>
+              <TH minW="80px">Subco</TH>
+              <TH minW="75px">TOW01</TH>
+              <TH minW="75px">TOW02</TH>
+              <TH minW="75px">TOW03</TH>
+              <TH minW="75px">TOW04</TH>
+              <TH minW="75px">TOW05</TH>
+              <TH minW="75px">TOW06</TH>
+              <TH minW="90px">Tot TOW</TH>
+              <TH minW="70px">P Anno</TH>
+              <TH minW="90px">P Release</TH>
+              <TH minW="120px">Importo BDO</TH>
+              <TH minW="130px">P Note</TH>
             </tr>
           </thead>
 
           <tbody>
             {filteredRows.map((r, index) => {
               const scost = isScostamento(r.importoExcel, r.pImporto);
+              const bg = scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa";
+              const bgHover = scost ? "#ffe8e8" : "#f0f4ff";
               return (
-                <tr
-                  key={r.id}
-                  style={{
-                    backgroundColor: scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa",
-                    borderBottom: "1px solid #f0f0f0",
-                    transition: "background-color 0.1s",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = scost ? "#ffe8e8" : "#f0f4ff"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa"}
-                >
-                  <td style={{ ...TD }}>{r.excelId}</td>
+                <tr key={r.id}
+                  style={{ backgroundColor: bg, borderBottom: "1px solid #f0f0f0", transition: "background-color 0.1s" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = bgHover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bg)}>
+
+                  {/* Azioni */}
+                  <td style={{ ...TD, textAlign: "center" }}>
+                    <button onClick={() => setEditRow(r)}
+                      style={{
+                        ...btn("primary"), padding: "4px 10px", fontSize: "12px",
+                        background: savedRows[r.id] ? "#34a853" : "#1a73e8"
+                      }}>
+                      {savedRows[r.id] ? "V" : "Modifica"}
+                    </button>
+                  </td>
+
+                  <td style={{ ...TD, fontSize: "12px", color: "#999" }}>{r.excelId}</td>
                   <td style={{ ...TD }}>{r.goTo}</td>
                   <td style={{ ...TD }}>{r.applicativo}</td>
-                  <td style={{ ...TD, maxWidth: "300px" }}>{r.descrizione}</td>
+                  <td style={{ ...TD, maxWidth: "280px" }}>{r.descrizione}</td>
+                  <td style={{ ...TD }}>{r.pmPoste ?? ""}</td>
+                  <td style={{ ...TD }}>{r.pmCap ?? ""}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{r.annoCompetenza}</td>
-                  <td style={{ ...TD }}>
-                    <span style={{
-                      display: "inline-block", padding: "2px 8px", borderRadius: "12px",
-                      fontSize: "13px",
-                      background: r.stato === "Approvato" ? "#e6f4ea" : r.stato === "In approvazione" ? "#fff8e1" : "#f1f3f4",
-                      color: r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
-                    }}>{r.stato || "(vuoto)"}</span>
-                  </td>
-                  <td style={{ ...TD, textAlign: "right", minWidth: "130px", whiteSpace: "nowrap" }}>{formatEuro(r.importoExcel)}</td>
+                  <td style={{ ...TD }}>{r.releaseExcel ?? ""}</td>
+                  <td style={{ ...TD }}>{statoBadge(r.stato)}</td>
+                  <td style={{ ...TD, fontSize: "12px" }}>{r.tipoContratto ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoExcel)}</td>
 
+                  {/* Note */}
                   <td style={{ ...TD, textAlign: "center" }}>
                     {r.noteExcel ? (
-                      <button
-                        data-note-btn="1"
+                      <button data-note-btn="1"
                         onClick={(e) => {
                           if (notePopover && notePopover.id === r.id) { setNotePopover(null); return; }
                           const rect = e.currentTarget.getBoundingClientRect();
                           setNotePopover({ id: r.id, text: r.noteExcel, x: rect.left, y: rect.bottom + window.scrollY + 6 });
                         }}
                         style={{
-                          padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 600,
+                          padding: "3px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600,
                           cursor: "pointer", border: "1px solid #1a73e8",
                           background: notePopover?.id === r.id ? "#1a73e8" : "#e8f0fe",
                           color: notePopover?.id === r.id ? "#fff" : "#1a73e8",
-                        }}
-                      >
+                        }}>
                         Note
                       </button>
                     ) : null}
                   </td>
 
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.bc ?? ""}</td>
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
+                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
+                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.capgemini)}</td>
+                  <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.iet)}</td>
+                  <td style={{ ...TD, fontSize: "12px" }}>{r.subco ?? ""}</td>
 
-                  <td style={{ ...TD, textAlign: "center" }}>{r.capgemini?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.capgemini ?? "")}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{r.iet?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.iet ?? "")}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{r.subco?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.subco ?? "")}</td>
+                  {/* TOW */}
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow021)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow022)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow023)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow024)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow025)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow026)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontSize: "12px", fontWeight: 600 }}>{fmtNum(r.towTotale)}</td>
 
-                  <td style={{ ...TD }}>
-                    <input type="number" value={r.pAnno}
-                      onChange={(e) => handleChange(r.id, "pAnno", e.target.value)}
-                      style={inputStyle({ width: "68px", textAlign: "center" })}
-                    />
-                  </td>
-
-                  <td style={{ ...TD }}>
-                    <input value={r.pRelease}
-                      onChange={(e) => handleChange(r.id, "pRelease", e.target.value)}
-                      style={inputStyle({ width: "90px" })}
-                    />
-                  </td>
-
-                  <td style={{ ...TD, textAlign: "right" }}>
-                    <input
-                      type="text"
-                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro((r.importoBdo && r.importoBdo !== 0) ? r.importoBdo : (r.ordinatoBdo ?? 0))}
-                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: (r.importoBdo && r.importoBdo !== 0) ? r.importoBdo : (r.ordinatoBdo ?? "") }))}
-                      onChange={(e) => setEditingBdo((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                      onBlur={(e) => {
-                        let raw = e.target.value.trim();
-                        if (raw.includes(".") && raw.includes(",")) raw = raw.replace(/\./g, "").replace(",", ".");
-                        else raw = raw.replace(",", ".");
-                        raw = raw.replace(/[^\d.]/g, "");
-                        const value = isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
-                        handleChange(r.id, "importoBdo", value);
-                        setEditingBdo((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
-                      }}
-                      style={inputStyle({
-                        width: "120px", textAlign: "right",
-                        backgroundColor: savedRows[r.id] ? "#d4edda" : "",
-                        transition: "background-color 0.3s ease",
-                      })}
-                    />
-                  </td>
-
-                  <td style={{ ...TD }}>
-                    <input value={r.pNote ?? ""}
-                      onChange={(e) => handleChange(r.id, "pNote", e.target.value)}
-                      style={inputStyle({ width: "100%", minWidth: "120px" })}
-                    />
-                  </td>
-
-                  <td style={{ ...TD, textAlign: "center" }}>
-                    <button
-                      onClick={() => handleSave(r.id)}
-                      style={{
-                        ...btn("primary"),
-                        padding: "5px 12px", fontSize: "13px",
-                        background: savedRows[r.id] ? "#34a853" : "#1a73e8",
-                      }}
-                    >
-                      {savedRows[r.id] ? "✓" : "Salva"}
-                    </button>
-                  </td>
+                  {/* PMO */}
+                  <td style={{ ...TD, textAlign: "center" }}>{r.pAnno}</td>
+                  <td style={{ ...TD }}>{r.pRelease}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoBdo && r.importoBdo !== 0 ? r.importoBdo : r.ordinatoBdo)}</td>
+                  <td style={{ ...TD, maxWidth: "180px", fontSize: "12px", color: "#666" }}>{r.pNote ?? ""}</td>
                 </tr>
               );
             })}
@@ -593,39 +653,36 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
         </table>
 
         {filteredRows.length === 0 && (
-          <div style={{ textAlign: "center", padding: "40px", color: "#888", fontSize: "14px" }}>
-            Nessun risultato trovato
-          </div>
+          <div style={{ textAlign: "center", padding: "40px", color: "#888", fontSize: "14px" }}>Nessun risultato trovato</div>
         )}
       </div>
 
-      {/* ── Popover Note ── */}
+      {/* Popover Note */}
       {notePopover && (
-        <div
-          data-note-popover="1"
-          style={{
-            position: "fixed",
-            left: Math.min(notePopover.x, window.innerWidth - 320),
-            top: notePopover.y - window.scrollY,
-            zIndex: 9999,
-            background: "#fff",
-            border: "1px solid #dadce0",
-            borderRadius: "8px",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-            padding: "12px 16px",
-            maxWidth: "300px",
-            minWidth: "180px",
-            fontSize: "13px",
-            color: "#333",
-            lineHeight: "1.5",
-          }}
-        >
+        <div data-note-popover="1" style={{
+          position: "fixed",
+          left: Math.min(notePopover.x, window.innerWidth - 320),
+          top: notePopover.y - window.scrollY,
+          zIndex: 9999, background: "#fff", border: "1px solid #dadce0",
+          borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+          padding: "12px 16px", maxWidth: "300px", minWidth: "180px",
+          fontSize: "13px", color: "#333", lineHeight: "1.5",
+        }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontWeight: 700, fontSize: "12px", color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Note</span>
-            <span onClick={() => setNotePopover(null)} style={{ cursor: "pointer", color: "#888", fontSize: "16px", lineHeight: 1 }}>×</span>
+            <span onClick={() => setNotePopover(null)} style={{ cursor: "pointer", color: "#888", fontSize: "16px", lineHeight: 1 }}>x</span>
           </div>
           {notePopover.text}
         </div>
+      )}
+
+      {/* Modale edit */}
+      {editRow && (
+        <EditModal
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSave={handleModalSave}
+        />
       )}
     </div>
   );

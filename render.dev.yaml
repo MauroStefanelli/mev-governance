@@ -5,7 +5,7 @@ services:
     name: mev-pdf-parser-dev
     runtime: docker
     dockerfilePath: ./mev-pdf-parser/Dockerfile
-    dockerContext: .
+    dockerContext: ./mev-pdf-parser
     branch: develop
     plan: free
 
@@ -25,12 +25,12 @@ services:
       - key: JWT_AUDIENCE
         value: mev-governance-ui-dev
       - key: ADMIN_PASSWORD
-        generateValue: true
+        value: Admin2025!
       - key: DATABASE_DIRECT_URL
         sync: false
-        # Imposta manualmente su Render con la connessione DIRETTA Supabase (non pooler):
-        # postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/MEV-Governance-Dev
-        # Per creare il DB: Supabase SQL Editor → CREATE DATABASE "MEV-Governance-Dev";
+        # Imposta manualmente su Render: Settings → Database su Supabase → Direct connection URI
+        # postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+        # Lo schema "dev" viene creato automaticamente dal backend al primo avvio (DB_SCHEMA=dev)
       - key: CORS_ORIGINS
         value: https://mev-governance-frontend-dev.onrender.com
       - key: PDF_PARSER_URL
@@ -48,6 +48,6 @@ services:
     dockerContext: ./mev-governance-ui
     branch: develop
     plan: free
-    buildArgs:
+    envVars:
       - key: REACT_APP_API_URL
         value: https://mev-governance-backend-dev.onrender.com

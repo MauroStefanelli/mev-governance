@@ -3,6 +3,7 @@ using System;
 using MevGovernanceBackend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace mevgovernancebackend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260730152452_AddAmbientiAndAmbienteId")]
+    partial class AddAmbientiAndAmbienteId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.5");
@@ -165,16 +168,10 @@ namespace mevgovernancebackend.Migrations
                     b.Property<decimal>("Impegnato")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsCatalogo")
-                        .HasColumnType("INTEGER");
-
                     b.Property<decimal>("OrdinatiRda")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Residuo")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("Sconto")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Tow")
@@ -256,9 +253,6 @@ namespace mevgovernancebackend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal?>("Accantonato")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("AmbienteId")
                         .HasColumnType("INTEGER");
 
@@ -278,17 +272,11 @@ namespace mevgovernancebackend.Migrations
                     b.Property<string>("Capgemini")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Cm")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Contratto")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Descrizione")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DocumentoOfferta")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ExcelId")
@@ -314,19 +302,7 @@ namespace mevgovernancebackend.Migrations
                     b.Property<decimal>("ImportoExcel")
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("ImportoFornituraScontato")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("InVita")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Nel")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("NoteExcel")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("OffertaEuro")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("OrdinatoBdo")
@@ -345,28 +321,10 @@ namespace mevgovernancebackend.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PmCap")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PmPoste")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Po")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PowerAppsId")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Rda")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Recupero")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("ReleaseExcel")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("ResiduoFatturabile")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Stato")
@@ -374,42 +332,6 @@ namespace mevgovernancebackend.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Subco")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SubcoNome")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TabellaOfferta")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Tbd")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TipoContratto")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Tow021")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Tow022")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Tow023")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Tow024")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Tow025")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Tow026")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("TowTotale")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("XOrdine")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
