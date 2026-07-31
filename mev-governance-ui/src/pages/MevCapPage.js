@@ -122,6 +122,8 @@ const inputStyle = (extra = {}) => ({
 });
 
 // ── Field e Section: definiti FUORI dalla modale per evitare re-mount ad ogni render ──
+
+// Campo con dropdown puro (select) — per edit mode
 const ModalField = ({ label, field, type, readOnly, width, form, onChange, options }) => (
   <div style={{ marginBottom: "12px", width: width || "100%" }}>
     <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
@@ -140,6 +142,46 @@ const ModalField = ({ label, field, type, readOnly, width, form, onChange, optio
   </div>
 );
 
+// Campo combo: dropdown con opzioni + "Aggiungi nuovo..." per inserire valori custom
+const ComboField = ({ label, field, width, form, onChange, options }) => {
+  const [addingNew, setAddingNew] = useState(false);
+  const [newVal, setNewVal] = useState("");
+  const currentValue = String(form[field] ?? "");
+  const isKnown = currentValue === "" || options.includes(currentValue);
+
+  const confirm = () => {
+    if (newVal.trim()) onChange(field, newVal.trim());
+    setAddingNew(false);
+    setNewVal("");
+  };
+
+  return (
+    <div style={{ marginBottom: "12px", width: width || "100%" }}>
+      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+      {addingNew ? (
+        <div style={{ display: "flex", gap: "4px" }}>
+          <input autoFocus value={newVal} onChange={(e) => setNewVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") confirm(); if (e.key === "Escape") { setAddingNew(false); setNewVal(""); } }}
+            placeholder="Nuovo valore..." style={{ ...inputStyle(), flex: 1 }} />
+          <button type="button" onClick={confirm}
+            style={{ padding: "4px 10px", background: "#34a853", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: 700 }}>OK</button>
+          <button type="button" onClick={() => { setAddingNew(false); setNewVal(""); }}
+            style={{ padding: "4px 8px", background: "#f1f3f4", color: "#555", border: "1px solid #dadce0", borderRadius: "4px", cursor: "pointer" }}>X</button>
+        </div>
+      ) : (
+        <select value={isKnown ? currentValue : "__custom__"}
+          onChange={(e) => { if (e.target.value === "__new__") setAddingNew(true); else onChange(field, e.target.value); }}
+          style={{ ...inputStyle(), height: "32px", cursor: "pointer" }}>
+          <option value="">-- seleziona --</option>
+          {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          {!isKnown && currentValue && <option value="__custom__">{currentValue}</option>}
+          <option value="__new__">+ Aggiungi nuovo...</option>
+        </select>
+      )}
+    </div>
+  );
+};
+
 const ModalSection = ({ title, children }) => (
   <div style={{ marginBottom: "18px" }}>
     <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", borderBottom: "2px solid #e8f0fe", paddingBottom: "4px" }}>{title}</div>
@@ -147,13 +189,31 @@ const ModalSection = ({ title, children }) => (
   </div>
 );
 
+// TOW keys → field nel form
+const TOW_FIELDS = [
+  { key: "TOW02.1", field: "tow021" }, { key: "TOW02.2", field: "tow022" },
+  { key: "TOW02.3", field: "tow023" }, { key: "TOW02.4", field: "tow024" },
+  { key: "TOW02.5", field: "tow025" }, { key: "TOW02.6", field: "tow026" },
+];
+
+// Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto
+const calcImporto = (form, priceMap) => {
+  const prices = priceMap?.[form.tipoContratto];
+  if (!prices) return 0;
+  return TOW_FIELDS.reduce((sum, { key, field }) => {
+    const qty = parseFloat(form[field]) || 0;
+    return sum + qty * (prices[key] ?? 0);
+  }, 0);
+};
+
 // ── Modale di modifica / creazione ───────────────────────────────────────────
-function EditModal({ row, mode, options, onClose, onSave }) {
+function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   const isCreate = mode === "create";
 
   const emptyForm = {
-    excelId: "", applicativo: "", descrizione: "", goTo: "", xOrdine: "",
-    pmPoste: "", pmCap: "", annoCompetenza: new Date().getFullYear(), releaseExcel: "",
+    excelId: nextId != null ? String(nextId) : "",
+    applicativo: "", descrizione: "", goTo: "", xOrdine: "",
+    pmPoste: "", pmCap: "", annoCompetenza: String(new Date().getFullYear()), releaseExcel: "",
     stato: "", tipoContratto: "", importoExcel: 0, recupero: "",
     bc: "", contratto: "", rda: "", atId: "", nel: "", inVita: "", cm: "",
     subco: "", tbd: "", accantonato: null,
@@ -165,18 +225,21 @@ function EditModal({ row, mode, options, onClose, onSave }) {
   const [form, setForm] = useState(isCreate ? emptyForm : { ...row });
   const [saving, setSaving] = useState(false);
 
+  const computedImporto = isCreate ? calcImporto(form, options.priceMap) : null;
+
   const set = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
 
   const handleSave = async () => {
     if (isCreate) {
-      if (!form.excelId?.trim()) { alert("ID Excel obbligatorio"); return; }
+      if (!form.excelId?.trim()) { alert("ID obbligatorio"); return; }
       if (!form.applicativo?.trim()) { alert("Applicativo obbligatorio"); return; }
       if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
     }
     setSaving(true);
-    try { await onSave(form); onClose(); }
+    const formToSave = isCreate ? { ...form, importoExcel: computedImporto } : form;
+    try { await onSave(formToSave); onClose(); }
     catch (e) { alert(`Errore salvataggio: ${e.message}`); }
     finally { setSaving(false); }
   };
@@ -195,7 +258,7 @@ function EditModal({ row, mode, options, onClose, onSave }) {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
           <div>
             <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>
-              {isCreate ? "Nuova riga MEV" : "Modifica MEV"}
+              {isCreate ? "Nuovo GoTo" : "Modifica MEV"}
             </div>
             {!isCreate && (
               <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>
@@ -208,50 +271,84 @@ function EditModal({ row, mode, options, onClose, onSave }) {
 
         {/* Sezione: Identificazione */}
         <ModalSection title="Identificazione">
-          <ModalField label="ID Excel *"   field="excelId"     readOnly={!isCreate} form={form} onChange={set} width="calc(10% - 8px)" />
-          <ModalField label="GoTo"         field="goTo"         readOnly={!isCreate} form={form} onChange={set} width="calc(12% - 8px)" />
-          <ModalField label="Applicativo *" field="applicativo" readOnly={!isCreate} options={isCreate ? options.applicativo : undefined} form={form} onChange={set} width="calc(18% - 8px)" />
-          <ModalField label="X ORDINE"     field="xOrdine"      readOnly={!isCreate} form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="ID *"          field="excelId"    readOnly={!isCreate} form={form} onChange={set} width="calc(10% - 8px)" />
+          <ModalField label="GoTo"          field="goTo"        readOnly={!isCreate} form={form} onChange={set} width="calc(12% - 8px)" />
+          {isCreate
+            ? <ComboField label="Applicativo *" field="applicativo" options={options.applicativo || []} form={form} onChange={set} width="calc(18% - 8px)" />
+            : <ModalField label="Applicativo"   field="applicativo" readOnly form={form} onChange={set} width="calc(18% - 8px)" />
+          }
+          <ModalField label="X ORDINE"      field="xOrdine"    readOnly={!isCreate} form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Descrizione *" field="descrizione" readOnly={!isCreate} form={form} onChange={set} width="calc(40% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Responsabili */}
         <ModalSection title="Responsabili">
-          <ModalField label="PM Poste"        field="pmPoste"        options={options.pmPoste}       form={form} onChange={set} width="calc(25% - 8px)" />
-          <ModalField label="PM CAP"           field="pmCap"          options={options.pmCap}         form={form} onChange={set} width="calc(25% - 8px)" />
-          <ModalField label="Anno Competenza"  field="annoCompetenza" options={options.annoCompetenza} form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="Release"          field="releaseExcel"   options={options.releaseExcel}  form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Recupero"         field="recupero"       form={form} onChange={set} width="calc(15% - 8px)" />
+          {isCreate
+            ? <ComboField label="PM Poste"        field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(25% - 8px)" />
+            : <ModalField label="PM Poste"         field="pmPoste"        options={options.pmPoste}              form={form} onChange={set} width="calc(25% - 8px)" />
+          }
+          {isCreate
+            ? <ComboField label="PM CAP"           field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(25% - 8px)" />
+            : <ModalField label="PM CAP"            field="pmCap"          options={options.pmCap}                form={form} onChange={set} width="calc(25% - 8px)" />
+          }
+          {isCreate
+            ? <ComboField label="Anno Competenza"  field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(15% - 8px)" />
+            : <ModalField label="Anno Competenza"   field="annoCompetenza" options={options.annoCompetenza}       form={form} onChange={set} width="calc(15% - 8px)" />
+          }
+          {isCreate
+            ? <ComboField label="Release"          field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(20% - 8px)" />
+            : <ModalField label="Release"           field="releaseExcel"   options={options.releaseExcel}         form={form} onChange={set} width="calc(20% - 8px)" />
+          }
+          <ModalField label="Recupero" field="recupero" form={form} onChange={set} width="calc(15% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Stato e Contratto */}
         <ModalSection title="Stato e Contratto">
-          <ModalField label="Stato"           field="stato"         options={options.stato}         form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Tipo Contratto"  field="tipoContratto" options={options.tipoContratto} form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="BC"              field="bc"            form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Contratto"       field="contratto"     form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="RDA"             field="rda"           form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="AT ID"           field="atId"          form={form} onChange={set} width="calc(15% - 8px)" />
+          {isCreate
+            ? <ComboField label="Stato"          field="stato"         options={options.stato || []}         form={form} onChange={set} width="calc(20% - 8px)" />
+            : <ModalField label="Stato"           field="stato"         options={options.stato}               form={form} onChange={set} width="calc(20% - 8px)" />
+          }
+          <ModalField label="Tipo Contratto"  field="tipoContratto" options={options.tipoContratto || []} form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="BC"       field="bc"       form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Contratto" field="contratto" form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="RDA"      field="rda"      form={form} onChange={set} width="calc(15% - 8px)" />
+          <ModalField label="AT ID"    field="atId"     form={form} onChange={set} width="calc(15% - 8px)" />
+        </ModalSection>
+
+        {/* Sezione: TOW (prima degli Importi in create, perché l'importo dipende dai TOW) */}
+        <ModalSection title="TOW (gg/qty)">
+          <ModalField label="TOW02.1"    field="tow021"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
+          <ModalField label="TOW02.2"    field="tow022"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
+          <ModalField label="TOW02.3"    field="tow023"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
+          <ModalField label="TOW02.4"    field="tow024"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
+          <ModalField label="TOW02.5"    field="tow025"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
+          <ModalField label="TOW02.6"    field="tow026"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
+          <ModalField label="Totale TOW" field="towTotale" readOnly      form={form} onChange={set} width="calc(16% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Importi */}
         <ModalSection title="Importi">
-          <ModalField label="Importo Fornitura" field="importoExcel"             readOnly={!isCreate} type="number" form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Importo Scontato"  field="importoFornituraScontato" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Ordinato (BdO)"    field="ordinatoBdo"              readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          {isCreate ? (
+            <div style={{ marginBottom: "12px", width: "calc(25% - 8px)" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                Importo Fornitura
+              </label>
+              <div style={{ padding: "6px 8px", border: "2px solid #1a73e8", borderRadius: "4px", fontSize: "13px", background: "#e8f0fe", color: "#1a73e8", fontWeight: 700, minHeight: "32px" }}>
+                {form.tipoContratto
+                  ? (options.priceMap?.[form.tipoContratto]
+                    ? `\u20AC ${fmtItIT(computedImporto)}`
+                    : <span style={{ color: "#ea4335", fontWeight: 400 }}>Nessun prezzo per {form.tipoContratto}</span>)
+                  : <span style={{ color: "#888", fontWeight: 400 }}>— seleziona Tipo Contratto —</span>
+                }
+              </div>
+            </div>
+          ) : (
+            <ModalField label="Importo Fornitura" field="importoExcel" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          )}
+          <ModalField label="Importo Scontato" field="importoFornituraScontato" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Ordinato (BdO)"   field="ordinatoBdo"              readOnly form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Fatturato"         field="fatturato"                readOnly form={form} onChange={set} width="calc(20% - 8px)" />
           <ModalField label="Residuo Fatt."     field="residuoFatturabile"       readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-        </ModalSection>
-
-        {/* Sezione: TOW */}
-        <ModalSection title="TOW (gg/qty)">
-          <ModalField label="TOW02.1"   field="tow021"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
-          <ModalField label="TOW02.2"   field="tow022"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
-          <ModalField label="TOW02.3"   field="tow023"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
-          <ModalField label="TOW02.4"   field="tow024"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
-          <ModalField label="TOW02.5"   field="tow025"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
-          <ModalField label="TOW02.6"   field="tow026"    type="number" form={form} onChange={set} width="calc(16% - 8px)" />
-          <ModalField label="Totale TOW" field="towTotale" readOnly     form={form} onChange={set} width="calc(20% - 8px)" />
         </ModalSection>
 
         {/* Sezione: Extra */}
@@ -275,10 +372,13 @@ function EditModal({ row, mode, options, onClose, onSave }) {
 
         {/* Sezione: PMO */}
         <ModalSection title="PMO">
-          <ModalField label="P Anno"      field="pAnno"      type="number"                          form={form} onChange={set} width="calc(12% - 8px)" />
-          <ModalField label="P Release"   field="pRelease"   options={options.releaseExcel}         form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="P Importo"   field="pImporto"   type="number"                          form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Importo BDO" field="importoBdo" type="number"                          form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
+          {isCreate
+            ? <ComboField label="P Release" field="pRelease" options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
+            : <ModalField label="P Release" field="pRelease" options={options.releaseExcel}       form={form} onChange={set} width="calc(20% - 8px)" />
+          }
+          <ModalField label="P Importo"   field="pImporto"   type="number" form={form} onChange={set} width="calc(20% - 8px)" />
+          <ModalField label="Importo BDO" field="importoBdo" type="number" form={form} onChange={set} width="calc(20% - 8px)" />
           <div style={{ width: "calc(28% - 8px)" }}>
             <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
             <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
@@ -290,7 +390,7 @@ function EditModal({ row, mode, options, onClose, onSave }) {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
           <button style={btn("ghost")} onClick={onClose}>Annulla</button>
           <button style={btn(isCreate ? "success" : "primary")} onClick={handleSave} disabled={saving}>
-            {saving ? "Salvataggio..." : isCreate ? "Crea riga" : "Salva modifiche"}
+            {saving ? "Salvataggio..." : isCreate ? "Crea GoTo" : "Salva modifiche"}
           </button>
         </div>
       </div>
@@ -309,7 +409,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [notePopover, setNotePopover] = useState(null);
   const [mevOptions, setMevOptions] = useState({
     applicativo: [], pmPoste: [], pmCap: [], annoCompetenza: [],
-    releaseExcel: [], stato: [], tipoContratto: [],
+    releaseExcel: [], stato: [], tipoContratto: [], priceMap: {},
   });
   const role = localStorage.getItem("role") || "";
 
@@ -343,6 +443,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         releaseExcel:   opts.releaseExcel   || [],
         stato:          opts.stato          || [],
         tipoContratto:  opts.tipoContratto  || [],
+        priceMap:       opts.priceMap       || {},
       });
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
@@ -790,6 +891,12 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           row={null}
           mode="create"
           options={mevOptions}
+          nextId={(() => {
+            const nums = rows
+              .map((r) => parseInt(r.excelId, 10))
+              .filter((n) => !isNaN(n));
+            return nums.length > 0 ? Math.max(...nums) + 1 : 1;
+          })()}
           onClose={() => setCreateModal(false)}
           onSave={handleCreateSave}
         />

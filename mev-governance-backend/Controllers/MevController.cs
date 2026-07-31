@@ -207,6 +207,19 @@ public class MevController : BaseController
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(v => v);
 
+        // Prezzi unitari per tipo contratto: { "BASE": { "TOW02.1": 123.45, ... }, "QDO": { ... } }
+        var towRows = _db.ConsumoTow
+            .AsNoTracking()
+            .Where(t => t.AmbienteId == ambienteId && t.TowContratto != null)
+            .ToList();
+
+        var priceMap = towRows
+            .GroupBy(t => t.TowContratto!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.ToDictionary(t => t.Tow, t => t.ValoreUnitario)
+            );
+
         return Ok(new
         {
             applicativo   = Distinct(items.Select(i => i.Applicativo)),
@@ -220,6 +233,7 @@ public class MevController : BaseController
             releaseExcel  = Distinct(items.Select(i => i.ReleaseExcel)),
             stato         = new[] { "Approvato", "In analisi / Stima", "In approvazione", "Sospeso", "Eliminato" },
             tipoContratto = new[] { "BASE", "QDO" },
+            priceMap,
         });
     }
 
