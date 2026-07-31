@@ -838,6 +838,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
   const [error, setError] = useState("");
   const [contratti, setContratti] = useState([]);
   const [selectedContratto, setSelectedContratto] = useState("");
+  const [expandedContratto, setExpandedContratto] = useState(null);
   const [editRow, setEditRow] = useState(null);
   const [editContratto, setEditContratto] = useState(null); // nome contratto da modificare in blocco
   const [showNewContratto, setShowNewContratto] = useState(false);
@@ -1138,28 +1139,125 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
         )}
       </div>
 
-      {/* ── KPI cards ── */}
-      {!loading && selectedContratto && (() => {
-        const kpis = [
-          { label: "Valore Totale", key: "valoreTotale", color: "#1e293b", bg: "#f8fafc" },
-          { label: "Approvato",     key: "approvato",    color: "#1a73e8", bg: "#eff6ff" },
-          { label: "Ordinato",      key: "ordinatiRda",  color: "#10b981", bg: "#f0fdf4" },
-          { label: "Impegnato",     key: "impegnato",    color: "#f59e0b", bg: "#fffbeb" },
-          { label: "Residuo",       key: "residuo",      color: "#f97316", bg: "#fff7ed" },
+      {/* ── Tabella collassabile per contratto ── */}
+      {!loading && contratti.length > 0 && (() => {
+        const COLS = [
+          { key: "valoreTotale", label: "Valore Totale", color: "#1e293b" },
+          { key: "approvato",    label: "Approvato",     color: "#1a73e8" },
+          { key: "ordinatiRda",  label: "Ordinato",      color: "#10b981" },
+          { key: "impegnato",    label: "Impegnato",     color: "#f59e0b" },
+          { key: "residuo",      label: "Residuo",       color: "#f97316" },
         ];
         return (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
-            {kpis.map(k => {
-              const tot = filteredRows.reduce((s, r) => s + (Number(r[k.key]) || 0), 0);
-              const perc = kpis[0].key !== k.key && filteredRows.reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0) > 0
-                ? (tot / filteredRows.reduce((s, r) => s + (Number(r.valoreTotale) || 0), 0) * 100).toFixed(1)
-                : null;
+          <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+            {/* Header colonne */}
+            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px) 90px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "0 12px" }}>
+              <div />
+              <div style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Contratto</div>
+              {COLS.map(c => (
+                <div key={c.key} style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: c.color, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>{c.label}</div>
+              ))}
+              <div style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>QTA</div>
+            </div>
+
+            {contratti.map((c, cIdx) => {
+              const cRows   = rows.filter(r => r.towContratto === c);
+              const isBase  = cIdx === 0;
+              const expanded = expandedContratto === c;
+              const totQta  = cRows.reduce((s, r) => s + (r.valoreUnitario > 0 ? Math.round(r.valoreTotale / r.valoreUnitario) : 0), 0);
+
               return (
-                <div key={k.key} style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "16px 18px", borderTop: `4px solid ${k.color}`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>{k.label}</div>
-                  <div style={{ fontSize: "14px", fontWeight: 800, color: k.color, letterSpacing: "-0.2px" }}>{formatEuro(tot)}</div>
-                  {perc !== null && (
-                    <div style={{ marginTop: "5px", display: "inline-block", fontSize: "11px", fontWeight: 700, color: k.color, background: k.bg, border: `1px solid ${k.color}33`, borderRadius: "6px", padding: "1px 7px" }}>{perc}%</div>
+                <div key={c} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  {/* ── Riga totale contratto (cliccabile) ── */}
+                  <div
+                    onClick={() => setExpandedContratto(expanded ? null : c)}
+                    style={{
+                      display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px) 90px",
+                      alignItems: "center", padding: "0 12px", cursor: "pointer",
+                      background: expanded ? "#eff6ff" : "#fff",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "#f8fafc"; }}
+                    onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "#fff"; }}
+                  >
+                    {/* Freccia expand */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "10px", transition: "transform 0.2s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</div>
+                    {/* Nome contratto */}
+                    <div style={{ padding: "12px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: 800, color: expanded ? "#1a73e8" : "#0f172a" }}>{c}</span>
+                      {isBase && <span style={{ fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: "5px", padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.4px" }}>BASE</span>}
+                      <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cRows.length} TOW</span>
+                    </div>
+                    {/* Valori aggregati */}
+                    {COLS.map(col => {
+                      const tot = cRows.reduce((s, r) => s + (Number(r[col.key]) || 0), 0);
+                      return (
+                        <div key={col.key} style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: col.key === "valoreTotale" ? 800 : 600, color: col.color }}>{formatEuro(tot)}</div>
+                      );
+                    })}
+                    <div style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748b" }}>{totQta > 0 ? formatQta(totQta) : "—"}</div>
+                  </div>
+
+                  {/* ── Dettaglio TOW (espanso) ── */}
+                  {expanded && (
+                    <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                      {/* Toolbar dettaglio */}
+                      <div style={{ padding: "8px 56px 8px 56px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e2e8f0" }}>
+                        <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Dettaglio TOW — {c}</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); setShowCollaudo(v => !v); }}
+                          style={{ padding: "4px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, cursor: "pointer", border: showCollaudo ? "1.5px solid #1a73e8" : "1.5px solid #cbd5e1", background: showCollaudo ? "#eff6ff" : "#fff", color: showCollaudo ? "#1a73e8" : "#64748b" }}
+                        >
+                          {showCollaudo ? "▼ Nascondi Collaudo" : "▶ Mostra Collaudo"}
+                        </button>
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                          <thead>
+                            <tr>
+                              <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
+                              <th style={{ ...TH("right"), width: "65px" }}>QTA</th>
+                              {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
+                                <th key={f.key} style={{ ...TH("right"), width: f.group === "euro" ? "125px" : "85px", color: f.color }}>{f.label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cRows.map((row, idx) => (
+                              <tr key={row.id}
+                                style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", transition: "background 0.1s" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}
+                              >
+                                <td style={{ ...TD("left"), fontWeight: 700 }}>
+                                  <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
+                                </td>
+                                <td style={{ ...TD("right"), color: "#64748b" }}>
+                                  {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
+                                </td>
+                                {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
+                                  <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                    {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                          {/* Riga totale interna */}
+                          <tfoot>
+                            <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
+                              <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
+                              <td style={TD("right")} />
+                              {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
+                                if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                              })}
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
                   )}
                 </div>
               );
@@ -1167,96 +1265,6 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
           </div>
         );
       })()}
-
-      {/* ── Tabella ── */}
-      {!loading && selectedContratto && (
-        <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden" }}>
-
-          {/* Header tabella */}
-          <div style={{ padding: "16px 22px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafbfc" }}>
-            <div>
-              <span style={{ fontSize: "18px", fontWeight: 700, color: "#0f1012" }}>Contratto </span>
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "#1a73e8" }}>{selectedContratto}</span>
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "#94a3b8", marginLeft: "10px" }}>{filteredRows.length} righe</span>
-            </div>
-            <button
-              onClick={() => setShowCollaudo(v => !v)}
-              style={{
-                padding: "7px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
-                cursor: "pointer", transition: "all 0.15s",
-                border: showCollaudo ? "1.5px solid #1a73e8" : "1.5px solid #cbd5e1",
-                background: showCollaudo ? "#eff6ff" : "#fff",
-                color: showCollaudo ? "#1a73e8" : "#64748b",
-                display: "flex", alignItems: "center", gap: "6px",
-              }}
-            >
-              <span style={{ fontSize: "10px" }}>{showCollaudo ? "▼" : "▶"}</span>
-              {showCollaudo ? "Nascondi Collaudo" : "Mostra Collaudo"}
-            </button>
-          </div>
-
-          {/* Tabella scrollabile */}
-          <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 420px)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
-              <thead>
-                <tr>
-                  <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
-                  <th style={{ ...TH("right"), width: "65px" }}>QTA</th>
-                  {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
-                    <th key={f.key} style={{ ...TH("right"), width: f.group === "euro" ? "125px" : "85px", color: f.color }}>{f.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                    {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).length + 2} style={{ padding: "48px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
-                      Nessuna riga per il contratto selezionato
-                    </td>
-                  </tr>
-                ) : filteredRows.map((row, idx) => (
-                  <tr key={row.id}
-                    style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa", transition: "background 0.1s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}
-                  >
-                    <td style={{ ...TD("left"), fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
-                    </td>
-                    <td style={{ ...TD("right"), color: "#64748b", fontWeight: 500 }}>
-                      {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
-                    </td>
-                    {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
-                      <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
-                        {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-
-              {/* Riga totali */}
-              {filteredRows.length > 0 && (
-                <tfoot>
-                  <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                    <td style={{ ...TD("left"), fontWeight: 700, color: "#1e293b", fontSize: "12px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Totale</td>
-                    <td style={TD("right")} />
-                    {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
-                      if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                      const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                      return (
-                        <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>
-                          {f.group === "euro" ? formatEuro(tot) : formatQta(tot)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </div>
-      )}
 
       {editRow && (
         <EditModal
