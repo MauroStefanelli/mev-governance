@@ -239,6 +239,22 @@ using (var scope = app.Services.CreateScope())
         Console.Error.WriteLine($"[MIGRATE ERROR] {ex.Message}");
     }
 
+    // Patch di sicurezza: aggiunge colonne mancanti se la migration non le ha create
+    if (isPostgres)
+    {
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""Sconto"" numeric NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""IsCatalogo"" boolean NOT NULL DEFAULT false;
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PATCH] Colonne Sconto/IsCatalogo verificate.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
+    }
+
     // Seed admin — inserisce MSTEFANE se non esiste, aggiorna la password se esiste già
 #pragma warning disable EF1002
     try
