@@ -1157,142 +1157,183 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
 
       {/* ── Tabella collassabile per contratto ── */}
       {!loading && contratti.length > 0 && (() => {
-        const COLS = [
-          { key: "valoreTotale", label: "Valore Totale", color: "#1e293b" },
-          { key: "approvato",    label: "Approvato",     color: "#1a73e8" },
-          { key: "ordinatiRda",  label: "Ordinato",      color: "#10b981" },
-          { key: "impegnato",    label: "Impegnato",     color: "#f59e0b" },
-          { key: "residuo",      label: "Residuo",       color: "#f97316" },
-        ];
+        // Le stesse colonne "aggregate" che compaiono nella riga riassuntiva per contratto
+        // e che devono coincidere con quelle della tabella TOW espansa.
+        // Le colonne visibili nella tabella interna sono:
+        //   TOW (100px) | QTA (65px) | [FIELDS filtrati per showCollaudo]
+        // Per allineare i totali di riga alle colonne interne usiamo una <table>
+        // con le stesse <col> widths.
+        const visibleFields = FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo"));
+
         return (
           <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
-            {/* Header colonne */}
-            <div style={{ display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)", background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "0 12px" }}>
-              <div />
-              <div style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>Contratto</div>
-              {COLS.map(c => (
-                <div key={c.key} style={{ padding: "10px 12px", fontSize: "11px", fontWeight: 700, color: c.color, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>{c.label}</div>
-              ))}
-            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
+                <colgroup>
+                  <col style={{ width: "32px" }} />   {/* freccia */}
+                  <col style={{ width: "180px" }} />  {/* nome contratto */}
+                  <col style={{ width: "100px" }} />  {/* = TOW nella tabella interna */}
+                  <col style={{ width: "65px" }} />   {/* = QTA nella tabella interna */}
+                  {visibleFields.map(f => (
+                    <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
+                  ))}
+                </colgroup>
 
-            {contratti.map((c, cIdx) => {
-              const cRows   = rows.filter(r => r.towContratto === c);
-              const isBase  = cIdx === 0;
-              const showBaseBadge = isBase && c.toUpperCase() !== "BASE";
-              const expanded = expandedContratto === c;
+                {/* Header */}
+                <thead>
+                  <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+                    <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
+                    <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
+                    <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />  {/* TOW */}
+                    <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />  {/* QTA */}
+                    {visibleFields.map(f => (
+                      <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>
+                    ))}
+                  </tr>
+                </thead>
 
-              return (
-                <div key={c} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  {/* ── Riga totale contratto (cliccabile) ── */}
-                  <div
-                    onClick={() => setExpandedContratto(expanded ? null : c)}
-                    style={{
-                      display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)",
-                      alignItems: "center", padding: "0 12px", cursor: "pointer",
-                      background: expanded ? "#eff6ff" : "#fff",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "#f8fafc"; }}
-                    onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "#fff"; }}
-                  >
-                    {/* Freccia expand */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "10px", transition: "transform 0.2s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</div>
-                    {/* Nome contratto */}
-                    <div style={{ padding: "12px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "14px", fontWeight: 800, color: expanded ? "#1a73e8" : "#0f172a" }}>{c}</span>
-                      {showBaseBadge && <span style={{ fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: "5px", padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.4px" }}>BASE</span>}
-                      <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cRows.length} TOW</span>
-                    </div>
-                    {/* Valori aggregati */}
-                    {COLS.map(col => {
-                      const tot = cRows.reduce((s, r) => s + (Number(r[col.key]) || 0), 0);
-                      return (
-                        <div key={col.key} style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: col.key === "valoreTotale" ? 800 : 600, color: col.color }}>{formatEuro(tot)}</div>
-                      );
-                    })}
-                  </div>
+                <tbody>
+                  {contratti.map((c, cIdx) => {
+                    const cRows   = rows.filter(r => r.towContratto === c);
+                    const isBase  = cIdx === 0;
+                    const showBaseBadge = isBase && c.toUpperCase() !== "BASE";
+                    const expanded = expandedContratto === c;
 
-                  {/* ── Dettaglio TOW (espanso) — inizia sotto il nome contratto ── */}
-                  {expanded && (
-                    <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-                      <div style={{ overflowX: "auto", paddingLeft: "44px" }}>
-                        <table style={{ width: "calc(100% - 44px)", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
-                          <thead>
-                            <tr>
-                              <th style={{ ...TH("left"), width: "100px" }}>TOW</th>
-                              <th style={{ ...TH("right"), width: "65px" }}>QTA</th>
-                              {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
-                                <th key={f.key} style={{ ...TH("right"), width: f.group === "euro" ? "125px" : "85px", color: f.color }}>{f.label}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {cRows.map((row, idx) => (
-                              <tr key={row.id}
-                                style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", transition: "background 0.1s" }}
-                                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}
-                              >
-                                <td style={{ ...TD("left"), fontWeight: 700 }}>
-                                  <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
-                                </td>
-                                <td style={{ ...TD("right"), color: "#64748b" }}>
-                                  {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
-                                </td>
-                                {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => (
-                                  <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
-                                    {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                          {/* Riga totale interna */}
-                          <tfoot>
-                            <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
-                              <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
-                              <td style={TD("right")} />
-                              {FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo")).map(f => {
-                                if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                                const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                                return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
-                              })}
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* ── Riga TOTALE CONTRATTI ── */}
-            {contratti.length > 0 && (() => {
-              const allRows = rows.filter(r => contratti.includes(r.towContratto));
-              return (
-                <div style={{
-                  display: "grid", gridTemplateColumns: "32px 1fr repeat(5, 150px)",
-                  alignItems: "center", padding: "0 12px",
-                  background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)",
-                  borderTop: "2px solid #1e293b",
-                }}>
-                  <div />
-                  <div style={{ padding: "14px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
-                    <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{contratti.length} contratti · {allRows.length} TOW</span>
-                  </div>
-                  {COLS.map(col => {
-                    const tot = allRows.reduce((s, r) => s + (Number(r[col.key]) || 0), 0);
                     return (
-                      <div key={col.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: col.key === "valoreTotale" ? "#fff" : col.color, filter: col.key === "valoreTotale" ? "none" : "brightness(1.4)" }}>
-                        {formatEuro(tot)}
-                      </div>
+                      <React.Fragment key={c}>
+                        {/* ── Riga riassuntiva contratto (cliccabile) ── */}
+                        <tr
+                          onClick={() => setExpandedContratto(expanded ? null : c)}
+                          style={{
+                            background: expanded ? "#eff6ff" : "#fff",
+                            cursor: "pointer", transition: "background 0.15s",
+                            borderBottom: expanded ? "none" : "1px solid #f1f5f9",
+                          }}
+                          onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "#f8fafc"; }}
+                          onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = expanded ? "#eff6ff" : "#fff"; }}
+                        >
+                          {/* Freccia */}
+                          <td style={{ ...TD(), textAlign: "center", color: "#94a3b8", fontSize: "10px" }}>
+                            <span style={{ display: "inline-block", transition: "transform 0.2s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                          </td>
+                          {/* Nome contratto */}
+                          <td style={{ ...TD("left"), padding: "12px 12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "14px", fontWeight: 800, color: expanded ? "#1a73e8" : "#0f172a" }}>{c}</span>
+                              {showBaseBadge && <span style={{ fontSize: "10px", fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: "5px", padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.4px" }}>BASE</span>}
+                              <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cRows.length} TOW</span>
+                            </div>
+                          </td>
+                          {/* Celle vuote per TOW e QTA — allineano con le colonne interne */}
+                          <td />
+                          <td />
+                          {/* Totali per ogni field */}
+                          {visibleFields.map(f => {
+                            const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                            return (
+                              <td key={f.key} style={{ ...TD("right"), fontWeight: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? 800 : 600) : 400, color: TOTALE_KEYS.has(f.key) ? f.color : "#94a3b8" }}>
+                                {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
+                              </td>
+                            );
+                          })}
+                        </tr>
+
+                        {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
+                        {expanded && (
+                          <tr>
+                            <td colSpan={4 + visibleFields.length} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
+                              <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                                  <colgroup>
+                                    <col style={{ width: "32px" }} />
+                                    <col style={{ width: "180px" }} />
+                                    <col style={{ width: "100px" }} />
+                                    <col style={{ width: "65px" }} />
+                                    {visibleFields.map(f => (
+                                      <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
+                                    ))}
+                                  </colgroup>
+                                  <tbody>
+                                    {cRows.map((row, idx) => (
+                                      <tr key={row.id}
+                                        style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", transition: "background 0.1s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                                        onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}
+                                      >
+                                        {/* cella freccia vuota per allineamento */}
+                                        <td />
+                                        {/* Nome TOW nella colonna "Contratto" */}
+                                        <td style={{ ...TD("left"), fontWeight: 700, paddingLeft: "24px" }}>
+                                          <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
+                                        </td>
+                                        {/* TOW (vuoto — usato per "TOW" label nell'header) */}
+                                        <td style={TD("right")} />
+                                        {/* QTA */}
+                                        <td style={{ ...TD("right"), color: "#64748b" }}>
+                                          {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
+                                        </td>
+                                        {visibleFields.map(f => (
+                                          <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                            {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  {/* Riga totale interna */}
+                                  <tfoot>
+                                    <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
+                                      <td />
+                                      <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b", paddingLeft: "24px" }}>Totale</td>
+                                      <td />
+                                      <td />
+                                      {visibleFields.map(f => {
+                                        if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                        const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                        return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                                      })}
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
-                </div>
-              );
-            })()}
+                </tbody>
+
+                {/* ── Riga TOTALE CONTRATTI ── */}
+                <tfoot>
+                  {(() => {
+                    const allRows = rows.filter(r => contratti.includes(r.towContratto));
+                    return (
+                      <tr style={{ background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)", borderTop: "2px solid #1e293b" }}>
+                        <td />
+                        <td style={{ padding: "14px 12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
+                            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{contratti.length} contratti · {allRows.length} TOW</span>
+                          </div>
+                        </td>
+                        <td />
+                        <td />
+                        {visibleFields.map(f => {
+                          const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                          return (
+                            <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
+                              {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })()}
+                </tfoot>
+              </table>
+            </div>
           </div>
         );
       })()}
