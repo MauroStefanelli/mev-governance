@@ -881,7 +881,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
     </div>
   );
 }
-export default function ConsumoTowAdminPage({ onUnauthorized }) {
+export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -920,15 +920,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
       const tipi = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
       const ordered = applyOrder(tipi);
       setContratti(ordered);
-      setSelectedContratto(prev => prev || ordered[0] || "");
-      setExpandedContratto(prev => prev || ordered[0] || null);
+      setSelectedContratto(ordered[0] || "");
+      setExpandedContratto(ordered[0] || null);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
       else setError("Errore nel caricamento dei dati");
     } finally { setLoading(false); }
   }, [applyOrder]); // eslint-disable-line
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, ambienteId]); // eslint-disable-line
 
   const filteredRows = selectedContratto ? rows.filter(r => r.towContratto === selectedContratto) : [];
 

@@ -686,7 +686,7 @@ function App() {
         {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
         {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
         {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleLogout} />}
-        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleLogout} />}
+        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
         {page === "superadmin"        && role === "SuperAdmin" && <SuperAdminPage />}
       </main>
 
