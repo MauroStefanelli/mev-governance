@@ -921,6 +921,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
       const ordered = applyOrder(tipi);
       setContratti(ordered);
       setSelectedContratto(prev => prev || ordered[0] || "");
+      setExpandedContratto(prev => prev || ordered[0] || null);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
       else setError("Errore nel caricamento dei dati");
@@ -1059,8 +1060,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized }) {
                     cursor: "grab",
                   }}
                 >
-                  <div
-                    onClick={() => setSelectedContratto(c)}
+                   <div
+                    onClick={() => {
+                      setSelectedContratto(c);
+                      setExpandedContratto(prev => prev === c ? null : c);
+                    }}
                     style={{ padding: "14px 18px 10px", flex: 1, userSelect: "none" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
