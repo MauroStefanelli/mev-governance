@@ -124,7 +124,7 @@ const inputStyle = (extra = {}) => ({
 // ── Field e Section: definiti FUORI dalla modale per evitare re-mount ad ogni render ──
 
 // Campo con dropdown puro (select) — per edit mode
-const ModalField = ({ label, field, type, readOnly, width, form, onChange, options }) => (
+const ModalField = ({ label, field, type, readOnly, width, form, onChange, options, step }) => (
   <div style={{ marginBottom: "12px", width: width || "100%" }}>
     <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
     {readOnly
@@ -136,6 +136,7 @@ const ModalField = ({ label, field, type, readOnly, width, form, onChange, optio
             {options.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         : <input value={form[field] ?? ""} type={type || "text"}
+            step={type === "number" ? (step ?? "any") : undefined}
             onChange={(e) => onChange(field, e.target.value)}
             style={inputStyle()} />
     }
@@ -182,12 +183,50 @@ const ComboField = ({ label, field, width, form, onChange, options }) => {
   );
 };
 
-const ModalSection = ({ title, children }) => (
+const ModalSection = ({ title, children, color }) => (
   <div style={{ marginBottom: "18px" }}>
-    <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", borderBottom: "2px solid #e8f0fe", paddingBottom: "4px" }}>{title}</div>
+    <div style={{ fontSize: "11px", fontWeight: 700, color: color || "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", borderBottom: `2px solid ${color ? color + "33" : "#e8f0fe"}`, paddingBottom: "4px" }}>{title}</div>
     <div style={{ display: "flex", flexWrap: "wrap", gap: "0 16px" }}>{children}</div>
   </div>
 );
+
+// Campo importo read-only visualizzato in €
+const EuroField = ({ label, value, width }) => (
+  <div style={{ marginBottom: "12px", width: width || "calc(20% - 8px)" }}>
+    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+    <div style={{ padding: "6px 10px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", background: "#f8f9fa", color: "#1a73e8", fontWeight: 600, minHeight: "32px", textAlign: "right", whiteSpace: "nowrap" }}>
+      {formatEuro(value)}
+    </div>
+  </div>
+);
+
+// Campo TOW con step 0.001 e pulsanti +/-
+const TowField = ({ label, field, width, form, onChange }) => {
+  const val = form[field];
+  const num = parseFloat(val) || 0;
+  const step = 0.001;
+  return (
+    <div style={{ marginBottom: "12px", width: width || "calc(16% - 8px)" }}>
+      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+      <div style={{ display: "flex", alignItems: "center", border: "1px solid #dadce0", borderRadius: "4px", overflow: "hidden", background: "white" }}>
+        <button type="button"
+          onClick={() => onChange(field, Math.max(0, parseFloat((num - step).toFixed(3))))}
+          style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
+        <input
+          value={val ?? ""}
+          type="number"
+          step="0.001"
+          min="0"
+          onChange={(e) => onChange(field, e.target.value === "" ? null : parseFloat(e.target.value))}
+          style={{ flex: 1, padding: "5px 6px", border: "none", fontSize: "13px", color: "#333", textAlign: "right", minWidth: 0, outline: "none" }}
+        />
+        <button type="button"
+          onClick={() => onChange(field, parseFloat((num + step).toFixed(3)))}
+          style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
+      </div>
+    </div>
+  );
+};
 
 // TOW keys → field nel form
 const TOW_FIELDS = [
@@ -244,154 +283,173 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     finally { setSaving(false); }
   };
 
+  // Colori sezioni
+  const sectionColor = isCreate ? "#0d6e3d" : "#1a73e8";
+  const accentBg     = isCreate ? "#f0fdf4" : "#f0f6ff";
+  const accentBorder = isCreate ? "#a7f3d0" : "#bfdbfe";
+  const headerBg     = isCreate
+    ? "linear-gradient(135deg, #0d6e3d 0%, #15803d 100%)"
+    : "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)";
+
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center"
+      background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center",
+      backdropFilter: "blur(2px)",
     }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        background: "white", borderRadius: "12px", boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
-        width: "min(880px, 95vw)", maxHeight: "90vh", overflowY: "auto",
-        padding: "28px 32px", position: "relative"
+        background: "white", borderRadius: "16px",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.28), 0 4px 16px rgba(0,0,0,0.12)",
+        width: "min(960px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column",
+        position: "relative", overflow: "hidden",
       }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
-          <div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>
-              {isCreate ? "Nuovo GoTo" : "Modifica MEV"}
-            </div>
-            {!isCreate && (
-              <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>
-                ID {row.excelId} &mdash; {row.applicativo} &mdash; {row.descrizione}
+
+        {/* ── Header colorato ── */}
+        <div style={{ background: headerBg, padding: "22px 28px 18px", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                MEV-CAP
               </div>
-            )}
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>
+                {isCreate ? "Nuovo GoTo" : "Modifica MEV"}
+              </div>
+              {!isCreate && (
+                <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.75)", marginTop: "4px" }}>
+                  ID {row.excelId} &nbsp;&mdash;&nbsp; {row.applicativo} &nbsp;&mdash;&nbsp; {row.descrizione}
+                </div>
+              )}
+            </div>
+            <button onClick={onClose} style={{
+              background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "8px",
+              cursor: "pointer", color: "#fff", width: "32px", height: "32px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "18px", lineHeight: 1, flexShrink: 0,
+            }}>×</button>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "#888", lineHeight: 1 }}>x</button>
         </div>
 
-        {/* Sezione: Identificazione */}
-        <ModalSection title="Identificazione">
-          <ModalField label="ID *"          field="excelId"    readOnly={!isCreate} form={form} onChange={set} width="calc(10% - 8px)" />
-          <ModalField label="GoTo"          field="goTo"        readOnly={!isCreate} form={form} onChange={set} width="calc(12% - 8px)" />
-          {isCreate
-            ? <ComboField label="Applicativo *" field="applicativo" options={options.applicativo || []} form={form} onChange={set} width="calc(18% - 8px)" />
-            : <ModalField label="Applicativo"   field="applicativo" readOnly form={form} onChange={set} width="calc(18% - 8px)" />
-          }
-          <ModalField label="X ORDINE"      field="xOrdine"    readOnly={!isCreate} form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Descrizione *" field="descrizione" readOnly={!isCreate} form={form} onChange={set} width="calc(40% - 8px)" />
-        </ModalSection>
+        {/* ── Corpo scrollabile ── */}
+        <div style={{ overflowY: "auto", padding: "24px 28px", flex: 1 }}>
 
-        {/* Sezione: Responsabili */}
-        <ModalSection title="Responsabili">
-          {isCreate
-            ? <ComboField label="PM Poste"        field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(25% - 8px)" />
-            : <ModalField label="PM Poste"         field="pmPoste"        options={options.pmPoste}              form={form} onChange={set} width="calc(25% - 8px)" />
-          }
-          {isCreate
-            ? <ComboField label="PM CAP"           field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(25% - 8px)" />
-            : <ModalField label="PM CAP"            field="pmCap"          options={options.pmCap}                form={form} onChange={set} width="calc(25% - 8px)" />
-          }
-          {isCreate
-            ? <ComboField label="Anno Competenza"  field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(15% - 8px)" />
-            : <ModalField label="Anno Competenza"   field="annoCompetenza" options={options.annoCompetenza}       form={form} onChange={set} width="calc(15% - 8px)" />
-          }
-          {isCreate
-            ? <ComboField label="Release"          field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(20% - 8px)" />
-            : <ModalField label="Release"           field="releaseExcel"   options={options.releaseExcel}         form={form} onChange={set} width="calc(20% - 8px)" />
-          }
-          <ModalField label="Recupero" field="recupero" form={form} onChange={set} width="calc(15% - 8px)" />
-        </ModalSection>
+          {/* Sezione: Identificazione */}
+          <ModalSection title="Identificazione" color={sectionColor}>
+            <ModalField label="ID *"          field="excelId"    readOnly={true}      form={form} onChange={set} width="calc(10% - 8px)" />
+            <ModalField label="GoTo"          field="goTo"        form={form} onChange={set} width="calc(12% - 8px)" />
+            <ComboField label={isCreate ? "Applicativo *" : "Applicativo"} field="applicativo" options={options.applicativo || []} form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="X Ordine"      field="xOrdine"    form={form} onChange={set} width="calc(18% - 8px)" />
+            <ModalField label="Descrizione *" field="descrizione" form={form} onChange={set} width="calc(40% - 8px)" />
+          </ModalSection>
 
-        {/* Sezione: Stato e Contratto */}
-        <ModalSection title="Stato e Contratto">
-          {isCreate
-            ? <ComboField label="Stato"          field="stato"         options={options.stato || []}         form={form} onChange={set} width="calc(20% - 8px)" />
-            : <ModalField label="Stato"           field="stato"         options={options.stato}               form={form} onChange={set} width="calc(20% - 8px)" />
-          }
-          <ModalField label="Tipo Contratto"  field="tipoContratto" options={options.tipoContratto || []} form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="BC"       field="bc"       form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Contratto" field="contratto" form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="RDA"      field="rda"      form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="AT ID"    field="atId"     form={form} onChange={set} width="calc(15% - 8px)" />
-        </ModalSection>
+          {/* Sezione: Responsabili */}
+          <ModalSection title="Responsabili" color={sectionColor}>
+            <ComboField label="PM Poste"       field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(25% - 8px)" />
+            <ComboField label="PM CAP"          field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(25% - 8px)" />
+            <ComboField label="Anno Competenza" field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(15% - 8px)" />
+            <ComboField label="Release"         field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="Recupero"        field="recupero"       form={form} onChange={set} width="calc(15% - 8px)" />
+          </ModalSection>
 
-        {/* Sezione: TOW (prima degli Importi in create, perché l'importo dipende dai TOW) */}
-        <ModalSection title="TOW (gg/qty)">
-          <ModalField label="TOW02.1"    field="tow021"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
-          <ModalField label="TOW02.2"    field="tow022"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
-          <ModalField label="TOW02.3"    field="tow023"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
-          <ModalField label="TOW02.4"    field="tow024"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
-          <ModalField label="TOW02.5"    field="tow025"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
-          <ModalField label="TOW02.6"    field="tow026"    type="number" form={form} onChange={set} width="calc(14% - 8px)" />
-          <ModalField label="Totale TOW" field="towTotale" readOnly      form={form} onChange={set} width="calc(16% - 8px)" />
-        </ModalSection>
+          {/* Sezione: Stato e Contratto */}
+          <ModalSection title="Stato e Contratto" color={sectionColor}>
+            <ComboField label="Stato"          field="stato"         options={options.stato || []}         form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="Tipo Contratto" field="tipoContratto" options={options.tipoContratto || []} form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="BC"             field="bc"            form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="Contratto"      field="contratto"     form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="RDA"            field="rda"           form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(15% - 8px)" />
+          </ModalSection>
 
-        {/* Sezione: Importi */}
-        <ModalSection title="Importi">
-          {isCreate ? (
-            <div style={{ marginBottom: "12px", width: "calc(25% - 8px)" }}>
-              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                Importo Fornitura
-              </label>
-              <div style={{ padding: "6px 8px", border: "2px solid #1a73e8", borderRadius: "4px", fontSize: "13px", background: "#e8f0fe", color: "#1a73e8", fontWeight: 700, minHeight: "32px" }}>
-                {form.tipoContratto
-                  ? (options.priceMap?.[form.tipoContratto]
-                    ? `\u20AC ${fmtItIT(computedImporto)}`
-                    : <span style={{ color: "#ea4335", fontWeight: 400 }}>Nessun prezzo per {form.tipoContratto}</span>)
-                  : <span style={{ color: "#888", fontWeight: 400 }}>— seleziona Tipo Contratto —</span>
-                }
+          {/* Sezione: TOW — step 0.001, senza Totale TOW */}
+          <ModalSection title="TOW (gg/qty)" color={sectionColor}>
+            <TowField label="TOW02.1" field="tow021" form={form} onChange={set} width="calc(16% - 8px)" />
+            <TowField label="TOW02.2" field="tow022" form={form} onChange={set} width="calc(16% - 8px)" />
+            <TowField label="TOW02.3" field="tow023" form={form} onChange={set} width="calc(16% - 8px)" />
+            <TowField label="TOW02.4" field="tow024" form={form} onChange={set} width="calc(16% - 8px)" />
+            <TowField label="TOW02.5" field="tow025" form={form} onChange={set} width="calc(16% - 8px)" />
+            <TowField label="TOW02.6" field="tow026" form={form} onChange={set} width="calc(16% - 8px)" />
+          </ModalSection>
+
+          {/* Sezione: Importi — tutti in € */}
+          <ModalSection title="Importi" color={sectionColor}>
+            {isCreate ? (
+              <div style={{ marginBottom: "12px", width: "calc(25% - 8px)" }}>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                  Importo Fornitura
+                </label>
+                <div style={{ padding: "6px 10px", border: "2px solid #1a73e8", borderRadius: "4px", fontSize: "13px", background: "#e8f0fe", color: "#1a73e8", fontWeight: 700, minHeight: "32px", textAlign: "right" }}>
+                  {form.tipoContratto
+                    ? (options.priceMap?.[form.tipoContratto]
+                      ? formatEuro(computedImporto)
+                      : <span style={{ color: "#ea4335", fontWeight: 400 }}>Nessun prezzo per {form.tipoContratto}</span>)
+                    : <span style={{ color: "#888", fontWeight: 400 }}>— seleziona Tipo Contratto —</span>
+                  }
+                </div>
               </div>
+            ) : (
+              <EuroField label="Importo Fornitura"  value={form.importoExcel}               width="calc(20% - 8px)" />
+            )}
+            <EuroField label="Importo Scontato"     value={form.importoFornituraScontato}   width="calc(20% - 8px)" />
+            <EuroField label="Ordinato (BdO)"       value={form.ordinatoBdo}                width="calc(20% - 8px)" />
+            <EuroField label="Fatturato"             value={form.fatturato}                  width="calc(20% - 8px)" />
+            <EuroField label="Residuo Fatt."         value={form.residuoFatturabile}         width="calc(20% - 8px)" />
+          </ModalSection>
+
+          {/* Sezione: Extra */}
+          <ModalSection title="Extra" color={sectionColor}>
+            <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="SUBCO"       field="subco"       form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(20% - 8px)" />
+          </ModalSection>
+
+          {/* Sezione: Note Excel */}
+          <ModalSection title="Note Excel" color={sectionColor}>
+            <div style={{ width: "100%" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Note</label>
+              <textarea value={form.noteExcel ?? ""} onChange={(e) => set("noteExcel", e.target.value)}
+                style={{ ...inputStyle(), minHeight: "72px", resize: "vertical" }} />
             </div>
-          ) : (
-            <ModalField label="Importo Fornitura" field="importoExcel" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-          )}
-          <ModalField label="Importo Scontato" field="importoFornituraScontato" readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Ordinato (BdO)"   field="ordinatoBdo"              readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Fatturato"         field="fatturato"                readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Residuo Fatt."     field="residuoFatturabile"       readOnly form={form} onChange={set} width="calc(20% - 8px)" />
-        </ModalSection>
+          </ModalSection>
 
-        {/* Sezione: Extra */}
-        <ModalSection title="Extra">
-          <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(15% - 8px)" />
-          <ModalField label="SUBCO"       field="subco"       form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(20% - 8px)" />
-        </ModalSection>
+          {/* Sezione: PMO */}
+          <ModalSection title="PMO" color={sectionColor}>
+            <ModalField label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
+            <ComboField label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="P Importo"   field="pImporto"   type="number" form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="Importo BDO" field="importoBdo" type="number" form={form} onChange={set} width="calc(20% - 8px)" />
+            <div style={{ width: "calc(28% - 8px)" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
+              <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
+                style={{ ...inputStyle(), minHeight: "56px", resize: "vertical" }} />
+            </div>
+          </ModalSection>
+        </div>
 
-        {/* Sezione: Note Excel */}
-        <ModalSection title="Note Excel">
-          <div style={{ width: "100%" }}>
-            <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Note</label>
-            <textarea value={form.noteExcel ?? ""} onChange={(e) => set("noteExcel", e.target.value)}
-              style={{ ...inputStyle(), minHeight: "80px", resize: "vertical" }} />
+        {/* ── Footer fisso ── */}
+        <div style={{
+          padding: "16px 28px", borderTop: "1px solid #e2e8f0", background: "#f8fafc",
+          display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0,
+        }}>
+          <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+            {isCreate ? "Compila tutti i campi obbligatori (*)" : `Modifica riga ID ${row.excelId}`}
           </div>
-        </ModalSection>
-
-        {/* Sezione: PMO */}
-        <ModalSection title="PMO">
-          <ModalField label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
-          {isCreate
-            ? <ComboField label="P Release" field="pRelease" options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
-            : <ModalField label="P Release" field="pRelease" options={options.releaseExcel}       form={form} onChange={set} width="calc(20% - 8px)" />
-          }
-          <ModalField label="P Importo"   field="pImporto"   type="number" form={form} onChange={set} width="calc(20% - 8px)" />
-          <ModalField label="Importo BDO" field="importoBdo" type="number" form={form} onChange={set} width="calc(20% - 8px)" />
-          <div style={{ width: "calc(28% - 8px)" }}>
-            <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
-            <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
-              style={{ ...inputStyle(), minHeight: "60px", resize: "vertical" }} />
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button style={btn("ghost")} onClick={onClose}>Annulla</button>
+            <button
+              style={{
+                ...btn(isCreate ? "success" : "primary"),
+                opacity: saving ? 0.7 : 1,
+                minWidth: "140px",
+              }}
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? "Salvataggio..." : isCreate ? "Crea GoTo" : "Salva modifiche"}
+            </button>
           </div>
-        </ModalSection>
-
-        {/* Azioni */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
-          <button style={btn("ghost")} onClick={onClose}>Annulla</button>
-          <button style={btn(isCreate ? "success" : "primary")} onClick={handleSave} disabled={saving}>
-            {saving ? "Salvataggio..." : isCreate ? "Crea GoTo" : "Salva modifiche"}
-          </button>
         </div>
       </div>
     </div>
@@ -684,7 +742,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         </div>
 
         <button style={btn("success")} onClick={() => setCreateModal(true)}>
-          + Nuova riga
+          + Nuovo GoTo
         </button>
 
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>
@@ -713,7 +771,6 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
             {/* Riga filtri */}
             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-              <th style={{ padding: "4px 6px", minWidth: "40px" }}></th>
               <th style={{ padding: "4px 6px", minWidth: "60px" }}></th>
               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
@@ -738,7 +795,6 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              <TH minW="50px">Azioni</TH>
               <TH minW="50px">ID</TH>
               <TH minW="80px">GoTo</TH>
               <TH minW="110px">Applicativo</TH>
@@ -777,20 +833,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               const bgHover = scost ? "#ffe8e8" : "#f0f4ff";
               return (
                 <tr key={r.id}
-                  style={{ backgroundColor: bg, borderBottom: "1px solid #f0f0f0", transition: "background-color 0.1s" }}
+                  onClick={() => setEditRow(r)}
+                  style={{ backgroundColor: bg, borderBottom: "1px solid #f0f0f0", transition: "background-color 0.1s", cursor: "pointer" }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = bgHover)}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bg)}>
-
-                  {/* Azioni */}
-                  <td style={{ ...TD, textAlign: "center" }}>
-                    <button onClick={() => setEditRow(r)}
-                      style={{
-                        ...btn("primary"), padding: "4px 10px", fontSize: "12px",
-                        background: savedRows[r.id] ? "#34a853" : "#1a73e8"
-                      }}>
-                      {savedRows[r.id] ? "V" : "Modifica"}
-                    </button>
-                  </td>
 
                   <td style={{ ...TD, fontSize: "12px", color: "#999" }}>{r.excelId}</td>
                   <td style={{ ...TD }}>{r.goTo}</td>
@@ -809,6 +855,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                     {r.noteExcel ? (
                       <button data-note-btn="1"
                         onClick={(e) => {
+                          e.stopPropagation();
                           if (notePopover && notePopover.id === r.id) { setNotePopover(null); return; }
                           const rect = e.currentTarget.getBoundingClientRect();
                           setNotePopover({ id: r.id, text: r.noteExcel, x: rect.left, y: rect.bottom + window.scrollY + 6 });
