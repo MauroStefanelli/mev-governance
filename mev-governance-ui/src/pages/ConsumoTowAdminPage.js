@@ -1502,7 +1502,7 @@ function RigheSection({ contratti = [], rows = [] }) {
     return map;
   }, [rows]);
 
-  const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", consumato: "" };
+  const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRighe] = React.useState(loadRigheLS);
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
@@ -1524,6 +1524,7 @@ function RigheSection({ contratti = [], rows = [] }) {
       dataInizio: riga.dataInizio || "",
       dataApprovazione: riga.dataApprovazione || "",
       percentuale: riga.percentuale != null ? String(riga.percentuale * 100) : "",
+      importo: riga.importo != null ? String(riga.importo) : "",
       consumato: riga.consumato != null ? String(riga.consumato) : "",
     });
     setEditId(riga._id); setErr(""); setShowForm(true);
@@ -1540,7 +1541,13 @@ function RigheSection({ contratti = [], rows = [] }) {
   const handleSave = () => {
     if (!form.societa.trim()) { setErr("Inserisci il nome della Società"); return; }
     if (!form.contratto) { setErr("Seleziona un contratto"); return; }
-    const importoCalcolato = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
+    // Importo: se inserito manualmente ha precedenza, altrimenti si calcola dalla %
+    let importoFinale = null;
+    if (form.importo !== "") {
+      importoFinale = parseNum(form.importo);
+    } else if (form.percentuale !== "") {
+      importoFinale = calcImporto(form.contratto, form.percentuale);
+    }
     const riga = {
       _id: editId !== null ? editId : nextId(righe),
       contratto: form.contratto,
@@ -1549,7 +1556,7 @@ function RigheSection({ contratti = [], rows = [] }) {
       dataInizio: form.dataInizio,
       dataApprovazione: form.dataApprovazione,
       percentuale: form.percentuale !== "" ? parseNum(form.percentuale) / 100 : null,
-      importo: importoCalcolato,
+      importo: importoFinale,
       consumato: form.consumato !== "" ? parseNum(form.consumato) : null,
     };
     if (editId !== null) {
@@ -1645,8 +1652,8 @@ function RigheSection({ contratti = [], rows = [] }) {
             </div>
           </div>
 
-          {/* Riga 2: Date, %, Consumato */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "10px" }}>
+          {/* Riga 2: Date, %, Importo, Consumato */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "10px" }}>
             <div>
               <div style={lbl}>Data Inizio</div>
               <input style={inp} type="date" value={form.dataInizio} onChange={e => setForm(p => ({ ...p, dataInizio: e.target.value }))} />
@@ -1658,12 +1665,36 @@ function RigheSection({ contratti = [], rows = [] }) {
             <div>
               <div style={lbl}>% Quota</div>
               <div style={{ position: "relative" }}>
-                <input style={{ ...inp, textAlign: "right", paddingRight: "24px" }} value={form.percentuale} onChange={e => setForm(p => ({ ...p, percentuale: e.target.value }))} placeholder="0" />
+                <input
+                  style={{ ...inp, textAlign: "right", paddingRight: "24px" }}
+                  value={form.percentuale}
+                  onChange={e => {
+                    const perc = e.target.value;
+                    // Pre-compila importo solo se non è stato inserito manualmente
+                    const vt = valoriContratto[form.contratto] || 0;
+                    const calcolato = vt > 0 ? parseNum(perc) / 100 * vt : null;
+                    setForm(p => ({
+                      ...p,
+                      percentuale: perc,
+                      importo: calcolato !== null ? String(calcolato) : p.importo,
+                    }));
+                  }}
+                  placeholder="0"
+                />
                 <span style={{ position: "absolute", right: "9px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", color: "#64748b", pointerEvents: "none" }}>%</span>
               </div>
-              {importoPreview !== null && (
-                <div style={{ fontSize: "11px", color: "#1a73e8", marginTop: "3px", textAlign: "right" }}>
-                  = {formatEuro(importoPreview)}
+            </div>
+            <div>
+              <div style={lbl}>Importo (€)</div>
+              <input
+                style={{ ...inp, textAlign: "right", borderColor: form.importo !== "" ? "#1a73e8" : "#dadce0" }}
+                value={form.importo}
+                onChange={e => setForm(p => ({ ...p, importo: e.target.value }))}
+                placeholder="0,00"
+              />
+              {importoPreview !== null && form.importo === "" && (
+                <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "3px", textAlign: "right" }}>
+                  da %: {formatEuro(importoPreview)}
                 </div>
               )}
             </div>
