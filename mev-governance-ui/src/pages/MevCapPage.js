@@ -4,7 +4,7 @@ import {
   getConsumoTow, createConsumoTowFiglio,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
-import { loadTowImpatto } from "./ConsumoTowAdminPage";
+import { loadTowImpatto, NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 const RTI_KEY = "rtisubco-righe";
@@ -384,92 +384,6 @@ const calcImporto = (form, priceMap) => {
   }, 0);
 };
 
-// ── Modale rapida per creare un contratto figlio (da MEV-CAP) ─────────────────
-function NewContrattoFiglioInline({ baseRows, onClose, onCreated }) {
-  const [nomeContratto, setNomeContratto] = useState("");
-  const [sconto, setSconto] = useState("0");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const baseTowNames = [...new Set((baseRows || []).map(r => r.tow))];
-  const [towData, setTowData] = useState(() =>
-    Object.fromEntries(baseTowNames.map(k => [k, { qta: "1" }]))
-  );
-
-  const parseNum = (v) => { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
-  const scontoNum = parseNum(sconto);
-  const getBaseValore = (tow) => { const r = baseRows.find(x => x.tow === tow); return r ? Number(r.valoreUnitario) || 0 : 0; };
-
-  const handleSave = async () => {
-    if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto"); return; }
-    setSaving(true); setError("");
-    try {
-      const qtaByName = Object.fromEntries(baseTowNames.map(k => [k, parseNum(towData[k]?.qta)]));
-      const isCatalogoMap = Object.fromEntries(baseTowNames.map(k => [k, false]));
-      const newRows = await createConsumoTowFiglio(nomeContratto.trim(), scontoNum, qtaByName, isCatalogoMap);
-      onCreated(newRows);
-    } catch (e) { setError(e.message || "Errore"); setSaving(false); }
-  };
-
-  const inp = { padding: "7px 10px", borderRadius: "6px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box" };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.65)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ background: "#fff", borderRadius: "14px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", width: "100%", maxWidth: "560px", overflow: "hidden" }}>
-        <div style={{ padding: "18px 22px 14px", background: "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
-            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)" }}>Basato sul contratto BASE</div>
-          </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "28px", height: "28px", borderRadius: "50%", fontSize: "16px" }}>✕</button>
-        </div>
-        <div style={{ padding: "20px 22px" }}>
-          {error && <div style={{ background: "#fef2f2", color: "#dc2626", borderRadius: "7px", padding: "8px 12px", marginBottom: "12px", fontSize: "12px" }}>{error}</div>}
-          {baseRows.length === 0 && (
-            <div style={{ background: "#fffbeb", color: "#92400e", borderRadius: "7px", padding: "10px 12px", marginBottom: "14px", fontSize: "12px" }}>
-              Nessun contratto BASE trovato. Crea prima un contratto BASE nella pagina Gestione Contratto.
-            </div>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "12px", marginBottom: "14px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "4px" }}>Nome Contratto</label>
-              <input style={inp} placeholder="es. Contratto-XYZ" value={nomeContratto} onChange={e => setNomeContratto(e.target.value)} autoFocus />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "4px" }}>% Sconto</label>
-              <input style={{ ...inp, textAlign: "right" }} placeholder="0" value={sconto} onChange={e => setSconto(e.target.value)} />
-            </div>
-          </div>
-          {baseTowNames.length > 0 && (
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "6px" }}>N° TOW per tipo</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {baseTowNames.map(tow => (
-                  <div key={tow} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "7px", padding: "5px 10px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#334155" }}>{tow}</span>
-                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>× {(getBaseValore(tow) * (1 - scontoNum / 100)).toLocaleString("it-IT", { maximumFractionDigits: 2 })} €</span>
-                    <input
-                      type="number" min="0" step="1"
-                      value={towData[tow]?.qta ?? "1"}
-                      onChange={e => setTowData(p => ({ ...p, [tow]: { qta: e.target.value } }))}
-                      style={{ width: "60px", padding: "3px 6px", border: "1px solid #dadce0", borderRadius: "5px", fontSize: "12px", textAlign: "right" }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <div style={{ padding: "12px 22px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
-          <button onClick={onClose} style={{ padding: "7px 18px", borderRadius: "7px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer" }}>Annulla</button>
-          <button onClick={handleSave} disabled={saving || baseRows.length === 0} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: "#10b981", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving || baseRows.length === 0 ? 0.6 : 1 }}>
-            {saving ? "Creazione..." : "Crea Contratto"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Modale di modifica / creazione ───────────────────────────────────────────
 function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   const isCreate = mode === "create";
@@ -627,7 +541,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
 
           {/* Sezione: TOW — con % impatto, pulsante Calcola, validazione rosso */}
           <ModalSection title="TOW (gg/qty)" color={sectionColor}>
-            {/* Pulsante Calcola sopra TOW02.5 — applica le percentuali di impatto a tutti i TOW */}
+            {/* Pulsante Calcola sopra TOW02.5 */}
             {TOW_FIELDS.some(({ key }) => towImpatto[key]) && (
               <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
                 <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
@@ -636,15 +550,24 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const base = parseFloat(form.tow025) || 0;
-                    if (!base) { alert("Inserisci prima il valore per TOW02.5"); return; }
+                    const prices = options.priceMap?.[form.tipoContratto] || {};
+                    const qty025 = parseFloat(form.tow025) || 0;
+                    if (!qty025) { alert("Inserisci prima il valore per TOW02.5"); return; }
                     const perc025 = towImpatto["TOW02.5"];
                     if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
-                    const totale = base / (perc025 / 100);
+                    const valUnit025 = prices["TOW02.5"] || 0;
+                    if (!valUnit025) { alert("Seleziona un Tipo Contratto con prezzi configurati per calcolare i TOW"); return; }
+                    // Importo totale dell'intervento ricavato da TOW02.5
+                    const importo025 = qty025 * valUnit025;
+                    const totaleIntervento = importo025 / (perc025 / 100);
                     const updates = {};
                     TOW_FIELDS.forEach(({ key, field }) => {
                       if (field !== "tow025" && towImpatto[key]) {
-                        updates[field] = parseFloat((totale * towImpatto[key] / 100).toFixed(3));
+                        const valUnit = prices[key] || 0;
+                        if (valUnit > 0) {
+                          const importoTow = totaleIntervento * towImpatto[key] / 100;
+                          updates[field] = parseFloat((importoTow / valUnit).toFixed(3));
+                        }
                       }
                     });
                     setForm(prev => ({ ...prev, ...updates }));
@@ -658,19 +581,26 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             {TOW_FIELDS.map(({ key, field }) => {
               const perc = towImpatto[key];
               const val = parseFloat(form[field]) || 0;
-              // Validazione: se ho la % e il totale (da tow025 + perc025), controlla scostamento
+              const prices = options.priceMap?.[form.tipoContratto] || {};
+              // Validazione: ricava il totale intervento da TOW02.5 e controlla lo scostamento
               const perc025 = towImpatto["TOW02.5"];
-              const base025 = parseFloat(form.tow025) || 0;
-              const totale = perc025 && base025 ? base025 / (perc025 / 100) : null;
-              const atteso = totale && perc ? totale * perc / 100 : null;
-              const scostamento = atteso && val ? Math.abs(val - atteso) / atteso * 100 : 0;
-              const isError = atteso && val && scostamento > 0.2;
+              const qty025 = parseFloat(form.tow025) || 0;
+              const valUnit025 = prices["TOW02.5"] || 0;
+              const valUnitTow = prices[key] || 0;
+              const totaleIntervento = (perc025 && qty025 && valUnit025)
+                ? (qty025 * valUnit025) / (perc025 / 100)
+                : null;
+              const atesoQty = (totaleIntervento && perc && valUnitTow && field !== "tow025")
+                ? (totaleIntervento * perc / 100) / valUnitTow
+                : null;
+              const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
+              const isError = atesoQty && val && scostamento > 0.2;
               const labelText = perc ? `${key} — ${perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%` : key;
               return (
                 <div key={field} style={{ marginBottom: "12px", width: "calc(16% - 8px)" }}>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555" }}>
                     {labelText}
-                    {isError && <span title={`Atteso: ${atteso?.toFixed(3)} — scostamento: ${scostamento.toFixed(2)}%`} style={{ marginLeft: "4px", cursor: "help" }}>⚠</span>}
+                    {isError && <span title={`Atteso: ${atesoQty?.toFixed(3)} — scostamento: ${scostamento.toFixed(2)}%`} style={{ marginLeft: "4px", cursor: "help" }}>⚠</span>}
                   </label>
                   <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white", transition: "border-color 0.15s" }}>
                     <button type="button"
@@ -690,7 +620,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                   </div>
                   {isError && (
                     <div style={{ fontSize: "10px", color: "#dc2626", marginTop: "2px", textAlign: "right" }}>
-                      Atteso: {atteso?.toFixed(3)} (±{scostamento.toFixed(2)}%)
+                      Atteso: {atesoQty?.toFixed(3)} (±{scostamento.toFixed(2)}%)
                     </div>
                   )}
                 </div>
@@ -805,9 +735,9 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
         </div>
       </div>
 
-      {/* Modale Crea Contratto — si apre sopra la modale attuale */}
+      {/* Modale Crea Contratto — si apre sopra la modale attuale, usa la stessa UI di Gestione Contratto */}
       {showCreaContratto && (
-        <NewContrattoFiglioInline
+        <NewContrattoFiglioModal
           baseRows={baseRowsTow}
           onClose={() => setShowCreaContratto(false)}
           onCreated={(newRows) => {

@@ -216,7 +216,7 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
 }
 
 // ── Modale Nuovo Contratto Figlio (non-BASE) ──────────────────────────────────
-function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
+export function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
   const { pos, onMouseDown } = useDrag();
   const baseTowNames = [...new Set(baseRows.map(r => r.tow))];
 
@@ -1199,6 +1199,9 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         // con le stesse <col> widths.
         const visibleFields = FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo"));
         const isBaseExpanded = expandedContratto === contratti[0];
+        const baseContratto0 = contratti[0] || "";
+        // Mostra colonna % Impatto sempre se ci sono impatti configurati (allineamento garantito)
+        const hasImpatto = Object.keys(towImpatto).length > 0;
 
         const handleImpattoChange = (tow, val) => {
           const next = { ...towImpatto, [tow]: val === "" ? undefined : parseNum(val) };
@@ -1212,14 +1215,14 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                 {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
                 <colgroup>
-                  <col style={{ width: "32px" }} />   {/* freccia */}
-                  <col style={{ width: "180px" }} />  {/* nome contratto */}
-                  <col style={{ width: "100px" }} />  {/* = TOW nella tabella interna */}
-                  <col style={{ width: "65px" }} />   {/* = QTA nella tabella interna */}
+                  <col style={{ width: "32px" }} />
+                  <col style={{ width: "180px" }} />
+                  <col style={{ width: "100px" }} />
+                  <col style={{ width: "65px" }} />
                   {visibleFields.map(f => (
                     <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
                   ))}
-                  {isBaseExpanded && <col style={{ width: "90px" }} />}  {/* % Impatto */}
+                  {hasImpatto && <col style={{ width: "90px" }} />}
                 </colgroup>
 
                 {/* Header */}
@@ -1232,7 +1235,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                     {visibleFields.map(f => (
                       <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>
                     ))}
-                    {isBaseExpanded && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
+                    {hasImpatto && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
                   </tr>
                 </thead>
 
@@ -1280,7 +1283,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                               </td>
                             );
                           })}
-                          {isBaseExpanded && <td />}
+                          {hasImpatto && <td />}
                         </tr>
 
                         {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
@@ -1297,7 +1300,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                      {visibleFields.map(f => (
                                        <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
                                      ))}
-                                     {isBase && <col style={{ width: "90px" }} />}
+                                     {hasImpatto && <col style={{ width: "90px" }} />}
                                    </colgroup>
                                   <tbody>
                                     {cRows.map((row, idx) => (
@@ -1323,27 +1326,35 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                             {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
                                           </td>
                                         ))}
-                                        {isBase && (
+                                        {hasImpatto && (
                                           <td style={{ ...TD("right"), padding: "6px 8px" }}>
-                                            <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                step="0.1"
-                                                value={towImpatto[row.tow] !== undefined ? towImpatto[row.tow] : ""}
-                                                onChange={e => handleImpattoChange(row.tow, e.target.value)}
-                                                placeholder="0"
-                                                style={{
-                                                  width: "60px", padding: "3px 20px 3px 6px",
-                                                  border: "1px solid #ddd8fe", borderRadius: "6px",
-                                                  fontSize: "12px", textAlign: "right", outline: "none",
-                                                  background: towImpatto[row.tow] ? "#f5f3ff" : "#fff",
-                                                  color: "#7c3aed", fontWeight: towImpatto[row.tow] ? 700 : 400,
-                                                }}
-                                              />
-                                              <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
-                                            </div>
+                                            {isBase ? (
+                                              <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  max="100"
+                                                  step="0.1"
+                                                  value={towImpatto[row.tow] !== undefined ? towImpatto[row.tow] : ""}
+                                                  onChange={e => handleImpattoChange(row.tow, e.target.value)}
+                                                  placeholder="0"
+                                                  style={{
+                                                    width: "60px", padding: "3px 20px 3px 6px",
+                                                    border: "1px solid #ddd8fe", borderRadius: "6px",
+                                                    fontSize: "12px", textAlign: "right", outline: "none",
+                                                    background: towImpatto[row.tow] ? "#f5f3ff" : "#fff",
+                                                    color: "#7c3aed", fontWeight: towImpatto[row.tow] ? 700 : 400,
+                                                  }}
+                                                />
+                                                <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
+                                              </div>
+                                            ) : (
+                                              towImpatto[row.tow] ? (
+                                                <span style={{ fontSize: "12px", color: "#8b5cf6", fontWeight: 600 }}>
+                                                  {Number(towImpatto[row.tow]).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
+                                                </span>
+                                              ) : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
+                                            )}
                                           </td>
                                         )}
                                       </tr>
@@ -1372,8 +1383,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                              ) : "—";
                                            })()}
                                          </td>
-                                       )}
-                                     </tr>
+                                       )}                                     </tr>
                                    </tfoot>
                                 </table>
                               </div>
@@ -1406,13 +1416,13 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                              <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
                                {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
                              </td>
-                           );
-                         })}
-                         {isBaseExpanded && <td />}
-                       </tr>
-                    );
-                  })()}
-                </tfoot>
+                            );
+                          })}
+                          {hasImpatto && <td />}
+                        </tr>
+                     );
+                   })()}
+                 </tfoot>
               </table>
             </div>
           </div>
