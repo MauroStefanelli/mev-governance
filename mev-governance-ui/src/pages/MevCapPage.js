@@ -1,11 +1,42 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel
+  getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel,
+  getConsumoTow, createConsumoTowFiglio,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
+import { loadTowImpatto } from "./ConsumoTowAdminPage";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
+const RTI_KEY = "rtisubco-righe";
 
+// Legge le righe RTI&SUBCO da localStorage
+const loadRtiSocietà = () => {
+  try { return JSON.parse(localStorage.getItem(RTI_KEY) || "[]"); } catch { return []; }
+};
+
+// Società per ruolo
+const getSocietàPerRuolo = (ruoli) =>
+  loadRtiSocietà()
+    .filter(r => ruoli.includes(r.ruolo))
+    .map(r => r.societa)
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i); // unique
+
+// Parse valore campo multi-società (JSON array o stringa singola)
+const parseSocietà = (val) => {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return val ? [val] : [];
+};
+
+// Serializza array → JSON string (o "" se vuoto)
+const serializeSocietà = (arr) =>
+  arr.length === 0 ? "" : arr.length === 1 ? arr[0] : JSON.stringify(arr);
+
+// ── MultiSelect dropdown con checkbox ────────────────────────────────────────
 // ── MultiSelect dropdown con checkbox ────────────────────────────────────────
 function MultiSelect({ options, selected, onChange, placeholder, formatOption }) {
   const [open, setOpen] = useState(false);
@@ -74,6 +105,82 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── SocietàMultiSelect: dropdown con chips colorate per selezione multi-società ──
+function SocietàMultiSelect({ value, onChange, ruoli, label, width, color = "#1a73e8", bgColor = "#eff6ff" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = parseSocietà(value);
+  const options = getSocietàPerRuolo(ruoli);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (soc) => {
+    const next = selected.includes(soc) ? selected.filter(s => s !== soc) : [...selected, soc];
+    onChange(serializeSocietà(next));
+  };
+
+  return (
+    <div style={{ marginBottom: "12px", width: width || "100%" }}>
+      {label && <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>}
+      <div ref={ref} style={{ position: "relative" }}>
+        <div
+          onClick={() => setOpen(v => !v)}
+          style={{
+            minHeight: "34px", padding: "4px 8px", border: `1.5px solid ${open ? color : "#dadce0"}`,
+            borderRadius: "6px", background: "#fff", cursor: "pointer",
+            display: "flex", flexWrap: "wrap", gap: "4px", alignItems: "center",
+            transition: "border-color 0.15s",
+          }}
+        >
+          {selected.length === 0
+            ? <span style={{ fontSize: "12px", color: "#aaa" }}>{options.length === 0 ? "— nessuna società in RTI&SUBCO —" : "Seleziona..."}</span>
+            : selected.map(s => (
+              <span key={s} style={{
+                display: "inline-flex", alignItems: "center", gap: "4px",
+                background: bgColor, color, border: `1px solid ${color}33`,
+                borderRadius: "12px", padding: "2px 8px", fontSize: "11px", fontWeight: 700,
+              }}>
+                {s}
+                <span
+                  onClick={e => { e.stopPropagation(); toggle(s); }}
+                  style={{ cursor: "pointer", fontSize: "12px", lineHeight: 1, color, opacity: 0.7, fontWeight: 900 }}
+                >×</span>
+              </span>
+            ))
+          }
+          <span style={{ marginLeft: "auto", fontSize: "10px", color: "#aaa" }}>▾</span>
+        </div>
+        {open && options.length > 0 && (
+          <div style={{
+            position: "absolute", top: "100%", left: 0, zIndex: 50,
+            background: "#fff", border: "1px solid #dadce0", borderRadius: "8px",
+            marginTop: "3px", minWidth: "200px", maxHeight: "220px", overflowY: "auto",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 10px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc", position: "sticky", top: 0 }}>
+              <span onClick={() => { onChange(serializeSocietà(options)); setOpen(false); }} style={{ fontSize: "11px", color: "#34a853", fontWeight: 700, cursor: "pointer" }}>Tutti</span>
+              <span onClick={() => { onChange(""); }} style={{ fontSize: "11px", color: "#ea4335", fontWeight: 700, cursor: "pointer" }}>Nessuno</span>
+            </div>
+            {options.map(soc => (
+              <label key={soc} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px", cursor: "pointer", fontSize: "13px" }}
+                onMouseEnter={e => e.currentTarget.style.background = bgColor}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <input type="checkbox" checked={selected.includes(soc)} onChange={() => toggle(soc)}
+                  style={{ cursor: "pointer", accentColor: color }} />
+                <span style={{ fontWeight: selected.includes(soc) ? 700 : 400, color: selected.includes(soc) ? color : "#374151" }}>{soc}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -190,6 +297,38 @@ const ModalSection = ({ title, children, color }) => (
   </div>
 );
 
+// Campo Tipo Contratto: dropdown dai contratti ConsumoTow + pulsante "Crea"
+function ContrattoSelectField({ label, field, width, form, onChange, contrattiOptions, onCrea }) {
+  const currentValue = String(form[field] ?? "");
+  const isKnown = currentValue === "" || contrattiOptions.includes(currentValue);
+  return (
+    <div style={{ marginBottom: "12px", width: width || "100%" }}>
+      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+      <div style={{ display: "flex", gap: "6px" }}>
+        <select
+          value={isKnown ? currentValue : "__custom__"}
+          onChange={e => onChange(field, e.target.value === "__custom__" ? currentValue : e.target.value)}
+          style={{ ...inputStyle(), height: "32px", cursor: "pointer", flex: 1 }}
+        >
+          <option value="">-- seleziona --</option>
+          {contrattiOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          {!isKnown && currentValue && <option value="__custom__">{currentValue}</option>}
+        </select>
+        <button
+          type="button"
+          onClick={onCrea}
+          title="Crea nuovo contratto"
+          style={{
+            padding: "0 12px", height: "32px", borderRadius: "6px", border: "1.5px solid #10b981",
+            background: "#f0fdf4", color: "#10b981", fontSize: "12px", fontWeight: 700,
+            cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+          }}
+        >+ Crea</button>
+      </div>
+    </div>
+  );
+}
+
 // Campo importo read-only visualizzato in €
 const EuroField = ({ label, value, width }) => (
   <div style={{ marginBottom: "12px", width: width || "calc(20% - 8px)" }}>
@@ -245,6 +384,92 @@ const calcImporto = (form, priceMap) => {
   }, 0);
 };
 
+// ── Modale rapida per creare un contratto figlio (da MEV-CAP) ─────────────────
+function NewContrattoFiglioInline({ baseRows, onClose, onCreated }) {
+  const [nomeContratto, setNomeContratto] = useState("");
+  const [sconto, setSconto] = useState("0");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const baseTowNames = [...new Set((baseRows || []).map(r => r.tow))];
+  const [towData, setTowData] = useState(() =>
+    Object.fromEntries(baseTowNames.map(k => [k, { qta: "1" }]))
+  );
+
+  const parseNum = (v) => { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
+  const scontoNum = parseNum(sconto);
+  const getBaseValore = (tow) => { const r = baseRows.find(x => x.tow === tow); return r ? Number(r.valoreUnitario) || 0 : 0; };
+
+  const handleSave = async () => {
+    if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto"); return; }
+    setSaving(true); setError("");
+    try {
+      const qtaByName = Object.fromEntries(baseTowNames.map(k => [k, parseNum(towData[k]?.qta)]));
+      const isCatalogoMap = Object.fromEntries(baseTowNames.map(k => [k, false]));
+      const newRows = await createConsumoTowFiglio(nomeContratto.trim(), scontoNum, qtaByName, isCatalogoMap);
+      onCreated(newRows);
+    } catch (e) { setError(e.message || "Errore"); setSaving(false); }
+  };
+
+  const inp = { padding: "7px 10px", borderRadius: "6px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.65)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ background: "#fff", borderRadius: "14px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", width: "100%", maxWidth: "560px", overflow: "hidden" }}>
+        <div style={{ padding: "18px 22px 14px", background: "linear-gradient(135deg,#10b981 0%,#059669 100%)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff" }}>Nuovo Contratto</div>
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)" }}>Basato sul contratto BASE</div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", color: "#fff", width: "28px", height: "28px", borderRadius: "50%", fontSize: "16px" }}>✕</button>
+        </div>
+        <div style={{ padding: "20px 22px" }}>
+          {error && <div style={{ background: "#fef2f2", color: "#dc2626", borderRadius: "7px", padding: "8px 12px", marginBottom: "12px", fontSize: "12px" }}>{error}</div>}
+          {baseRows.length === 0 && (
+            <div style={{ background: "#fffbeb", color: "#92400e", borderRadius: "7px", padding: "10px 12px", marginBottom: "14px", fontSize: "12px" }}>
+              Nessun contratto BASE trovato. Crea prima un contratto BASE nella pagina Gestione Contratto.
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "12px", marginBottom: "14px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "4px" }}>Nome Contratto</label>
+              <input style={inp} placeholder="es. Contratto-XYZ" value={nomeContratto} onChange={e => setNomeContratto(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "4px" }}>% Sconto</label>
+              <input style={{ ...inp, textAlign: "right" }} placeholder="0" value={sconto} onChange={e => setSconto(e.target.value)} />
+            </div>
+          </div>
+          {baseTowNames.length > 0 && (
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "6px" }}>N° TOW per tipo</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {baseTowNames.map(tow => (
+                  <div key={tow} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "7px", padding: "5px 10px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#334155" }}>{tow}</span>
+                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>× {(getBaseValore(tow) * (1 - scontoNum / 100)).toLocaleString("it-IT", { maximumFractionDigits: 2 })} €</span>
+                    <input
+                      type="number" min="0" step="1"
+                      value={towData[tow]?.qta ?? "1"}
+                      onChange={e => setTowData(p => ({ ...p, [tow]: { qta: e.target.value } }))}
+                      style={{ width: "60px", padding: "3px 6px", border: "1px solid #dadce0", borderRadius: "5px", fontSize: "12px", textAlign: "right" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "12px 22px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
+          <button onClick={onClose} style={{ padding: "7px 18px", borderRadius: "7px", border: "1px solid #dadce0", background: "#fff", fontSize: "13px", cursor: "pointer" }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving || baseRows.length === 0} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: "#10b981", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving || baseRows.length === 0 ? 0.6 : 1 }}>
+            {saving ? "Creazione..." : "Crea Contratto"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Modale di modifica / creazione ───────────────────────────────────────────
 function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   const isCreate = mode === "create";
@@ -255,14 +480,32 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     pmPoste: "", pmCap: "", annoCompetenza: String(new Date().getFullYear()), releaseExcel: "",
     stato: "", tipoContratto: "", importoExcel: 0, recupero: "",
     bc: "", contratto: "", rda: "", atId: "", nel: "", inVita: "", cm: "",
-    subco: "", tbd: "", accantonato: null,
+    capMandanti: "", subco: "", tbd: "", accantonato: null,
     tow021: null, tow022: null, tow023: null, tow024: null, tow025: null, tow026: null,
     noteExcel: "", pAnno: new Date().getFullYear(), pRelease: "", pImporto: 0,
     pNote: "", importoBdo: 0,
   };
 
-  const [form, setForm] = useState(isCreate ? emptyForm : { ...row });
+  const [form, setForm] = useState(isCreate ? emptyForm : {
+    ...row,
+    capMandanti: row?.capgemini ?? "",
+  });
   const [saving, setSaving] = useState(false);
+  const [contrattiTow, setContrattiTow] = useState([]);
+  const [baseRowsTow, setBaseRowsTow] = useState([]);
+  const [showCreaContratto, setShowCreaContratto] = useState(false);
+  const towImpatto = loadTowImpatto(); // { "TOW02.1": 30, ... }
+
+  // Carica contratti ConsumoTow per il dropdown Tipo Contratto
+  useEffect(() => {
+    getConsumoTow().then(data => {
+      const contratti = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
+      setContrattiTow(contratti);
+      // baseRows = righe del primo contratto (BASE)
+      const base = contratti[0] || "";
+      setBaseRowsTow(data.filter(r => r.towContratto === base));
+    }).catch(() => {});
+  }, []);
 
   // Ricalcolo importo fornitura dai TOW — funziona sia in create che in edit
   const computedImporto = calcImporto(form, options.priceMap);
@@ -290,8 +533,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     setSaving(true);
     const towTotale = TOW_FIELDS.reduce((s, { field }) => s + (parseFloat(form[field]) || 0), 0);
     const formToSave = isCreate
-      ? { ...form, importoExcel: computedImporto, towTotale }
-      : { ...form, importoExcel: displayImporto, importoFornituraScontato: displayScontato, towTotale };
+      ? { ...form, importoExcel: computedImporto, towTotale, capgemini: form.capMandanti }
+      : { ...form, importoExcel: displayImporto, importoFornituraScontato: displayScontato, towTotale, capgemini: form.capMandanti };
     try { await onSave(formToSave); onClose(); }
     catch (e) { alert(`Errore salvataggio: ${e.message}`); }
     finally { setSaving(false); }
@@ -367,21 +610,92 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
           {/* Sezione: Stato e Contratto */}
           <ModalSection title="Stato e Contratto" color={sectionColor}>
             <ComboField label="Stato"          field="stato"         options={options.stato || []}         form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="Tipo Contratto" field="tipoContratto" options={options.tipoContratto || []} form={form} onChange={set} width="calc(15% - 8px)" />
+            <ContrattoSelectField
+              label="Tipo Contratto"
+              field="tipoContratto"
+              form={form}
+              onChange={set}
+              width="calc(20% - 8px)"
+              contrattiOptions={contrattiTow.length > 0 ? contrattiTow : (options.tipoContratto || [])}
+              onCrea={() => setShowCreaContratto(true)}
+            />
             <ModalField label="BC"             field="bc"            form={form} onChange={set} width="calc(20% - 8px)" />
             <ModalField label="Contratto"      field="contratto"     form={form} onChange={set} width="calc(15% - 8px)" />
             <ModalField label="RDA"            field="rda"           form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(10% - 8px)" />
           </ModalSection>
 
-          {/* Sezione: TOW — step 0.001, senza Totale TOW */}
+          {/* Sezione: TOW — con % impatto, pulsante Calcola, validazione rosso */}
           <ModalSection title="TOW (gg/qty)" color={sectionColor}>
-            <TowField label="TOW02.1" field="tow021" form={form} onChange={set} width="calc(16% - 8px)" />
-            <TowField label="TOW02.2" field="tow022" form={form} onChange={set} width="calc(16% - 8px)" />
-            <TowField label="TOW02.3" field="tow023" form={form} onChange={set} width="calc(16% - 8px)" />
-            <TowField label="TOW02.4" field="tow024" form={form} onChange={set} width="calc(16% - 8px)" />
-            <TowField label="TOW02.5" field="tow025" form={form} onChange={set} width="calc(16% - 8px)" />
-            <TowField label="TOW02.6" field="tow026" form={form} onChange={set} width="calc(16% - 8px)" />
+            {/* Pulsante Calcola sopra TOW02.5 — applica le percentuali di impatto a tutti i TOW */}
+            {TOW_FIELDS.some(({ key }) => towImpatto[key]) && (
+              <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
+                <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
+                  Percentuali di impatto configurate — inserisci il valore in TOW02.5 e clicca Calcola per distribuire proporzionalmente
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const base = parseFloat(form.tow025) || 0;
+                    if (!base) { alert("Inserisci prima il valore per TOW02.5"); return; }
+                    const perc025 = towImpatto["TOW02.5"];
+                    if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
+                    const totale = base / (perc025 / 100);
+                    const updates = {};
+                    TOW_FIELDS.forEach(({ key, field }) => {
+                      if (field !== "tow025" && towImpatto[key]) {
+                        updates[field] = parseFloat((totale * towImpatto[key] / 100).toFixed(3));
+                      }
+                    });
+                    setForm(prev => ({ ...prev, ...updates }));
+                  }}
+                  style={{ padding: "5px 16px", borderRadius: "6px", border: "none", background: "#7c3aed", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  Calcola
+                </button>
+              </div>
+            )}
+            {TOW_FIELDS.map(({ key, field }) => {
+              const perc = towImpatto[key];
+              const val = parseFloat(form[field]) || 0;
+              // Validazione: se ho la % e il totale (da tow025 + perc025), controlla scostamento
+              const perc025 = towImpatto["TOW02.5"];
+              const base025 = parseFloat(form.tow025) || 0;
+              const totale = perc025 && base025 ? base025 / (perc025 / 100) : null;
+              const atteso = totale && perc ? totale * perc / 100 : null;
+              const scostamento = atteso && val ? Math.abs(val - atteso) / atteso * 100 : 0;
+              const isError = atteso && val && scostamento > 0.2;
+              const labelText = perc ? `${key} — ${perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%` : key;
+              return (
+                <div key={field} style={{ marginBottom: "12px", width: "calc(16% - 8px)" }}>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555" }}>
+                    {labelText}
+                    {isError && <span title={`Atteso: ${atteso?.toFixed(3)} — scostamento: ${scostamento.toFixed(2)}%`} style={{ marginLeft: "4px", cursor: "help" }}>⚠</span>}
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white", transition: "border-color 0.15s" }}>
+                    <button type="button"
+                      onClick={() => set(field, Math.max(0, parseFloat(((parseFloat(form[field]) || 0) - 0.001).toFixed(3))))}
+                      style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
+                    <input
+                      value={form[field] ?? ""}
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      onChange={e => set(field, e.target.value === "" ? null : parseFloat(e.target.value))}
+                      style={{ flex: 1, padding: "5px 6px", border: "none", fontSize: "13px", color: isError ? "#dc2626" : "#333", textAlign: "right", minWidth: 0, outline: "none", background: "transparent", fontWeight: isError ? 700 : 400 }}
+                    />
+                    <button type="button"
+                      onClick={() => set(field, parseFloat(((parseFloat(form[field]) || 0) + 0.001).toFixed(3)))}
+                      style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
+                  </div>
+                  {isError && (
+                    <div style={{ fontSize: "10px", color: "#dc2626", marginTop: "2px", textAlign: "right" }}>
+                      Atteso: {atteso?.toFixed(3)} (±{scostamento.toFixed(2)}%)
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </ModalSection>
 
           {/* Sezione: Importi — tutti in € */}
@@ -417,11 +731,30 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
           {/* Sezione: Extra */}
           <ModalSection title="Extra" color={sectionColor}>
             <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="SUBCO"       field="subco"       form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(20% - 8px)" />
+            <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(10% - 8px)" />
+            <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(10% - 8px)" />
+            <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(10% - 8px)" />
+            <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(10% - 8px)" />
+            <div style={{ width: "calc(45% - 8px)" }}>
+              <SocietàMultiSelect
+                label="Mandataria / Mandante"
+                value={form.capMandanti}
+                onChange={v => set("capMandanti", v)}
+                ruoli={["Mandataria", "Mandante"]}
+                color="#1a73e8"
+                bgColor="#eff6ff"
+              />
+            </div>
+            <div style={{ width: "calc(45% - 8px)" }}>
+              <SocietàMultiSelect
+                label="SUBCO"
+                value={form.subco}
+                onChange={v => set("subco", v)}
+                ruoli={["SUBCO"]}
+                color="#f59e0b"
+                bgColor="#fffbeb"
+              />
+            </div>
           </ModalSection>
 
           {/* Sezione: Note Excel */}
@@ -471,6 +804,22 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
           </div>
         </div>
       </div>
+
+      {/* Modale Crea Contratto — si apre sopra la modale attuale */}
+      {showCreaContratto && (
+        <NewContrattoFiglioInline
+          baseRows={baseRowsTow}
+          onClose={() => setShowCreaContratto(false)}
+          onCreated={(newRows) => {
+            const nome = newRows[0]?.towContratto;
+            if (nome) {
+              setContrattiTow(prev => prev.includes(nome) ? prev : [...prev, nome]);
+              set("tipoContratto", nome);
+            }
+            setShowCreaContratto(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -812,6 +1161,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("capgemini")} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("iet")} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("capgemini"), "capgemini")} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
@@ -837,7 +1187,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="100px">RDA (AT ID)</TH>
               <TH minW="60px">CAP</TH>
               <TH minW="50px">IET</TH>
-              <TH minW="80px">Subco</TH>
+              <TH minW="140px">Mandataria/Mandante</TH>
+              <TH minW="120px">Subco</TH>
               <TH minW="75px">TOW01</TH>
               <TH minW="75px">TOW02</TH>
               <TH minW="75px">TOW03</TH>
@@ -910,7 +1261,26 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.capgemini)}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.iet)}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.subco)}</td>
+                  <td style={{ ...TD }}>
+                    {parseSocietà(r.capgemini).length > 0
+                      ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                          {parseSocietà(r.capgemini).map(s => (
+                            <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                          ))}
+                        </div>
+                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
+                    }
+                  </td>
+                  <td style={{ ...TD }}>
+                    {parseSocietà(r.subco).length > 0
+                      ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                          {parseSocietà(r.subco).map(s => (
+                            <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                          ))}
+                        </div>
+                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
+                    }
+                  </td>
 
                   {/* TOW */}
                   <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow021)}</td>

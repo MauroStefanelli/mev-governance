@@ -3,6 +3,12 @@ import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFigl
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
+export const TOW_IMPATTO_KEY = "tow-impatto-perc"; // { "TOW02.1": 30.5, ... }
+
+export const loadTowImpatto = () => {
+  try { return JSON.parse(localStorage.getItem(TOW_IMPATTO_KEY) || "{}"); } catch { return {}; }
+};
+const saveTowImpatto = (map) => localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(map));
 
 const formatEuro = (v) => {
   const n = Number(v);
@@ -910,13 +916,14 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [selectedContratto, setSelectedContratto] = useState("");
   const [expandedContratto, setExpandedContratto] = useState(null);
   const [editRow, setEditRow] = useState(null);
-  const [editContratto, setEditContratto] = useState(null); // nome contratto da modificare in blocco
+  const [editContratto, setEditContratto] = useState(null);
   const [showNewContratto, setShowNewContratto] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
   const [dragOver, setDragOver] = useState(null);
   const [contrattiBudget, setContrattiBudget] = useState([]); // eslint-disable-line
-  const [righe] = useState([]); // gestito internamente in RigheSection via localStorage // eslint-disable-line
+  const [righe] = useState([]); // eslint-disable-line
+  const [towImpatto, setTowImpatto] = useState(loadTowImpatto);
   const dragItem = useRef(null);
 
   // Il contratto BASE è il primo della lista (indice 0 nell'ordine salvato)
@@ -1191,6 +1198,13 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         // Per allineare i totali di riga alle colonne interne usiamo una <table>
         // con le stesse <col> widths.
         const visibleFields = FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo"));
+        const isBaseExpanded = expandedContratto === contratti[0];
+
+        const handleImpattoChange = (tow, val) => {
+          const next = { ...towImpatto, [tow]: val === "" ? undefined : parseNum(val) };
+          saveTowImpatto(next);
+          setTowImpatto(next);
+        };
 
         return (
           <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
@@ -1205,6 +1219,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                   {visibleFields.map(f => (
                     <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
                   ))}
+                  {isBaseExpanded && <col style={{ width: "90px" }} />}  {/* % Impatto */}
                 </colgroup>
 
                 {/* Header */}
@@ -1217,6 +1232,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                     {visibleFields.map(f => (
                       <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>
                     ))}
+                    {isBaseExpanded && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
                   </tr>
                 </thead>
 
@@ -1264,6 +1280,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                               </td>
                             );
                           })}
+                          {isBaseExpanded && <td />}
                         </tr>
 
                         {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
@@ -1272,15 +1289,16 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                             <td colSpan={4 + visibleFields.length} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
                               <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
-                                  <colgroup>
-                                    <col style={{ width: "32px" }} />
-                                    <col style={{ width: "180px" }} />
-                                    <col style={{ width: "100px" }} />
-                                    <col style={{ width: "65px" }} />
-                                    {visibleFields.map(f => (
-                                      <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
-                                    ))}
-                                  </colgroup>
+                                   <colgroup>
+                                     <col style={{ width: "32px" }} />
+                                     <col style={{ width: "180px" }} />
+                                     <col style={{ width: "100px" }} />
+                                     <col style={{ width: "65px" }} />
+                                     {visibleFields.map(f => (
+                                       <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
+                                     ))}
+                                     {isBase && <col style={{ width: "90px" }} />}
+                                   </colgroup>
                                   <tbody>
                                     {cRows.map((row, idx) => (
                                       <tr key={row.id}
@@ -1305,23 +1323,58 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                             {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
                                           </td>
                                         ))}
+                                        {isBase && (
+                                          <td style={{ ...TD("right"), padding: "6px 8px" }}>
+                                            <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                                value={towImpatto[row.tow] !== undefined ? towImpatto[row.tow] : ""}
+                                                onChange={e => handleImpattoChange(row.tow, e.target.value)}
+                                                placeholder="0"
+                                                style={{
+                                                  width: "60px", padding: "3px 20px 3px 6px",
+                                                  border: "1px solid #ddd8fe", borderRadius: "6px",
+                                                  fontSize: "12px", textAlign: "right", outline: "none",
+                                                  background: towImpatto[row.tow] ? "#f5f3ff" : "#fff",
+                                                  color: "#7c3aed", fontWeight: towImpatto[row.tow] ? 700 : 400,
+                                                }}
+                                              />
+                                              <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
+                                            </div>
+                                          </td>
+                                        )}
                                       </tr>
                                     ))}
                                   </tbody>
                                   {/* Riga totale interna */}
-                                  <tfoot>
-                                    <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
-                                      <td />
-                                      <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b", paddingLeft: "24px" }}>Totale</td>
-                                      <td />
-                                      <td />
-                                      {visibleFields.map(f => {
-                                        if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                                        const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                                        return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
-                                      })}
-                                    </tr>
-                                  </tfoot>
+                                     <tfoot>
+                                     <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
+                                       <td />
+                                       <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b", paddingLeft: "24px" }}>Totale</td>
+                                       <td />
+                                       <td />
+                                       {visibleFields.map(f => {
+                                         if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                         const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                         return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                                       })}
+                                       {isBase && (
+                                         <td style={{ ...TD("right"), fontWeight: 700, color: "#7c3aed", fontSize: "12px" }}>
+                                           {(() => {
+                                             const tot = cRows.reduce((s, r) => s + (Number(towImpatto[r.tow]) || 0), 0);
+                                             return tot > 0 ? (
+                                               <span style={{ background: tot === 100 ? "#f0fdf4" : tot > 100 ? "#fef2f2" : "#f5f3ff", color: tot === 100 ? "#16a34a" : tot > 100 ? "#dc2626" : "#7c3aed", border: `1px solid ${tot === 100 ? "#bbf7d0" : tot > 100 ? "#fecaca" : "#ddd8fe"}`, borderRadius: "5px", padding: "1px 6px", fontSize: "11px" }}>
+                                                 {tot.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
+                                               </span>
+                                             ) : "—";
+                                           })()}
+                                         </td>
+                                       )}
+                                     </tr>
+                                   </tfoot>
                                 </table>
                               </div>
                             </td>
@@ -1337,25 +1390,26 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                   {(() => {
                     const allRows = rows.filter(r => contratti.includes(r.towContratto));
                     return (
-                      <tr style={{ background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)", borderTop: "2px solid #1e293b" }}>
-                        <td />
-                        <td style={{ padding: "14px 12px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
-                            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{contratti.length} contratti · {allRows.length} TOW</span>
-                          </div>
-                        </td>
-                        <td />
-                        <td />
-                        {visibleFields.map(f => {
-                          const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                          return (
-                            <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
-                              {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
-                            </td>
-                          );
-                        })}
-                      </tr>
+                       <tr style={{ background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)", borderTop: "2px solid #1e293b" }}>
+                         <td />
+                         <td style={{ padding: "14px 12px" }}>
+                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                             <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
+                             <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{contratti.length} contratti · {allRows.length} TOW</span>
+                           </div>
+                         </td>
+                         <td />
+                         <td />
+                         {visibleFields.map(f => {
+                           const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                           return (
+                             <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
+                               {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
+                             </td>
+                           );
+                         })}
+                         {isBaseExpanded && <td />}
+                       </tr>
                     );
                   })()}
                 </tfoot>
