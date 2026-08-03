@@ -1041,8 +1041,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 
       {/* ── Titolo ── */}
       <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Logistica Lotto 2</div>
-        <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Gestione Consumo TOW</h2>
+        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Gestione Contratto</div>
+        <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Monitoraggio</h2>
         <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
       </div>
 
@@ -1050,10 +1050,6 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>⚠ {error}</div>}
       {successMsg && <div style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>✓ {successMsg}</div>}
 
-      {/* Contratti Budget */}
-      <ContrattiSection rows={rows} />
-      {/* RTI & SUBCO */}
-      <RigheSection />
       {/* Selezione contratto */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratti</div>
@@ -1394,6 +1390,10 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
           onSaved={handleContrattoSaved}
         />
       )}
+
+      {/* RTI & SUBCO — in fondo, con accesso ai dati dei contratti */}
+      <RigheSection contratti={contratti} rows={rows} />
+
     </div>
   );
 }
@@ -1474,6 +1474,7 @@ function ContrattiSection({ rows }) {
   );
 }
 
+
 // ─── RTI & SUBCO (gestione locale con localStorage) ──────────────────────────
 const RTI_KEY = "rtisubco-righe";
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
@@ -1483,57 +1484,85 @@ const loadRigheLS = () => {
 };
 const saveRigheLS = (righe) => localStorage.setItem(RTI_KEY, JSON.stringify(righe));
 
-function RigheSection() {
-  const emptyForm = { ruolo: "Mandataria", idSocieta: "", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
-  const [righe, setRighe] = useState(loadRigheLS);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [editIdx, setEditIdx] = useState(null);
-  const [err, setErr] = useState("");
+// Calcola il prossimo ID auto-incrementale
+const nextId = (righe) => {
+  if (!righe.length) return 1;
+  return Math.max(...righe.map(r => r._id || 0)) + 1;
+};
+
+function RigheSection({ contratti = [], rows = [] }) {
+  // Calcola valoreTotale per contratto dai dati TOW reali
+  const valoriContratto = React.useMemo(() => {
+    const map = {};
+    (rows || []).forEach(r => {
+      const k = r.towContratto || "";
+      if (!map[k]) map[k] = 0;
+      map[k] += Number(r.valoreTotale) || 0;
+    });
+    return map;
+  }, [rows]);
+
+  const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", consumato: "" };
+  const [righe, setRighe] = React.useState(loadRigheLS);
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState(emptyForm);
+  const [editId, setEditId] = React.useState(null);
+  const [err, setErr] = React.useState("");
+  const [filterContratto, setFilterContratto] = React.useState(""); // "" = tutti
 
   const persistAndSet = (newRighe) => { saveRigheLS(newRighe); setRighe(newRighe); };
 
-  const openNew = () => { setForm(emptyForm); setEditIdx(null); setErr(""); setShowForm(true); };
-  const openEdit = (idx) => {
-    const r = righe[idx];
+  const openNew = () => {
+    setForm({ ...emptyForm, contratto: contratti[0] || "" });
+    setEditId(null); setErr(""); setShowForm(true);
+  };
+  const openEdit = (riga) => {
     setForm({
-      ruolo: r.ruolo || "Mandataria",
-      idSocieta: r.idSocieta ?? "",
-      societa: r.societa || "",
-      dataInizio: r.dataInizio || "",
-      dataApprovazione: r.dataApprovazione || "",
-      percentuale: r.percentuale !== undefined ? String(r.percentuale * 100) : "",
-      importo: r.importo ?? "",
-      consumato: r.consumato ?? "",
+      contratto: riga.contratto || "",
+      ruolo: riga.ruolo || "Mandataria",
+      societa: riga.societa || "",
+      dataInizio: riga.dataInizio || "",
+      dataApprovazione: riga.dataApprovazione || "",
+      percentuale: riga.percentuale != null ? String(riga.percentuale * 100) : "",
+      consumato: riga.consumato != null ? String(riga.consumato) : "",
     });
-    setEditIdx(idx); setErr(""); setShowForm(true);
+    setEditId(riga._id); setErr(""); setShowForm(true);
   };
   const cancel = () => { setShowForm(false); setErr(""); };
 
+  // Calcola importo automaticamente da % e valoreTotale del contratto
+  const calcImporto = (contratto, percStr) => {
+    const vt = valoriContratto[contratto] || 0;
+    const perc = parseNum(percStr) / 100;
+    return vt * perc;
+  };
+
   const handleSave = () => {
     if (!form.societa.trim()) { setErr("Inserisci il nome della Società"); return; }
+    if (!form.contratto) { setErr("Seleziona un contratto"); return; }
+    const importoCalcolato = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
     const riga = {
+      _id: editId !== null ? editId : nextId(righe),
+      contratto: form.contratto,
       ruolo: form.ruolo,
-      idSocieta: form.idSocieta ? Number(form.idSocieta) : "",
       societa: form.societa.trim(),
       dataInizio: form.dataInizio,
       dataApprovazione: form.dataApprovazione,
       percentuale: form.percentuale !== "" ? parseNum(form.percentuale) / 100 : null,
-      importo: form.importo !== "" ? parseNum(form.importo) : null,
+      importo: importoCalcolato,
       consumato: form.consumato !== "" ? parseNum(form.consumato) : null,
     };
-    if (editIdx !== null) {
-      const updated = righe.map((r, i) => i === editIdx ? riga : r);
-      persistAndSet(updated);
+    if (editId !== null) {
+      persistAndSet(righe.map(r => r._id === editId ? riga : r));
     } else {
       persistAndSet([...righe, riga]);
     }
     setShowForm(false); setErr("");
   };
 
-  const handleDelete = (idx) => {
+  const handleDelete = (id) => {
     if (!window.confirm("Eliminare questa riga?")) return;
-    persistAndSet(righe.filter((_, i) => i !== idx));
+    persistAndSet(righe.filter(r => r._id !== id));
   };
 
   const ruoloBadge = (ruolo) => {
@@ -1554,70 +1583,120 @@ function RigheSection() {
     borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", color: "#374151", ...extra,
   });
 
-  const totImporto   = righe.reduce((s, r) => s + (Number(r.importo) || 0), 0);
-  const totConsumo   = righe.reduce((s, r) => s + (Number(r.consumato) || 0), 0);
-  const totResiduo   = totImporto - totConsumo;
+  // Righe filtrate per contratto selezionato
+  const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
+
+  const totImporto = righeVisibili.reduce((s, r) => s + (Number(r.importo) || 0), 0);
+  const totConsumo = righeVisibili.reduce((s, r) => s + (Number(r.consumato) || 0), 0);
+  const totResiduo = totImporto - totConsumo;
+
+  // Importo % anteprima nel form
+  const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
 
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+      {/* Header */}
       <div style={{ padding: "14px 22px", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>RTI & SUBCO</div>
           <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Ripartizione importi per società</div>
         </div>
-        <button onClick={openNew} style={{ padding: "6px 16px", borderRadius: "8px", border: "1.5px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-          + Nuovo
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {/* Filtro per contratto */}
+          {contratti.length > 0 && (
+            <select
+              value={filterContratto}
+              onChange={e => setFilterContratto(e.target.value)}
+              style={{ padding: "5px 10px", borderRadius: "7px", border: "1.5px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+            >
+              <option value="" style={{ color: "#0f172a" }}>Tutti i contratti</option>
+              {contratti.map(c => <option key={c} value={c} style={{ color: "#0f172a" }}>{c}</option>)}
+            </select>
+          )}
+          <button onClick={openNew} style={{ padding: "6px 16px", borderRadius: "8px", border: "1.5px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+            + Nuovo
+          </button>
+        </div>
       </div>
 
+      {/* Form */}
       {showForm && (
         <div style={{ padding: "18px 22px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
           {err && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px", fontSize: "12px" }}>{err}</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "12px" }}>
-            <div><div style={lbl}>Ruolo</div>
+
+          {/* Riga 1: Contratto, Ruolo, Società */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "12px", marginBottom: "12px" }}>
+            <div>
+              <div style={lbl}>Contratto</div>
+              <select style={inp} value={form.contratto} onChange={e => setForm(p => ({ ...p, contratto: e.target.value }))}>
+                {contratti.length === 0 && <option value="">— nessun contratto —</option>}
+                {contratti.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={lbl}>Ruolo</div>
               <select style={inp} value={form.ruolo} onChange={e => setForm(p => ({ ...p, ruolo: e.target.value }))}>
                 {RUOLI_RTI.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-            <div><div style={lbl}>ID Società</div>
-              <input style={inp} type="number" value={form.idSocieta} onChange={e => setForm(p => ({ ...p, idSocieta: e.target.value }))} placeholder="1" />
-            </div>
-            <div style={{ gridColumn: "span 2" }}><div style={lbl}>Società</div>
+            <div>
+              <div style={lbl}>Società</div>
               <input style={inp} value={form.societa} onChange={e => setForm(p => ({ ...p, societa: e.target.value }))} placeholder="Nome società" />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px", marginBottom: "14px" }}>
-            <div><div style={lbl}>Data Inizio</div>
+
+          {/* Riga 2: Date, %, Consumato */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "10px" }}>
+            <div>
+              <div style={lbl}>Data Inizio</div>
               <input style={inp} type="date" value={form.dataInizio} onChange={e => setForm(p => ({ ...p, dataInizio: e.target.value }))} />
             </div>
-            <div><div style={lbl}>Data Approv.</div>
+            <div>
+              <div style={lbl}>Data Approv.</div>
               <input style={inp} type="date" value={form.dataApprovazione} onChange={e => setForm(p => ({ ...p, dataApprovazione: e.target.value }))} />
             </div>
-            <div><div style={lbl}>% (es. 90)</div>
-              <input style={{ ...inp, textAlign: "right" }} value={form.percentuale} onChange={e => setForm(p => ({ ...p, percentuale: e.target.value }))} placeholder="90" />
+            <div>
+              <div style={lbl}>% Quota</div>
+              <div style={{ position: "relative" }}>
+                <input style={{ ...inp, textAlign: "right", paddingRight: "24px" }} value={form.percentuale} onChange={e => setForm(p => ({ ...p, percentuale: e.target.value }))} placeholder="0" />
+                <span style={{ position: "absolute", right: "9px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", color: "#64748b", pointerEvents: "none" }}>%</span>
+              </div>
+              {importoPreview !== null && (
+                <div style={{ fontSize: "11px", color: "#1a73e8", marginTop: "3px", textAlign: "right" }}>
+                  = {formatEuro(importoPreview)}
+                </div>
+              )}
             </div>
-            <div><div style={lbl}>Importo (€)</div>
-              <input style={{ ...inp, textAlign: "right" }} value={form.importo} onChange={e => setForm(p => ({ ...p, importo: e.target.value }))} placeholder="0" />
-            </div>
-            <div><div style={lbl}>Consumato (€)</div>
+            <div>
+              <div style={lbl}>Consumato (€)</div>
               <input style={{ ...inp, textAlign: "right" }} value={form.consumato} onChange={e => setForm(p => ({ ...p, consumato: e.target.value }))} placeholder="0" />
             </div>
           </div>
+
+          {/* Info valore contratto */}
+          {form.contratto && valoriContratto[form.contratto] > 0 && (
+            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "8px 14px", marginBottom: "10px", fontSize: "12px", color: "#1a73e8" }}>
+              Valore Totale contratto <strong>{form.contratto}</strong>: <strong>{formatEuro(valoriContratto[form.contratto])}</strong>
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
             <button onClick={cancel} style={{ padding: "7px 18px", borderRadius: "7px", border: "1px solid #dadce0", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#374151" }}>Annulla</button>
             <button onClick={handleSave} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: "#1a73e8", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-              {editIdx !== null ? "Aggiorna" : "Salva"}
+              {editId !== null ? "Aggiorna" : "Salva"}
             </button>
           </div>
         </div>
       )}
 
+      {/* Tabella */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead>
             <tr>
-              <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("right")}>ID</th>
+              <th style={TH2("left")}>Contratto</th>
+              <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("left")}>Società</th>
               <th style={TH2("center")}>Data Inizio</th>
               <th style={TH2("center")}>Data Approv.</th>
@@ -1629,16 +1708,21 @@ function RigheSection() {
             </tr>
           </thead>
           <tbody>
-            {righe.length === 0 ? (
-              <tr><td colSpan={10} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Nessuna riga inserita</td></tr>
-            ) : righe.map((r, idx) => {
+            {righeVisibili.length === 0 ? (
+              <tr><td colSpan={11} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+                {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
+              </td></tr>
+            ) : righeVisibili.map((r, idx) => {
               const residuo = (Number(r.importo) || 0) - (Number(r.consumato) || 0);
               return (
-                <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
+                <tr key={r._id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
                   onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
+                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "11px" }}>{r._id}</td>
+                  <td style={{ ...TD2("left") }}>
+                    <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px", fontSize: "11px", fontWeight: 700 }}>{r.contratto || "—"}</span>
+                  </td>
                   <td style={TD2("left")}>{ruoloBadge(r.ruolo)}</td>
-                  <td style={{ ...TD2("right"), color: "#64748b" }}>{r.idSocieta || "—"}</td>
                   <td style={{ ...TD2("left"), fontWeight: 600, color: "#0f172a" }}>{r.societa}</td>
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
@@ -1648,18 +1732,18 @@ function RigheSection() {
                   <td style={{ ...TD2("right"), fontWeight: 700, color: residuo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(residuo)}</td>
                   <td style={TD2("center")}>
                     <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                      <button onClick={() => openEdit(idx)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #1a73e8", background: "#eff6ff", color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Modifica</button>
-                      <button onClick={() => handleDelete(idx)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
+                      <button onClick={() => openEdit(r)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #1a73e8", background: "#eff6ff", color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Modifica</button>
+                      <button onClick={() => handleDelete(r._id)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
                     </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
-          {righe.length > 0 && (
+          {righeVisibili.length > 0 && (
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td colSpan={6} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale</td>
+                <td colSpan={7} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totImporto)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totConsumo)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: totResiduo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totResiduo)}</td>
