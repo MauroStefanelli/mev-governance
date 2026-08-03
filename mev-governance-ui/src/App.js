@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import MevPage from "./pages/MevPage";
 import MevCapPage from "./pages/MevCapPage";
 import LoginPage from "./pages/LoginPage";
@@ -174,6 +174,18 @@ function App() {
 
     setPage("mev");
   };
+
+  // Evita falsi logout su cold-start backend Render free:
+  // aspetta 4s e riverifica il token prima di slogare
+  const handleUnauthorized = useCallback(async () => {
+    await new Promise(r => setTimeout(r, 4000));
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` }
+      });
+      if (res.status === 401) handleLogout();
+    } catch { /* errore di rete: backend ancora in avvio, non slogare */ }
+  }, []); // eslint-disable-line
 
   const handleLogout = async () => {
     const tok = localStorage.getItem("jwt");
@@ -678,15 +690,15 @@ function App() {
       )}
 
       <main style={{ padding: "0" }}>
-        {page === "mev"               && <MevPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
-        {page === "mevcap"            && <MevCapPage onUnauthorized={handleLogout} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
-        {page === "contratti"         && <ContrattiPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
+        {page === "mev"               && <MevPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "mevcap"            && <MevCapPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
-        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
+        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
         {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
-        {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleLogout} />}
-        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleLogout} ambienteId={ambienteId} />}
+        {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleUnauthorized} />}
+        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && role === "SuperAdmin" && <SuperAdminPage />}
       </main>
 

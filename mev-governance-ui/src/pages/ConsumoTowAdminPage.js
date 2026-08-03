@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto } from "../services/mevService";
+import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
+  getContrattiBudget, saveContrattoBudget, deleteContrattoBudget,
+  getConsumoTowRighe, saveConsumoTowRiga, deleteConsumoTowRiga,
+} from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
 
@@ -21,6 +24,26 @@ const parseNum = (v) => {
   const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 };
+
+
+const formatDate = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return v;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+};
+
+const formatPerc = (v) => {
+  const n = Number(v);
+  if (isNaN(n)) return "—";
+  return (n * 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
+};
+
+const RUOLI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
+
 
 // Formatta un numero per la visualizzazione nel campo input (formato italiano)
 const formatForInput = (v, group) => {
@@ -894,6 +917,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
   const [dragOver, setDragOver] = useState(null);
+  const [contrattiBudget, setContrattiBudget] = useState([]);
+  const [righe, setRighe] = useState([]);
   const dragItem = useRef(null);
 
   // Il contratto BASE è il primo della lista (indice 0 nell'ordine salvato)
@@ -928,7 +953,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     } finally { setLoading(false); }
   }, [applyOrder]); // eslint-disable-line
 
-  useEffect(() => { load(); }, [load, ambienteId]); // eslint-disable-line
+  const loadExtra = useCallback(async () => {
+    try {
+      const [cb, rg] = await Promise.all([getContrattiBudget(), getConsumoTowRighe()]);
+      setContrattiBudget(cb || []);
+      setRighe(rg || []);
+    } catch { /* non-critical */ }
+  }, []);
+
+  useEffect(() => { load(); loadExtra(); }, [load, ambienteId]); // eslint-disable-line
 
   const filteredRows = selectedContratto ? rows.filter(r => r.towContratto === selectedContratto) : [];
 
@@ -1027,7 +1060,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>⚠ {error}</div>}
       {successMsg && <div style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>✓ {successMsg}</div>}
 
-      {/* ── Selezione contratto ── */}
+      {/* Contratti Budget */}
+      <ContrattiSection contrattiBudget={contrattiBudget} setContrattiBudget={setContrattiBudget} />
+      {/* Righe Societarie */}
+      <RigheSection righe={righe} setRighe={setRighe} />
+      {/* Selezione contratto */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "14px" }}>Contratti</div>
         {loading ? (
@@ -1370,3 +1407,285 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     </div>
   );
 }
+
+function ContrattiSection({ contrattiBudget, setContrattiBudget }) {
+  const emptyForm = { contratto: "", valore: "" };
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const openNew = () => { setForm(emptyForm); setEditId(null); setErr(""); setShowForm(true); };
+  const openEdit = (r) => { setForm({ contratto: r.contratto || "", valore: r.valore ?? "" }); setEditId(r.id); setErr(""); setShowForm(true); };
+  const cancel = () => { setShowForm(false); setErr(""); };
+
+  const handleSave = async () => {
+    setSaving(true); setErr("");
+    try {
+      const payload = { contratto: form.contratto, valore: parseNum(form.valore) };
+      const saved = await saveContrattoBudget(editId ? { ...payload, id: editId } : payload);
+      setContrattiBudget(prev => editId ? prev.map(r => r.id === saved.id ? saved : r) : [...prev, saved]);
+      setShowForm(false);
+    } catch (e) { setErr(e.message || "Errore salvataggio"); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Eliminare questo contratto budget?")) return;
+    try {
+      await deleteContrattoBudget(id);
+      setContrattiBudget(prev => prev.filter(r => r.id !== id));
+    } catch (e) { alert(e.message || "Errore eliminazione"); }
+  };
+
+  const inputBase = { padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none" };
+  const labelStyle = { fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" };
+
+  return (
+    <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+      {/* Header */}
+      <div style={{ padding: "14px 22px", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>Contratti Budget</div>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Definizione valori contrattuali</div>
+        </div>
+        <button onClick={openNew} style={{ padding: "6px 16px", borderRadius: "8px", border: "1.5px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer", letterSpacing: "0.3px" }}>
+          + Nuovo
+        </button>
+      </div>
+
+      {/* Inline form */}
+      {showForm && (
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
+          {err && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px", fontSize: "12px" }}>{err}</div>}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+            <div>
+              <div style={labelStyle}>Contratto</div>
+              <input style={inputBase} value={form.contratto} onChange={e => setForm(p => ({ ...p, contratto: e.target.value }))} placeholder="Es. C001" />
+            </div>
+            <div>
+              <div style={labelStyle}>Valore (€)</div>
+              <input style={{ ...inputBase, textAlign: "right" }} value={form.valore} onChange={e => setForm(p => ({ ...p, valore: e.target.value }))} onBlur={e => setForm(p => ({ ...p, valore: parseNum(e.target.value) }))} placeholder="0" />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            <button onClick={cancel} style={{ padding: "7px 18px", borderRadius: "7px", border: "1px solid #dadce0", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: saving ? "#93c5fd" : "#1a73e8", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
+              {saving ? "Salvataggio..." : "Salva"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr>
+              <th style={{ ...TH("left"), width: "60%" }}>Contratto</th>
+              <th style={{ ...TH("right") }}>Valore</th>
+              <th style={{ ...TH("center"), width: "120px" }}>Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contrattiBudget.length === 0 ? (
+              <tr><td colSpan={3} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Nessun contratto budget inserito</td></tr>
+            ) : contrattiBudget.map((r, idx) => (
+              <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
+                <td style={{ ...TD("left"), fontWeight: 600, color: "#0f172a" }}>{r.contratto}</td>
+                <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(r.valore)}</td>
+                <td style={TD("center")}>
+                  <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                    <button onClick={() => openEdit(r)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #1a73e8", background: "#eff6ff", color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Modifica</button>
+                    <button onClick={() => handleDelete(r.id)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Righe Societarie ──────────────────────────────────────────────────────────
+function RigheSection({ righe, setRighe }) {
+  const emptyForm = { ruolo: "Mandataria", idSocieta: "", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const openNew = () => { setForm(emptyForm); setEditId(null); setErr(""); setShowForm(true); };
+  const openEdit = (r) => {
+    setForm({
+      ruolo: r.ruolo || "Mandataria",
+      idSocieta: r.idSocieta ?? "",
+      societa: r.societa || "",
+      dataInizio: r.dataInizio ? r.dataInizio.slice(0, 10) : "",
+      dataApprovazione: r.dataApprovazione ? r.dataApprovazione.slice(0, 10) : "",
+      percentuale: r.percentuale != null ? (Number(r.percentuale) * 100).toFixed(2) : "",
+      importo: r.importo ?? "",
+      consumato: r.consumato ?? "",
+    });
+    setEditId(r.id); setErr(""); setShowForm(true);
+  };
+  const cancel = () => { setShowForm(false); setErr(""); };
+
+  const handleSave = async () => {
+    setSaving(true); setErr("");
+    try {
+      const payload = {
+        ruolo: form.ruolo,
+        idSocieta: form.idSocieta !== "" ? Number(form.idSocieta) : null,
+        societa: form.societa,
+        dataInizio: form.dataInizio || null,
+        dataApprovazione: form.dataApprovazione || null,
+        percentuale: form.percentuale !== "" ? parseNum(form.percentuale) / 100 : null,
+        importo: parseNum(form.importo),
+        consumato: parseNum(form.consumato),
+      };
+      const saved = await saveConsumoTowRiga(editId ? { ...payload, id: editId } : payload);
+      setRighe(prev => editId ? prev.map(r => r.id === saved.id ? saved : r) : [...prev, saved]);
+      setShowForm(false);
+    } catch (e) { setErr(e.message || "Errore salvataggio"); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Eliminare questa riga societaria?")) return;
+    try {
+      await deleteConsumoTowRiga(id);
+      setRighe(prev => prev.filter(r => r.id !== id));
+    } catch (e) { alert(e.message || "Errore eliminazione"); }
+  };
+
+  const inputBase = { padding: "8px 11px", borderRadius: "7px", border: "1px solid #dadce0", fontSize: "13px", width: "100%", boxSizing: "border-box", outline: "none" };
+  const labelStyle = { fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "5px" };
+
+  return (
+    <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+      {/* Header */}
+      <div style={{ padding: "14px 22px", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>Righe Societarie</div>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Ripartizione per società partecipanti</div>
+        </div>
+        <button onClick={openNew} style={{ padding: "6px 16px", borderRadius: "8px", border: "1.5px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer", letterSpacing: "0.3px" }}>
+          + Nuovo
+        </button>
+      </div>
+
+      {/* Inline form */}
+      {showForm && (
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
+          {err && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px", fontSize: "12px" }}>{err}</div>}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", marginBottom: "14px" }}>
+            <div>
+              <div style={labelStyle}>Ruolo</div>
+              <select style={{ ...inputBase, background: "#fff" }} value={form.ruolo} onChange={e => setForm(p => ({ ...p, ruolo: e.target.value }))}>
+                {RUOLI.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={labelStyle}>ID Societa</div>
+              <input type="number" style={inputBase} value={form.idSocieta} onChange={e => setForm(p => ({ ...p, idSocieta: e.target.value }))} placeholder="ID" />
+            </div>
+            <div style={{ gridColumn: "span 2" }}>
+              <div style={labelStyle}>Societa</div>
+              <input style={inputBase} value={form.societa} onChange={e => setForm(p => ({ ...p, societa: e.target.value }))} placeholder="Nome società" />
+            </div>
+            <div>
+              <div style={labelStyle}>Data Inizio</div>
+              <input type="date" style={inputBase} value={form.dataInizio} onChange={e => setForm(p => ({ ...p, dataInizio: e.target.value }))} />
+            </div>
+            <div>
+              <div style={labelStyle}>Data Approvazione</div>
+              <input type="date" style={inputBase} value={form.dataApprovazione} onChange={e => setForm(p => ({ ...p, dataApprovazione: e.target.value }))} />
+            </div>
+            <div>
+              <div style={labelStyle}>Percentuale (%)</div>
+              <input style={{ ...inputBase, textAlign: "right" }} value={form.percentuale} onChange={e => setForm(p => ({ ...p, percentuale: e.target.value }))} placeholder="Es. 90" />
+            </div>
+            <div>
+              <div style={labelStyle}>Importo (€)</div>
+              <input style={{ ...inputBase, textAlign: "right" }} value={form.importo} onChange={e => setForm(p => ({ ...p, importo: e.target.value }))} onBlur={e => setForm(p => ({ ...p, importo: parseNum(e.target.value) }))} placeholder="0" />
+            </div>
+            <div>
+              <div style={labelStyle}>Consumato (€)</div>
+              <input style={{ ...inputBase, textAlign: "right" }} value={form.consumato} onChange={e => setForm(p => ({ ...p, consumato: e.target.value }))} onBlur={e => setForm(p => ({ ...p, consumato: parseNum(e.target.value) }))} placeholder="0" />
+            </div>
+            <div>
+              <div style={labelStyle}>Residuo (€)</div>
+              <input style={{ ...inputBase, textAlign: "right", background: "#f1f5f9", color: "#64748b", cursor: "not-allowed" }} value={parseNum(form.importo) - parseNum(form.consumato)} readOnly />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            <button onClick={cancel} style={{ padding: "7px 18px", borderRadius: "7px", border: "1px solid #dadce0", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#374151", fontWeight: 500 }}>Annulla</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: saving ? "#93c5fd" : "#1a73e8", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
+              {saving ? "Salvataggio..." : "Salva"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+          <thead>
+            <tr>
+              <th style={TH("left")}>Ruolo</th>
+              <th style={TH("right")}>ID</th>
+              <th style={TH("left")}>Societa</th>
+              <th style={TH("center")}>Data Inizio</th>
+              <th style={TH("center")}>Data Approv.</th>
+              <th style={TH("right")}>%</th>
+              <th style={TH("right")}>Importo</th>
+              <th style={TH("right")}>Consumato</th>
+              <th style={TH("right")}>Residuo</th>
+              <th style={{ ...TH("center"), width: "120px" }}>Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {righe.length === 0 ? (
+              <tr><td colSpan={10} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Nessuna riga societaria inserita</td></tr>
+            ) : righe.map((r, idx) => {
+              const residuo = (Number(r.importo) || 0) - (Number(r.consumato) || 0);
+              const ruoloBadgeColor = r.ruolo === "Mandataria" ? "#1a73e8" : r.ruolo === "Mandante" ? "#10b981" : r.ruolo === "SUBCO" ? "#f59e0b" : "#64748b";
+              return (
+                <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                  onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
+                  <td style={TD("left")}>
+                    <span style={{ display: "inline-block", background: ruoloBadgeColor + "1a", color: ruoloBadgeColor, border: `1px solid ${ruoloBadgeColor}44`, borderRadius: "5px", padding: "2px 7px", fontSize: "11px", fontWeight: 700 }}>{r.ruolo}</span>
+                  </td>
+                  <td style={{ ...TD("right"), color: "#64748b" }}>{r.idSocieta ?? "—"}</td>
+                  <td style={{ ...TD("left"), fontWeight: 600, color: "#0f172a" }}>{r.societa || "—"}</td>
+                  <td style={{ ...TD("center"), color: "#64748b" }}>{formatDate(r.dataInizio)}</td>
+                  <td style={{ ...TD("center"), color: "#64748b" }}>{formatDate(r.dataApprovazione)}</td>
+                  <td style={{ ...TD("right"), fontWeight: 600, color: "#1a73e8" }}>{r.percentuale != null ? formatPerc(r.percentuale) : "—"}</td>
+                  <td style={{ ...TD("right"), color: "#374151" }}>{formatEuro(r.importo)}</td>
+                  <td style={{ ...TD("right"), color: "#f59e0b", fontWeight: 600 }}>{formatEuro(r.consumato)}</td>
+                  <td style={{ ...TD("right"), color: residuo >= 0 ? "#10b981" : "#dc2626", fontWeight: 700 }}>{formatEuro(residuo)}</td>
+                  <td style={TD("center")}>
+                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                      <button onClick={() => openEdit(r)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #1a73e8", background: "#eff6ff", color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Modifica</button>
+                      <button onClick={() => handleDelete(r.id)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Modale ────────────────────────────────────────────────────────────────────

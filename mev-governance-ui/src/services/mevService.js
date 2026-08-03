@@ -625,3 +625,48 @@ export const updateDescrizioneAmbiente = async (ambienteId, descrizione) => {
   return response.json(); // { id, codiceContratto, descrizione }
 };
 
+// ---- Contratti Budget e Righe Societarie (ConsumoTow) ----
+
+export const getContrattiBudget = async () => {
+  const response = await fetch(API_BASE_URL + '/api/contratti/budget', { headers: authHeaders() });
+  if (response.status === 401) throw new Error('401');
+  if (!response.ok) throw new Error('Errore nel recupero budget contratti');
+  return response.json();
+};
+
+export const saveContrattoBudget = async (payload) => {
+  const method = payload.id ? 'PUT' : 'POST';
+  const url = payload.id ? API_BASE_URL + '/api/contratti/budget/' + payload.id : API_BASE_URL + '/api/contratti/budget';
+  const response = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(payload) });
+  if (response.status === 401) throw new Error('401');
+  if (!response.ok) throw new Error('Errore nel salvataggio budget contratto');
+  return response.json();
+};
+
+export const deleteContrattoBudget = async (id) => {
+  const response = await fetch(API_BASE_URL + '/api/contratti/budget/' + id, { method: 'DELETE', headers: authHeaders() });
+  if (response.status === 401) throw new Error('401');
+  if (!response.ok) throw new Error('Errore eliminazione budget contratto');
+};
+
+export const getConsumoTowRighe = async () => {
+  const response = await fetch(API_BASE_URL + '/api/contratti/consumo-tow-righe', { headers: authHeaders() });
+  if (response.status === 401) throw new Error('401');
+  if (!response.ok) throw new Error('Errore nel recupero righe ConsumoTOW');
+  return response.json();
+};
+
+export const saveConsumoTowRiga = async (payload) => {
+  const method = payload.id ? 'PUT' : 'POST';
+  const url = payload.id ? API_BASE_URL + '/api/contratti/consumo-tow-righe/' + payload.id : API_BASE_URL + '/api/contratti/consumo-tow-righe';
+  const response = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(payload) });
+  if (response.status === 401) throw new Error('401');
+  if (!response.ok) throw new Error('Errore nel salvataggio riga ConsumoTOW');
+  return response.json();
+};
+
+export const deleteConsumoTowRiga = async (id) => {
+  const response = await fetch(API_BASE_URL + '/api/contratti/consumo-tow-righe/' + id, { method: 'DELETE', headers: authHeaders() });
+  if (response.status === 401) throw new Error('401');
+  if (!response.ok) throw new Error('Errore eliminazione riga ConsumoTOW');
+};
