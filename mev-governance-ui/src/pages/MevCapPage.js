@@ -32,6 +32,44 @@ const parseSocietà = (val) => {
   return val ? [val] : [];
 };
 
+// Risolve il valore di capgemini/iet per la colonna Mandataria/Mandante.
+// Se il valore è "x" (legacy checkmark) cerca la società per _id in RTI&SUBCO,
+// altrimenti usa parseSocietà normalmente.
+// capId  = _id della riga RTI da usare per la x di CAP  (default 1 = Capgemini Italia S.p.A.)
+// ietId  = _id della riga RTI da usare per la x di IET  (default 2 = I&T)
+const resolveCapMandanti = (capVal, ietVal) => {
+  const rtiRows = loadRtiSocietà();
+  const byId = (id) => {
+    const found = rtiRows.find(r => String(r._id) === String(id) || Number(r._id) === Number(id));
+    return found?.societa || null;
+  };
+
+  const fromCap = (() => {
+    if (!capVal) return [];
+    const trimmed = String(capVal).trim().toLowerCase();
+    if (trimmed === "x") {
+      const soc = byId(1);
+      return soc ? [soc] : ["Capgemini Italia S.p.A."];
+    }
+    return parseSocietà(capVal);
+  })();
+
+  const fromIet = (() => {
+    if (!ietVal) return [];
+    const trimmed = String(ietVal).trim().toLowerCase();
+    if (trimmed === "x") {
+      const soc = byId(2);
+      return soc ? [soc] : ["I&T"];
+    }
+    return parseSocietà(ietVal);
+  })();
+
+  // unisci evitando duplicati
+  const combined = [...fromCap];
+  fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
+  return combined;
+};
+
 // Serializza array → JSON string (o "" se vuoto)
 const serializeSocietà = (arr) =>
   arr.length === 0 ? "" : arr.length === 1 ? arr[0] : JSON.stringify(arr);
@@ -1089,8 +1127,6 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <th style={{ padding: "4px 6px" }}></th>
               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("capgemini")} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("iet")} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("capgemini"), "capgemini")} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
@@ -1115,8 +1151,6 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="60px">Note</TH>
               <TH minW="120px">ODA (BC)</TH>
               <TH minW="100px">RDA (AT ID)</TH>
-              <TH minW="60px">CAP</TH>
-              <TH minW="50px">IET</TH>
               <TH minW="140px">Mandataria/Mandante</TH>
               <TH minW="120px">Subco</TH>
               <TH minW="75px">TOW01</TH>
@@ -1189,12 +1223,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.capgemini)}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{checkMark(r.iet)}</td>
                   <td style={{ ...TD }}>
-                    {parseSocietà(r.capgemini).length > 0
+                    {resolveCapMandanti(r.capgemini, r.iet).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                          {parseSocietà(r.capgemini).map(s => (
+                          {resolveCapMandanti(r.capgemini, r.iet).map(s => (
                             <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
                           ))}
                         </div>
