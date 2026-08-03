@@ -634,7 +634,20 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                     const perc025 = towImpatto["TOW02.5"];
                     if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
                     const valUnit025 = prices["TOW02.5"] || 0;
-                    if (!valUnit025) { alert("Seleziona un Tipo Contratto con prezzi configurati per calcolare i TOW"); return; }
+                    if (!valUnit025) {
+                      // DEBUG: mostra i dati disponibili per diagnosticare
+                      const availKeys = Object.keys(effectivePriceMap);
+                      const priceKeys = Object.keys(prices);
+                      console.warn("[Calcola] effectivePriceMap keys:", availKeys);
+                      console.warn("[Calcola] prices per", form.tipoContratto, ":", prices);
+                      console.warn("[Calcola] towImpatto:", towImpatto);
+                      alert(
+                        `Nessun prezzo per TOW02.5 nel contratto "${form.tipoContratto}".\n\n` +
+                        `Contratti disponibili: ${availKeys.join(", ") || "(nessuno)"}\n` +
+                        `Chiavi prezzi del contratto selezionato: ${priceKeys.join(", ") || "(nessuna)"}`
+                      );
+                      return;
+                    }
                     // Importo totale dell'intervento ricavato da TOW02.5
                     const importo025 = qty025 * valUnit025;
                     const totaleIntervento = importo025 / (perc025 / 100);
