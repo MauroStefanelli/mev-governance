@@ -951,8 +951,22 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const buildOptions = (field) =>
     [...new Set(rows.map((r) => r[field]).filter((v) => v !== null && v !== undefined && v !== ""))].sort();
 
+  // Opzioni filtro Mandataria/Mandante: risolve i valori legacy "x" nei nomi reali
+  const buildOptionsMandataria = () => {
+    const names = new Set();
+    rows.forEach(r => {
+      resolveCapMandanti(r.capgemini, r.iet).forEach(s => { if (s && s.trim()) names.add(s); });
+    });
+    return [...names].sort();
+  };
+
   const withVuoto = (opts, field) => {
     const hasEmpty = rows.some((r) => !r[field] || String(r[field]).trim() === "");
+    return [...opts, ...(hasEmpty ? ["(vuoto)"] : [])];
+  };
+
+  const withVuotoMandataria = (opts) => {
+    const hasEmpty = rows.some(r => resolveCapMandanti(r.capgemini, r.iet).length === 0);
     return [...opts, ...(hasEmpty ? ["(vuoto)"] : [])];
   };
 
@@ -961,6 +975,14 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     const val = r[rowField] ?? "";
     if (!String(val).trim() && filters[filterKey].includes("(vuoto)")) return true;
     return filters[filterKey].includes(String(val));
+  };
+
+  // Filtro Mandataria/Mandante: usa i nomi risolti (gestisce legacy "x")
+  const matchMandataria = (r) => {
+    if (filters.capgemini.length === 0) return true;
+    const resolved = resolveCapMandanti(r.capgemini, r.iet);
+    if (resolved.length === 0 && filters.capgemini.includes("(vuoto)")) return true;
+    return resolved.some(s => filters.capgemini.includes(s));
   };
 
   const filteredRows = rows.filter((r) =>
@@ -974,7 +996,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     matchField(r, "pmCap", "pmCap") &&
     matchField(r, "oda", "bc") &&
     matchField(r, "rda", "atId") &&
-    matchField(r, "capgemini", "capgemini") &&
+    matchMandataria(r) &&
     matchField(r, "iet", "iet") &&
     matchField(r, "subco", "subco") &&
     matchField(r, "recupero", "recupero") &&
@@ -1208,7 +1230,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <th style={{ padding: "4px 6px" }}></th>
               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("capgemini"), "capgemini")} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
