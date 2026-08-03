@@ -172,7 +172,7 @@ const inputStyle = (extra = {}) => ({
 });
 
 // ── Componente ───────────────────────────────────────────────────────────────
-function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned, ambienteId }) {
+function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savedRows, setSavedRows] = useState({});
@@ -193,8 +193,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   // ── Data load ──────────────────────────────────────────────────────────────
   const loadMev = async () => {
     setLoading(true);
-    setRows([]);
-    onRowsChange?.([]);
     try {
       const data = await getMevList();
       setRows(data);
@@ -206,7 +204,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     }
   };
 
-  useEffect(() => { loadMev(); }, [ambienteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadMev(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
