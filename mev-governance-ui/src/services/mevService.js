@@ -80,6 +80,30 @@ export async function updateMev(id, payload) {
   return response.json();
 }
 
+export async function createMev(payload) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401) throw new Error("401");
+  if (response.status === 409) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  if (!response.ok) throw new Error("Errore nella creazione MEV");
+  return response.json();
+}
+
+export async function getMevOptions() {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/options`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore nel recupero opzioni");
+  return response.json();
+}
+
 export const exportMev = async (rows, filters = {}) => {
   const XLSX = await import("xlsx");
 

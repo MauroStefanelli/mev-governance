@@ -17,7 +17,21 @@ const TD = (align = "left", extra = {}) => ({
   verticalAlign: "middle", whiteSpace: "nowrap", textAlign: align, ...extra,
 });
 
-function ContrattiPage({ onUnauthorized }) {
+// Larghezze colonne della tabella BC/GoTo — condivise tra header, BC, GoTo e totali
+const COL_W = {
+  arrow:    28,
+  bc:       150,
+  rda:      130,
+  atId:     120,
+  impForn:  160,
+  ordinato: 160,
+  fatt:     150,
+  daFatt:   150,
+};
+// Larghezza minima totale tabella (somma colonne) — garantisce che tableLayout:fixed sia rispettato
+const TABLE_MIN_W = Object.values(COL_W).reduce((s, v) => s + v, 0) + "px";
+
+function ContrattiPage({ onUnauthorized, ambienteId }) {
   const [contratti, setContratti]         = useState([]);
   const [loading, setLoading]             = useState(true);
   const [openContratti, setOpenContratti] = useState({});
@@ -26,6 +40,7 @@ function ContrattiPage({ onUnauthorized }) {
 
   const load = async () => {
     setLoading(true);
+    setContratti([]);
     try {
       const data = await getContratti();
       setContratti(data);
@@ -36,7 +51,7 @@ function ContrattiPage({ onUnauthorized }) {
     }
   };
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, [ambienteId]); // eslint-disable-line
 
   const toggleContratto = (id) =>
     setOpenContratti((p) => ({ ...p, [id]: !p[id] }));
@@ -150,129 +165,135 @@ function ContrattiPage({ onUnauthorized }) {
                                         </span>
                                       </div>
 
-                                      {/* ── Livello 3: BC sommati ── */}
+                                      {/* ── Livello 3: BC + GoTo nella stessa tabella ── */}
                                       {annoOpen && (
                                         <div style={{ background: "white", padding: "8px 14px 12px 28px" }}>
-                                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                                             <thead>
-                                              <tr>
-                                                 <th style={TH()} />
-                                                 <th style={TH()}>BC</th>
-                                                 <th style={TH()}>RDA</th>
-                                                 <th style={TH()}>AT ID</th>
-                                                 <th style={TH("right")}>Imp. Fornitura</th>
-                                                 <th style={TH("right")}>Ordinato (BdO)</th>
-                                                 <th style={TH("right")}>Fatturato</th>
-                                                 <th style={TH("right")}>Da fatturare</th>
-                                               </tr>
-                                             </thead>
-                                            <tbody>
-                                                  {a.bcList.map((b, bi) => {
-                                                const bcKey = `${c.id}-${a.anno}-${b.bc}`;
-                                                const bcOpen = !!openBc[bcKey];
-                                                // Valori distinti di RDA e AT ID dal GoToList
-                                                const rdaList  = [...new Set(b.goToList.map(g => g.rda).filter(Boolean))].join(", ");
-                                                const atIdList = [...new Set(b.goToList.map(g => g.atId).filter(Boolean))].join(", ");
-                                                return (
-                                                   <>
-                                                     {/* Riga BC */}
-                                                     <tr
-                                                       key={bcKey}
-                                                       onClick={() => toggleBc(bcKey)}
-                                                       style={{
-                                                         background: bcOpen ? "#e8f0fe" : bi % 2 === 0 ? "white" : "#fafafa",
-                                                         borderBottom: "1px solid #f0f0f0", cursor: "pointer",
-                                                       }}
-                                                       onMouseEnter={(e) => { if (!bcOpen) e.currentTarget.style.background = "#f0f4ff"; }}
-                                                       onMouseLeave={(e) => { if (!bcOpen) e.currentTarget.style.background = bi % 2 === 0 ? "white" : "#fafafa"; }}
-                                                     >
-                                                       <td style={TD("center", { width: "28px", color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
-                                                         {bcOpen ? "▲" : "▶"}
-                                                       </td>
-                                                       <td style={TD("left", { fontWeight: 600, color: "#1a73e8" })}>{b.bc}</td>
-                                                       <td style={TD("left", { fontSize: "12px", color: "#555" })}>{rdaList}</td>
-                                                       <td style={TD("left", { fontSize: "12px", color: "#555" })}>{atIdList}</td>
-                                                       <td style={TD("right")}>{formatEuro(b.totImportoFornitura)}</td>
-                                                       <td style={TD("right")}>{formatEuro(b.totOrdinatoBdo)}</td>
-                                                       <td style={TD("right")}>{formatEuro(b.totFatturato)}</td>
-                                                       <td style={TD("right")}>{formatEuro(b.totImportoFornitura - b.totFatturato)}</td>
-                                                     </tr>
+                                          <div style={{ overflowX: "auto" }}>
+                                            <table style={{ width: "100%", minWidth: TABLE_MIN_W, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                                              {/* colgroup condiviso tra header BC, righe BC, righe GoTo e totali */}
+                                              <colgroup>
+                                                <col style={{ width: COL_W.arrow + "px" }} />
+                                                <col style={{ width: COL_W.bc + "px" }} />
+                                                <col style={{ width: COL_W.rda + "px" }} />
+                                                <col style={{ width: COL_W.atId + "px" }} />
+                                                <col style={{ width: COL_W.impForn + "px" }} />
+                                                <col style={{ width: COL_W.ordinato + "px" }} />
+                                                <col style={{ width: COL_W.fatt + "px" }} />
+                                                <col style={{ width: COL_W.daFatt + "px" }} />
+                                              </colgroup>
+                                              <thead>
+                                                <tr>
+                                                  <th style={TH()} />
+                                                  <th style={TH()}>BC</th>
+                                                  <th style={TH()}>RDA</th>
+                                                  <th style={TH()}>AT ID</th>
+                                                  <th style={TH("right")}>Imp. Fornitura</th>
+                                                  <th style={TH("right")}>Ordinato (BdO)</th>
+                                                  <th style={TH("right")}>Fatturato</th>
+                                                  <th style={TH("right")}>Da fatturare</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {a.bcList.map((b, bi) => {
+                                                  const bcKey  = `${c.id}-${a.anno}-${b.bc}`;
+                                                  const bcOpen = !!openBc[bcKey];
+                                                  const rdaList  = [...new Set(b.goToList.map(g => g.rda).filter(Boolean))].join(", ");
+                                                  const atIdList = [...new Set(b.goToList.map(g => g.atId).filter(Boolean))].join(", ");
+                                                  return (
+                                                    <>
+                                                      {/* Riga BC */}
+                                                      <tr
+                                                        key={bcKey}
+                                                        onClick={() => toggleBc(bcKey)}
+                                                        style={{
+                                                          background: bcOpen ? "#e8f0fe" : bi % 2 === 0 ? "white" : "#fafafa",
+                                                          borderBottom: "1px solid #f0f0f0", cursor: "pointer",
+                                                        }}
+                                                        onMouseEnter={(e) => { if (!bcOpen) e.currentTarget.style.background = "#f0f4ff"; }}
+                                                        onMouseLeave={(e) => { if (!bcOpen) e.currentTarget.style.background = bi % 2 === 0 ? "white" : "#fafafa"; }}
+                                                      >
+                                                        <td style={TD("center", { color: "#1a73e8", fontWeight: 700, fontSize: "11px" })}>
+                                                          {bcOpen ? "▲" : "▶"}
+                                                        </td>
+                                                        <td style={TD("left", { fontWeight: 600, color: "#1a73e8" })}>{b.bc}</td>
+                                                        <td style={TD("left", { fontSize: "12px", color: "#555" })}>{rdaList}</td>
+                                                        <td style={TD("left", { fontSize: "12px", color: "#555" })}>{atIdList}</td>
+                                                        <td style={TD("right")}>{formatEuro(b.totImportoFornitura)}</td>
+                                                        <td style={TD("right")}>{formatEuro(b.totOrdinatoBdo)}</td>
+                                                        <td style={TD("right")}>{formatEuro(b.totFatturato)}</td>
+                                                        <td style={TD("right")}>{formatEuro(b.totImportoFornitura - b.totFatturato)}</td>
+                                                      </tr>
 
-                                                     {/* ── Livello 4: dettaglio GoTo ── */}
-                                                     {bcOpen && (
-                                                       <tr key={`${bcKey}-detail`}>
-                                                       <td colSpan={8} style={{ padding: 0 }}>
-                                                           <div style={{ background: "#f8fbff", padding: "6px 8px 10px 36px" }}>
-                                                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-                                               <thead>
-                                                 <tr>
-                                                   <th style={{ ...TH(), fontSize: "11px" }}>GoTo</th>
-                                                   <th style={{ ...TH("left"), fontSize: "11px" }}>Applicativo</th>
-                                                   <th style={{ ...TH("left"), fontSize: "11px" }}>Anno</th>
-                                                   <th style={{ ...TH("left"), fontSize: "11px" }}>Release</th>
-                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura</th>
-                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Ordinato (BdO)</th>
-                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Fatturato</th>
-                                                   <th style={{ ...TH("right"), fontSize: "11px" }}>Da fatturare</th>
-                                                 </tr>
-                                               </thead>
-                                                               <tbody>
-                                                                 {b.goToList.map((g, gi) => (
-                                                   <tr key={gi} style={{
-                                                     background: gi % 2 === 0 ? "white" : "#f4f8ff",
-                                                     borderBottom: "1px solid #f0f0f0",
-                                                   }}>
-                                                      <td style={TD("left", { fontSize: "12px" })}>{g.goTo}</td>
-                                                      <td style={TD("left", { fontSize: "12px" })}>{g.applicativo}</td>
-                                                     <td style={TD("left", { fontSize: "12px" })}>{g.annoCompetenza}</td>
-                                                     <td style={TD("left", { fontSize: "12px" })}>{g.releaseExcel}</td>
-                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato)}</td>
-                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.ordinatoBdo)}</td>
-                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.fatturato)}</td>
-                                                     <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato - g.fatturato)}</td>
-                                                   </tr>
-                                                                 ))}
-                                                               </tbody>
-                                                               {/* Totale GoTo */}
-                                                               <tfoot>
-                                                                 <tr style={{ background: "#e8f0fe", borderTop: "2px solid #dadce0" }}>
-                                                   <td colSpan={3} style={{ ...TD("left", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
-                                                     Totale
-                                                   </td>
-                                                                   <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
-                                                                     {formatEuro(b.goToList.reduce((s, g) => s + (g.importoForniturascontato || 0), 0))}
-                                                                   </td>
-                                                                   <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
-                                                                     {formatEuro(b.totOrdinatoBdo)}
-                                                                   </td>
-                                                                   <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
-                                                                     {formatEuro(b.totFatturato)}
-                                                                   </td>
-                                                                   <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
-                                                                     {formatEuro(b.totImportoFornitura - b.totFatturato)}
-                                                                   </td>
-                                                                 </tr>
-                                                               </tfoot>
-                                                             </table>
-                                                           </div>
-                                                         </td>
-                                                       </tr>
-                                                     )}
-                                                  </>
-                                                );
-                                              })}
-                                            </tbody>
-                                             {/* Totale anno */}
-                                             <tfoot>
-                                               <tr style={{ background: "#e8f0fe", borderTop: "2px solid #dadce0" }}>
-                                                 <td colSpan={4} style={{ ...TD("left"), fontWeight: 700, color: "#1a73e8", fontSize: "12px" }}>Totale Anno {a.anno}</td>
-                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totImportoFornitura)}</td>
-                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totOrdinatoBdo)}</td>
-                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totFatturato)}</td>
-                                                 <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totImportoFornitura - a.totFatturato)}</td>
-                                               </tr>
-                                             </tfoot>
-                                          </table>
+                                                      {/* ── Livello 4: GoTo — righe inline nella stessa tabella ── */}
+                                                      {bcOpen && (
+                                                        <>
+                                                          {/* Sub-header GoTo con sfondo distinto */}
+                                                          <tr style={{ background: "#f0f4ff" }}>
+                                                            <td />
+                                                            <td style={{ ...TH("left"), fontSize: "11px", paddingLeft: "20px" }}>GoTo</td>
+                                                            <td style={{ ...TH("left"), fontSize: "11px" }}>Applicativo</td>
+                                                            <td style={{ ...TH("left"), fontSize: "11px" }}>Anno / Release</td>
+                                                            <td style={{ ...TH("right"), fontSize: "11px" }}>Imp. Fornitura</td>
+                                                            <td style={{ ...TH("right"), fontSize: "11px" }}>Ordinato (BdO)</td>
+                                                            <td style={{ ...TH("right"), fontSize: "11px" }}>Fatturato</td>
+                                                            <td style={{ ...TH("right"), fontSize: "11px" }}>Da fatturare</td>
+                                                          </tr>
+
+                                                          {/* Righe GoTo */}
+                                                          {b.goToList.map((g, gi) => (
+                                                            <tr key={gi} style={{
+                                                              background: gi % 2 === 0 ? "#fafcff" : "#f4f8ff",
+                                                              borderBottom: "1px solid #f0f0f0",
+                                                            }}>
+                                                              <td />
+                                                              <td style={TD("left", { fontSize: "12px", paddingLeft: "20px", color: "#1a73e8", fontWeight: 500 })}>{g.goTo}</td>
+                                                              <td style={TD("left", { fontSize: "12px", color: "#555" })}>{g.applicativo}</td>
+                                                              <td style={TD("left", { fontSize: "12px", color: "#555" })}>{g.annoCompetenza}{g.releaseExcel ? ` · ${g.releaseExcel}` : ""}</td>
+                                                              <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato)}</td>
+                                                              <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.ordinatoBdo)}</td>
+                                                              <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.fatturato)}</td>
+                                                              <td style={TD("right", { fontSize: "12px" })}>{formatEuro(g.importoForniturascontato - g.fatturato)}</td>
+                                                            </tr>
+                                                          ))}
+
+                                                          {/* Totale GoTo */}
+                                                          <tr style={{ background: "#e8f0fe", borderTop: "2px solid #dadce0", borderBottom: "2px solid #1a73e8" }}>
+                                                            <td />
+                                                            <td colSpan={3} style={{ ...TD("left", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8", paddingLeft: "20px" }}>
+                                                              Totale {b.bc}
+                                                            </td>
+                                                            <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
+                                                              {formatEuro(b.goToList.reduce((s, g) => s + (g.importoForniturascontato || 0), 0))}
+                                                            </td>
+                                                            <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
+                                                              {formatEuro(b.totOrdinatoBdo)}
+                                                            </td>
+                                                            <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
+                                                              {formatEuro(b.totFatturato)}
+                                                            </td>
+                                                            <td style={{ ...TD("right", { fontSize: "12px" }), fontWeight: 700, color: "#1a73e8" }}>
+                                                              {formatEuro(b.totImportoFornitura - b.totFatturato)}
+                                                            </td>
+                                                          </tr>
+                                                        </>
+                                                      )}
+                                                    </>
+                                                  );
+                                                })}
+                                              </tbody>
+                                              {/* Totale anno */}
+                                              <tfoot>
+                                                <tr style={{ background: "#e8f0fe", borderTop: "2px solid #dadce0" }}>
+                                                  <td />
+                                                  <td colSpan={3} style={{ ...TD("left"), fontWeight: 700, color: "#1a73e8", fontSize: "12px" }}>Totale Anno {a.anno}</td>
+                                                  <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totImportoFornitura)}</td>
+                                                  <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totOrdinatoBdo)}</td>
+                                                  <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totFatturato)}</td>
+                                                  <td style={{ ...TD("right"), fontWeight: 700, color: "#1a73e8" }}>{formatEuro(a.totImportoFornitura - a.totFatturato)}</td>
+                                                </tr>
+                                              </tfoot>
+                                            </table>
+                                          </div>
                                         </div>
                                       )}
                                     </div>
