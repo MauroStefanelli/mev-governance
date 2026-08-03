@@ -631,21 +631,13 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                     const prices = effectivePriceMap[form.tipoContratto] || {};
                     const qty025 = parseFloat(form.tow025) || 0;
                     if (!qty025) { alert("Inserisci prima il valore per TOW02.5"); return; }
+                    if (!form.tipoContratto) { alert("Seleziona prima il Tipo Contratto"); return; }
+                    if (!("TOW02.5" in prices)) { alert(`Nessuna riga TOW02.5 per il contratto "${form.tipoContratto}".\nVerifica in Gestione Contratto.`); return; }
                     const perc025 = towImpatto["TOW02.5"];
                     if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
-                    const valUnit025 = prices["TOW02.5"] || 0;
-                    if (!valUnit025) {
-                      // DEBUG: mostra i dati disponibili per diagnosticare
-                      const availKeys = Object.keys(effectivePriceMap);
-                      const priceKeys = Object.keys(prices);
-                      console.warn("[Calcola] effectivePriceMap keys:", availKeys);
-                      console.warn("[Calcola] prices per", form.tipoContratto, ":", prices);
-                      console.warn("[Calcola] towImpatto:", towImpatto);
-                      alert(
-                        `Nessun prezzo per TOW02.5 nel contratto "${form.tipoContratto}".\n\n` +
-                        `Contratti disponibili: ${availKeys.join(", ") || "(nessuno)"}\n` +
-                        `Chiavi prezzi del contratto selezionato: ${priceKeys.join(", ") || "(nessuna)"}`
-                      );
+                    const valUnit025 = Number(prices["TOW02.5"]);
+                    if (!valUnit025 || valUnit025 <= 0) {
+                      alert(`Il Valore Unitario di TOW02.5 nel contratto "${form.tipoContratto}" è zero.\nImposta il prezzo in Gestione Contratto prima di usare Calcola.`);
                       return;
                     }
                     // Importo totale dell'intervento ricavato da TOW02.5
