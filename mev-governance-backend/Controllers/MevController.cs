@@ -83,6 +83,11 @@ public class MevController : BaseController
         if (request.Cm         != null) item.Cm         = request.Cm;
         if (request.NoteExcel  != null) item.NoteExcel  = request.NoteExcel;
 
+        // Ricalcolo importi e TowTotale se inviati dal frontend
+        if (request.ImportoExcel             != null) item.ImportoExcel             = request.ImportoExcel.Value;
+        if (request.ImportoFornituraScontato != null) item.ImportoFornituraScontato = request.ImportoFornituraScontato.Value;
+        if (request.TowTotale               != null) item.TowTotale               = request.TowTotale.Value;
+
         _db.SaveChanges();
 
         // Invia email di notifica solo agli utenti con SendEmail = true

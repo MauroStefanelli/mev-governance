@@ -32,4 +32,9 @@ public class UpdateMevRequest
     public string? InVita { get; set; }
     public string? Cm { get; set; }
     public string? NoteExcel { get; set; }
+
+    // ── Importi ricalcolati dai TOW ──────────────────────────────────────────
+    public decimal? ImportoExcel { get; set; }
+    public decimal? ImportoFornituraScontato { get; set; }
+    public decimal? TowTotale { get; set; }
 }

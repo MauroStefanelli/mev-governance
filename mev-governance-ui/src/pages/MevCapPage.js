@@ -264,7 +264,18 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   const [form, setForm] = useState(isCreate ? emptyForm : { ...row });
   const [saving, setSaving] = useState(false);
 
-  const computedImporto = isCreate ? calcImporto(form, options.priceMap) : null;
+  // Ricalcolo importo fornitura dai TOW — funziona sia in create che in edit
+  const computedImporto = calcImporto(form, options.priceMap);
+  const hasPriceMap     = !!(options.priceMap?.[form.tipoContratto]);
+  // In edit, se non c'è priceMap per il tipoContratto corrente, mantieni il valore originale
+  const displayImporto  = (hasPriceMap && computedImporto > 0) ? computedImporto : (form.importoExcel ?? 0);
+  // Importo scontato: ricalcolato proporzionalmente se l'importo originale era > 0
+  const origImporto     = parseFloat(row?.importoExcel) || 0;
+  const origScontato    = parseFloat(row?.importoFornituraScontato) || 0;
+  const scontoRatio     = origImporto > 0 ? origScontato / origImporto : 1;
+  const displayScontato = hasPriceMap && origImporto > 0
+    ? computedImporto * scontoRatio
+    : (form.importoFornituraScontato ?? 0);
 
   const set = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -277,7 +288,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
       if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
     }
     setSaving(true);
-    const formToSave = isCreate ? { ...form, importoExcel: computedImporto } : form;
+    const towTotale = TOW_FIELDS.reduce((s, { field }) => s + (parseFloat(form[field]) || 0), 0);
+    const formToSave = isCreate
+      ? { ...form, importoExcel: computedImporto, towTotale }
+      : { ...form, importoExcel: displayImporto, importoFornituraScontato: displayScontato, towTotale };
     try { await onSave(formToSave); onClose(); }
     catch (e) { alert(`Errore salvataggio: ${e.message}`); }
     finally { setSaving(false); }
@@ -347,7 +361,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             <ComboField label="PM CAP"          field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(25% - 8px)" />
             <ComboField label="Anno Competenza" field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(15% - 8px)" />
             <ComboField label="Release"         field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="Recupero"        field="recupero"       form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="Recupero"        field="recupero"       options={["SI", "NO"]} form={form} onChange={set} width="calc(15% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Stato e Contratto */}
@@ -372,27 +386,32 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
 
           {/* Sezione: Importi — tutti in € */}
           <ModalSection title="Importi" color={sectionColor}>
-            {isCreate ? (
-              <div style={{ marginBottom: "12px", width: "calc(25% - 8px)" }}>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  Importo Fornitura
-                </label>
-                <div style={{ padding: "6px 10px", border: "2px solid #1a73e8", borderRadius: "4px", fontSize: "13px", background: "#e8f0fe", color: "#1a73e8", fontWeight: 700, minHeight: "32px", textAlign: "right" }}>
-                  {form.tipoContratto
-                    ? (options.priceMap?.[form.tipoContratto]
-                      ? formatEuro(computedImporto)
-                      : <span style={{ color: "#ea4335", fontWeight: 400 }}>Nessun prezzo per {form.tipoContratto}</span>)
-                    : <span style={{ color: "#888", fontWeight: 400 }}>— seleziona Tipo Contratto —</span>
-                  }
-                </div>
+            {/* Importo Fornitura: calcolato in tempo reale dai TOW se priceMap disponibile */}
+            <div style={{ marginBottom: "12px", width: "calc(25% - 8px)" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                Importo Fornitura
+              </label>
+              <div style={{ padding: "6px 10px", border: `2px solid ${hasPriceMap ? sectionColor : "#dadce0"}`, borderRadius: "4px", fontSize: "13px", background: hasPriceMap ? (isCreate ? "#f0fdf4" : "#f0f6ff") : "#f8f9fa", color: hasPriceMap ? sectionColor : "#888", fontWeight: hasPriceMap ? 700 : 400, minHeight: "32px", textAlign: "right", whiteSpace: "nowrap" }}>
+                {form.tipoContratto
+                  ? hasPriceMap
+                    ? formatEuro(displayImporto)
+                    : <span style={{ color: "#ea4335", fontWeight: 400 }}>Nessun prezzo per {form.tipoContratto}</span>
+                  : <span style={{ fontWeight: 400 }}>— seleziona Tipo Contratto —</span>
+                }
               </div>
-            ) : (
-              <EuroField label="Importo Fornitura"  value={form.importoExcel}               width="calc(20% - 8px)" />
-            )}
-            <EuroField label="Importo Scontato"     value={form.importoFornituraScontato}   width="calc(20% - 8px)" />
-            <EuroField label="Ordinato (BdO)"       value={form.ordinatoBdo}                width="calc(20% - 8px)" />
-            <EuroField label="Fatturato"             value={form.fatturato}                  width="calc(20% - 8px)" />
-            <EuroField label="Residuo Fatt."         value={form.residuoFatturabile}         width="calc(20% - 8px)" />
+            </div>
+            {/* Importo Scontato: ricalcolato proporzionalmente */}
+            <div style={{ marginBottom: "12px", width: "calc(20% - 8px)" }}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                Importo Scontato
+              </label>
+              <div style={{ padding: "6px 10px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", background: "#f8f9fa", color: "#1a73e8", fontWeight: 600, minHeight: "32px", textAlign: "right", whiteSpace: "nowrap" }}>
+                {formatEuro(displayScontato)}
+              </div>
+            </div>
+            <EuroField label="Ordinato (BdO)"  value={form.ordinatoBdo}        width="calc(20% - 8px)" />
+            <EuroField label="Fatturato"        value={form.fatturato}          width="calc(20% - 8px)" />
+            <EuroField label="Residuo Fatt."    value={form.residuoFatturabile} width="calc(15% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Extra */}
@@ -475,7 +494,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     goTo: [], applicativo: [], stato: [], annoCompetenza: [],
     tipoContratto: [], releaseExcel: [], pmPoste: [], pmCap: [],
     oda: [], rda: [], capgemini: [], iet: [], subco: [],
-    pAnno: [], pRelease: [], importoExcel: []
+    recupero: [], pAnno: [], pRelease: [], importoExcel: []
   };
 
   const [filters, setFilters] = useState(() => {
@@ -560,6 +579,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     matchField(r, "capgemini", "capgemini") &&
     matchField(r, "iet", "iet") &&
     matchField(r, "subco", "subco") &&
+    matchField(r, "recupero", "recupero") &&
     matchField(r, "pAnno", "pAnno") &&
     matchField(r, "pRelease", "pRelease") &&
     (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
@@ -601,6 +621,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       inVita:     form.inVita,
       cm:         form.cm,
       noteExcel:  form.noteExcel,
+      // Importi ricalcolati dai TOW (se presenti nel form dopo il save della modale)
+      importoExcel:               form.importoExcel             != null ? Number(form.importoExcel) : undefined,
+      importoFornituraScontato:   form.importoFornituraScontato != null ? Number(form.importoFornituraScontato) : undefined,
+      towTotale:                  form.towTotale                != null ? Number(form.towTotale) : undefined,
     });
     setRows((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...updated } : r)));
     setSavedRows((prev) => ({ ...prev, [form.id]: true }));
@@ -781,6 +805,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
+              <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "130px" }}></th>
               <th style={{ padding: "4px 6px" }}></th>
               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
@@ -805,6 +830,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="100px">Release</TH>
               <TH minW="100px">Stato</TH>
               <TH minW="80px">Tipo Contr.</TH>
+              <TH minW="80px">Recupero</TH>
               <TH minW="130px">Importo CAP</TH>
               <TH minW="60px">Note</TH>
               <TH minW="120px">ODA (BC)</TH>
@@ -848,6 +874,15 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   <td style={{ ...TD }}>{r.releaseExcel ?? ""}</td>
                   <td style={{ ...TD }}>{statoBadge(r.stato)}</td>
                   <td style={{ ...TD, fontSize: "12px" }}>{r.tipoContratto ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "center", fontSize: "12px" }}>
+                    {r.recupero ? (
+                      <span style={{
+                        display: "inline-block", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600,
+                        background: r.recupero.toUpperCase() === "SI" ? "#e6f4ea" : "#f1f3f4",
+                        color: r.recupero.toUpperCase() === "SI" ? "#2e7d32" : "#555",
+                      }}>{r.recupero}</span>
+                    ) : ""}
+                  </td>
                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoExcel)}</td>
 
                   {/* Note */}
