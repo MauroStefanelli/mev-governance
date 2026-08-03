@@ -3,10 +3,21 @@ import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFigl
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
-export const TOW_IMPATTO_KEY = "tow-impatto-perc"; // { "TOW02.1": 30.5, ... }
+export const TOW_IMPATTO_KEY = "tow-impatto-perc"; // { "NomeContratto": { "TOW02.1": 30.5, ... } }
 
-export const loadTowImpatto = () => {
-  try { return JSON.parse(localStorage.getItem(TOW_IMPATTO_KEY) || "{}"); } catch { return {}; }
+export const loadTowImpatto = (contratto) => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TOW_IMPATTO_KEY) || "{}");
+    // Retrocompatibilità: se il dato è flat { "TOW02.1": 30 } (valori numerici diretti)
+    // lo trattiamo come configurazione del primo contratto disponibile
+    const firstVal = Object.values(raw)[0];
+    if (typeof firstVal === "number") {
+      // struttura vecchia flat — restituisce flat se contratto non specificato
+      return contratto ? raw : raw;
+    }
+    if (contratto) return raw[contratto] || {};
+    return raw; // { contratto: { tow: perc } }
+  } catch { return contratto ? {} : {}; }
 };
 const saveTowImpatto = (map) => localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(map));
 
@@ -1203,10 +1214,22 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         // Mostra colonna % Impatto sempre se ci sono impatti configurati (allineamento garantito)
         const hasImpatto = Object.keys(towImpatto).length > 0;
 
-        const handleImpattoChange = (tow, val) => {
-          const next = { ...towImpatto, [tow]: val === "" ? undefined : parseNum(val) };
+        const handleImpattoChange = (contratto, tow, val) => {
+          const prev = typeof Object.values(towImpatto)[0] === "number"
+            ? { [contratti[0] || "BASE"]: { ...towImpatto } } // migra da flat a per-contratto
+            : { ...towImpatto };
+          const percContr = { ...(prev[contratto] || {}) };
+          if (val === "") delete percContr[tow]; else percContr[tow] = parseNum(val);
+          const next = { ...prev, [contratto]: percContr };
           saveTowImpatto(next);
           setTowImpatto(next);
+        };
+
+        // Helper: legge la % impatto per un dato contratto e TOW
+        const getImpatto = (contratto, tow) => {
+          // retrocompatibilità: struttura flat
+          if (typeof Object.values(towImpatto)[0] === "number") return towImpatto[tow];
+          return towImpatto[contratto]?.[tow];
         };
 
         return (
@@ -1228,10 +1251,10 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                 {/* Header */}
                 <thead>
                   <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                    <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
+                     <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
                     <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
-                    <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />  {/* TOW */}
-                    <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />  {/* QTA */}
+                    <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>Nome TOW</th>
+                    <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
                     {visibleFields.map(f => (
                       <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>
                     ))}
@@ -1328,35 +1351,27 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                         ))}
                                         {hasImpatto && (
                                           <td style={{ ...TD("right"), padding: "6px 8px" }}>
-                                            {isBase ? (
-                                              <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-                                                <input
-                                                  type="number"
-                                                  min="0"
-                                                  max="100"
-                                                  step="0.1"
-                                                  value={towImpatto[row.tow] !== undefined ? towImpatto[row.tow] : ""}
-                                                  onChange={e => handleImpattoChange(row.tow, e.target.value)}
-                                                  placeholder="0"
-                                                  style={{
-                                                    width: "60px", padding: "3px 20px 3px 6px",
-                                                    border: "1px solid #ddd8fe", borderRadius: "6px",
-                                                    fontSize: "12px", textAlign: "right", outline: "none",
-                                                    background: towImpatto[row.tow] ? "#f5f3ff" : "#fff",
-                                                    color: "#7c3aed", fontWeight: towImpatto[row.tow] ? 700 : 400,
-                                                  }}
-                                                />
-                                                <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
-                                              </div>
-                                            ) : (
-                                              towImpatto[row.tow] ? (
-                                                <span style={{ fontSize: "12px", color: "#8b5cf6", fontWeight: 600 }}>
-                                                  {Number(towImpatto[row.tow]).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
-                                                </span>
-                                              ) : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
-                                            )}
-                                          </td>
-                                        )}
+                                            <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                                value={getImpatto(c, row.tow) !== undefined ? getImpatto(c, row.tow) : ""}
+                                                onChange={e => handleImpattoChange(c, row.tow, e.target.value)}
+                                                placeholder="0"
+                                                style={{
+                                                  width: "60px", padding: "3px 20px 3px 6px",
+                                                  border: "1px solid #ddd8fe", borderRadius: "6px",
+                                                  fontSize: "12px", textAlign: "right", outline: "none",
+                                                  background: getImpatto(c, row.tow) ? "#f5f3ff" : "#fff",
+                                                  color: "#7c3aed", fontWeight: getImpatto(c, row.tow) ? 700 : 400,
+                                                }}
+                                              />
+                                               <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
+                                             </div>
+                                           </td>
+                                         )}
                                       </tr>
                                     ))}
                                   </tbody>
@@ -1372,18 +1387,18 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                          const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                                          return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
                                        })}
-                                       {isBase && (
-                                         <td style={{ ...TD("right"), fontWeight: 700, color: "#7c3aed", fontSize: "12px" }}>
-                                           {(() => {
-                                             const tot = cRows.reduce((s, r) => s + (Number(towImpatto[r.tow]) || 0), 0);
-                                             return tot > 0 ? (
-                                               <span style={{ background: tot === 100 ? "#f0fdf4" : tot > 100 ? "#fef2f2" : "#f5f3ff", color: tot === 100 ? "#16a34a" : tot > 100 ? "#dc2626" : "#7c3aed", border: `1px solid ${tot === 100 ? "#bbf7d0" : tot > 100 ? "#fecaca" : "#ddd8fe"}`, borderRadius: "5px", padding: "1px 6px", fontSize: "11px" }}>
-                                                 {tot.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
-                                               </span>
-                                             ) : "—";
-                                           })()}
-                                         </td>
-                                       )}                                     </tr>
+                                        {hasImpatto && (
+                                          <td style={{ ...TD("right"), fontWeight: 700, color: "#7c3aed", fontSize: "12px" }}>
+                                            {(() => {
+                                              const tot = cRows.reduce((s, r) => s + (Number(getImpatto(c, r.tow)) || 0), 0);
+                                              return tot > 0 ? (
+                                                <span style={{ background: tot === 100 ? "#f0fdf4" : tot > 100 ? "#fef2f2" : "#f5f3ff", color: tot === 100 ? "#16a34a" : tot > 100 ? "#dc2626" : "#7c3aed", border: `1px solid ${tot === 100 ? "#bbf7d0" : tot > 100 ? "#fecaca" : "#ddd8fe"}`, borderRadius: "5px", padding: "1px 6px", fontSize: "11px" }}>
+                                                  {tot.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
+                                                </span>
+                                              ) : "—";
+                                            })()}
+                                          </td>
+                                        )}                                     </tr>
                                    </tfoot>
                                 </table>
                               </div>

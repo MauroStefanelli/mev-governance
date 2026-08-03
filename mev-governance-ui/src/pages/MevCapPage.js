@@ -438,15 +438,44 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     pNote: "", importoBdo: 0,
   };
 
-  const [form, setForm] = useState(isCreate ? emptyForm : {
-    ...row,
-    capMandanti: row?.capgemini ?? "",
+  const [form, setForm] = useState(() => {
+    if (isCreate) return emptyForm;
+    // Risolve il valore legacy "x" di capgemini/iet in nomi società reali
+    const rtiRows = loadRtiSocietà();
+    const byId = (id) => rtiRows.find(r => Number(r._id) === Number(id))?.societa || null;
+    const resolveToArray = (capVal, ietVal) => {
+      const fromCap = (() => {
+        if (!capVal) return [];
+        if (String(capVal).trim().toLowerCase() === "x") { const s = byId(1); return s ? [s] : ["Capgemini Italia S.p.A."]; }
+        return parseSocietà(capVal);
+      })();
+      const fromIet = (() => {
+        if (!ietVal) return [];
+        if (String(ietVal).trim().toLowerCase() === "x") { const s = byId(2); return s ? [s] : ["I&T"]; }
+        return parseSocietà(ietVal);
+      })();
+      const combined = [...fromCap];
+      fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
+      return combined;
+    };
+    const resolved = resolveToArray(row?.capgemini, row?.iet);
+    const capMandanti = resolved.length > 0 ? serializeSocietà(resolved) : "";
+    return { ...row, capMandanti };
   });
   const [saving, setSaving] = useState(false);
   const [contrattiTow, setContrattiTow] = useState([]);
   const [baseRowsTow, setBaseRowsTow] = useState([]);
+  const [localPriceMap, setLocalPriceMap] = useState({});
   const [showCreaContratto, setShowCreaContratto] = useState(false);
-  const towImpatto = loadTowImpatto(); // { "TOW02.1": 30, ... }
+  const towImpattoAll = loadTowImpatto(); // { "NomeContratto": { "TOW02.1": 30, ... } } o flat legacy
+  // Percentuali di impatto per il tipo contratto selezionato
+  // Se la struttura è flat (legacy), usarla direttamente; altrimenti estrarre per contratto
+  const towImpatto = (() => {
+    const firstVal = Object.values(towImpattoAll)[0];
+    if (!towImpattoAll || Object.keys(towImpattoAll).length === 0) return {};
+    if (typeof firstVal === "number") return towImpattoAll; // flat legacy
+    return towImpattoAll[form.tipoContratto] || {};
+  })();
 
   // Carica contratti ConsumoTow per il dropdown Tipo Contratto
   useEffect(() => {
@@ -456,12 +485,23 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
       // baseRows = righe del primo contratto (BASE)
       const base = contratti[0] || "";
       setBaseRowsTow(data.filter(r => r.towContratto === base));
+      // Costruisce localPriceMap: { "NomeContratto": { "TOW02.1": valoreUnitario, ... } }
+      const pm = {};
+      data.forEach(r => {
+        if (!r.towContratto || !r.tow) return;
+        if (!pm[r.towContratto]) pm[r.towContratto] = {};
+        pm[r.towContratto][r.tow] = Number(r.valoreUnitario) || 0;
+      });
+      setLocalPriceMap(pm);
     }).catch(() => {});
   }, []);
 
+  // priceMap effettivo: preferisce localPriceMap (dal DB), fallback su options.priceMap
+  const effectivePriceMap = Object.keys(localPriceMap).length > 0 ? localPriceMap : (options.priceMap || {});
+
   // Ricalcolo importo fornitura dai TOW — funziona sia in create che in edit
-  const computedImporto = calcImporto(form, options.priceMap);
-  const hasPriceMap     = !!(options.priceMap?.[form.tipoContratto]);
+  const computedImporto = calcImporto(form, effectivePriceMap);
+  const hasPriceMap     = !!(effectivePriceMap[form.tipoContratto]);
   // In edit, se non c'è priceMap per il tipoContratto corrente, mantieni il valore originale
   const displayImporto  = (hasPriceMap && computedImporto > 0) ? computedImporto : (form.importoExcel ?? 0);
   // Importo scontato: ricalcolato proporzionalmente se l'importo originale era > 0
@@ -588,7 +628,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const prices = options.priceMap?.[form.tipoContratto] || {};
+                    const prices = effectivePriceMap[form.tipoContratto] || {};
                     const qty025 = parseFloat(form.tow025) || 0;
                     if (!qty025) { alert("Inserisci prima il valore per TOW02.5"); return; }
                     const perc025 = towImpatto["TOW02.5"];
@@ -619,7 +659,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             {TOW_FIELDS.map(({ key, field }) => {
               const perc = towImpatto[key];
               const val = parseFloat(form[field]) || 0;
-              const prices = options.priceMap?.[form.tipoContratto] || {};
+              const prices = effectivePriceMap[form.tipoContratto] || {};
               // Validazione: ricava il totale intervento da TOW02.5 e controlla lo scostamento
               const perc025 = towImpatto["TOW02.5"];
               const qty025 = parseFloat(form.tow025) || 0;
