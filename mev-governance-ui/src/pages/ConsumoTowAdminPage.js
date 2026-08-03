@@ -124,15 +124,18 @@ const TD = (align = "right", extra = {}) => ({
 
 // ── Modale Nuovo Contratto BASE ───────────────────────────────────────────────
 function NewContrattoBaseModal({ onClose, onCreated }) {
+  const INIT_TOWS = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"];
   const [nomeContratto, setNomeContratto] = useState("");
-  const [towNames, setTowNames]   = useState(["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"]);
-  const [valori, setValori]       = useState(() => Object.fromEntries(["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"].map(k => [k, ""])));
-  const [qta, setQta]             = useState(() => Object.fromEntries(["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"].map(k => [k, ""])));
+  const [towNames, setTowNames]   = useState(INIT_TOWS);
+  const [valori, setValori]       = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, ""])));
+  const [qta, setQta]             = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, ""])));
+  const [perc, setPerc]           = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, ""])));
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
 
   const setValore  = (idx, val) => setValori(p  => { const n = { ...p }; n[towNames[idx]] = val; return n; });
   const setQtaVal  = (idx, val) => setQta(p     => { const n = { ...p }; n[towNames[idx]] = val; return n; });
+  const setPercVal = (idx, val) => setPerc(p    => { const n = { ...p }; n[towNames[idx]] = val; return n; });
   const setTowName = (idx, val) => {
     setTowNames(prev => {
       const next = [...prev];
@@ -140,6 +143,7 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
       next[idx] = val;
       setValori(p  => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
       setQta(p     => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
+      setPerc(p    => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
       return next;
     });
   };
@@ -151,11 +155,24 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
   const handleSave = async () => {
     if (!nomeContratto.trim()) { setError("Inserisci il nome del contratto."); return; }
     if (towNames.some(t => !t.trim())) { setError("Tutti i nomi TOW devono essere compilati."); return; }
+    const percTot = towNames.reduce((s, k) => s + (parseNum(perc[k]) || 0), 0);
+    if (percTot > 0 && Math.abs(percTot - 100) > 0.1) {
+      if (!window.confirm(`La somma delle % è ${percTot.toFixed(1)}% (non 100%). Continuare?`)) return;
+    }
     setSaving(true); setError("");
     try {
       const valoriByName = Object.fromEntries(towNames.map(k => [k, parsedValori[k]]));
       const qtaByName    = Object.fromEntries(towNames.map(k => [k, parsedQta[k]]));
       const newRows = await createConsumoTow(nomeContratto.trim(), valoriByName, qtaByName);
+      // Salva le % impatto per questo contratto in localStorage
+      const percMap = {};
+      towNames.forEach(k => { const v = parseNum(perc[k]); if (v > 0) percMap[k] = v; });
+      if (Object.keys(percMap).length > 0) {
+        const all = loadTowImpatto();
+        const isFlat = typeof Object.values(all)[0] === "number";
+        const prev = isFlat ? {} : { ...all };
+        saveTowImpatto({ ...prev, [nomeContratto.trim()]: percMap });
+      }
       onCreated(newRows);
       onClose();
     } catch (e) { setError(e.message || "Errore durante la creazione"); }
@@ -187,6 +204,7 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
                 <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Nome TOW</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>QTA</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore €</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Subtotale</th>
               </tr>
             </thead>
@@ -204,15 +222,43 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
                     <td style={{ padding: "6px 12px" }}>
                       <input style={{ ...inputBase, textAlign: "right", width: "140px" }} placeholder="0,00" value={valori[tow] ?? ""} onChange={e => setValore(idx, e.target.value)} onBlur={e => setValore(idx, formatForInput(parseNum(e.target.value), "euro"))} />
                     </td>
+                    <td style={{ padding: "6px 12px" }}>
+                      <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                        <input
+                          style={{ ...inputBase, textAlign: "right", width: "80px", paddingRight: "22px",
+                            color: "#7c3aed", fontWeight: perc[tow] ? 700 : 400,
+                            background: perc[tow] ? "#f5f3ff" : "#fff",
+                            border: "1px solid #ddd8fe" }}
+                          placeholder="0"
+                          value={perc[tow] ?? ""}
+                          onChange={e => setPercVal(idx, e.target.value)}
+                        />
+                        <span style={{ position: "absolute", right: "8px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
+                      </div>
+                    </td>
                     <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: "13px", color: sub > 0 ? "#059669" : "#94a3b8" }}>{formatEuro(sub)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (Σ QTA × Valore€)</span>
-            <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotale)}</span>
+          {/* Totali */}
+          <div style={{ display: "flex", gap: "12px", marginBottom: "0" }}>
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flex: 1 }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#064e3b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Valore Totale (Σ QTA × Valore€)</span>
+              <span style={{ fontSize: "20px", fontWeight: 800, color: "#059669" }}>{formatEuro(valoreTotale)}</span>
+            </div>
+            {(() => {
+              const totPerc = towNames.reduce((s, k) => s + (parseNum(perc[k]) || 0), 0);
+              if (totPerc === 0) return null;
+              const ok = Math.abs(totPerc - 100) <= 0.1;
+              return (
+                <div style={{ background: ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: "10px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", minWidth: "160px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: ok ? "#064e3b" : "#991b1b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Totale %</span>
+                  <span style={{ fontSize: "20px", fontWeight: 800, color: ok ? "#059669" : "#dc2626" }}>{totPerc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
         <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "10px", background: "#f8fafc" }}>
@@ -230,6 +276,11 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
 export function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
   const { pos, onMouseDown } = useDrag();
   const baseTowNames = [...new Set(baseRows.map(r => r.tow))];
+  const baseContratto = baseRows[0]?.towContratto || "";
+  // Legge le % impatto per il contratto BASE (per mostrarle nella tabella)
+  const towImpattoAll = loadTowImpatto();
+  const isFlat = typeof Object.values(towImpattoAll)[0] === "number";
+  const basePerc = isFlat ? towImpattoAll : (towImpattoAll[baseContratto] || {});
 
   const [nomeContratto, setNomeContratto] = useState("");
   const [sconto, setSconto]               = useState("");
@@ -339,18 +390,20 @@ export function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
             <colgroup>
               <col style={{ width: "110px" }} />
               <col style={{ width: "120px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "70px" }} />
+              <col style={{ width: "60px" }} />
               <col style={{ width: "130px" }} />
-              <col style={{ width: "80px" }} />
-              <col style={{ width: "150px" }} />
-              <col style={{ width: "130px" }} />
+              <col style={{ width: "120px" }} />
             </colgroup>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
                 <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>TOW</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. BASE €</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Val. Scontato €</th>
-                <th style={{ padding: "8px 12px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Catalogo</th>
-                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>N° TOW / € Catalogo</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>% Imp.</th>
+                <th style={{ padding: "8px 12px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Cat.</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>N° TOW / € Cat.</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore Totale</th>
               </tr>
             </thead>
@@ -367,6 +420,13 @@ export function NewContrattoFiglioModal({ onClose, onCreated, baseRows }) {
                     </td>
                     <td style={{ padding: "8px 12px", textAlign: "right", fontSize: "13px", color: "#94a3b8" }}>{formatEuro(baseVal)}</td>
                     <td style={{ padding: "8px 12px", textAlign: "right", fontSize: "13px", fontWeight: 600, color: "#059669" }}>{formatEuro(valSc)}</td>
+                    {/* % Impatto (read-only, dal contratto BASE) */}
+                    <td style={{ padding: "8px 12px", textAlign: "right", fontSize: "13px" }}>
+                      {basePerc[tow]
+                        ? <span style={{ color: "#7c3aed", fontWeight: 700 }}>{Number(basePerc[tow]).toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</span>
+                        : <span style={{ color: "#cbd5e1" }}>—</span>
+                      }
+                    </td>
                     {/* Catalogo checkbox */}
                     <td style={{ padding: "6px 12px", textAlign: "center" }}>
                       <input
@@ -1312,7 +1372,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                         {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
                         {expanded && (
                           <tr>
-                            <td colSpan={4 + visibleFields.length} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
+                            <td colSpan={4 + visibleFields.length + (hasImpatto ? 1 : 0)} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
                               <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                                    <colgroup>

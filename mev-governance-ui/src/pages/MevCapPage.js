@@ -625,32 +625,31 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
                   Percentuali di impatto configurate — inserisci il valore in TOW02.5 e clicca Calcola per distribuire proporzionalmente
                 </span>
-                <button
+                 <button
                   type="button"
                   onClick={() => {
-                    const prices = effectivePriceMap[form.tipoContratto] || {};
-                    const qty025 = parseFloat(form.tow025) || 0;
-                    if (!qty025) { alert("Inserisci prima il valore per TOW02.5"); return; }
+                    // TOW02.5 contiene un importo diretto in €, non una quantità
+                    const importo025 = parseFloat(form.tow025) || 0;
+                    if (!importo025) { alert("Inserisci prima il valore in € per TOW02.5"); return; }
                     if (!form.tipoContratto) { alert("Seleziona prima il Tipo Contratto"); return; }
-                    if (!("TOW02.5" in prices)) { alert(`Nessuna riga TOW02.5 per il contratto "${form.tipoContratto}".\nVerifica in Gestione Contratto.`); return; }
                     const perc025 = towImpatto["TOW02.5"];
                     if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
-                    const valUnit025 = Number(prices["TOW02.5"]);
-                    if (!valUnit025 || valUnit025 <= 0) {
-                      alert(`Il Valore Unitario di TOW02.5 nel contratto "${form.tipoContratto}" è zero.\nImposta il prezzo in Gestione Contratto prima di usare Calcola.`);
-                      return;
-                    }
-                    // Importo totale dell'intervento ricavato da TOW02.5
-                    const importo025 = qty025 * valUnit025;
+                    const prices = effectivePriceMap[form.tipoContratto] || {};
+                    // Ricava il totale intervento: se TOW02.5 vale il 65%, il totale è importo025 / 0.65
                     const totaleIntervento = importo025 / (perc025 / 100);
                     const updates = {};
                     TOW_FIELDS.forEach(({ key, field }) => {
-                      if (field !== "tow025" && towImpatto[key]) {
-                        const valUnit = prices[key] || 0;
-                        if (valUnit > 0) {
-                          const importoTow = totaleIntervento * towImpatto[key] / 100;
-                          updates[field] = parseFloat((importoTow / valUnit).toFixed(3));
-                        }
+                      if (field === "tow025") return; // lascia invariato
+                      const perc = towImpatto[key];
+                      if (!perc) return; // nessuna % per questo TOW
+                      const importoTow = totaleIntervento * perc / 100;
+                      const valUnit = Number(prices[key]) || 0;
+                      if (valUnit > 0) {
+                        // campo qty: importo / valore_unitario
+                        updates[field] = parseFloat((importoTow / valUnit).toFixed(3));
+                      } else {
+                        // nessun valore unitario → salva l'importo € direttamente
+                        updates[field] = parseFloat(importoTow.toFixed(2));
                       }
                     });
                     setForm(prev => ({ ...prev, ...updates }));
@@ -665,13 +664,12 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
               const perc = towImpatto[key];
               const val = parseFloat(form[field]) || 0;
               const prices = effectivePriceMap[form.tipoContratto] || {};
-              // Validazione: ricava il totale intervento da TOW02.5 e controlla lo scostamento
+              // Validazione: TOW02.5 è un importo € diretto — ricava totale da esso e dalla sua %
               const perc025 = towImpatto["TOW02.5"];
-              const qty025 = parseFloat(form.tow025) || 0;
-              const valUnit025 = prices["TOW02.5"] || 0;
-              const valUnitTow = prices[key] || 0;
-              const totaleIntervento = (perc025 && qty025 && valUnit025)
-                ? (qty025 * valUnit025) / (perc025 / 100)
+              const importo025 = parseFloat(form.tow025) || 0;
+              const valUnitTow = Number(prices[key]) || 0;
+              const totaleIntervento = (perc025 && importo025)
+                ? importo025 / (perc025 / 100)
                 : null;
               const atesoQty = (totaleIntervento && perc && valUnitTow && field !== "tow025")
                 ? (totaleIntervento * perc / 100) / valUnitTow
