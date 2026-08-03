@@ -377,6 +377,28 @@ const EuroField = ({ label, value, width }) => (
   </div>
 );
 
+// Campo importo editabile con simbolo € — 3 decimali
+const EuroEditField = ({ label, field, width, form, onChange }) => {
+  const raw = form[field];
+  const num = raw != null && raw !== "" ? Number(raw) : "";
+  return (
+    <div style={{ marginBottom: "12px", width: width || "calc(20% - 8px)" }}>
+      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
+      <div style={{ display: "flex", alignItems: "center", border: "1px solid #dadce0", borderRadius: "4px", overflow: "hidden", background: "white" }}>
+        <input
+          value={num === "" ? "" : num}
+          type="number"
+          step="0.001"
+          min="0"
+          onChange={e => onChange(field, e.target.value === "" ? null : parseFloat(e.target.value))}
+          style={{ flex: 1, padding: "5px 8px", border: "none", fontSize: "13px", color: "#1a73e8", fontWeight: 600, textAlign: "right", minWidth: 0, outline: "none" }}
+        />
+        <span style={{ padding: "0 8px", color: "#888", fontSize: "12px", flexShrink: 0 }}>€</span>
+      </div>
+    </div>
+  );
+};
+
 // Campo TOW con step 0.001 e pulsanti +/-
 const TowField = ({ label, field, width, form, onChange }) => {
   const val = form[field];
@@ -592,11 +614,15 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
 
           {/* Sezione: Responsabili */}
           <ModalSection title="Responsabili" color={sectionColor}>
-            <ComboField label="PM Poste"       field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(25% - 8px)" />
-            <ComboField label="PM CAP"          field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(25% - 8px)" />
-            <ComboField label="Anno Competenza" field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(15% - 8px)" />
-            <ComboField label="Release"         field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="Recupero"        field="recupero"       options={["SI", "NO"]} form={form} onChange={set} width="calc(15% - 8px)" />
+            <ComboField label="PM Poste"       field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(30% - 8px)" />
+            <ComboField label="PM CAP"          field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(30% - 8px)" />
+            <ModalField label="Recupero"        field="recupero"       options={["SI", "NO"]} form={form} onChange={set} width="calc(20% - 8px)" />
+          </ModalSection>
+
+          {/* Sezione: Release */}
+          <ModalSection title="Release" color={sectionColor}>
+            <ComboField label="Anno Competenza" field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(20% - 8px)" />
+            <ComboField label="Release"         field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(25% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Stato e Contratto */}
@@ -617,8 +643,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(10% - 8px)" />
           </ModalSection>
 
-          {/* Sezione: TOW — con % impatto, pulsante Calcola, validazione rosso */}
-          <ModalSection title="TOW (gg/qty)" color={sectionColor}>
+          {/* Sezione: TOW Offerta — con % impatto, pulsante Calcola, validazione rosso */}
+          <ModalSection title="TOW Offerta" color={sectionColor}>
             {/* Pulsante Calcola sopra TOW02.5 */}
             {TOW_FIELDS.some(({ key }) => towImpatto[key]) && (
               <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
@@ -739,34 +765,46 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             <EuroField label="Residuo Fatt."    value={form.residuoFatturabile} width="calc(15% - 8px)" />
           </ModalSection>
 
-          {/* Sezione: Extra */}
-          <ModalSection title="Extra" color={sectionColor}>
-            <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(10% - 8px)" />
-            <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(10% - 8px)" />
-            <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(10% - 8px)" />
-            <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(10% - 8px)" />
-            <div style={{ width: "calc(45% - 8px)" }}>
-              <SocietàMultiSelect
-                label="Mandataria / Mandante"
-                value={form.capMandanti}
-                onChange={v => set("capMandanti", v)}
-                ruoli={["Mandataria", "Mandante"]}
-                color="#1a73e8"
-                bgColor="#eff6ff"
-              />
+          {/* Sezione: Extra — visibile solo se presente SUBCO */}
+          {(parseSocietà(form.subco).length > 0 || parseSocietà(form.capMandanti).length > 0) && (
+            <ModalSection title="Extra" color={sectionColor}>
+              <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
+              <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(10% - 8px)" />
+              <div style={{ width: "calc(45% - 8px)" }}>
+                <SocietàMultiSelect
+                  label="Mandataria / Mandante"
+                  value={form.capMandanti}
+                  onChange={v => set("capMandanti", v)}
+                  ruoli={["Mandataria", "Mandante"]}
+                  color="#1a73e8"
+                  bgColor="#eff6ff"
+                />
+              </div>
+              <div style={{ width: "calc(45% - 8px)" }}>
+                <SocietàMultiSelect
+                  label="SUBCO"
+                  value={form.subco}
+                  onChange={v => set("subco", v)}
+                  ruoli={["SUBCO"]}
+                  color="#f59e0b"
+                  bgColor="#fffbeb"
+                />
+              </div>
+            </ModalSection>
+          )}
+          {/* Link per mostrare la sezione Extra quando non c'è ancora subco */}
+          {parseSocietà(form.subco).length === 0 && parseSocietà(form.capMandanti).length === 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <button type="button"
+                onClick={() => set("subco", " ")}
+                style={{ fontSize: "12px", color: "#1a73e8", background: "none", border: "1px dashed #93c5fd", borderRadius: "6px", padding: "5px 14px", cursor: "pointer", fontWeight: 600 }}>
+                + Aggiungi Mandataria/Mandante o SUBCO
+              </button>
             </div>
-            <div style={{ width: "calc(45% - 8px)" }}>
-              <SocietàMultiSelect
-                label="SUBCO"
-                value={form.subco}
-                onChange={v => set("subco", v)}
-                ruoli={["SUBCO"]}
-                color="#f59e0b"
-                bgColor="#fffbeb"
-              />
-            </div>
-          </ModalSection>
+          )}
 
           {/* Sezione: Note Excel */}
           <ModalSection title="Note Excel" color={sectionColor}>
@@ -777,12 +815,12 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             </div>
           </ModalSection>
 
-          {/* Sezione: PMO */}
-          <ModalSection title="PMO" color={sectionColor}>
-            <ModalField label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
-            <ComboField label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="P Importo"   field="pImporto"   type="number" form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="Importo BDO" field="importoBdo" type="number" form={form} onChange={set} width="calc(20% - 8px)" />
+          {/* Sezione: PMO Poste */}
+          <ModalSection title="PMO Poste" color={sectionColor}>
+            <ModalField   label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
+            <ComboField   label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
+            <EuroEditField label="P Importo"  field="pImporto"   form={form} onChange={set} width="calc(20% - 8px)" />
+            <EuroEditField label="Importo BDO" field="importoBdo" form={form} onChange={set} width="calc(20% - 8px)" />
             <div style={{ width: "calc(28% - 8px)" }}>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
               <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}

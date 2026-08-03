@@ -1297,30 +1297,40 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                 {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
-                <colgroup>
-                  <col style={{ width: "32px" }} />
-                  <col style={{ width: "180px" }} />
-                  <col style={{ width: "100px" }} />
-                  <col style={{ width: "65px" }} />
-                  {visibleFields.map(f => (
-                    <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
-                  ))}
-                  {hasImpatto && <col style={{ width: "90px" }} />}
-                </colgroup>
+                {(() => {
+                  const fieldsA = visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key));
+                  const fieldsB = visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key));
+                  return (
+                    <colgroup>
+                      <col style={{ width: "32px" }} />
+                      <col style={{ width: "180px" }} />
+                      <col style={{ width: "100px" }} />
+                      <col style={{ width: "65px" }} />
+                      {fieldsA.map(f => <col key={f.key} style={{ width: "125px" }} />)}
+                      {hasImpatto && <col style={{ width: "90px" }} />}
+                      {fieldsB.map(f => <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />)}
+                    </colgroup>
+                  );
+                })()}
 
                 {/* Header */}
-                <thead>
-                  <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                     <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
-                    <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
-                    <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>Nome TOW</th>
-                    <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
-                    {visibleFields.map(f => (
-                      <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>
-                    ))}
-                    {hasImpatto && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
-                  </tr>
-                </thead>
+                {(() => {
+                  const fieldsA = visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key));
+                  const fieldsB = visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key));
+                  return (
+                    <thead>
+                      <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+                        <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
+                        <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
+                        <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>Nome TOW</th>
+                        <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
+                        {fieldsA.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
+                        {hasImpatto && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
+                        {fieldsB.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
+                      </tr>
+                    </thead>
+                  );
+                })()}
 
                 <tbody>
                   {contratti.map((c, cIdx) => {
@@ -1357,8 +1367,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                           {/* Celle vuote per TOW e QTA — allineano con le colonne interne */}
                           <td />
                           <td />
-                          {/* Totali per ogni field */}
-                          {visibleFields.map(f => {
+                          {/* Totali per ogni field — rispettando l'ordine con % Impatto dopo valoreTotale */}
+                          {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
                             const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                             return (
                               <td key={f.key} style={{ ...TD("right"), fontWeight: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? 800 : 600) : 400, color: TOTALE_KEYS.has(f.key) ? f.color : "#94a3b8" }}>
@@ -1367,6 +1377,14 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                             );
                           })}
                           {hasImpatto && <td />}
+                          {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
+                            const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                            return (
+                              <td key={f.key} style={{ ...TD("right"), fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400, color: TOTALE_KEYS.has(f.key) ? f.color : "#94a3b8" }}>
+                                {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
+                              </td>
+                            );
+                          })}
                         </tr>
 
                         {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
@@ -1374,16 +1392,19 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                           <tr>
                             <td colSpan={4 + visibleFields.length + (hasImpatto ? 1 : 0)} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
                               <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                                    <colgroup>
                                      <col style={{ width: "32px" }} />
                                      <col style={{ width: "180px" }} />
                                      <col style={{ width: "100px" }} />
                                      <col style={{ width: "65px" }} />
-                                     {visibleFields.map(f => (
-                                       <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
+                                     {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                       <col key={f.key} style={{ width: "125px" }} />
                                      ))}
                                      {hasImpatto && <col style={{ width: "90px" }} />}
+                                     {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                       <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
+                                     ))}
                                    </colgroup>
                                   <tbody>
                                     {cRows.map((row, idx) => (
@@ -1394,17 +1415,17 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                       >
                                         {/* cella freccia vuota per allineamento */}
                                         <td />
-                                        {/* Nome TOW nella colonna "Contratto" */}
-                                        <td style={{ ...TD("left"), fontWeight: 700, paddingLeft: "24px" }}>
+                                        {/* Contratto — vuoto nelle righe espanse */}
+                                        <td />
+                                        {/* Nome TOW — allineato all'intestazione */}
+                                        <td style={{ ...TD("left"), fontWeight: 700 }}>
                                           <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
                                         </td>
-                                        {/* TOW (vuoto — usato per "TOW" label nell'header) */}
-                                        <td style={TD("right")} />
                                         {/* QTA */}
                                         <td style={{ ...TD("right"), color: "#64748b" }}>
                                           {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
                                         </td>
-                                        {visibleFields.map(f => (
+                                        {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
                                           <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
                                             {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
                                           </td>
@@ -1428,21 +1449,26 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                                   color: "#7c3aed", fontWeight: getImpatto(c, row.tow) ? 700 : 400,
                                                 }}
                                               />
-                                               <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
-                                             </div>
-                                           </td>
-                                         )}
+                                              <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
+                                            </div>
+                                          </td>
+                                        )}
+                                        {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                          <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                            {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                          </td>
+                                        ))}
                                       </tr>
                                     ))}
                                   </tbody>
                                   {/* Riga totale interna */}
                                      <tfoot>
-                                     <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
-                                       <td />
-                                       <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b", paddingLeft: "24px" }}>Totale</td>
-                                       <td />
-                                       <td />
-                                       {visibleFields.map(f => {
+                                      <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
+                                        <td />
+                                        <td />
+                                        <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
+                                        <td />
+                                       {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
                                          if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                                          const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                                          return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
@@ -1458,7 +1484,12 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                               ) : "—";
                                             })()}
                                           </td>
-                                        )}                                     </tr>
+                                        )}
+                                       {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
+                                         if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                         const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                         return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                                       })}                                    </tr>
                                    </tfoot>
                                 </table>
                               </div>
@@ -1732,8 +1763,10 @@ function RigheSection({ contratti = [], rows = [] }) {
   // Righe filtrate per contratto selezionato
   const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
 
-  const totImporto = righeVisibili.reduce((s, r) => s + (Number(r.importo) || 0), 0);
-  const totConsumo = righeVisibili.reduce((s, r) => s + (Number(r.consumato) || 0), 0);
+  // Totali: escludono le righe con ruolo SUBCO (solo RTI)
+  const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
+  const totImporto = righeRti.reduce((s, r) => s + (Number(r.importo) || 0), 0);
+  const totConsumo = righeRti.reduce((s, r) => s + (Number(r.consumato) || 0), 0);
   const totResiduo = totImporto - totConsumo;
 
   // Importo % anteprima nel form
@@ -1913,7 +1946,7 @@ function RigheSection({ contratti = [], rows = [] }) {
           {righeVisibili.length > 0 && (
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td colSpan={7} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale</td>
+                <td colSpan={7} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI (escluso SUBCO)</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totImporto)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totConsumo)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: totResiduo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totResiduo)}</td>
