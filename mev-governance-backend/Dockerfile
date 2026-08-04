@@ -12,6 +12,10 @@ COPY --from=build /app/publish .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 
+# Disabilita il file watcher di ASP.NET (causa crash su Render per limiti inotify)
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+ENV ASPNETCORE_hostBuilder__reloadConfigOnChange=false
+
 # PDF_PARSER_URL punta al servizio mev-pdf-parser su Render
 # Sovrascrivibile via variabile d'ambiente nel deploy
 ENV PDF_PARSER_URL=https://mev-pdf-parser.onrender.com

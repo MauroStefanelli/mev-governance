@@ -8,7 +8,17 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    // Disabilita il file watcher dei file di configurazione (appsettings.json)
+    // Necessario su Render e container Linux con inotify limitato (causa crash "Aborted core dumped")
+    EnvironmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+});
+builder.Configuration.Sources
+    .OfType<Microsoft.Extensions.Configuration.FileConfigurationSource>()
+    .ToList()
+    .ForEach(s => s.ReloadOnChange = false);
 
 // ✅ DB — caricato da db-config.json se presente, altrimenti env var
 string? DbConfigConnectionString = null;
