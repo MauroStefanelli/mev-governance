@@ -30,7 +30,9 @@ const tryRefreshToken = async () => {
   }
 };
 
-// Wrapper fetch che tenta il refresh automatico se riceve 401
+// Wrapper fetch che tenta il refresh automatico se riceve 401.
+// Se anche il refresh fallisce, dispatcha un evento "auth:expired" per
+// forzare il logout nell'UI.
 const fetchWithRefresh = async (url, options = {}) => {
   let res = await fetch(url, options);
   if (res.status === 401) {
@@ -45,6 +47,9 @@ const fetchWithRefresh = async (url, options = {}) => {
         },
       };
       res = await fetch(url, newOptions);
+    } else {
+      // Refresh fallito: sessione scaduta → notifica l'app per il logout
+      window.dispatchEvent(new CustomEvent("auth:expired"));
     }
   }
   return res;

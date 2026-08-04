@@ -115,6 +115,19 @@ function App() {
     bootstrap();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Logout automatico se il refresh token è scaduto ─────────────────────────
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
+      setToken(""); setUsername(""); setFullName(""); setRole("");
+      setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
+      setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
+      alert("Sessione scaduta. Effettua di nuovo il login.");
+    };
+    window.addEventListener("auth:expired", handleAuthExpired);
+    return () => window.removeEventListener("auth:expired", handleAuthExpired);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Dati iniziali dopo login/restore ────────────────────────────────────────
   useEffect(() => {
     if (token) {
