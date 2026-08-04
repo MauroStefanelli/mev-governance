@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel,
-  getConsumoTow, createConsumoTowFiglio, getTowImpatto,
+  getConsumoTow, getTowImpatto,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
-import { loadTowImpatto, NewContrattoFiglioModal, TOW_IMPATTO_KEY } from "./ConsumoTowAdminPage";
+import { loadTowImpatto, NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 const RTI_KEY = "rtisubco-righe";
@@ -441,34 +441,6 @@ const EuroEditField = ({ label, field, width, form, onChange }) => {
   );
 };
 
-// Campo TOW con step 0.001 e pulsanti +/-
-const TowField = ({ label, field, width, form, onChange }) => {
-  const val = form[field];
-  const num = parseFloat(val) || 0;
-  const step = 0.001;
-  return (
-    <div style={{ marginBottom: "12px", width: width || "calc(16% - 8px)" }}>
-      <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</label>
-      <div style={{ display: "flex", alignItems: "center", border: "1px solid #dadce0", borderRadius: "4px", overflow: "hidden", background: "white" }}>
-        <button type="button"
-          onClick={() => onChange(field, Math.max(0, parseFloat((num - step).toFixed(3))))}
-          style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
-        <input
-          value={val ?? ""}
-          type="number"
-          step="0.001"
-          min="0"
-          onChange={(e) => onChange(field, e.target.value === "" ? null : parseFloat(e.target.value))}
-          style={{ flex: 1, padding: "5px 6px", border: "none", fontSize: "13px", color: "#333", textAlign: "right", minWidth: 0, outline: "none" }}
-        />
-        <button type="button"
-          onClick={() => onChange(field, parseFloat((num + step).toFixed(3)))}
-          style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
-      </div>
-    </div>
-  );
-};
-
 // TOW keys → field nel form
 const TOW_FIELDS = [
   { key: "TOW02.1", field: "tow021" }, { key: "TOW02.2", field: "tow022" },
@@ -593,9 +565,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
                   inputMode="decimal"
                   value={displayVal}
                   placeholder="0,00"
-                  onFocus={() => handleFocus(nome)}
                   onChange={e => handleDraftChange(nome, e.target.value)}
-                  onBlur={() => handleBlur(nome)}
                   style={{
                     width: "110px", padding: "3px 6px",
                     border: `1px solid ${borderColor}`,
@@ -778,8 +748,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
   };
 
   // Colori sezioni
-  const sectionColor = isCreate ? "#0d6e3d" : "#1a73e8";
+  const sectionColor = isCreate ? "#0d6e3d" : "#1a73e8"; // eslint-disable-line no-unused-vars
+  // eslint-disable-next-line no-unused-vars
   const accentBg     = isCreate ? "#f0fdf4" : "#f0f6ff";
+  // eslint-disable-next-line no-unused-vars
   const accentBorder = isCreate ? "#a7f3d0" : "#bfdbfe";
   const headerBg     = isCreate
     ? "linear-gradient(135deg, #0d6e3d 0%, #15803d 100%)"
