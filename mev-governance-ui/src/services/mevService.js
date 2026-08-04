@@ -480,6 +480,28 @@ export const resetData = async () => {
   return response.json();
 };
 
+// ── TOW Impatto: % impatto per contratto (condivise tra tutti gli utenti) ─────
+
+export const getTowImpatto = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/tow-impatto`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) return {};
+  return response.json();
+};
+
+export const setTowImpatto = async (data) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/settings/tow-impatto`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore salvataggio impatto TOW");
+  return response.json();
+};
+
 export const updateConsumoTow = async (id, data) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/${id}`, {
     method: "PUT",

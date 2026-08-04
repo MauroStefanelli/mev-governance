@@ -42,4 +42,9 @@ public class CreateMevRequest
     public decimal PImporto  { get; set; }
     public string? PNote     { get; set; }
     public decimal ImportoBdo { get; set; }
+
+    // ── Partecipazione: importi € per società ────────────────────────────────
+    public string? Capgemini    { get; set; }
+    public string? CapImporti   { get; set; }
+    public string? SubcoImporti { get; set; }
 }

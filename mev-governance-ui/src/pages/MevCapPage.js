@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel,
-  getConsumoTow, createConsumoTowFiglio,
+  getConsumoTow, createConsumoTowFiglio, getTowImpatto,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
-import { loadTowImpatto, NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
+import { loadTowImpatto, NewContrattoFiglioModal, TOW_IMPATTO_KEY } from "./ConsumoTowAdminPage";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 const RTI_KEY = "rtisubco-righe";
@@ -491,6 +491,59 @@ const calcImporto = (form, priceMap) => {
   }, 0);
 };
 
+// ── Helper: parse/serialize mappa importi società { "NomeSocietà": importo } ─
+const parseImporti = (val) => {
+  if (!val) return {};
+  try {
+    const p = JSON.parse(val);
+    if (p && typeof p === "object" && !Array.isArray(p)) return p;
+  } catch {}
+  return {};
+};
+const serializeImporti = (map) => {
+  const clean = Object.fromEntries(
+    Object.entries(map).filter(([, v]) => v !== "" && v !== null && v !== undefined)
+  );
+  return Object.keys(clean).length === 0 ? "" : JSON.stringify(clean);
+};
+
+// ── Input importi € per una lista di società (usato in sezione Partecipazione) ─
+function SocietàImportiInput({ societàList, importiValue, onChange }) {
+  const map = parseImporti(importiValue);
+
+  const handleChange = (nome, raw) => {
+    const newMap = { ...map };
+    if (raw === "" || raw === null) {
+      delete newMap[nome];
+    } else {
+      newMap[nome] = raw; // teniamo la stringa durante la digitazione
+    }
+    onChange(serializeImporti(newMap));
+  };
+
+  if (!societàList || societàList.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
+      {societàList.map(nome => (
+        <div key={nome} style={{ display: "flex", alignItems: "center", gap: "4px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px 8px", minWidth: "180px" }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nome}</span>
+          <span style={{ fontSize: "10px", color: "#64748b", marginRight: "2px" }}>€</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={map[nome] ?? ""}
+            placeholder="—"
+            onChange={e => handleChange(nome, e.target.value)}
+            style={{ width: "90px", padding: "2px 4px", border: "none", borderBottom: "1px solid #cbd5e1", fontSize: "12px", textAlign: "right", outline: "none", background: "transparent", color: "#1e293b" }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Modale di modifica / creazione ───────────────────────────────────────────
 function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   const isCreate = mode === "create";
@@ -505,6 +558,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     tow021: null, tow022: null, tow023: null, tow024: null, tow025: null, tow026: null,
     noteExcel: "", pAnno: new Date().getFullYear(), pRelease: "", pImporto: 0,
     pNote: "", importoBdo: 0,
+    capImporti: "", subcoImporti: "",
   };
 
   const [form, setForm] = useState(() => {
@@ -529,7 +583,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     };
     const resolved = resolveToArray(row?.capgemini, row?.iet);
     const capMandanti = resolved.length > 0 ? serializeSocietà(resolved) : "";
-    return { ...row, capMandanti };
+    return { ...row, capMandanti, capImporti: row?.capImporti || "", subcoImporti: row?.subcoImporti || "" };
   });
   const [saving, setSaving] = useState(false);
   const [contrattiTow, setContrattiTow] = useState([]);
@@ -539,9 +593,9 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   // Sezione Extra (Accantonato, NEL, In Vita, CM, TBD): visibile se già compilata o aperta manualmente
   const hasExtraData = !!(form.accantonato || form.nel || form.inVita || form.cm || form.tbd);
   const [showExtra, setShowExtra] = useState(() => hasExtraData);
-  const towImpattoAll = loadTowImpatto(); // { "NomeContratto": { "TOW02.1": 30, ... } } o flat legacy
+  // % impatto: caricato dal backend (condiviso) con fallback su localStorage
+  const [towImpattoAll, setTowImpattoAll] = useState(() => loadTowImpatto());
   // Percentuali di impatto per il tipo contratto selezionato
-  // Se la struttura è flat (legacy), usarla direttamente; altrimenti estrarre per contratto
   const towImpatto = (() => {
     const firstVal = Object.values(towImpattoAll)[0];
     if (!towImpattoAll || Object.keys(towImpattoAll).length === 0) return {};
@@ -551,6 +605,14 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
 
   // Carica contratti ConsumoTow per il dropdown Tipo Contratto
   useEffect(() => {
+    // Carica le % impatto dal backend (sovrascrive localStorage se disponibili)
+    getTowImpatto().then(data => {
+      if (data && Object.keys(data).length > 0) {
+        localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(data));
+        setTowImpattoAll(data);
+      }
+    }).catch(() => {});
+
     getConsumoTow().then(data => {
       const contratti = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
       setContrattiTow(contratti);
@@ -609,7 +671,14 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
       if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
     }
     setSaving(true);
-    const towTotale = TOW_FIELDS.reduce((s, { field }) => s + (parseFloat(form[field]) || 0), 0);
+    // towTotale = importo totale calcolato dai TOW (qty×valoreUnitario + TOW02.5 diretto)
+    // coincide con computedImporto quando la priceMap è disponibile,
+    // altrimenti usa la somma grezza come fallback
+    const towTotale = hasPriceMap ? computedImporto
+      : TOW_FIELDS.reduce((s, { key, field }) => {
+          const v = parseFloat(form[field]) || 0;
+          return s + (key === "TOW02.5" ? v : v);
+        }, 0);
     const formToSave = isCreate
       ? { ...form, importoExcel: computedImporto, towTotale, capgemini: form.capMandanti }
       : { ...form, importoExcel: displayImporto, importoFornituraScontato: displayScontato, towTotale, capgemini: form.capMandanti };
@@ -894,6 +963,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 color="#1a73e8"
                 bgColor="#eff6ff"
               />
+              <SocietàImportiInput
+                societàList={parseSocietà(form.capMandanti)}
+                importiValue={form.capImporti}
+                onChange={v => set("capImporti", v)}
+              />
             </div>
             <div style={{ width: "calc(50% - 8px)" }}>
               <SocietàMultiSelect
@@ -903,6 +977,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 ruoli={["SUBCO"]}
                 color="#f59e0b"
                 bgColor="#fffbeb"
+              />
+              <SocietàImportiInput
+                societàList={parseSocietà(form.subco)}
+                importiValue={form.subcoImporti}
+                onChange={v => set("subcoImporti", v)}
               />
             </div>
           </ModalSection>
@@ -1152,6 +1231,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       recupero:   form.recupero,
       capgemini:  form.capMandanti,
       subco:      form.subco,
+      capImporti:   form.capImporti   || null,
+      subcoImporti: form.subcoImporti || null,
       tbd:        form.tbd,
       bc:         form.bc,
       contratto:  form.contratto,
@@ -1205,6 +1286,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       subco:         form.subco,
       tbd:           form.tbd,
       accantonato:   form.accantonato != null ? Number(form.accantonato) : null,
+      capgemini:     form.capMandanti,
+      capImporti:    form.capImporti   || null,
+      subcoImporti:  form.subcoImporti || null,
       tow021:        form.tow021 != null ? Number(form.tow021) : null,
       tow022:        form.tow022 != null ? Number(form.tow022) : null,
       tow023:        form.tow023 != null ? Number(form.tow023) : null,

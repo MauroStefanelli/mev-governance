@@ -14,4 +14,10 @@ public class AppSettings
 
     /// <summary>Minuti di inattività prima del logout automatico. Default 60.</summary>
     public int LogoutMinutes { get; set; } = 60;
+
+    /// <summary>
+    /// Percentuali impatto TOW per contratto, serializzate come JSON.
+    /// Formato: { "NomeContratto": { "TOW02.1": 30.5, ... } }
+    /// </summary>
+    public string? TowImpattoJson { get; set; }
 }

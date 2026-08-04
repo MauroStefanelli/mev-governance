@@ -48,6 +48,37 @@ public class SettingsController : ControllerBase
         return Ok(new { logoutMinutes = s.LogoutMinutes });
     }
 
+    // ── TOW Impatto (% impatto per contratto) — condiviso tra tutti gli utenti ─
+
+    [HttpGet("tow-impatto")]
+    [Authorize] // tutti gli utenti autenticati possono leggere
+    public IActionResult GetTowImpatto()
+    {
+        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        var json = s?.TowImpattoJson;
+        if (string.IsNullOrEmpty(json)) return Ok(new { });
+        try { return Content(json, "application/json"); }
+        catch { return Ok(new { }); }
+    }
+
+    [HttpPut("tow-impatto")]
+    public IActionResult SetTowImpatto([FromBody] object dto)
+    {
+        var json = JsonSerializer.Serialize(dto);
+        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        if (s == null)
+        {
+            s = new MevGovernanceBackend.Models.AppSettings { Id = 1, TowImpattoJson = json };
+            _db.AppSettings.Add(s);
+        }
+        else
+        {
+            s.TowImpattoJson = json;
+        }
+        _db.SaveChanges();
+        return Ok(new { message = "Configurazione impatto salvata" });
+    }
+
     [HttpGet("db-config")]
     public IActionResult GetDbConfig()
     {

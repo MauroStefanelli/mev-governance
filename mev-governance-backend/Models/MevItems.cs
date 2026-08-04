@@ -72,6 +72,18 @@ public class MevItem
     // ── Importo BDO (pre-popolato da OrdinatoBdo, modificabile dalla UI) ─────
     public decimal ImportoBdo { get; set; }
 
+    /// <summary>
+    /// Importi in € per le società Mandataria/Mandante, serializzati come JSON.
+    /// Formato: { "NomeSocietà": 12345.67, ... }
+    /// </summary>
+    public string? CapImporti { get; set; }
+
+    /// <summary>
+    /// Importi in € per le società SUBCO, serializzati come JSON.
+    /// Formato: { "NomeSocietà": 12345.67, ... }
+    /// </summary>
+    public string? SubcoImporti { get; set; }
+
     // ── Ambiente ─────────────────────────────────────────────────────────────
     public int AmbienteId { get; set; }
 }

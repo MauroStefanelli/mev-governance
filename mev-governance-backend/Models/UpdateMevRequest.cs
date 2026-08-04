@@ -38,4 +38,8 @@ public class UpdateMevRequest
     public decimal? ImportoExcel { get; set; }
     public decimal? ImportoFornituraScontato { get; set; }
     public decimal? TowTotale { get; set; }
+
+    // ── Partecipazione: importi € per società ────────────────────────────────
+    public string? CapImporti { get; set; }
+    public string? SubcoImporti { get; set; }
 }

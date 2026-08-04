@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
+  getTowImpatto, setTowImpatto, getMevList,
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
@@ -19,7 +20,11 @@ export const loadTowImpatto = (contratto) => {
     return raw; // { contratto: { tow: perc } }
   } catch { return contratto ? {} : {}; }
 };
-const saveTowImpatto = (map) => localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(map));
+const saveTowImpatto = (map) => {
+  localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(map));
+  // Salva anche sul backend (fire-and-forget) per condividere con tutti gli utenti
+  setTowImpatto(map).catch(() => {});
+};
 
 const formatEuro = (v) => {
   const n = Number(v);
@@ -981,6 +986,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
 }
 export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [rows, setRows] = useState([]);
+  const [mevRows, setMevRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [contratti, setContratti] = useState([]);
@@ -1016,8 +1022,9 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const data = await getConsumoTow();
+      const [data, mev] = await Promise.all([getConsumoTow(), getMevList().catch(() => [])]);
       setRows(data);
+      setMevRows(mev);
       const tipi = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
       const ordered = applyOrder(tipi);
       setContratti(ordered);
@@ -1562,7 +1569,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       )}
 
       {/* RTI & SUBCO — in fondo, con accesso ai dati dei contratti */}
-      <RigheSection contratti={contratti} rows={rows} />
+      <RigheSection contratti={contratti} rows={rows} mevRows={mevRows} />
 
     </div>
   );
@@ -1660,7 +1667,7 @@ const nextId = (righe) => {
   return Math.max(...righe.map(r => r._id || 0)) + 1;
 };
 
-function RigheSection({ contratti = [], rows = [] }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
   // Calcola valoreTotale per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -1671,6 +1678,28 @@ function RigheSection({ contratti = [], rows = [] }) {
     });
     return map;
   }, [rows]);
+
+  // Calcola consumato da MEV per contratto+società (da capImporti e subcoImporti)
+  const mevConsumatoMap = React.useMemo(() => {
+    // map: { "contratto|società": totale }
+    const map = {};
+    const addToMap = (contratto, importiJson) => {
+      if (!contratto || !importiJson) return;
+      try {
+        const obj = JSON.parse(importiJson);
+        Object.entries(obj).forEach(([societa, val]) => {
+          const key = `${contratto}|${societa}`;
+          map[key] = (map[key] || 0) + (Number(val) || 0);
+        });
+      } catch {}
+    };
+    (mevRows || []).forEach(r => {
+      const contratto = r.tipoContratto || "";
+      addToMap(contratto, r.capImporti);
+      addToMap(contratto, r.subcoImporti);
+    });
+    return map;
+  }, [mevRows]);
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRighe] = React.useState(loadRigheLS);
@@ -1766,7 +1795,10 @@ function RigheSection({ contratti = [], rows = [] }) {
   // Totali: escludono le righe con ruolo SUBCO (solo RTI)
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
   const totImporto = righeRti.reduce((s, r) => s + (Number(r.importo) || 0), 0);
-  const totConsumo = righeRti.reduce((s, r) => s + (Number(r.consumato) || 0), 0);
+  const totConsumo = righeRti.reduce((s, r) => {
+    const consumatoMev = mevConsumatoMap[`${r.contratto}|${r.societa}`] || 0;
+    return s + (Number(r.consumato) || 0) + consumatoMev;
+  }, 0);
   const totResiduo = totImporto - totConsumo;
 
   // Importo % anteprima nel form
@@ -1912,11 +1944,13 @@ function RigheSection({ contratti = [], rows = [] }) {
           </thead>
           <tbody>
             {righeVisibili.length === 0 ? (
-              <tr><td colSpan={11} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
-              const residuo = (Number(r.importo) || 0) - (Number(r.consumato) || 0);
+              const consumatoMev = mevConsumatoMap[`${r.contratto}|${r.societa}`] || 0;
+              const consumatoTot = (Number(r.consumato) || 0) + consumatoMev;
+              const residuo = (Number(r.importo) || 0) - consumatoTot;
               return (
                 <tr key={r._id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
@@ -1931,7 +1965,14 @@ function RigheSection({ contratti = [], rows = [] }) {
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}) + "%" : "—"}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{r.importo != null ? formatEuro(r.importo) : "—"}</td>
-                  <td style={{ ...TD2("right"), color: "#f59e0b", fontWeight: 600 }}>{r.consumato != null ? formatEuro(r.consumato) : "—"}</td>
+                  <td style={{ ...TD2("right"), color: "#f59e0b", fontWeight: 600 }}>
+                    {consumatoTot > 0 ? formatEuro(consumatoTot) : "—"}
+                    {consumatoMev > 0 && (
+                      <div style={{ fontSize: "10px", color: "#7c3aed", fontWeight: 400 }}>
+                        MEV: {formatEuro(consumatoMev)}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ ...TD2("right"), fontWeight: 700, color: residuo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(residuo)}</td>
                   <td style={TD2("center")}>
                     <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>

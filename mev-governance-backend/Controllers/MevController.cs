@@ -67,6 +67,8 @@ public class MevController : BaseController
         if (request.Recupero   != null) item.Recupero   = request.Recupero;
         if (request.Capgemini  != null) item.Capgemini  = request.Capgemini;
         if (request.Subco      != null) item.Subco      = request.Subco;
+        if (request.CapImporti   != null) item.CapImporti   = request.CapImporti;
+        if (request.SubcoImporti != null) item.SubcoImporti = request.SubcoImporti;
         if (request.Tbd        != null) item.Tbd        = request.Tbd;
         if (request.Bc         != null) item.Bc         = request.Bc;
         if (request.Contratto  != null) item.Contratto  = request.Contratto;
@@ -304,6 +306,9 @@ public class MevController : BaseController
             PImporto                = request.PImporto,
             PNote                   = request.PNote,
             ImportoBdo              = request.ImportoBdo,
+            Capgemini               = request.Capgemini,
+            CapImporti              = request.CapImporti,
+            SubcoImporti            = request.SubcoImporti,
             AmbienteId              = ambienteId,
         };
 
