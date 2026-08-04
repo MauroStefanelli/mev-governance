@@ -990,6 +990,8 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
 export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [rows, setRows] = useState([]);
   const [mevRows, setMevRows] = useState([]);
+  const [rtiRighe, setRtiRighe] = useState([]);
+  const [rtiLoading, setRtiLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [contratti, setContratti] = useState([]);
@@ -1048,7 +1050,44 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     } finally { setLoading(false); }
   }, [applyOrder]); // eslint-disable-line
 
+  // Carica le righe RTI separatamente (si usa anche dopo ogni modifica)
+  const loadRti = useCallback(async () => {
+    setRtiLoading(true);
+    try {
+      const dbRighe = await getRtiSocieta();
+      if (dbRighe.length === 0) {
+        // Migrazione one-shot da localStorage
+        try {
+          const ls = JSON.parse(localStorage.getItem(RTI_KEY) || "[]");
+          if (ls.length > 0) {
+            const dtos = ls.map(r => ({
+              contratto: r.contratto || "",
+              ruolo: r.ruolo || "",
+              societa: r.societa || "",
+              dataInizio: r.dataInizio || null,
+              dataApprovazione: r.dataApprovazione || null,
+              percentuale: r.percentuale != null ? Number(r.percentuale) : null,
+              importo: r.importo != null ? Number(r.importo) : null,
+              consumato: r.consumato != null ? Number(r.consumato) : null,
+            }));
+            const imported = await bulkImportRtiSocieta(dtos).catch(() => null);
+            if (imported) {
+              setRtiRighe(imported);
+              localStorage.removeItem(RTI_KEY);
+              return;
+            }
+          }
+        } catch {}
+      }
+      setRtiRighe(dbRighe);
+    } catch {
+      // Fallback localStorage
+      try { setRtiRighe(JSON.parse(localStorage.getItem(RTI_KEY) || "[]").map((r,i) => ({...r, id: r._id || i+1}))); } catch {}
+    } finally { setRtiLoading(false); }
+  }, []);
+
   useEffect(() => { load(); }, [load, ambienteId]); // eslint-disable-line
+  useEffect(() => { loadRti(); }, [loadRti, ambienteId]); // eslint-disable-line
 
   const filteredRows = selectedContratto ? rows.filter(r => r.towContratto === selectedContratto) : [];
 
@@ -1585,7 +1624,14 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       )}
 
       {/* RTI & SUBCO — in fondo, con accesso ai dati dei contratti */}
-      <RigheSection contratti={contratti} rows={rows} mevRows={mevRows} />
+      <RigheSection
+        contratti={contratti}
+        rows={rows}
+        mevRows={mevRows}
+        righeInit={rtiRighe}
+        righeLoading={rtiLoading}
+        onRigheChange={setRtiRighe}
+      />
 
     </div>
   );
@@ -1672,7 +1718,7 @@ function ContrattiSection({ rows }) {
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, onRigheChange }) {
   // Calcola valoreTotale per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -1706,48 +1752,26 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
   }, [mevRows]);
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
-  const [righe, setRighe] = React.useState([]);
-  const [loadingRighe, setLoadingRighe] = React.useState(true);
+  const [righe, setRigheLocal] = React.useState([]);
+  const [loadingRighe] = React.useState(false); // il loading è gestito dal padre
+
+  // Sincronizza le righe dalla prop del padre
+  React.useEffect(() => { setRigheLocal(righeInit); }, [righeInit]);
+
+  const setRighe = (updater) => {
+    setRigheLocal(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      onRigheChange?.(next);
+      return next;
+    });
+  };
+
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
   const [editId, setEditId] = React.useState(null);
   const [err, setErr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [filterContratto, setFilterContratto] = React.useState("");
-
-  // Carica dal DB; se il DB è vuoto ma localStorage ha dati, migra automaticamente
-  React.useEffect(() => {
-    setLoadingRighe(true);
-    getRtiSocieta().then(dbRighe => {
-      if (dbRighe.length === 0) {
-        // Prova migrazione da localStorage (one-shot)
-        try {
-          const ls = JSON.parse(localStorage.getItem(RTI_KEY) || "[]");
-          if (ls.length > 0) {
-            // Converti formato localStorage (_id, percentuale 0-1) in DTO backend
-            const dtos = ls.map(r => ({
-              contratto: r.contratto || "",
-              ruolo: r.ruolo || "",
-              societa: r.societa || "",
-              dataInizio: r.dataInizio || null,
-              dataApprovazione: r.dataApprovazione || null,
-              percentuale: r.percentuale != null ? Number(r.percentuale) : null,
-              importo: r.importo != null ? Number(r.importo) : null,
-              consumato: r.consumato != null ? Number(r.consumato) : null,
-            }));
-            return bulkImportRtiSocieta(dtos).then(imported => {
-              setRighe(imported);
-              localStorage.removeItem(RTI_KEY); // pulizia dopo migrazione
-            });
-          }
-        } catch {}
-      }
-      setRighe(dbRighe);
-    }).catch(() => {
-      // Fallback su localStorage se API non disponibile
-      try { setRighe(JSON.parse(localStorage.getItem(RTI_KEY) || "[]").map((r,i) => ({...r, id: r._id || i+1}))); } catch {}
-    }).finally(() => setLoadingRighe(false));
-  }, []); // eslint-disable-line
 
   const openNew = () => {
     setForm({ ...emptyForm, contratto: contratti[0] || "" });
@@ -1990,7 +2014,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
             </tr>
           </thead>
           <tbody>
-            {loadingRighe ? (
+            {righeLoading ? (
               <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>

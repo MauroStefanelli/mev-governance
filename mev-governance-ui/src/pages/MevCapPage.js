@@ -620,7 +620,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
 }
 
 // ── Modale di modifica / creazione ───────────────────────────────────────────
-function EditModal({ row, mode, options, nextId, onClose, onSave }) {
+function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll: towImpattoAllProp = null }) {
   const isCreate = mode === "create";
 
   const emptyForm = {
@@ -676,7 +676,18 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     }
   }, [form.subco]); // eslint-disable-line
   // % impatto: caricato dal backend (condiviso) con fallback su localStorage
-  const [towImpattoAll, setTowImpattoAll] = useState(() => loadTowImpatto());
+  // % impatto: preferisce la prop dal padre (già caricata), altrimenti localStorage come fallback
+  const [towImpattoAll, setTowImpattoAll] = useState(() =>
+    towImpattoAllProp && Object.keys(towImpattoAllProp).length > 0
+      ? towImpattoAllProp
+      : loadTowImpatto()
+  );
+  // Sincronizza se il padre aggiorna la prop dopo il mount
+  useEffect(() => {
+    if (towImpattoAllProp && Object.keys(towImpattoAllProp).length > 0) {
+      setTowImpattoAll(towImpattoAllProp);
+    }
+  }, [towImpattoAllProp]); // eslint-disable-line
   // Percentuali di impatto per il tipo contratto selezionato.
   // Se il contratto non ha impatti propri, prova il primo contratto disponibile (fallback).
   const towImpatto = (() => {
@@ -692,23 +703,13 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     return firstContratto || {};
   })();
 
-  // Carica contratti ConsumoTow per il dropdown Tipo Contratto
+  // Carica contratti ConsumoTow per il dropdown Tipo Contratto e priceMap
   useEffect(() => {
-    // Carica le % impatto dal backend (sovrascrive localStorage se disponibili)
-    getTowImpatto().then(data => {
-      if (data && Object.keys(data).length > 0) {
-        localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(data));
-        setTowImpattoAll(data);
-      }
-    }).catch(() => {});
-
     getConsumoTow().then(data => {
       const contratti = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
       setContrattiTow(contratti);
-      // baseRows = righe del primo contratto (BASE)
       const base = contratti[0] || "";
       setBaseRowsTow(data.filter(r => r.towContratto === base));
-      // Costruisce localPriceMap: { "NomeContratto": { "TOW02.1": valoreUnitario, ... } }
       const pm = {};
       data.forEach(r => {
         if (!r.towContratto || !r.tow) return;
@@ -1180,6 +1181,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [createModal, setCreateModal] = useState(false);
   const [savedRows, setSavedRows] = useState({});
   const [notePopover, setNotePopover] = useState(null);
+  const [towImpattoAll, setTowImpattoAll] = useState({});
   const [mevOptions, setMevOptions] = useState({
     applicativo: [], pmPoste: [], pmCap: [], annoCompetenza: [],
     releaseExcel: [], stato: [], tipoContratto: [], priceMap: {},
@@ -1205,7 +1207,11 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     setRows([]);
     onRowsChange?.([]);
     try {
-      const [data, opts] = await Promise.all([getMevList(), getMevOptions()]);
+      const [data, opts, impatto] = await Promise.all([
+        getMevList(),
+        getMevOptions(),
+        getTowImpatto().catch(() => ({})),
+      ]);
       setRows(data);
       onRowsChange?.(data);
       setMevOptions({
@@ -1218,6 +1224,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         tipoContratto:  opts.tipoContratto  || [],
         priceMap:       opts.priceMap       || {},
       });
+      if (impatto && Object.keys(impatto).length > 0) {
+        setTowImpattoAll(impatto);
+      }
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
     } finally { setLoading(false); }
@@ -1702,6 +1711,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           row={editRow}
           mode="edit"
           options={mevOptions}
+          towImpattoAll={towImpattoAll}
           onClose={() => setEditRow(null)}
           onSave={handleModalSave}
         />
@@ -1713,6 +1723,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           row={null}
           mode="create"
           options={mevOptions}
+          towImpattoAll={towImpattoAll}
           nextId={(() => {
             const nums = rows
               .map((r) => parseInt(r.excelId, 10))
