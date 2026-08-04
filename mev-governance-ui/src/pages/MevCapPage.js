@@ -535,8 +535,22 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
     : (form.importoFornituraScontato ?? 0);
 
   const set = useCallback((field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }, []);
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      // In modalità creazione, auto-genera xOrdine = goTo + "_" + applicativo
+      // solo se xOrdine è ancora vuoto oppure coincide con il valore auto-generato precedente
+      if (isCreate && (field === "goTo" || field === "applicativo")) {
+        const autoGenPrev = [prev.goTo, prev.applicativo].filter(Boolean).join("_");
+        const isAutoOrEmpty = !prev.xOrdine || prev.xOrdine === autoGenPrev;
+        if (isAutoOrEmpty) {
+          const newGoTo  = field === "goTo"        ? value : prev.goTo;
+          const newAppl  = field === "applicativo"  ? value : prev.applicativo;
+          next.xOrdine   = [newGoTo, newAppl].filter(Boolean).join("_");
+        }
+      }
+      return next;
+    });
+  }, [isCreate]);
 
   const handleSave = async () => {
     if (isCreate) {
@@ -690,25 +704,37 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
               const perc = towImpatto[key];
               const val = parseFloat(form[field]) || 0;
               const prices = effectivePriceMap[form.tipoContratto] || {};
+              const valUnitTow = Number(prices[key]) || 0;
+
+              // Importo € calcolato per questo TOW (qty × valoreUnitario)
+              const importoTow = val > 0 && valUnitTow > 0 ? val * valUnitTow : null;
+
               // Validazione: TOW02.5 è un importo € diretto — ricava totale da esso e dalla sua %
               const perc025 = towImpatto["TOW02.5"];
               const importo025 = parseFloat(form.tow025) || 0;
-              const valUnitTow = Number(prices[key]) || 0;
               const totaleIntervento = (perc025 && importo025)
                 ? importo025 / (perc025 / 100)
                 : null;
               const atesoQty = (totaleIntervento && perc && valUnitTow && field !== "tow025")
                 ? (totaleIntervento * perc / 100) / valUnitTow
                 : null;
+              // Tolleranza: 0.5% per evitare falsi positivi da arrotondamento floating-point
               const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
-              const isError = atesoQty && val && scostamento > 0.2;
-              const labelText = perc ? `${key} — ${perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%` : key;
+              const isError = atesoQty != null && val > 0 && scostamento > 0.5;
+
+              // Label: KEY — X% — importoCalcolato€
+              const labelParts = [key];
+              if (perc) labelParts.push(`${perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`);
+              if (importoTow != null) labelParts.push(formatEuro(importoTow));
+              const labelText = labelParts.join(" — ");
+
               return (
                 <div key={field} style={{ marginBottom: "12px", width: "calc(16% - 8px)" }}>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555" }}>
                     {labelText}
-                    {isError && <span title={`Atteso: ${atesoQty?.toFixed(3)} — scostamento: ${scostamento.toFixed(2)}%`} style={{ marginLeft: "4px", cursor: "help" }}>⚠</span>}
+                    {isError && <span title={`Atteso: ${atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} — scostamento: ${scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`} style={{ marginLeft: "4px", cursor: "help" }}>⚠</span>}
                   </label>
+                  {/* Input quantità */}
                   <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white", transition: "border-color 0.15s" }}>
                     <button type="button"
                       onClick={() => set(field, Math.max(0, parseFloat(((parseFloat(form[field]) || 0) - 0.001).toFixed(3))))}
@@ -725,9 +751,31 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                       onClick={() => set(field, parseFloat(((parseFloat(form[field]) || 0) + 0.001).toFixed(3)))}
                       style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
                   </div>
+                  {/* Importo € modificabile (aggiorna la qty inversa) */}
+                  {valUnitTow > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", marginTop: "4px", border: "1px solid #e2e8f0", borderRadius: "4px", overflow: "hidden", background: "#f8fafc" }}>
+                      <span style={{ padding: "3px 6px", fontSize: "11px", color: "#64748b", background: "#f1f5f9", borderRight: "1px solid #e2e8f0", flexShrink: 0, fontWeight: 600 }}>€</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={importoTow != null ? parseFloat(importoTow.toFixed(2)) : ""}
+                        placeholder="—"
+                        onChange={e => {
+                          const euro = parseFloat(e.target.value);
+                          if (!isNaN(euro) && valUnitTow > 0) {
+                            set(field, parseFloat((euro / valUnitTow).toFixed(3)));
+                          } else if (e.target.value === "") {
+                            set(field, null);
+                          }
+                        }}
+                        style={{ flex: 1, padding: "3px 6px", border: "none", fontSize: "12px", color: "#334155", textAlign: "right", minWidth: 0, outline: "none", background: "transparent" }}
+                      />
+                    </div>
+                  )}
                   {isError && (
                     <div style={{ fontSize: "10px", color: "#dc2626", marginTop: "2px", textAlign: "right" }}>
-                      Atteso: {atesoQty?.toFixed(3)} (±{scostamento.toFixed(2)}%)
+                      Atteso: {atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} (±{scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%)
                     </div>
                   )}
                 </div>
