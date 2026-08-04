@@ -10,7 +10,7 @@ import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken } from "./services/mevService";
 
 function App() {
   // ── Stato autenticazione ─────────────────────────────────────────────────────
@@ -143,6 +143,16 @@ function App() {
   }, [token]);
 
   // ── Polling accessi Editor ogni 10s (Admin e SuperAdmin) ────────────────────
+
+  // ── Silent token refresh ogni 10 minuti (per tutti gli utenti autenticati) ──
+  useEffect(() => {
+    if (!token) return;
+    // Rinnova silenziosamente il JWT prima che scada (scade a 15 min)
+    const interval = setInterval(() => {
+      tryRefreshToken().catch(() => {});
+    }, 10 * 60 * 1000); // ogni 10 minuti
+    return () => clearInterval(interval);
+  }, [token]);
   useEffect(() => {
     if (!token || !["Admin","SuperAdmin"].includes(role)) return;
 

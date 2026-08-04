@@ -8,7 +8,7 @@ const authHeaders = () => ({
 // ── Refresh automatico JWT ────────────────────────────────────────────────────
 // Tenta di rinnovare il JWT usando il refreshToken salvato in localStorage.
 // Ritorna true se il rinnovo è riuscito, false altrimenti.
-const tryRefreshToken = async () => {
+export const tryRefreshToken = async () => {
   const refreshToken = localStorage.getItem("refreshToken");
   if (!refreshToken) return false;
   try {

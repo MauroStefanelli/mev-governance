@@ -11,6 +11,7 @@ public class UpdateMevRequest
 
     // ── Campi Excel editabili ────────────────────────────────────────────────
     public string? Stato { get; set; }
+    public string? ReleaseExcel { get; set; }
     public string? PmPoste { get; set; }
     public string? PmCap { get; set; }
     public string? TipoContratto { get; set; }

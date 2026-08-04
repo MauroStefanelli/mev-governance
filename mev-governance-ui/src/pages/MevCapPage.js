@@ -510,27 +510,48 @@ const serializeImporti = (map) => {
 // ── Input importi € per una lista di società (usato in sezione Partecipazione) ─
 function SocietàImportiInput({ societàList, importiValue, onChange, color = "#1a73e8", bgColor = "#eff6ff" }) {
   const map = parseImporti(importiValue);
+  // draft: { nomeSocietà: stringaTestuale } — usato durante la digitazione
+  const [drafts, setDrafts] = useState({});
 
-  const handleChange = (nome, raw) => {
+  const formatDisplay = (val) => {
+    const n = parseFloat(val);
+    if (isNaN(n) || val === "" || val == null) return "";
+    return n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleFocus = (nome) => {
+    // Mostra il valore numerico raw per la modifica
+    const raw = map[nome];
+    setDrafts(p => ({ ...p, [nome]: raw != null ? String(raw).replace(".", ",") : "" }));
+  };
+
+  const handleDraftChange = (nome, val) => {
+    setDrafts(p => ({ ...p, [nome]: val }));
+  };
+
+  const handleBlur = (nome) => {
+    const raw = drafts[nome] ?? "";
+    // Accetta sia "12384,14" che "12384.14"
+    const parsed = parseFloat(raw.replace(/\./g, "").replace(",", "."));
     const newMap = { ...map };
-    if (raw === "" || raw === null) {
+    if (raw === "" || isNaN(parsed)) {
       delete newMap[nome];
     } else {
-      newMap[nome] = raw;
+      newMap[nome] = parsed;
     }
+    setDrafts(p => { const n = { ...p }; delete n[nome]; return n; });
     onChange(serializeImporti(newMap));
   };
 
   if (!societàList || societàList.length === 0) return null;
 
-  // Colori derivati
-  const borderColor = color + "55"; // 33% opacità
+  const borderColor = color + "55";
   const labelColor  = color;
   const totalImporti = societàList.reduce((s, n) => s + (parseFloat(map[n]) || 0), 0);
 
   return (
     <div style={{ marginTop: "8px", border: `1px solid ${borderColor}`, borderRadius: "8px", overflow: "hidden", background: bgColor }}>
-      {/* Header riga importi */}
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", borderBottom: `1px solid ${borderColor}`, background: color + "18" }}>
         <span style={{ fontSize: "10px", fontWeight: 700, color: labelColor, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           Importi €
@@ -543,49 +564,56 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
       </div>
       {/* Righe per società */}
       <div style={{ display: "flex", flexDirection: "column" }}>
-        {societàList.map((nome, idx) => (
-          <div
-            key={nome}
-            style={{
-              display: "flex", alignItems: "center", gap: "8px",
-              padding: "5px 10px",
-              borderBottom: idx < societàList.length - 1 ? `1px solid ${borderColor}` : "none",
-              background: idx % 2 === 0 ? "transparent" : color + "0A",
-            }}
-          >
-            <span style={{
-              fontSize: "11px", fontWeight: 600, color: "#374151",
-              flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-              maxWidth: "120px",
-            }}>
-              {nome}
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-              <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>€</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={map[nome] ?? ""}
-                placeholder="0,00"
-                onChange={e => handleChange(nome, e.target.value)}
-                style={{
-                  width: "100px", padding: "3px 6px",
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: "5px",
-                  fontSize: "12px", textAlign: "right",
-                  outline: "none",
-                  background: "#fff",
-                  color: "#1e293b",
-                  fontWeight: map[nome] ? 600 : 400,
-                  transition: "border-color 0.15s",
-                }}
-                onFocus={e => { e.target.style.borderColor = color; e.target.style.boxShadow = `0 0 0 2px ${color}22`; }}
-                onBlur={e => { e.target.style.borderColor = borderColor; e.target.style.boxShadow = "none"; }}
-              />
+        {societàList.map((nome, idx) => {
+          const inFocus = nome in drafts;
+          const displayVal = inFocus
+            ? drafts[nome]
+            : formatDisplay(map[nome]);
+          return (
+            <div
+              key={nome}
+              style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "5px 10px",
+                borderBottom: idx < societàList.length - 1 ? `1px solid ${borderColor}` : "none",
+                background: idx % 2 === 0 ? "transparent" : color + "0A",
+              }}
+            >
+              <span style={{
+                fontSize: "11px", fontWeight: 600, color: "#374151",
+                flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                maxWidth: "120px",
+              }}>
+                {nome}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>€</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={displayVal}
+                  placeholder="0,00"
+                  onFocus={() => handleFocus(nome)}
+                  onChange={e => handleDraftChange(nome, e.target.value)}
+                  onBlur={() => handleBlur(nome)}
+                  style={{
+                    width: "110px", padding: "3px 6px",
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: "5px",
+                    fontSize: "12px", textAlign: "right",
+                    outline: "none",
+                    background: "#fff",
+                    color: "#1e293b",
+                    fontWeight: map[nome] ? 600 : 400,
+                    transition: "border-color 0.15s",
+                  }}
+                  onFocus={(e) => { handleFocus(nome); e.target.style.borderColor = color; e.target.style.boxShadow = `0 0 0 2px ${color}22`; }}
+                  onBlur={(e) => { handleBlur(nome); e.target.style.borderColor = borderColor; e.target.style.boxShadow = "none"; }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -640,14 +668,28 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   // Sezione Extra (Accantonato, NEL, In Vita, CM, TBD): visibile se già compilata o aperta manualmente
   const hasExtraData = !!(form.accantonato || form.nel || form.inVita || form.cm || form.tbd);
   const [showExtra, setShowExtra] = useState(() => hasExtraData);
+
+  // Apri automaticamente Extra se viene inserito un SUBCO
+  useEffect(() => {
+    if (form.subco && parseSocietà(form.subco).length > 0) {
+      setShowExtra(true);
+    }
+  }, [form.subco]); // eslint-disable-line
   // % impatto: caricato dal backend (condiviso) con fallback su localStorage
   const [towImpattoAll, setTowImpattoAll] = useState(() => loadTowImpatto());
-  // Percentuali di impatto per il tipo contratto selezionato
+  // Percentuali di impatto per il tipo contratto selezionato.
+  // Se il contratto non ha impatti propri, prova il primo contratto disponibile (fallback).
   const towImpatto = (() => {
-    const firstVal = Object.values(towImpattoAll)[0];
     if (!towImpattoAll || Object.keys(towImpattoAll).length === 0) return {};
-    if (typeof firstVal === "number") return towImpattoAll; // flat legacy
-    return towImpattoAll[form.tipoContratto] || {};
+    const firstVal = Object.values(towImpattoAll)[0];
+    if (typeof firstVal === "number") return towImpattoAll; // struttura flat legacy
+    // Struttura per-contratto: cerca prima il contratto selezionato
+    if (form.tipoContratto && towImpattoAll[form.tipoContratto]) {
+      return towImpattoAll[form.tipoContratto];
+    }
+    // Fallback: usa il primo contratto disponibile con impatti configurati
+    const firstContratto = Object.values(towImpattoAll).find(v => v && typeof v === "object");
+    return firstContratto || {};
   })();
 
   // Carica contratti ConsumoTow per il dropdown Tipo Contratto
@@ -1062,8 +1104,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             </ModalSection>
           )}
 
-          {/* Sezione: Note Excel */}
-          <ModalSection title="Note Excel" color={sectionColor}>
+          {/* Sezione: Note */}
+          <ModalSection title="Note" color={sectionColor}>
             <div style={{ width: "100%" }}>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Note</label>
               <textarea value={form.noteExcel ?? ""} onChange={(e) => set("noteExcel", e.target.value)}
@@ -1276,6 +1318,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       pNote:      form.pNote,
       importoBdo: Number(form.importoBdo ?? 0),
       stato:      form.stato,
+      releaseExcel: form.releaseExcel,
       pmPoste:    form.pmPoste,
       pmCap:      form.pmCap,
       tipoContratto: form.tipoContratto,

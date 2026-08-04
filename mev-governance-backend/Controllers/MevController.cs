@@ -61,6 +61,7 @@ public class MevController : BaseController
 
         // Campi Excel editabili dalla modale
         if (request.Stato      != null) item.Stato      = request.Stato;
+        if (request.ReleaseExcel != null) item.ReleaseExcel = request.ReleaseExcel;
         if (request.PmPoste    != null) item.PmPoste    = request.PmPoste;
         if (request.PmCap      != null) item.PmCap      = request.PmCap;
         if (request.TipoContratto != null) item.TipoContratto = request.TipoContratto;
