@@ -18,15 +18,33 @@ public class RtiSocietaController : BaseController
         _db = db;
     }
 
+    // Helper: risolve l'ambienteId effettivo (fallback al primo ambiente se claim == 0)
+    private int ResolveAmbienteId()
+    {
+        var id = GetAmbienteId();
+        if (id > 0) return id;
+        // Fallback: primo ambiente disponibile nel DB
+        var first = _db.Set<MevGovernanceBackend.Models.Ambiente>().OrderBy(a => a.Id).FirstOrDefault();
+        return first?.Id ?? 1;
+    }
+
     // GET api/rti-societa — tutte le righe dell'ambiente corrente
     [HttpGet]
     public IActionResult GetAll()
     {
         var ambienteId = GetAmbienteId();
-        var righe = _db.RtiSocietaRighe
-            .Where(r => r.AmbienteId == ambienteId)
-            .OrderBy(r => r.Ordine).ThenBy(r => r.Id)
-            .ToList();
+        Console.WriteLine($"[RTI] GetAll ambienteId={ambienteId}");
+
+        IQueryable<RtiSocietaRiga> query = _db.RtiSocietaRighe;
+
+        // Se ambienteId è valido (>0) filtra per ambiente, altrimenti restituisce tutte le righe.
+        // AmbienteId==0 avviene quando il claim manca nel token (token emesso prima del campo,
+        // o utente senza ambienti associati). In questo caso mostriamo tutte le righe disponibili.
+        if (ambienteId > 0)
+            query = query.Where(r => r.AmbienteId == ambienteId);
+
+        var righe = query.OrderBy(r => r.Ordine).ThenBy(r => r.Id).ToList();
+        Console.WriteLine($"[RTI] Trovate {righe.Count} righe");
         return Ok(righe);
     }
 
@@ -34,7 +52,7 @@ public class RtiSocietaController : BaseController
     [HttpPost]
     public IActionResult Create([FromBody] RtiSocietaRigaDto dto)
     {
-        var ambienteId = GetAmbienteId();
+        var ambienteId = ResolveAmbienteId();
         var maxOrdine = _db.RtiSocietaRighe
             .Where(r => r.AmbienteId == ambienteId)
             .Select(r => (int?)r.Ordine).Max() ?? 0;
@@ -61,7 +79,7 @@ public class RtiSocietaController : BaseController
     [HttpPost("bulk")]
     public IActionResult BulkCreate([FromBody] List<RtiSocietaRigaDto> dtos)
     {
-        var ambienteId = GetAmbienteId();
+        var ambienteId = ResolveAmbienteId();
         // Evita duplicati: se ci sono già righe per questo ambiente, non importa
         if (_db.RtiSocietaRighe.Any(r => r.AmbienteId == ambienteId))
             return Ok(new { skipped = true, message = "Righe già presenti, import ignorato" });
@@ -90,7 +108,7 @@ public class RtiSocietaController : BaseController
     [HttpPut("{id}")]
     public IActionResult Update(int id, [FromBody] RtiSocietaRigaDto dto)
     {
-        var ambienteId = GetAmbienteId();
+        var ambienteId = ResolveAmbienteId();
         var riga = _db.RtiSocietaRighe.FirstOrDefault(r => r.Id == id && r.AmbienteId == ambienteId);
         if (riga == null) return NotFound();
 
@@ -111,7 +129,7 @@ public class RtiSocietaController : BaseController
     [HttpDelete("{id}")]
     public IActionResult Delete(int id)
     {
-        var ambienteId = GetAmbienteId();
+        var ambienteId = ResolveAmbienteId();
         var riga = _db.RtiSocietaRighe.FirstOrDefault(r => r.Id == id && r.AmbienteId == ambienteId);
         if (riga == null) return NotFound();
         _db.RtiSocietaRighe.Remove(riga);

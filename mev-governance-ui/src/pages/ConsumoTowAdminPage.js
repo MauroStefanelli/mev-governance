@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
-  getTowImpatto, setTowImpatto, getMevList,
+  getTowImpatto, setTowImpatto as saveTowImpattoToDb, getMevList,
   getRtiSocieta, createRtiSocieta, updateRtiSocieta, deleteRtiSocieta, bulkImportRtiSocieta,
 } from "../services/mevService";
 
@@ -24,7 +24,7 @@ export const loadTowImpatto = (contratto) => {
 const saveTowImpatto = (map) => {
   localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(map));
   // Salva anche sul backend (fire-and-forget) per condividere con tutti gli utenti
-  setTowImpatto(map).catch(() => {});
+  saveTowImpattoToDb(map).catch(() => {});
 };
 
 const formatEuro = (v) => {
@@ -1034,10 +1034,18 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       ]);
       setRows(data);
       setMevRows(mev);
-      // Carica % impatto dal DB (fonte primaria); fallback a localStorage
+      // Carica % impatto dal DB (fonte primaria); se DB vuoto, migra da localStorage one-shot
       if (impattoDb && Object.keys(impattoDb).length > 0) {
         localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(impattoDb));
         setTowImpatto(impattoDb);
+      } else {
+        // DB vuoto: controlla se localStorage ha dati e migra sul DB
+        const lsImpatto = loadTowImpatto();
+        if (lsImpatto && Object.keys(lsImpatto).length > 0) {
+          setTowImpatto(lsImpatto);
+          // Salva sul DB (migrazione one-shot, fire-and-forget)
+          saveTowImpattoToDb(lsImpatto).catch(() => {});
+        }
       }
       const tipi = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
       const ordered = applyOrder(tipi);
