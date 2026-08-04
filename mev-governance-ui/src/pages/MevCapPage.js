@@ -489,6 +489,9 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
   const [baseRowsTow, setBaseRowsTow] = useState([]);
   const [localPriceMap, setLocalPriceMap] = useState({});
   const [showCreaContratto, setShowCreaContratto] = useState(false);
+  // Sezione Extra (Accantonato, NEL, In Vita, CM, TBD): visibile se già compilata o aperta manualmente
+  const hasExtraData = !!(form.accantonato || form.nel || form.inVita || form.cm || form.tbd);
+  const [showExtra, setShowExtra] = useState(() => hasExtraData);
   const towImpattoAll = loadTowImpatto(); // { "NomeContratto": { "TOW02.1": 30, ... } } o flat legacy
   // Percentuali di impatto per il tipo contratto selezionato
   // Se la struttura è flat (legacy), usarla direttamente; altrimenti estrarre per contratto
@@ -630,7 +633,6 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
           <ModalSection title="Responsabili" color={sectionColor}>
             <ComboField label="PM Poste"       field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(30% - 8px)" />
             <ComboField label="PM CAP"          field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(30% - 8px)" />
-            <ModalField label="Recupero"        field="recupero"       options={["SI", "NO"]} form={form} onChange={set} width="calc(20% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Release */}
@@ -657,40 +659,34 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(10% - 8px)" />
           </ModalSection>
 
-          {/* Sezione: TOW Offerta — con % impatto, pulsante Calcola, validazione rosso */}
+          {/* Sezione: TOW Offerta — griglia tabellare allineata */}
           <ModalSection title="TOW Offerta" color={sectionColor}>
-            {/* Pulsante Calcola sopra TOW02.5 */}
+            {/* Pulsante Calcola */}
             {TOW_FIELDS.some(({ key }) => towImpatto[key]) && (
-              <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
+              <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
                 <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
-                  Percentuali di impatto configurate — inserisci il valore in TOW02.5 e clicca Calcola per distribuire proporzionalmente
+                  Inserisci il valore in TOW02.5 e clicca Calcola per distribuire proporzionalmente
                 </span>
-                 <button
+                <button
                   type="button"
                   onClick={() => {
-                    // TOW02.5 contiene un importo diretto in €, non una quantità
                     const importo025 = parseFloat(form.tow025) || 0;
                     if (!importo025) { alert("Inserisci prima il valore in € per TOW02.5"); return; }
                     if (!form.tipoContratto) { alert("Seleziona prima il Tipo Contratto"); return; }
                     const perc025 = towImpatto["TOW02.5"];
                     if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
                     const prices = effectivePriceMap[form.tipoContratto] || {};
-                    // Ricava il totale intervento: se TOW02.5 vale il 65%, il totale è importo025 / 0.65
                     const totaleIntervento = importo025 / (perc025 / 100);
                     const updates = {};
                     TOW_FIELDS.forEach(({ key, field }) => {
-                      if (field === "tow025") return; // lascia invariato
+                      if (field === "tow025") return;
                       const perc = towImpatto[key];
-                      if (!perc) return; // nessuna % per questo TOW
+                      if (!perc) return;
                       const importoTow = totaleIntervento * perc / 100;
                       const valUnit = Number(prices[key]) || 0;
-                      if (valUnit > 0) {
-                        // campo qty: importo / valore_unitario
-                        updates[field] = parseFloat((importoTow / valUnit).toFixed(3));
-                      } else {
-                        // nessun valore unitario → salva l'importo € direttamente
-                        updates[field] = parseFloat(importoTow.toFixed(2));
-                      }
+                      updates[field] = valUnit > 0
+                        ? parseFloat((importoTow / valUnit).toFixed(3))
+                        : parseFloat(importoTow.toFixed(2));
                     });
                     setForm(prev => ({ ...prev, ...updates }));
                   }}
@@ -700,87 +696,114 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 </button>
               </div>
             )}
-            {TOW_FIELDS.map(({ key, field }) => {
-              const perc = towImpatto[key];
-              const val = parseFloat(form[field]) || 0;
-              const prices = effectivePriceMap[form.tipoContratto] || {};
-              const valUnitTow = Number(prices[key]) || 0;
-
-              // Importo € calcolato per questo TOW (qty × valoreUnitario)
-              const importoTow = val > 0 && valUnitTow > 0 ? val * valUnitTow : null;
-
-              // Validazione: TOW02.5 è un importo € diretto — ricava totale da esso e dalla sua %
-              const perc025 = towImpatto["TOW02.5"];
-              const importo025 = parseFloat(form.tow025) || 0;
-              const totaleIntervento = (perc025 && importo025)
-                ? importo025 / (perc025 / 100)
-                : null;
-              const atesoQty = (totaleIntervento && perc && valUnitTow && field !== "tow025")
-                ? (totaleIntervento * perc / 100) / valUnitTow
-                : null;
-              // Tolleranza: 0.5% per evitare falsi positivi da arrotondamento floating-point
-              const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
-              const isError = atesoQty != null && val > 0 && scostamento > 0.5;
-
-              // Label: KEY — X% — importoCalcolato€
-              const labelParts = [key];
-              if (perc) labelParts.push(`${perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%`);
-              if (importoTow != null) labelParts.push(formatEuro(importoTow));
-              const labelText = labelParts.join(" — ");
-
-              return (
-                <div key={field} style={{ marginBottom: "12px", width: "calc(16% - 8px)" }}>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555" }}>
-                    {labelText}
-                    {isError && <span title={`Atteso: ${atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} — scostamento: ${scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`} style={{ marginLeft: "4px", cursor: "help" }}>⚠</span>}
-                  </label>
-                  {/* Input quantità */}
-                  <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white", transition: "border-color 0.15s" }}>
-                    <button type="button"
-                      onClick={() => set(field, Math.max(0, parseFloat(((parseFloat(form[field]) || 0) - 0.001).toFixed(3))))}
-                      style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
-                    <input
-                      value={form[field] ?? ""}
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      onChange={e => set(field, e.target.value === "" ? null : parseFloat(e.target.value))}
-                      style={{ flex: 1, padding: "5px 6px", border: "none", fontSize: "13px", color: isError ? "#dc2626" : "#333", textAlign: "right", minWidth: 0, outline: "none", background: "transparent", fontWeight: isError ? 700 : 400 }}
-                    />
-                    <button type="button"
-                      onClick={() => set(field, parseFloat(((parseFloat(form[field]) || 0) + 0.001).toFixed(3)))}
-                      style={{ padding: "4px 8px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "14px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
-                  </div>
-                  {/* Importo € modificabile (aggiorna la qty inversa) */}
-                  {valUnitTow > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", marginTop: "4px", border: "1px solid #e2e8f0", borderRadius: "4px", overflow: "hidden", background: "#f8fafc" }}>
-                      <span style={{ padding: "3px 6px", fontSize: "11px", color: "#64748b", background: "#f1f5f9", borderRight: "1px solid #e2e8f0", flexShrink: 0, fontWeight: 600 }}>€</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={importoTow != null ? parseFloat(importoTow.toFixed(2)) : ""}
-                        placeholder="—"
-                        onChange={e => {
-                          const euro = parseFloat(e.target.value);
-                          if (!isNaN(euro) && valUnitTow > 0) {
-                            set(field, parseFloat((euro / valUnitTow).toFixed(3)));
-                          } else if (e.target.value === "") {
-                            set(field, null);
-                          }
-                        }}
-                        style={{ flex: 1, padding: "3px 6px", border: "none", fontSize: "12px", color: "#334155", textAlign: "right", minWidth: 0, outline: "none", background: "transparent" }}
-                      />
-                    </div>
+            {/* Griglia tabellare: 6 colonne, una per TOW */}
+            <div style={{ width: "100%", overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "6px 0", tableLayout: "fixed" }}>
+                <colgroup>
+                  {TOW_FIELDS.map(({ key }) => <col key={key} style={{ width: `${100 / TOW_FIELDS.length}%` }} />)}
+                </colgroup>
+                {/* Intestazioni: TOW key — % — importo€ */}
+                <thead>
+                  <tr>
+                    {TOW_FIELDS.map(({ key, field }) => {
+                      const perc = towImpatto[key];
+                      const val = parseFloat(form[field]) || 0;
+                      const prices = effectivePriceMap[form.tipoContratto] || {};
+                      const valUnitTow = Number(prices[key]) || 0;
+                      const importoTow = val > 0 && valUnitTow > 0 ? val * valUnitTow : null;
+                      const perc025 = towImpatto["TOW02.5"];
+                      const importo025 = parseFloat(form.tow025) || 0;
+                      const totaleIntervento = perc025 && importo025 ? importo025 / (perc025 / 100) : null;
+                      const atesoQty = totaleIntervento && perc && valUnitTow && field !== "tow025"
+                        ? (totaleIntervento * perc / 100) / valUnitTow : null;
+                      const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
+                      const isError = atesoQty != null && val > 0 && scostamento > 0.5;
+                      return (
+                        <th key={key} style={{ padding: "0 0 4px 0", textAlign: "center", verticalAlign: "bottom", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555", whiteSpace: "nowrap" }}>
+                          <div>{key}{isError && <span title={`Atteso: ${atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} — scost.: ${scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`} style={{ marginLeft: "3px", cursor: "help" }}>⚠</span>}</div>
+                          {perc && <div style={{ fontWeight: 600, fontSize: "10px", color: "#7c3aed" }}>{perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</div>}
+                          {importoTow != null && <div style={{ fontWeight: 700, fontSize: "10px", color: isError ? "#dc2626" : "#1a73e8", marginTop: "1px" }}>{formatEuro(importoTow)}</div>}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Riga quantità (qty) */}
+                  <tr>
+                    {TOW_FIELDS.map(({ key, field }) => {
+                      const prices = effectivePriceMap[form.tipoContratto] || {};
+                      const valUnitTow = Number(prices[key]) || 0;
+                      const val = parseFloat(form[field]) || 0;
+                      const perc = towImpatto[key];
+                      const perc025 = towImpatto["TOW02.5"];
+                      const importo025 = parseFloat(form.tow025) || 0;
+                      const totaleIntervento = perc025 && importo025 ? importo025 / (perc025 / 100) : null;
+                      const atesoQty = totaleIntervento && perc && valUnitTow && field !== "tow025"
+                        ? (totaleIntervento * perc / 100) / valUnitTow : null;
+                      const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
+                      const isError = atesoQty != null && val > 0 && scostamento > 0.5;
+                      return (
+                        <td key={field} style={{ padding: "0 0 4px 0", verticalAlign: "top" }}>
+                          <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white" }}>
+                            <button type="button"
+                              onClick={() => set(field, Math.max(0, parseFloat(((parseFloat(form[field]) || 0) - 0.001).toFixed(3))))}
+                              style={{ padding: "3px 5px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "13px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
+                            <input
+                              value={form[field] ?? ""}
+                              type="number" step="0.001" min="0"
+                              onChange={e => set(field, e.target.value === "" ? null : parseFloat(e.target.value))}
+                              style={{ flex: 1, padding: "4px 4px", border: "none", fontSize: "12px", color: isError ? "#dc2626" : "#333", textAlign: "right", minWidth: 0, outline: "none", background: "transparent", fontWeight: isError ? 700 : 400 }}
+                            />
+                            <button type="button"
+                              onClick={() => set(field, parseFloat(((parseFloat(form[field]) || 0) + 0.001).toFixed(3)))}
+                              style={{ padding: "3px 5px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "13px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
+                          </div>
+                          {isError && (
+                            <div style={{ fontSize: "9px", color: "#dc2626", marginTop: "1px", textAlign: "right" }}>
+                              Att.: {atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {/* Riga importo € (visibile solo se almeno un TOW ha valoreUnitario) */}
+                  {TOW_FIELDS.some(({ key }) => Number((effectivePriceMap[form.tipoContratto] || {})[key]) > 0) && (
+                    <tr>
+                      {TOW_FIELDS.map(({ key, field }) => {
+                        const prices = effectivePriceMap[form.tipoContratto] || {};
+                        const valUnitTow = Number(prices[key]) || 0;
+                        const val = parseFloat(form[field]) || 0;
+                        const importoTow = val > 0 && valUnitTow > 0 ? val * valUnitTow : null;
+                        return (
+                          <td key={field} style={{ padding: "0 0 2px 0", verticalAlign: "top" }}>
+                            {valUnitTow > 0 ? (
+                              <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: "4px", overflow: "hidden", background: "#f8fafc" }}>
+                                <span style={{ padding: "2px 4px", fontSize: "10px", color: "#64748b", background: "#f1f5f9", borderRight: "1px solid #e2e8f0", flexShrink: 0, fontWeight: 700 }}>€</span>
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  value={importoTow != null ? parseFloat(importoTow.toFixed(2)) : ""}
+                                  placeholder="—"
+                                  onChange={e => {
+                                    const euro = parseFloat(e.target.value);
+                                    if (!isNaN(euro) && valUnitTow > 0) set(field, parseFloat((euro / valUnitTow).toFixed(3)));
+                                    else if (e.target.value === "") set(field, null);
+                                  }}
+                                  style={{ flex: 1, padding: "2px 4px", border: "none", fontSize: "11px", color: "#334155", textAlign: "right", minWidth: 0, outline: "none", background: "transparent" }}
+                                />
+                              </div>
+                            ) : (
+                              <div style={{ height: "22px" }} />
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
                   )}
-                  {isError && (
-                    <div style={{ fontSize: "10px", color: "#dc2626", marginTop: "2px", textAlign: "right" }}>
-                      Atteso: {atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} (±{scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%)
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                </tbody>
+              </table>
+            </div>
           </ModalSection>
 
           {/* Sezione: Importi — tutti in € */}
@@ -810,48 +833,57 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
             </div>
             <EuroField label="Ordinato (BdO)"  value={form.ordinatoBdo}        width="calc(20% - 8px)" />
             <EuroField label="Fatturato"        value={form.fatturato}          width="calc(20% - 8px)" />
+            <ModalField label="Recupero"        field="recupero"  form={form} onChange={set} width="calc(12% - 8px)" />
             <EuroField label="Residuo Fatt."    value={form.residuoFatturabile} width="calc(15% - 8px)" />
           </ModalSection>
 
-          {/* Sezione: Extra — visibile solo se presente SUBCO */}
-          {(parseSocietà(form.subco).length > 0 || parseSocietà(form.capMandanti).length > 0) && (
+          {/* Sezione: Partecipazione — sempre visibile */}
+          <ModalSection title="Partecipazione" color={sectionColor}>
+            <div style={{ width: "calc(50% - 8px)" }}>
+              <SocietàMultiSelect
+                label="Mandataria / Mandante"
+                value={form.capMandanti}
+                onChange={v => set("capMandanti", v)}
+                ruoli={["Mandataria", "Mandante"]}
+                color="#1a73e8"
+                bgColor="#eff6ff"
+              />
+            </div>
+            <div style={{ width: "calc(50% - 8px)" }}>
+              <SocietàMultiSelect
+                label="SUBCO"
+                value={form.subco}
+                onChange={v => set("subco", v)}
+                ruoli={["SUBCO"]}
+                color="#f59e0b"
+                bgColor="#fffbeb"
+              />
+            </div>
+          </ModalSection>
+
+          {/* Sezione: Extra — collassabile, mostra Accantonato, NEL, In Vita, CM, TBD */}
+          {!showExtra ? (
+            <div style={{ marginBottom: "16px" }}>
+              <button type="button"
+                onClick={() => setShowExtra(true)}
+                style={{ fontSize: "12px", color: "#1a73e8", background: "none", border: "1px dashed #93c5fd", borderRadius: "6px", padding: "5px 14px", cursor: "pointer", fontWeight: 600 }}>
+                + Extra
+              </button>
+            </div>
+          ) : (
             <ModalSection title="Extra" color={sectionColor}>
               <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
               <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(10% - 8px)" />
               <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(10% - 8px)" />
               <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(10% - 8px)" />
               <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(10% - 8px)" />
-              <div style={{ width: "calc(45% - 8px)" }}>
-                <SocietàMultiSelect
-                  label="Mandataria / Mandante"
-                  value={form.capMandanti}
-                  onChange={v => set("capMandanti", v)}
-                  ruoli={["Mandataria", "Mandante"]}
-                  color="#1a73e8"
-                  bgColor="#eff6ff"
-                />
-              </div>
-              <div style={{ width: "calc(45% - 8px)" }}>
-                <SocietàMultiSelect
-                  label="SUBCO"
-                  value={form.subco}
-                  onChange={v => set("subco", v)}
-                  ruoli={["SUBCO"]}
-                  color="#f59e0b"
-                  bgColor="#fffbeb"
-                />
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "flex-end", paddingBottom: "2px" }}>
+                <button type="button" onClick={() => setShowExtra(false)}
+                  style={{ fontSize: "11px", color: "#94a3b8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                  Nascondi
+                </button>
               </div>
             </ModalSection>
-          )}
-          {/* Link per mostrare la sezione Extra quando non c'è ancora subco */}
-          {parseSocietà(form.subco).length === 0 && parseSocietà(form.capMandanti).length === 0 && (
-            <div style={{ marginBottom: "16px" }}>
-              <button type="button"
-                onClick={() => set("subco", " ")}
-                style={{ fontSize: "12px", color: "#1a73e8", background: "none", border: "1px dashed #93c5fd", borderRadius: "6px", padding: "5px 14px", cursor: "pointer", fontWeight: 600 }}>
-                + Aggiungi Mandataria/Mandante o SUBCO
-              </button>
-            </div>
           )}
 
           {/* Sezione: Note Excel */}
