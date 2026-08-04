@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<VerbaleAvanzamento> VerbaliAvanzamento => Set<VerbaleAvanzamento>();
     public DbSet<Ambiente> Ambienti => Set<Ambiente>();
     public DbSet<UserAmbiente> UserAmbienti => Set<UserAmbiente>();
+    public DbSet<RtiSocietaRiga> RtiSocietaRighe => Set<RtiSocietaRiga>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

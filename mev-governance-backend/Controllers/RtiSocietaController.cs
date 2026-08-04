@@ -1,0 +1,133 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using MevGovernanceBackend.Data;
+using MevGovernanceBackend.Models;
+using System.Security.Claims;
+
+namespace MevGovernanceBackend.Controllers;
+
+[ApiController]
+[Route("api/rti-societa")]
+[Authorize]
+public class RtiSocietaController : BaseController
+{
+    private readonly AppDbContext _db;
+
+    public RtiSocietaController(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    // GET api/rti-societa — tutte le righe dell'ambiente corrente
+    [HttpGet]
+    public IActionResult GetAll()
+    {
+        var ambienteId = GetAmbienteId();
+        var righe = _db.RtiSocietaRighe
+            .Where(r => r.AmbienteId == ambienteId)
+            .OrderBy(r => r.Ordine).ThenBy(r => r.Id)
+            .ToList();
+        return Ok(righe);
+    }
+
+    // POST api/rti-societa — crea una nuova riga
+    [HttpPost]
+    public IActionResult Create([FromBody] RtiSocietaRigaDto dto)
+    {
+        var ambienteId = GetAmbienteId();
+        var maxOrdine = _db.RtiSocietaRighe
+            .Where(r => r.AmbienteId == ambienteId)
+            .Select(r => (int?)r.Ordine).Max() ?? 0;
+
+        var riga = new RtiSocietaRiga
+        {
+            AmbienteId      = ambienteId,
+            Contratto       = dto.Contratto ?? "",
+            Ruolo           = dto.Ruolo ?? "",
+            Societa         = dto.Societa ?? "",
+            DataInizio      = dto.DataInizio,
+            DataApprovazione = dto.DataApprovazione,
+            Percentuale     = dto.Percentuale,
+            Importo         = dto.Importo,
+            Consumato       = dto.Consumato,
+            Ordine          = maxOrdine + 1,
+        };
+        _db.RtiSocietaRighe.Add(riga);
+        _db.SaveChanges();
+        return Ok(riga);
+    }
+
+    // POST api/rti-societa/bulk — importa un array di righe (migrazione da localStorage)
+    [HttpPost("bulk")]
+    public IActionResult BulkCreate([FromBody] List<RtiSocietaRigaDto> dtos)
+    {
+        var ambienteId = GetAmbienteId();
+        // Evita duplicati: se ci sono già righe per questo ambiente, non importa
+        if (_db.RtiSocietaRighe.Any(r => r.AmbienteId == ambienteId))
+            return Ok(new { skipped = true, message = "Righe già presenti, import ignorato" });
+
+        int ordine = 1;
+        var righe = dtos.Select(dto => new RtiSocietaRiga
+        {
+            AmbienteId       = ambienteId,
+            Contratto        = dto.Contratto ?? "",
+            Ruolo            = dto.Ruolo ?? "",
+            Societa          = dto.Societa ?? "",
+            DataInizio       = dto.DataInizio,
+            DataApprovazione = dto.DataApprovazione,
+            Percentuale      = dto.Percentuale,
+            Importo          = dto.Importo,
+            Consumato        = dto.Consumato,
+            Ordine           = ordine++,
+        }).ToList();
+
+        _db.RtiSocietaRighe.AddRange(righe);
+        _db.SaveChanges();
+        return Ok(righe);
+    }
+
+    // PUT api/rti-societa/{id} — aggiorna una riga esistente
+    [HttpPut("{id}")]
+    public IActionResult Update(int id, [FromBody] RtiSocietaRigaDto dto)
+    {
+        var ambienteId = GetAmbienteId();
+        var riga = _db.RtiSocietaRighe.FirstOrDefault(r => r.Id == id && r.AmbienteId == ambienteId);
+        if (riga == null) return NotFound();
+
+        riga.Contratto        = dto.Contratto ?? riga.Contratto;
+        riga.Ruolo            = dto.Ruolo ?? riga.Ruolo;
+        riga.Societa          = dto.Societa ?? riga.Societa;
+        riga.DataInizio       = dto.DataInizio;
+        riga.DataApprovazione = dto.DataApprovazione;
+        riga.Percentuale      = dto.Percentuale;
+        riga.Importo          = dto.Importo;
+        riga.Consumato        = dto.Consumato;
+
+        _db.SaveChanges();
+        return Ok(riga);
+    }
+
+    // DELETE api/rti-societa/{id}
+    [HttpDelete("{id}")]
+    public IActionResult Delete(int id)
+    {
+        var ambienteId = GetAmbienteId();
+        var riga = _db.RtiSocietaRighe.FirstOrDefault(r => r.Id == id && r.AmbienteId == ambienteId);
+        if (riga == null) return NotFound();
+        _db.RtiSocietaRighe.Remove(riga);
+        _db.SaveChanges();
+        return Ok(new { deleted = id });
+    }
+}
+
+public class RtiSocietaRigaDto
+{
+    public string? Contratto { get; set; }
+    public string? Ruolo { get; set; }
+    public string? Societa { get; set; }
+    public DateTime? DataInizio { get; set; }
+    public DateTime? DataApprovazione { get; set; }
+    public decimal? Percentuale { get; set; }
+    public decimal? Importo { get; set; }
+    public decimal? Consumato { get; set; }
+}

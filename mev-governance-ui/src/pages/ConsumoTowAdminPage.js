@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
   getTowImpatto, setTowImpatto, getMevList,
+  getRtiSocieta, createRtiSocieta, updateRtiSocieta, deleteRtiSocieta, bulkImportRtiSocieta,
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
@@ -1667,20 +1668,9 @@ function ContrattiSection({ rows }) {
 }
 
 
-// ─── RTI & SUBCO (gestione locale con localStorage) ──────────────────────────
-const RTI_KEY = "rtisubco-righe";
+// ─── RTI & SUBCO (dati persistiti su DB backend) ─────────────────────────────
+const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
-
-const loadRigheLS = () => {
-  try { return JSON.parse(localStorage.getItem(RTI_KEY) || "[]"); } catch { return []; }
-};
-const saveRigheLS = (righe) => localStorage.setItem(RTI_KEY, JSON.stringify(righe));
-
-// Calcola il prossimo ID auto-incrementale
-const nextId = (righe) => {
-  if (!righe.length) return 1;
-  return Math.max(...righe.map(r => r._id || 0)) + 1;
-};
 
 function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
   // Calcola valoreTotale per contratto dai dati TOW reali
@@ -1696,7 +1686,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
 
   // Calcola consumato da MEV per contratto+società (da capImporti e subcoImporti)
   const mevConsumatoMap = React.useMemo(() => {
-    // map: { "contratto|società": totale }
     const map = {};
     const addToMap = (contratto, importiJson) => {
       if (!contratto || !importiJson) return;
@@ -1717,14 +1706,48 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
   }, [mevRows]);
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
-  const [righe, setRighe] = React.useState(loadRigheLS);
+  const [righe, setRighe] = React.useState([]);
+  const [loadingRighe, setLoadingRighe] = React.useState(true);
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
   const [editId, setEditId] = React.useState(null);
   const [err, setErr] = React.useState("");
-  const [filterContratto, setFilterContratto] = React.useState(""); // "" = tutti
+  const [saving, setSaving] = React.useState(false);
+  const [filterContratto, setFilterContratto] = React.useState("");
 
-  const persistAndSet = (newRighe) => { saveRigheLS(newRighe); setRighe(newRighe); };
+  // Carica dal DB; se il DB è vuoto ma localStorage ha dati, migra automaticamente
+  React.useEffect(() => {
+    setLoadingRighe(true);
+    getRtiSocieta().then(dbRighe => {
+      if (dbRighe.length === 0) {
+        // Prova migrazione da localStorage (one-shot)
+        try {
+          const ls = JSON.parse(localStorage.getItem(RTI_KEY) || "[]");
+          if (ls.length > 0) {
+            // Converti formato localStorage (_id, percentuale 0-1) in DTO backend
+            const dtos = ls.map(r => ({
+              contratto: r.contratto || "",
+              ruolo: r.ruolo || "",
+              societa: r.societa || "",
+              dataInizio: r.dataInizio || null,
+              dataApprovazione: r.dataApprovazione || null,
+              percentuale: r.percentuale != null ? Number(r.percentuale) : null,
+              importo: r.importo != null ? Number(r.importo) : null,
+              consumato: r.consumato != null ? Number(r.consumato) : null,
+            }));
+            return bulkImportRtiSocieta(dtos).then(imported => {
+              setRighe(imported);
+              localStorage.removeItem(RTI_KEY); // pulizia dopo migrazione
+            });
+          }
+        } catch {}
+      }
+      setRighe(dbRighe);
+    }).catch(() => {
+      // Fallback su localStorage se API non disponibile
+      try { setRighe(JSON.parse(localStorage.getItem(RTI_KEY) || "[]").map((r,i) => ({...r, id: r._id || i+1}))); } catch {}
+    }).finally(() => setLoadingRighe(false));
+  }, []); // eslint-disable-line
 
   const openNew = () => {
     setForm({ ...emptyForm, contratto: contratti[0] || "" });
@@ -1735,55 +1758,66 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
       contratto: riga.contratto || "",
       ruolo: riga.ruolo || "Mandataria",
       societa: riga.societa || "",
-      dataInizio: riga.dataInizio || "",
-      dataApprovazione: riga.dataApprovazione || "",
+      dataInizio: riga.dataInizio ? riga.dataInizio.substring(0, 10) : "",
+      dataApprovazione: riga.dataApprovazione ? riga.dataApprovazione.substring(0, 10) : "",
       percentuale: riga.percentuale != null ? String(riga.percentuale * 100) : "",
       importo: riga.importo != null ? String(riga.importo) : "",
       consumato: riga.consumato != null ? String(riga.consumato) : "",
     });
-    setEditId(riga._id); setErr(""); setShowForm(true);
+    setEditId(riga.id); setErr(""); setShowForm(true);
   };
   const cancel = () => { setShowForm(false); setErr(""); };
 
-  // Calcola importo automaticamente da % e valoreTotale del contratto
   const calcImporto = (contratto, percStr) => {
     const vt = valoriContratto[contratto] || 0;
     const perc = parseNum(percStr) / 100;
     return vt * perc;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.societa.trim()) { setErr("Inserisci il nome della Società"); return; }
     if (!form.contratto) { setErr("Seleziona un contratto"); return; }
-    // Importo: se inserito manualmente ha precedenza, altrimenti si calcola dalla %
     let importoFinale = null;
     if (form.importo !== "") {
       importoFinale = parseNum(form.importo);
     } else if (form.percentuale !== "") {
       importoFinale = calcImporto(form.contratto, form.percentuale);
     }
-    const riga = {
-      _id: editId !== null ? editId : nextId(righe),
+    const dto = {
       contratto: form.contratto,
       ruolo: form.ruolo,
       societa: form.societa.trim(),
-      dataInizio: form.dataInizio,
-      dataApprovazione: form.dataApprovazione,
+      dataInizio: form.dataInizio || null,
+      dataApprovazione: form.dataApprovazione || null,
       percentuale: form.percentuale !== "" ? parseNum(form.percentuale) / 100 : null,
       importo: importoFinale,
       consumato: form.consumato !== "" ? parseNum(form.consumato) : null,
     };
-    if (editId !== null) {
-      persistAndSet(righe.map(r => r._id === editId ? riga : r));
-    } else {
-      persistAndSet([...righe, riga]);
+    setSaving(true); setErr("");
+    try {
+      if (editId !== null) {
+        const updated = await updateRtiSocieta(editId, dto);
+        setRighe(prev => prev.map(r => r.id === editId ? updated : r));
+      } else {
+        const created = await createRtiSocieta(dto);
+        setRighe(prev => [...prev, created]);
+      }
+      setShowForm(false);
+    } catch (e) {
+      setErr(e.message || "Errore durante il salvataggio");
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false); setErr("");
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Eliminare questa riga?")) return;
-    persistAndSet(righe.filter(r => r._id !== id));
+    try {
+      await deleteRtiSocieta(id);
+      setRighe(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      alert(e.message || "Errore eliminazione");
+    }
   };
 
   const ruoloBadge = (ruolo) => {
@@ -1806,8 +1840,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
 
   // Righe filtrate per contratto selezionato
   const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
-
-  // Totali: escludono le righe con ruolo SUBCO (solo RTI)
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
   const totImporto = righeRti.reduce((s, r) => s + (Number(r.importo) || 0), 0);
   const totConsumo = righeRti.reduce((s, r) => {
@@ -1932,8 +1964,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
 
           <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
             <button onClick={cancel} style={{ padding: "7px 18px", borderRadius: "7px", border: "1px solid #dadce0", background: "#fff", fontSize: "12px", cursor: "pointer", color: "#374151" }}>Annulla</button>
-            <button onClick={handleSave} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: "#1a73e8", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-              {editId !== null ? "Aggiorna" : "Salva"}
+            <button onClick={handleSave} disabled={saving} style={{ padding: "7px 18px", borderRadius: "7px", border: "none", background: saving ? "#93c5fd" : "#1a73e8", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+              {saving ? "Salvataggio..." : (editId !== null ? "Aggiorna" : "Salva")}
             </button>
           </div>
         </div>
@@ -1958,7 +1990,11 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
             </tr>
           </thead>
           <tbody>
-            {righeVisibili.length === 0 ? (
+            {loadingRighe ? (
+              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+                Caricamento in corso...
+              </td></tr>
+            ) : righeVisibili.length === 0 ? (
               <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
@@ -1967,10 +2003,10 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
               const consumatoTot = (Number(r.consumato) || 0) + consumatoMev;
               const residuo = (Number(r.importo) || 0) - consumatoTot;
               return (
-                <tr key={r._id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
+                <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
                   onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
-                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "11px" }}>{r._id}</td>
+                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "11px" }}>{r.id}</td>
                   <td style={{ ...TD2("left") }}>
                     <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px", fontSize: "11px", fontWeight: 700 }}>{r.contratto || "—"}</span>
                   </td>
@@ -1992,7 +2028,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [] }) {
                   <td style={TD2("center")}>
                     <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                       <button onClick={() => openEdit(r)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #1a73e8", background: "#eff6ff", color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Modifica</button>
-                      <button onClick={() => handleDelete(r._id)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
+                      <button onClick={() => handleDelete(r.id)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
                     </div>
                   </td>
                 </tr>

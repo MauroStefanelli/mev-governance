@@ -697,3 +697,47 @@ export const deleteConsumoTowRiga = async (id) => {
   if (response.status === 401) throw new Error('401');
   if (!response.ok) throw new Error('Errore eliminazione riga ConsumoTOW');
 };
+
+// ── RTI & SUBCO (righe ripartizione importi per società) ─────────────────────
+
+export const getRtiSocieta = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/rti-societa`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore caricamento RTI');
+  return r.json();
+};
+
+export const createRtiSocieta = async (dto) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/rti-societa`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify(dto),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore creazione riga RTI');
+  return r.json();
+};
+
+export const updateRtiSocieta = async (id, dto) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/rti-societa/${id}`, {
+    method: 'PUT', headers: authHeaders(), body: JSON.stringify(dto),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore aggiornamento riga RTI');
+  return r.json();
+};
+
+export const deleteRtiSocieta = async (id) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/rti-societa/${id}`, {
+    method: 'DELETE', headers: authHeaders(),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore eliminazione riga RTI');
+};
+
+export const bulkImportRtiSocieta = async (righe) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/rti-societa/bulk`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify(righe),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore import RTI');
+  return r.json();
+};
