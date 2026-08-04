@@ -238,6 +238,48 @@ const fmtNum = (v) => {
   return fmtItIT(n);
 };
 
+// Input € per la riga TOW: tiene uno stato di testo locale durante la digitazione
+// e aggiorna la qty (tramite onCommit) solo su blur / Enter.
+// Questo evita che React riscriva il campo ad ogni keystroke.
+function TowEuroInput({ importoTow, valUnitTow, onCommit }) {
+  // testo visualizzato mentre l'utente digita
+  const [draft, setDraft] = useState(null); // null = non in editing
+  const displayValue = draft !== null
+    ? draft
+    : (importoTow != null ? parseFloat(importoTow.toFixed(2)) : "");
+
+  const commit = (raw) => {
+    setDraft(null);
+    const euro = parseFloat(String(raw).replace(",", "."));
+    if (!isNaN(euro) && valUnitTow > 0) {
+      onCommit(parseFloat((euro / valUnitTow).toFixed(3)));
+    } else if (raw === "" || raw === null) {
+      onCommit(null);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: "4px", overflow: "hidden", background: "#f8fafc" }}>
+      <span style={{ padding: "2px 4px", fontSize: "10px", color: "#64748b", background: "#f1f5f9", borderRight: "1px solid #e2e8f0", flexShrink: 0, fontWeight: 700 }}>€</span>
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        value={displayValue}
+        placeholder="—"
+        onFocus={e => {
+          // All'ingresso nel campo, imposta il draft con il valore attuale
+          setDraft(importoTow != null ? parseFloat(importoTow.toFixed(2)) : "");
+        }}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={e => commit(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(e.target.value); } }}
+        style={{ flex: 1, padding: "2px 4px", border: "none", fontSize: "11px", color: "#334155", textAlign: "right", minWidth: 0, outline: "none", background: "transparent" }}
+      />
+    </div>
+  );
+}
+
 const isScostamento = (excel, pianificato) =>
   excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
 
@@ -779,20 +821,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                         return (
                           <td key={field} style={{ padding: "0 0 2px 0", verticalAlign: "top" }}>
                             {valUnitTow > 0 ? (
-                              <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: "4px", overflow: "hidden", background: "#f8fafc" }}>
-                                <span style={{ padding: "2px 4px", fontSize: "10px", color: "#64748b", background: "#f1f5f9", borderRight: "1px solid #e2e8f0", flexShrink: 0, fontWeight: 700 }}>€</span>
-                                <input
-                                  type="number" step="0.01" min="0"
-                                  value={importoTow != null ? parseFloat(importoTow.toFixed(2)) : ""}
-                                  placeholder="—"
-                                  onChange={e => {
-                                    const euro = parseFloat(e.target.value);
-                                    if (!isNaN(euro) && valUnitTow > 0) set(field, parseFloat((euro / valUnitTow).toFixed(3)));
-                                    else if (e.target.value === "") set(field, null);
-                                  }}
-                                  style={{ flex: 1, padding: "2px 4px", border: "none", fontSize: "11px", color: "#334155", textAlign: "right", minWidth: 0, outline: "none", background: "transparent" }}
-                                />
-                              </div>
+                              <TowEuroInput
+                                importoTow={importoTow}
+                                valUnitTow={valUnitTow}
+                                onCommit={qty => set(field, qty)}
+                              />
                             ) : (
                               <div style={{ height: "22px" }} />
                             )}
