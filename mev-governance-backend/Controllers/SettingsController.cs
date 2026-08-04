@@ -169,7 +169,47 @@ public class SettingsController : ControllerBase
                     _         => "SSL Mode=Disable",
                 };
 
-                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={dto.Password};{ssl}";
+                // Se la password non è stata inviata dal form (campo lasciato vuoto),
+                // prova a recuperarla dalla configurazione persistente (file o env var).
+                var password = dto.Password;
+                if (string.IsNullOrEmpty(password))
+                {
+                    // 1) Prova dal file db-config.json
+                    if (System.IO.File.Exists(ConfigFile))
+                    {
+                        try
+                        {
+                            var saved = JsonSerializer.Deserialize<DbConfigDto>(System.IO.File.ReadAllText(ConfigFile));
+                            if (!string.IsNullOrEmpty(saved?.Password))
+                                password = saved.Password;
+                        }
+                        catch { }
+                    }
+
+                    // 2) Fallback: estrai la password da DATABASE_DIRECT_URL
+                    if (string.IsNullOrEmpty(password))
+                    {
+                        var envUrl = (Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
+                                   ?? Environment.GetEnvironmentVariable("DATABASE_URL"))?.Trim();
+                        if (!string.IsNullOrEmpty(envUrl))
+                        {
+                            try
+                            {
+                                var s2 = envUrl;
+                                if (s2.StartsWith("postgresql://")) s2 = s2.Substring("postgresql://".Length);
+                                else if (s2.StartsWith("postgres://"))  s2 = s2.Substring("postgres://".Length);
+                                var atIdx2   = s2.LastIndexOf('@');
+                                var userInfo = atIdx2 >= 0 ? s2.Substring(0, atIdx2) : "";
+                                var colonIdx = userInfo.IndexOf(':');
+                                if (colonIdx >= 0)
+                                    password = Uri.UnescapeDataString(userInfo.Substring(colonIdx + 1));
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                var connStr = $"Host={dto.Host};Port={port};Database={dto.Database};Username={dto.Username};Password={password};{ssl}";
 
                 Console.WriteLine("===== TEST-DB =====");
                 Console.WriteLine(connStr);
