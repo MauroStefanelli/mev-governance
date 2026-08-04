@@ -1,22 +1,16 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel,
-  getConsumoTow, getTowImpatto,
+  getConsumoTow, getTowImpatto, getRtiSocieta,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
-import { loadTowImpatto, NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
+import { NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
-const RTI_KEY = "rtisubco-righe";
 
-// Legge le righe RTI&SUBCO da localStorage
-const loadRtiSocietà = () => {
-  try { return JSON.parse(localStorage.getItem(RTI_KEY) || "[]"); } catch { return []; }
-};
-
-// Società per ruolo
-const getSocietàPerRuolo = (ruoli) =>
-  loadRtiSocietà()
+// Società per ruolo (accetta rtiRows dal DB)
+const getSocietàPerRuolo = (ruoli, rtiRows = []) =>
+  rtiRows
     .filter(r => ruoli.includes(r.ruolo))
     .map(r => r.societa)
     .filter(Boolean)
@@ -35,12 +29,9 @@ const parseSocietà = (val) => {
 // Risolve il valore di capgemini/iet per la colonna Mandataria/Mandante.
 // Se il valore è "x" (legacy checkmark) cerca la società per _id in RTI&SUBCO,
 // altrimenti usa parseSocietà normalmente.
-// capId  = _id della riga RTI da usare per la x di CAP  (default 1 = Capgemini Italia S.p.A.)
-// ietId  = _id della riga RTI da usare per la x di IET  (default 2 = I&T)
-const resolveCapMandanti = (capVal, ietVal) => {
-  const rtiRows = loadRtiSocietà();
+const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => {
   const byId = (id) => {
-    const found = rtiRows.find(r => String(r._id) === String(id) || Number(r._id) === Number(id));
+    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
     return found?.societa || null;
   };
 
@@ -148,11 +139,11 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
 }
 
 // ── SocietàMultiSelect: dropdown con chips colorate per selezione multi-società ──
-function SocietàMultiSelect({ value, onChange, ruoli, label, width, color = "#1a73e8", bgColor = "#eff6ff" }) {
+function SocietàMultiSelect({ value, onChange, ruoli, label, width, color = "#1a73e8", bgColor = "#eff6ff", rtiRows = [] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const selected = parseSocietà(value);
-  const options = getSocietàPerRuolo(ruoli);
+  const options = getSocietàPerRuolo(ruoli, rtiRows);
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -590,7 +581,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
 }
 
 // ── Modale di modifica / creazione ───────────────────────────────────────────
-function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll: towImpattoAllProp = null }) {
+function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll: towImpattoAllProp = null, rtiRows: rtiRowsProp = [] }) {
   const isCreate = mode === "create";
 
   const emptyForm = {
@@ -609,8 +600,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
   const [form, setForm] = useState(() => {
     if (isCreate) return emptyForm;
     // Risolve il valore legacy "x" di capgemini/iet in nomi società reali
-    const rtiRows = loadRtiSocietà();
-    const byId = (id) => rtiRows.find(r => Number(r._id) === Number(id))?.societa || null;
+    const rtiRows = rtiRowsProp;
+    const byId = (id) => rtiRows.find(r => Number(r._id || r.id) === Number(id))?.societa || null;
     const resolveToArray = (capVal, ietVal) => {
       const fromCap = (() => {
         if (!capVal) return [];
@@ -645,12 +636,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
       setShowExtra(true);
     }
   }, [form.subco]); // eslint-disable-line
-  // % impatto: caricato dal backend (condiviso) con fallback su localStorage
-  // % impatto: preferisce la prop dal padre (già caricata), altrimenti localStorage come fallback
+  // % impatto: caricato dal backend (condiviso), passato come prop dal padre
   const [towImpattoAll, setTowImpattoAll] = useState(() =>
     towImpattoAllProp && Object.keys(towImpattoAllProp).length > 0
       ? towImpattoAllProp
-      : loadTowImpatto()
+      : {}
   );
   // Sincronizza se il padre aggiorna la prop dopo il mount
   useEffect(() => {
@@ -840,7 +830,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
           {/* Sezione: TOW Offerta — griglia tabellare allineata */}
           <ModalSection title="TOW Offerta" color={sectionColor}>
             {/* Pulsante Calcola */}
-            {TOW_FIELDS.some(({ key }) => towImpatto[key]) && (
+            {TOW_FIELDS.some(({ key }) => key in towImpatto) && (
               <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
                 <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
                   Inserisci il valore in TOW02.5 e clicca Calcola per distribuire proporzionalmente
@@ -1024,6 +1014,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
                 ruoli={["Mandataria", "Mandante"]}
                 color="#1a73e8"
                 bgColor="#eff6ff"
+                rtiRows={rtiRowsProp}
               />
               <SocietàImportiInput
                 societàList={parseSocietà(form.capMandanti)}
@@ -1041,6 +1032,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
                 ruoli={["SUBCO"]}
                 color="#f59e0b"
                 bgColor="#fffbeb"
+                rtiRows={rtiRowsProp}
               />
               <SocietàImportiInput
                 societàList={parseSocietà(form.subco)}
@@ -1151,9 +1143,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [aligning, setAligning] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [createModal, setCreateModal] = useState(false);
-  const [savedRows, setSavedRows] = useState({});
+  const [savedRows, setSavedRows] = useState({}); // eslint-disable-line no-unused-vars
   const [notePopover, setNotePopover] = useState(null);
   const [towImpattoAll, setTowImpattoAll] = useState({});
+  const [rtiRows, setRtiRows] = useState([]);
   const [mevOptions, setMevOptions] = useState({
     applicativo: [], pmPoste: [], pmCap: [], annoCompetenza: [],
     releaseExcel: [], stato: [], tipoContratto: [], priceMap: {},
@@ -1179,10 +1172,11 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     setRows([]);
     onRowsChange?.([]);
     try {
-      const [data, opts, impatto] = await Promise.all([
+      const [data, opts, impatto, rti] = await Promise.all([
         getMevList(),
         getMevOptions(),
         getTowImpatto().catch(() => ({})),
+        getRtiSocieta().catch(() => []),
       ]);
       setRows(data);
       onRowsChange?.(data);
@@ -1198,6 +1192,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       });
       if (impatto && Object.keys(impatto).length > 0) {
         setTowImpattoAll(impatto);
+      }
+      if (rti && rti.length > 0) {
+        setRtiRows(rti);
       }
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
@@ -1234,7 +1231,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const buildOptionsMandataria = () => {
     const names = new Set();
     rows.forEach(r => {
-      resolveCapMandanti(r.capgemini, r.iet).forEach(s => { if (s && s.trim()) names.add(s); });
+      resolveCapMandanti(r.capgemini, r.iet, rtiRows).forEach(s => { if (s && s.trim()) names.add(s); });
     });
     return [...names].sort();
   };
@@ -1245,7 +1242,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   };
 
   const withVuotoMandataria = (opts) => {
-    const hasEmpty = rows.some(r => resolveCapMandanti(r.capgemini, r.iet).length === 0);
+    const hasEmpty = rows.some(r => resolveCapMandanti(r.capgemini, r.iet, rtiRows).length === 0);
     return [...opts, ...(hasEmpty ? ["(vuoto)"] : [])];
   };
 
@@ -1259,7 +1256,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   // Filtro Mandataria/Mandante: usa i nomi risolti (gestisce legacy "x")
   const matchMandataria = (r) => {
     if (filters.capgemini.length === 0) return true;
-    const resolved = resolveCapMandanti(r.capgemini, r.iet);
+    const resolved = resolveCapMandanti(r.capgemini, r.iet, rtiRows);
     if (resolved.length === 0 && filters.capgemini.includes("(vuoto)")) return true;
     return resolved.some(s => filters.capgemini.includes(s));
   };
@@ -1613,9 +1610,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
                   <td style={{ ...TD }}>
-                    {resolveCapMandanti(r.capgemini, r.iet).length > 0
+                    {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                          {resolveCapMandanti(r.capgemini, r.iet).map(s => (
+                          {resolveCapMandanti(r.capgemini, r.iet, rtiRows).map(s => (
                             <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
                           ))}
                         </div>
@@ -1684,6 +1681,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           mode="edit"
           options={mevOptions}
           towImpattoAll={towImpattoAll}
+          rtiRows={rtiRows}
           onClose={() => setEditRow(null)}
           onSave={handleModalSave}
         />
@@ -1696,6 +1694,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           mode="create"
           options={mevOptions}
           towImpattoAll={towImpattoAll}
+          rtiRows={rtiRows}
           nextId={(() => {
             const nums = rows
               .map((r) => parseInt(r.excelId, 10))
