@@ -508,7 +508,7 @@ const serializeImporti = (map) => {
 };
 
 // ── Input importi € per una lista di società (usato in sezione Partecipazione) ─
-function SocietàImportiInput({ societàList, importiValue, onChange }) {
+function SocietàImportiInput({ societàList, importiValue, onChange, color = "#1a73e8", bgColor = "#eff6ff" }) {
   const map = parseImporti(importiValue);
 
   const handleChange = (nome, raw) => {
@@ -516,30 +516,77 @@ function SocietàImportiInput({ societàList, importiValue, onChange }) {
     if (raw === "" || raw === null) {
       delete newMap[nome];
     } else {
-      newMap[nome] = raw; // teniamo la stringa durante la digitazione
+      newMap[nome] = raw;
     }
     onChange(serializeImporti(newMap));
   };
 
   if (!societàList || societàList.length === 0) return null;
 
+  // Colori derivati
+  const borderColor = color + "55"; // 33% opacità
+  const labelColor  = color;
+  const totalImporti = societàList.reduce((s, n) => s + (parseFloat(map[n]) || 0), 0);
+
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
-      {societàList.map(nome => (
-        <div key={nome} style={{ display: "flex", alignItems: "center", gap: "4px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "4px 8px", minWidth: "180px" }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nome}</span>
-          <span style={{ fontSize: "10px", color: "#64748b", marginRight: "2px" }}>€</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={map[nome] ?? ""}
-            placeholder="—"
-            onChange={e => handleChange(nome, e.target.value)}
-            style={{ width: "90px", padding: "2px 4px", border: "none", borderBottom: "1px solid #cbd5e1", fontSize: "12px", textAlign: "right", outline: "none", background: "transparent", color: "#1e293b" }}
-          />
-        </div>
-      ))}
+    <div style={{ marginTop: "8px", border: `1px solid ${borderColor}`, borderRadius: "8px", overflow: "hidden", background: bgColor }}>
+      {/* Header riga importi */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", borderBottom: `1px solid ${borderColor}`, background: color + "18" }}>
+        <span style={{ fontSize: "10px", fontWeight: 700, color: labelColor, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          Importi €
+        </span>
+        {totalImporti > 0 && (
+          <span style={{ fontSize: "10px", fontWeight: 700, color: labelColor }}>
+            Tot: {totalImporti.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        )}
+      </div>
+      {/* Righe per società */}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {societàList.map((nome, idx) => (
+          <div
+            key={nome}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              padding: "5px 10px",
+              borderBottom: idx < societàList.length - 1 ? `1px solid ${borderColor}` : "none",
+              background: idx % 2 === 0 ? "transparent" : color + "0A",
+            }}
+          >
+            <span style={{
+              fontSize: "11px", fontWeight: 600, color: "#374151",
+              flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              maxWidth: "120px",
+            }}>
+              {nome}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+              <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>€</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={map[nome] ?? ""}
+                placeholder="0,00"
+                onChange={e => handleChange(nome, e.target.value)}
+                style={{
+                  width: "100px", padding: "3px 6px",
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: "5px",
+                  fontSize: "12px", textAlign: "right",
+                  outline: "none",
+                  background: "#fff",
+                  color: "#1e293b",
+                  fontWeight: map[nome] ? 600 : 400,
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => { e.target.style.borderColor = color; e.target.style.boxShadow = `0 0 0 2px ${color}22`; }}
+                onBlur={e => { e.target.style.borderColor = borderColor; e.target.style.boxShadow = "none"; }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -967,6 +1014,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 societàList={parseSocietà(form.capMandanti)}
                 importiValue={form.capImporti}
                 onChange={v => set("capImporti", v)}
+                color="#1a73e8"
+                bgColor="#eff6ff"
               />
             </div>
             <div style={{ width: "calc(50% - 8px)" }}>
@@ -982,6 +1031,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                 societàList={parseSocietà(form.subco)}
                 importiValue={form.subcoImporti}
                 onChange={v => set("subcoImporti", v)}
+                color="#f59e0b"
+                bgColor="#fffbeb"
               />
             </div>
           </ModalSection>

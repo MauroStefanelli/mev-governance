@@ -128,7 +128,7 @@ const TD = (align = "right", extra = {}) => ({
 });
 
 // ── Modale Nuovo Contratto BASE ───────────────────────────────────────────────
-function NewContrattoBaseModal({ onClose, onCreated }) {
+function NewContrattoBaseModal({ onClose, onCreated, onImpattoSaved }) {
   const INIT_TOWS = ["TOW02.1","TOW02.2","TOW02.3","TOW02.4","TOW02.5","TOW02.6"];
   const [nomeContratto, setNomeContratto] = useState("");
   const [towNames, setTowNames]   = useState(INIT_TOWS);
@@ -176,7 +176,9 @@ function NewContrattoBaseModal({ onClose, onCreated }) {
         const all = loadTowImpatto();
         const isFlat = typeof Object.values(all)[0] === "number";
         const prev = isFlat ? {} : { ...all };
-        saveTowImpatto({ ...prev, [nomeContratto.trim()]: percMap });
+        const next = { ...prev, [nomeContratto.trim()]: percMap };
+        saveTowImpatto(next);
+        onImpattoSaved?.(next);
       }
       onCreated(newRows);
       onClose();
@@ -1022,9 +1024,18 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [data, mev] = await Promise.all([getConsumoTow(), getMevList().catch(() => [])]);
+      const [data, mev, impattoDb] = await Promise.all([
+        getConsumoTow(),
+        getMevList().catch(() => []),
+        getTowImpatto().catch(() => null),
+      ]);
       setRows(data);
       setMevRows(mev);
+      // Carica % impatto dal DB (fonte primaria); fallback a localStorage
+      if (impattoDb && Object.keys(impattoDb).length > 0) {
+        localStorage.setItem(TOW_IMPATTO_KEY, JSON.stringify(impattoDb));
+        setTowImpatto(impattoDb);
+      }
       const tipi = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
       const ordered = applyOrder(tipi);
       setContratti(ordered);
@@ -1552,7 +1563,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         />
       )}
       {showNewContratto === "base" && (
-        <NewContrattoBaseModal onClose={() => setShowNewContratto(false)} onCreated={handleCreated} />
+        <NewContrattoBaseModal
+          onClose={() => setShowNewContratto(false)}
+          onCreated={handleCreated}
+          onImpattoSaved={next => setTowImpatto(next)}
+        />
       )}
       {showNewContratto === "figlio" && (
         <NewContrattoFiglioModal onClose={() => setShowNewContratto(false)} onCreated={handleCreated} baseRows={baseRows} />
