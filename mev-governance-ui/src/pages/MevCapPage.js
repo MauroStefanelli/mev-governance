@@ -476,12 +476,17 @@ const TOW_FIELDS = [
   { key: "TOW02.5", field: "tow025" }, { key: "TOW02.6", field: "tow026" },
 ];
 
-// Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto
+// Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto.
+// TOW02.5 è un importo diretto in €: viene sommato senza moltiplicazione.
 const calcImporto = (form, priceMap) => {
   const prices = priceMap?.[form.tipoContratto];
   if (!prices) return 0;
   return TOW_FIELDS.reduce((sum, { key, field }) => {
     const qty = parseFloat(form[field]) || 0;
+    if (key === "TOW02.5") {
+      // importo diretto in €
+      return sum + qty;
+    }
     return sum + qty * (prices[key] ?? 0);
   }, 0);
 };
@@ -752,7 +757,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                       const val = parseFloat(form[field]) || 0;
                       const prices = effectivePriceMap[form.tipoContratto] || {};
                       const valUnitTow = Number(prices[key]) || 0;
-                      const importoTow = val > 0 && valUnitTow > 0 ? val * valUnitTow : null;
+                      // TOW02.5: importo diretto in € (qty = €, nessuna moltiplicazione)
+                      const importoTow = key === "TOW02.5"
+                        ? (val > 0 ? val : null)
+                        : (val > 0 && valUnitTow > 0 ? val * valUnitTow : null);
                       const perc025 = towImpatto["TOW02.5"];
                       const importo025 = parseFloat(form.tow025) || 0;
                       const totaleIntervento = perc025 && importo025 ? importo025 / (perc025 / 100) : null;
@@ -810,14 +818,19 @@ function EditModal({ row, mode, options, nextId, onClose, onSave }) {
                       );
                     })}
                   </tr>
-                  {/* Riga importo € (visibile solo se almeno un TOW ha valoreUnitario) */}
-                  {TOW_FIELDS.some(({ key }) => Number((effectivePriceMap[form.tipoContratto] || {})[key]) > 0) && (
+                  {/* Riga importo € (visibile solo se almeno un TOW ha valoreUnitario, oppure TOW02.5 è presente) */}
+                  {(TOW_FIELDS.some(({ key }) => Number((effectivePriceMap[form.tipoContratto] || {})[key]) > 0) || form.tow025) && (
                     <tr>
                       {TOW_FIELDS.map(({ key, field }) => {
                         const prices = effectivePriceMap[form.tipoContratto] || {};
-                        const valUnitTow = Number(prices[key]) || 0;
+                        const valUnitRaw = Number(prices[key]) || 0;
+                        // TOW02.5: importo diretto in € → valUnitTow virtuale = 1
+                        const valUnitTow = key === "TOW02.5" ? 1 : valUnitRaw;
                         const val = parseFloat(form[field]) || 0;
-                        const importoTow = val > 0 && valUnitTow > 0 ? val * valUnitTow : null;
+                        // TOW02.5: importoTow = qty stessa (è già in €)
+                        const importoTow = key === "TOW02.5"
+                          ? (val > 0 ? val : null)
+                          : (val > 0 && valUnitTow > 0 ? val * valUnitTow : null);
                         return (
                           <td key={field} style={{ padding: "0 0 2px 0", verticalAlign: "top" }}>
                             {valUnitTow > 0 ? (
