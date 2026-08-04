@@ -15,6 +15,7 @@ public class UpdateMevRequest
     public string? PmCap { get; set; }
     public string? TipoContratto { get; set; }
     public string? Recupero { get; set; }
+    public string? Capgemini { get; set; }
     public string? Subco { get; set; }
     public string? Tbd { get; set; }
     public string? Bc { get; set; }

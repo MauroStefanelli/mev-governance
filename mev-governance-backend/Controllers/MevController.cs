@@ -65,6 +65,7 @@ public class MevController : BaseController
         if (request.PmCap      != null) item.PmCap      = request.PmCap;
         if (request.TipoContratto != null) item.TipoContratto = request.TipoContratto;
         if (request.Recupero   != null) item.Recupero   = request.Recupero;
+        if (request.Capgemini  != null) item.Capgemini  = request.Capgemini;
         if (request.Subco      != null) item.Subco      = request.Subco;
         if (request.Tbd        != null) item.Tbd        = request.Tbd;
         if (request.Bc         != null) item.Bc         = request.Bc;

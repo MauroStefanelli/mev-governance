@@ -1150,6 +1150,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       pmCap:      form.pmCap,
       tipoContratto: form.tipoContratto,
       recupero:   form.recupero,
+      capgemini:  form.capMandanti,
       subco:      form.subco,
       tbd:        form.tbd,
       bc:         form.bc,
