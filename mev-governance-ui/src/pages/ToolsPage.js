@@ -402,7 +402,7 @@ export default function ToolsPage({ onUnauthorized }) {
         text: `✔ "${res.nomePdf}" — ${res.meseAvanzamento} — ${res.righeAggiornate} righe aggiornate su ${res.righeElaborate} elaborate`,
       });
       await load();
-      // Se ci sono righe con subappalto=SI, apri il modale di associazione Subco
+      // Se ci sono righe con subappalto da abbinare (SI o nome abbreviato), apri il modale
       if (res.subappaltiSI && res.subappaltiSI.length > 0) {
         // Carica la lista Subco da RTI se non già disponibile
         let soci = subcoList;
@@ -416,8 +416,16 @@ export default function ToolsPage({ onUnauthorized }) {
             setSubcoList(soci);
           } catch { /* ignora, il selettore sarà comunque editabile */ }
         }
+        // Pre-seleziona il Subco se il nome letto dal PDF corrisponde parzialmente
         const scelte = {};
-        res.subappaltiSI.forEach(r => { scelte[r.id] = soci[0] || ""; });
+        res.subappaltiSI.forEach(r => {
+          const letto = (r.subappaltoLetto || "").toLowerCase();
+          // Cerca corrispondenza parziale: il nome letto è contenuto nel nome SUBCO o viceversa
+          const match = soci.find(s =>
+            s.toLowerCase().includes(letto) || letto.includes(s.toLowerCase().split(" ")[0])
+          );
+          scelte[r.id] = match || soci[0] || "";
+        });
         setSubcoModal({ righe: res.subappaltiSI, scelte });
       }
     } catch (e) {
@@ -1631,7 +1639,7 @@ export default function ToolsPage({ onUnauthorized }) {
         }}>
           <div style={{
             background: "#fff", borderRadius: "14px", padding: "28px 32px",
-            maxWidth: "680px", width: "92%", maxHeight: "80vh", overflowY: "auto",
+            maxWidth: "720px", width: "92%", maxHeight: "80vh", overflowY: "auto",
             boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
           }}>
             {/* Header */}
@@ -1640,21 +1648,21 @@ export default function ToolsPage({ onUnauthorized }) {
                 Associa Subappaltatore
               </div>
               <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
-                Le righe seguenti hanno <strong>Subappalto = SI</strong>. Scegli a quale società
-                subappaltatrice associare ciascuna riga.
+                Le righe seguenti hanno un valore di subappalto nel verbale PDF.
+                Verifica il testo letto e associa il Subco corretto dalla lista RTI &amp; SUBCO.
               </div>
             </div>
 
-            {/* Tabella righe SI */}
+            {/* Tabella righe da abbinare */}
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", marginBottom: "20px" }}>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>ODA</th>
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>Pos.</th>
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>Descrizione</th>
-                  <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "#64748b" }}>Q.tà</th>
                   <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "#64748b" }}>Importo</th>
-                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#1a73e8" }}>Subco</th>
+                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#f59e0b" }}>Letto dal PDF</th>
+                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#1a73e8" }}>Assegna Subco</th>
                 </tr>
               </thead>
               <tbody>
@@ -1662,10 +1670,20 @@ export default function ToolsPage({ onUnauthorized }) {
                   <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "8px 10px", fontWeight: 600 }}>{r.oda}</td>
                     <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.pos || "—"}</td>
-                    <td style={{ padding: "8px 10px", color: "#0f172a", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    <td style={{ padding: "8px 10px", color: "#0f172a", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       title={r.descrizione}>{r.descrizione || "—"}</td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", color: "#0f766e" }}>{r.qta || "—"}</td>
                     <td style={{ padding: "8px 10px", textAlign: "right", color: "#0f766e" }}>{r.importo ? `€ ${fmt(r.importo)}` : "—"}</td>
+                    {/* Testo letto dal PDF — badge giallo se nome, arancio se SI */}
+                    <td style={{ padding: "8px 10px" }}>
+                      <span style={{
+                        display: "inline-block",
+                        background: r.subappaltoLetto === "SI" ? "#fef3c7" : "#fff7ed",
+                        color:      r.subappaltoLetto === "SI" ? "#92400e" : "#c2410c",
+                        padding: "2px 8px", borderRadius: "8px",
+                        fontWeight: 700, fontSize: "11px", fontFamily: "monospace",
+                      }}>{r.subappaltoLetto || "SI"}</span>
+                    </td>
+                    {/* Selettore Subco */}
                     <td style={{ padding: "8px 6px" }}>
                       {subcoList.length > 0 ? (
                         <select

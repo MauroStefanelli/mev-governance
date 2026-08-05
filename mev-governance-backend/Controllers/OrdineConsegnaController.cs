@@ -276,12 +276,16 @@ public class OrdineConsegnaController : BaseController
             });
             await _db.SaveChangesAsync();
 
-            // ── Raccogli le righe con subappalto = "SI" per il frontend ──────────
-            // Per ogni (oda, pos) con SI, recupera l'id del record OrdineConsegna aggiornato
+            // ── Raccogli le righe che richiedono abbinamento al Subco ─────────────
+            // Include: subappalto = "SI" (da abbinare) oppure nome abbreviato (es. "Logica")
+            // Esclude: "" (non valorizzato) e "NO"
             var subappaltiSI = new List<object>();
             foreach (var (oda, pos, qta, importo, subappalto) in righe)
             {
-                if (!string.Equals(subappalto, "SI", StringComparison.OrdinalIgnoreCase)) continue;
+                // Salta righe senza subappalto o con NO
+                if (string.IsNullOrWhiteSpace(subappalto)) continue;
+                if (string.Equals(subappalto, "NO", StringComparison.OrdinalIgnoreCase)) continue;
+
                 List<OrdineConsegnaItem> matching;
                 if (string.IsNullOrEmpty(pos))
                 {
@@ -299,7 +303,15 @@ public class OrdineConsegnaController : BaseController
                         .ToList();
                 }
                 foreach (var rec in matching)
-                    subappaltiSI.Add(new { id = rec.Id, oda, pos, qta, importo, descrizione = rec.Descrizione });
+                    subappaltiSI.Add(new {
+                        id          = rec.Id,
+                        oda,
+                        pos,
+                        qta,
+                        importo,
+                        descrizione = rec.Descrizione,
+                        subappaltoLetto = subappalto  // valore raw dal PDF ("SI" o "Logica" ecc.)
+                    });
             }
 
             return Ok(new
@@ -680,15 +692,16 @@ public class OrdineConsegnaController : BaseController
         // Pattern ODA + POS all'inizio del blocco riassemblato
         var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b");
 
-        // ── Formato v2 (template corrente): ODA POS [Cod] Descr [TOW] PREZZO€ QTA IMPORTO€ SI/NO
-        // SI/NO può essere seguito da watermark — usiamo \b non $
-        // Importo: accetta qualsiasi formato italiano con virgola decimale
-        //   es. 8.192,00 | 19.329,00 | 192,00 | 1.234.567,89
+        // ── Formato v2 (template corrente): ODA POS [Cod] Descr [TOW] PREZZO€ QTA IMPORTO€ SI/NO|NomeParziale
+        // Il campo subappalto può essere:
+        //   - "SI" / "NO"  (caso standard)
+        //   - un nome abbreviato della società subappaltatrice (es. "Logica", "Levia")
+        // Catturiamo qualsiasi token non-numerico dopo l'importo€
         var codaReV2 = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
             @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€\s*" +
-            @"(SI|NO)\b",
+            @"([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\.]{0,40}?)(?:\s*$|\s+\d|\s+[/\(])",
             RegexOptions.IgnoreCase
         );
 
@@ -732,7 +745,12 @@ public class OrdineConsegnaController : BaseController
                 var codaM  = codaMatchesV2[0];
                 var qta        = codaM.Groups[2].Value;
                 var importo    = codaM.Groups[3].Value;
-                var subappalto = codaM.Groups[4].Value.ToUpper();
+                // Normalizza il campo subappalto:
+                //   "si"/"no" → uppercase; qualsiasi altro testo → preserva come letto (trim)
+                var subRaw = codaM.Groups[4].Value.Trim();
+                var subappalto = string.Equals(subRaw, "SI", StringComparison.OrdinalIgnoreCase) ? "SI"
+                               : string.Equals(subRaw, "NO", StringComparison.OrdinalIgnoreCase) ? "NO"
+                               : subRaw; // nome abbreviato o testo libero
                 righe.Add((oda, pos == "0" ? "" : pos, qta, importo, subappalto));
                 continue;
             }
