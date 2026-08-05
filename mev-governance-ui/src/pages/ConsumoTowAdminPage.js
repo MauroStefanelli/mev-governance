@@ -1925,61 +1925,99 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
 
-  // ── Mappa MEV per società: aggrega capImporti/subcoImporti per stato ──────────
-  // Struttura: { "NomeSocietà": { totale, approvato, ordinato, impegnato } }
-  const mevImportiPerSocieta = React.useMemo(() => {
-    const map = {};
-    const ensure = (soc) => {
-      if (!map[soc]) map[soc] = { totale: 0, approvato: 0, ordinato: 0, impegnato: 0 };
-    };
-    const parseObj = (raw) => {
-      if (!raw) return null;
-      try { return typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return null; }
-    };
-    (mevRows || []).forEach(r => {
-      const stato = (r.stato || "").trim();
-      if (stato === "Eliminato") return; // escludi eliminati dal totale
-      const ordBdo   = Number(r.ordinatoBdo)  || 0;
-      const fatturato = Number(r.fatturato)   || 0;
-      const importoEx = Number(r.importoExcel) || 0;
+   // ── Mappa MEV per società: aggrega importi per stato ────────────────────────
+   // Logica di attribuzione per ogni MEV:
+   //   1. capgemini = "x" (legacy) → tutto l'importo va a "Capgemini Italia S.p.A."
+   //   2. capgemini = array JSON  → legge capImporti se disponibile; altrimenti divide
+   //      proporzionalmente tra le società dell'array
+   //   Stesso criterio per subco / subcoImporti.
+   // Struttura risultante: { "NomeSocietà": { approvato, ordinato, impegnato } }
+   const mevImportiPerSocieta = React.useMemo(() => {
+     const CAP_MANDATARIA = "Capgemini Italia S.p.A.";
+     const map = {};
+     const ensure = (soc) => {
+       if (!map[soc]) map[soc] = { approvato: 0, ordinato: 0, impegnato: 0 };
+     };
+     const parseJSON = (raw) => {
+       if (!raw) return null;
+       if (typeof raw === "object") return raw;
+       try { return JSON.parse(raw); } catch { return null; }
+     };
 
-      [r.capImporti, r.subcoImporti].forEach(field => {
-        const obj = parseObj(field);
-        if (!obj) return;
-        Object.entries(obj).forEach(([soc, val]) => {
-          const v = Number(val) || 0;
-          ensure(soc);
-          map[soc].totale    += v;
-          if (stato === "Approvato")                     map[soc].approvato += v;
-          if (ordBdo > 0)                                map[soc].ordinato  += v;
-          // Impegnato = quota proporzionale del fatturato
-          if (fatturato > 0 && importoEx > 0)
-            map[soc].impegnato += v * (fatturato / importoEx);
-        });
-      });
-    });
-    return map;
-  }, [mevRows]);
+     // Aggiunge i valori per una singola MEV a una mappa {soc: importo}
+     // Ritorna la mappa { soc: quota } pronta per essere accumulata
+     const allocate = (capField, importiField, totalImporto) => {
+       // Caso 1: campo legacy "x" → tutto a Capgemini
+       if (!capField || capField === "x") {
+         return totalImporto > 0 ? { [CAP_MANDATARIA]: totalImporto } : null;
+       }
+       // Caso 2: array JSON di nomi società
+       const soci = parseJSON(capField);
+       if (!Array.isArray(soci) || soci.length === 0) return null;
+       if (soci.length === 1) {
+         return totalImporto > 0 ? { [soci[0]]: totalImporto } : null;
+       }
+       // Più società: usa capImporti se disponibile, altrimenti divisione proporzionale
+       const importiObj = parseJSON(importiField);
+       if (importiObj && Object.keys(importiObj).length > 0) {
+         return importiObj; // { "Capgemini": 69225, "IET": 38000, ... }
+       }
+       // Divisione proporzionale
+       const quota = totalImporto / soci.length;
+       return Object.fromEntries(soci.map(s => [s, quota]));
+     };
+
+     (mevRows || []).forEach(r => {
+       const stato     = (r.stato || "").trim();
+       if (stato === "Eliminato") return;
+       const importoEx = Number(r.importoExcel) || 0;
+       const ordBdo    = Number(r.ordinatoBdo)  || 0;
+       const fatturato = Number(r.fatturato)    || 0;
+
+       // ── CAP (Mandataria / Mandanti) ──────────────────────────────────────────
+       const capAlloc = allocate(r.capgemini, r.capImporti, importoEx);
+       if (capAlloc) {
+         Object.entries(capAlloc).forEach(([soc, v]) => {
+           v = Number(v) || 0;
+           ensure(soc);
+           if (stato === "Approvato")          map[soc].approvato += v;
+           if (ordBdo > 0 && importoEx > 0)   map[soc].ordinato  += v * (ordBdo    / importoEx);
+           if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
+         });
+       }
+
+       // ── SUBCO ────────────────────────────────────────────────────────────────
+       const subcoAlloc = allocate(r.subco, r.subcoImporti, importoEx);
+       if (subcoAlloc) {
+         Object.entries(subcoAlloc).forEach(([soc, v]) => {
+           v = Number(v) || 0;
+           ensure(soc);
+           if (stato === "Approvato")          map[soc].approvato += v;
+           if (ordBdo > 0 && importoEx > 0)   map[soc].ordinato  += v * (ordBdo    / importoEx);
+           if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
+         });
+       }
+     });
+     return map;
+   }, [mevRows]);
 
   // Helper: restituisce i 5 valori per una riga RTI.
-  // - Valore Totale: sempre dall'importo manuale della riga RTI (inserito in fase di configurazione)
-  // - Approvato/Ordinato/Impegnato: dai capImporti/subcoImporti delle MEV-CAP se disponibili,
-  //   altrimenti fallback su % × totali ConsumoTow (finché le MEV non vengono compilate)
+  // - Valore Totale: sempre dall'importo manuale della riga RTI
+  // - Approvato/Ordinato/Impegnato: da mevImportiPerSocieta (calcolato dai campi MEV diretti)
   // - Residuo: Valore Totale − Approvato
   const calcCampiRiga = (r) => {
-    const vt = r.importo != null ? Number(r.importo) : null;
-
-    // Dati da MEV-CAP
+    const vt  = r.importo != null ? Number(r.importo) : null;
     const mev = mevImportiPerSocieta[r.societa];
-    if (mev && mev.approvato > 0) {
-      const approvato = mev.approvato;
-      const ordinato  = mev.ordinato;
-      const impegnato = mev.impegnato > 0 ? mev.impegnato : null;
-      const residuo   = vt != null ? vt - approvato : approvato - ordinato;
+
+    if (mev) {
+      const approvato = mev.approvato  || 0;
+      const ordinato  = mev.ordinato   || 0;
+      const impegnato = mev.impegnato  > 0 ? mev.impegnato : null;
+      const residuo   = vt != null ? vt - approvato : null;
       return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
     }
 
-    // Fallback: % × totali ConsumoTow
+    // Fallback: % × totali ConsumoTow (società senza MEV assegnate, es. Levia, Logica)
     const vc   = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
