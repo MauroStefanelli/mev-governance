@@ -408,7 +408,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok("MEV Backend is running....."));
-app.MapGet("/version", () => Results.Ok(new { commit = "0fed4fe", built = DateTime.UtcNow.ToString("o") }));
+app.MapGet("/version", () => Results.Ok(new { commit = "a973890", built = DateTime.UtcNow.ToString("o") }));
 app.MapControllers();
 
 app.Run();
