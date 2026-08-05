@@ -471,10 +471,29 @@ const serializeImporti = (map) => {
 };
 
 // ── Input importi € per una lista di società (usato in sezione Partecipazione) ─
-function SocietàImportiInput({ societàList, importiValue, onChange, color = "#1a73e8", bgColor = "#eff6ff" }) {
+function SocietàImportiInput({ societàList, importiValue, onChange, color = "#1a73e8", bgColor = "#eff6ff", autoFill = null }) {
   const map = parseImporti(importiValue);
   // draft: { nomeSocietà: stringaTestuale } — usato durante la digitazione
   const [drafts, setDrafts] = useState({});
+
+  // Se c'è una sola società e il campo è vuoto, pre-compila con autoFill (Importo Fornitura)
+  useEffect(() => {
+    if (
+      autoFill != null &&
+      autoFill > 0 &&
+      societàList &&
+      societàList.length === 1
+    ) {
+      const nome = societàList[0];
+      const current = parseImporti(importiValue);
+      if (!current[nome]) {
+        // pre-popola silenziosamente
+        const newMap = { ...current, [nome]: autoFill };
+        onChange(serializeImporti(newMap));
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [societàList, autoFill]);
 
   const formatDisplay = (val) => {
     const n = parseFloat(val);
@@ -1022,6 +1041,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
                 onChange={v => set("capImporti", v)}
                 color="#1a73e8"
                 bgColor="#eff6ff"
+                autoFill={displayImporto > 0 ? displayImporto : null}
               />
             </div>
             <div style={{ width: "calc(50% - 8px)" }}>
