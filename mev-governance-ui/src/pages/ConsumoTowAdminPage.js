@@ -1881,8 +1881,9 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
       console.log("[RTI-DEBUG] ordiniRows:", ordiniRows.length, "sample:", ordiniRows[0]);
       console.log("[RTI-DEBUG] righeInit:", righeInit.length, "sample:", righeInit[0]);
       console.log("[RTI-DEBUG] ordiniOrdinatoMap:", ordiniOrdinatoMap);
+      console.log("[RTI-DEBUG] mevImportiPerSocieta:", mevImportiPerSocieta);
     }
-  }, [ordiniRows, righeInit, ordiniOrdinatoMap]); // eslint-disable-line
+  }, [ordiniRows, righeInit, ordiniOrdinatoMap, mevImportiPerSocieta]); // eslint-disable-line
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRigheLocal] = React.useState([]);
@@ -2012,9 +2013,12 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
    // Struttura risultante: { "NomeSocietà": { approvato, ordinato, impegnato } }
    const mevImportiPerSocieta = React.useMemo(() => {
      const CAP_MANDATARIA = "Capgemini Italia S.p.A.";
+     // Struttura: { societa: { tipoContratto: { approvato, ordinato, impegnato } } }
+     // tipoContratto = valore di r.tipoContratto (es. "BASE", "QDO") oppure "__all__" se assente
      const map = {};
-     const ensure = (soc) => {
-       if (!map[soc]) map[soc] = { approvato: 0, ordinato: 0, impegnato: 0 };
+     const ensure = (soc, tc) => {
+       if (!map[soc]) map[soc] = {};
+       if (!map[soc][tc]) map[soc][tc] = { approvato: 0, ordinato: 0, impegnato: 0 };
      };
      const parseJSON = (raw) => {
        if (!raw) return null;
@@ -2040,11 +2044,12 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
      };
 
      (mevRows || []).forEach(r => {
-       const stato     = (r.stato || "").trim();
+       const stato        = (r.stato || "").trim();
        if (stato === "Eliminato") return;
-       const importoEx = Number(r.importoExcel) || 0;
-       const ordBdo    = Number(r.ordinatoBdo)  || 0;
-       const fatturato = Number(r.fatturato)    || 0;
+       const tc           = (r.tipoContratto || "__all__").trim();
+       const importoEx    = Number(r.importoExcel) || 0;
+       const ordBdo       = Number(r.ordinatoBdo)  || 0;
+       const fatturato    = Number(r.fatturato)    || 0;
 
        // ── CAP allocation ───────────────────────────────────────────────────────
        const capAlloc = allocateCap(r.capgemini, r.capImporti, importoEx);
@@ -2069,14 +2074,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
          }
        }
 
-       // ── Accumula nella mappa globale ─────────────────────────────────────────
+       // ── Accumula nella mappa per società × tipoContratto ─────────────────────
        Object.entries(finalAlloc).forEach(([soc, v]) => {
          v = Number(v) || 0;
          if (v <= 0) return;
-         ensure(soc);
-         if (stato === "Approvato")           map[soc].approvato += v;
-         if (ordBdo > 0 && importoEx > 0)    map[soc].ordinato  += v * (ordBdo    / importoEx);
-         if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
+         ensure(soc, tc);
+         if (stato === "Approvato")           map[soc][tc].approvato += v;
+         if (ordBdo > 0 && importoEx > 0)    map[soc][tc].ordinato  += v * (ordBdo    / importoEx);
+         if (fatturato > 0 && importoEx > 0) map[soc][tc].impegnato += v * (fatturato / importoEx);
        });
      });
      return map;
@@ -2084,20 +2089,34 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
 
   // Helper: restituisce i 5 valori per una riga RTI.
   // - Valore Totale: importo manuale della riga RTI
-  // - Approvato/Impegnato: da mevImportiPerSocieta (campi MEV diretti)
+  // - Approvato/Impegnato: da mevImportiPerSocieta filtrato per tipoContratto = r.contratto
   // - Ordinato: dagli Ordini di Consegna (somma importi per società); fallback MEV
   // - Residuo: Valore Totale − Approvato
   const calcCampiRiga = (r) => {
     const vt  = r.importo != null ? Number(r.importo) : null;
-    const mev = mevImportiPerSocieta[r.societa];
+
+    // Recupera i dati MEV per questa società filtrando per tipoContratto
+    // Priorità: tipoContratto == r.contratto → "__all__" → somma di tutti i tipi
+    const mevBySoc = mevImportiPerSocieta[r.societa] || {};
+    const tc = r.contratto || "";
+    const mevTc = mevBySoc[tc] || mevBySoc["__all__"] || (() => {
+      // fallback: somma tutti i tipoContratto disponibili per questa società
+      const agg = { approvato: 0, ordinato: 0, impegnato: 0 };
+      Object.values(mevBySoc).forEach(v => {
+        agg.approvato += v.approvato || 0;
+        agg.ordinato  += v.ordinato  || 0;
+        agg.impegnato += v.impegnato || 0;
+      });
+      return Object.keys(mevBySoc).length > 0 ? agg : null;
+    })();
 
     // Ordinato dagli ordini di consegna (fonte primaria, flat per società)
     const ordiniOrdinato = ordiniOrdinatoMap[r.societa] || 0;
 
-    if (mev) {
-      const approvato = mev.approvato  || 0;
-      const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : (mev.ordinato || 0);
-      const impegnato = mev.impegnato  > 0 ? mev.impegnato : null;
+    if (mevTc) {
+      const approvato = mevTc.approvato || 0;
+      const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : (mevTc.ordinato || 0);
+      const impegnato = mevTc.impegnato > 0 ? mevTc.impegnato : null;
       const residuo   = vt != null ? vt - approvato : null;
       return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
     }
