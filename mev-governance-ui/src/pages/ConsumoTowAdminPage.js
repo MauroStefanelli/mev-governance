@@ -1687,6 +1687,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         mevRows={mevRows}
         righeInit={rtiRighe}
         righeLoading={rtiLoading}
+        hasImpatto={Object.keys(towImpatto).length > 0}
         onRigheChange={setRtiRighe}
       />
 
@@ -1775,7 +1776,7 @@ function ContrattiSection({ rows }) {
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, onRigheChange }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, hasImpatto = false, onRigheChange }) {
   // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -2164,17 +2165,18 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
         </div>
       )}
 
-      {/* Tabella — colgroup speculare alla tabella CONTRATTO sopra:
-           info cols: 32+88+90+170+60+62 = 502px  (≡ 32+180+100+65+125 di CONTRATTO)
-           poi ValTotale/Approvato/Ordinato/Impegnato/Residuo 125px ciascuna
-           poi Azioni 64px extra (fuori dall'allineamento numerico) */}
+           {/* info cols: si adattano al colgroup CONTRATTO sopra.
+               Se hasImpatto=true: 32+118+90+230+60+62=592px (≡ 377+125+90 di CONTRATTO)
+               Se hasImpatto=false: 32+88+90+170+60+62=502px (≡ 377+125 di CONTRATTO)
+               poi ValTotale/Approvato/Ordinato/Impegnato/Residuo 125px ciascuna
+               poi Azioni 64px extra */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "32px"  }} />{/* ID */}
-            <col style={{ width: "88px"  }} />{/* Contratto */}
+            <col style={{ width: hasImpatto ? "118px" : "88px"  }} />{/* Contratto */}
             <col style={{ width: "90px"  }} />{/* Ruolo */}
-            <col style={{ width: "170px" }} />{/* Società (+% inline) */}
+            <col style={{ width: hasImpatto ? "230px" : "170px" }} />{/* Società (+% inline) */}
             <col style={{ width: "60px"  }} />{/* Data Inizio */}
             <col style={{ width: "62px"  }} />{/* Data Approv. */}
             <col style={{ width: "125px" }} />{/* Valore Totale */}

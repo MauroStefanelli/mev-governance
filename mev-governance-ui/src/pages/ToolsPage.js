@@ -403,30 +403,28 @@ export default function ToolsPage({ onUnauthorized }) {
       });
       await load();
       // Se ci sono righe con subappalto da abbinare (SI o nome abbreviato), apri il modale
-      if (res.subappaltiSI && res.subappaltiSI.length > 0) {
-        // Carica la lista Subco da RTI se non già disponibile
-        let soci = subcoList;
-        if (soci.length === 0) {
-          try {
-            const rti = await getRtiSocietaLocal();
-            soci = rti
-              .filter(r => r.ruolo === "SUBCO")
-              .map(r => r.societa)
-              .filter(Boolean);
-            setSubcoList(soci);
-          } catch { /* ignora, il selettore sarà comunque editabile */ }
+      const righeDA = (res.subappaltiSI || []);
+      if (righeDA.length > 0) {
+        // Carica sempre la lista Subco da RTI (non usare la cache stale)
+        let soci = [];
+        try {
+          const rti = await getRtiSocietaLocal();
+          soci = rti.filter(r => r.ruolo === "SUBCO").map(r => r.societa).filter(Boolean);
+          setSubcoList(soci);
+        } catch (err) {
+          console.warn("getRtiSocietaLocal failed:", err);
         }
-        // Pre-seleziona il Subco se il nome letto dal PDF corrisponde parzialmente
+        // Pre-seleziona il Subco per corrispondenza parziale con il testo letto dal PDF
         const scelte = {};
-        res.subappaltiSI.forEach(r => {
+        righeDA.forEach(r => {
           const letto = (r.subappaltoLetto || "").toLowerCase();
-          // Cerca corrispondenza parziale: il nome letto è contenuto nel nome SUBCO o viceversa
           const match = soci.find(s =>
             s.toLowerCase().includes(letto) || letto.includes(s.toLowerCase().split(" ")[0])
           );
-          scelte[r.id] = match || soci[0] || "";
+          // Se non c'è match rimane "" — l'utente dovrà scegliere manualmente
+          scelte[r.id] = match || "";
         });
-        setSubcoModal({ righe: res.subappaltiSI, scelte });
+        setSubcoModal({ righe: righeDA, scelte });
       }
     } catch (e) {
       setVapMsg({ type: "err", text: `Errore: ${parseApiError(e.message)}` });
@@ -1739,7 +1737,7 @@ export default function ToolsPage({ onUnauthorized }) {
               >Salta</button>
               <button
                 onClick={handleSalvaSubco}
-                disabled={savingSubco || Object.values(subcoModal.scelte).every(v => !v)}
+                disabled={savingSubco}
                 style={{
                   padding: "9px 24px", borderRadius: "8px", border: "none",
                   background: savingSubco ? "#93c5fd" : "#1a73e8",
