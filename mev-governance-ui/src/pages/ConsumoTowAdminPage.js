@@ -1812,64 +1812,45 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   }, [rows]);
 
   // ── Ordinato dagli Ordini di Consegna per società ──────────────────────────
-  // Logica di attribuzione:
-  //   - Se ordine.Subappalto è il nome di una società RTI (SUBCO) → importo → quella società
-  //   - Altrimenti (Subappalto vuoto, "NO" o non riconosciuto) → importo → Mandataria del contratto
-  // Struttura risultante: { "NomeSocietà": { "NomeContratto": totaleOrdinato } }
+  // Logica:
+  //   - Se ordine.subappalto è il nome (o parte) di una società RTI (qualsiasi ruolo)
+  //     → l'importo va a quella società
+  //   - Altrimenti (vuoto, "NO", "SI" non abbinato)
+  //     → l'importo va alla Mandataria (prima riga RTI con ruolo Mandataria)
+  // Risultato: { "NomeSocietà": totaleOrdinato }   (flat, senza join per contratto)
   const ordiniOrdinatoMap = React.useMemo(() => {
-    const map = {}; // { societa: { contratto: totale } }
-    const ensure = (soc, contr) => {
-      if (!map[soc]) map[soc] = {};
-      if (!map[soc][contr] === undefined) map[soc][contr] = 0; // eslint-disable-line
-      map[soc][contr] = (map[soc][contr] || 0);
-    };
-    const add = (soc, contr, importo) => {
-      if (!soc || !contr) return;
-      if (!map[soc]) map[soc] = {};
-      map[soc][contr] = (map[soc][contr] || 0) + importo;
+    const map = {}; // { societa: totale }
+    const add = (soc, importo) => {
+      if (!soc) return;
+      map[soc] = (map[soc] || 0) + importo;
     };
 
-    // Costruisce una mappa veloce: nome società SUBCO (lowercase) → nome canonico
-    const subcoNames = new Set(
-      (righeInit || [])
-        .filter(r => r.ruolo === "SUBCO")
-        .map(r => (r.societa || "").trim())
-        .filter(Boolean)
-    );
+    // Tutte le società RTI registrate (nome canonico)
+    const tuttiNomi = (righeInit || [])
+      .map(r => (r.societa || "").trim())
+      .filter(Boolean);
 
-    // Mappa contratto → mandataria (prima società con ruolo Mandataria per quel contratto)
-    const mandatariaPerContratto = {};
-    (righeInit || []).forEach(r => {
-      if (r.ruolo === "Mandataria" && r.contratto && r.societa) {
-        if (!mandatariaPerContratto[r.contratto])
-          mandatariaPerContratto[r.contratto] = r.societa;
-      }
-    });
+    // Prima Mandataria registrata (fallback per ordini senza subappalto)
+    const mandataria = (righeInit || []).find(r => r.ruolo === "Mandataria")?.societa || null;
 
     (ordiniRows || []).forEach(ord => {
-      const importoNum = parseNum(ord.importo || ord.Importo || "");
+      const importoNum = parseNum(ord.importo || "");
       if (!importoNum || importoNum <= 0) return;
-      const contratto = (ord.contratto || ord.Contratto || "").trim();
-      if (!contratto) return;
-      const subappalto = (ord.subappalto || ord.Subappalto || "").trim();
 
-      // Determina la società destinataria
-      const subappaltoUpper = subappalto.toUpperCase();
-      if (subappalto && subappaltoUpper !== "NO" && subappaltoUpper !== "") {
-        // Cerca corrispondenza con una società SUBCO registrata
-        const match = [...subcoNames].find(s =>
+      const subappalto = (ord.subappalto || "").trim();
+      const subUpper   = subappalto.toUpperCase();
+
+      if (subappalto && subUpper !== "NO" && subUpper !== "SI" && subUpper !== "") {
+        // subappalto contiene il nome della società: cerca match esatto o parziale
+        const match = tuttiNomi.find(s =>
           s.toLowerCase() === subappalto.toLowerCase() ||
           s.toLowerCase().includes(subappalto.toLowerCase()) ||
           subappalto.toLowerCase().includes(s.toLowerCase().split(" ")[0].toLowerCase())
         );
-        if (match) {
-          add(match, contratto, importoNum);
-          return;
-        }
+        if (match) { add(match, importoNum); return; }
       }
-      // Nessun subappalto riconosciuto → va alla mandataria del contratto
-      const mandataria = mandatariaPerContratto[contratto];
-      if (mandataria) add(mandataria, contratto, importoNum);
+      // Nessun subappalto riconosciuto → Mandataria
+      if (mandataria) add(mandataria, importoNum);
     });
 
     return map;
@@ -1893,6 +1874,15 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
     });
     return map;
   }, [mevRows]);
+
+  // DEBUG — rimuovere dopo verifica
+  React.useEffect(() => {
+    if (ordiniRows.length > 0 || righeInit.length > 0) {
+      console.log("[RTI-DEBUG] ordiniRows:", ordiniRows.length, "sample:", ordiniRows[0]);
+      console.log("[RTI-DEBUG] righeInit:", righeInit.length, "sample:", righeInit[0]);
+      console.log("[RTI-DEBUG] ordiniOrdinatoMap:", ordiniOrdinatoMap);
+    }
+  }, [ordiniRows, righeInit, ordiniOrdinatoMap]); // eslint-disable-line
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRigheLocal] = React.useState([]);
@@ -2093,35 +2083,30 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
    }, [mevRows]);
 
   // Helper: restituisce i 5 valori per una riga RTI.
-  // - Valore Totale: sempre dall'importo manuale della riga RTI
-  // - Approvato/Impegnato: da mevImportiPerSocieta (calcolato dai campi MEV diretti)
-  // - Ordinato: dagli Ordini di Consegna (somma importi per società+contratto); fallback MEV
+  // - Valore Totale: importo manuale della riga RTI
+  // - Approvato/Impegnato: da mevImportiPerSocieta (campi MEV diretti)
+  // - Ordinato: dagli Ordini di Consegna (somma importi per società); fallback MEV
   // - Residuo: Valore Totale − Approvato
   const calcCampiRiga = (r) => {
     const vt  = r.importo != null ? Number(r.importo) : null;
     const mev = mevImportiPerSocieta[r.societa];
 
-    // Ordinato dagli ordini di consegna (fonte primaria)
-    const ordiniSoc      = ordiniOrdinatoMap[r.societa] || {};
-    const ordiniOrdinato = r.contratto
-      ? (ordiniSoc[r.contratto] || 0)
-      : Object.values(ordiniSoc).reduce((s, v) => s + v, 0);
+    // Ordinato dagli ordini di consegna (fonte primaria, flat per società)
+    const ordiniOrdinato = ordiniOrdinatoMap[r.societa] || 0;
 
     if (mev) {
       const approvato = mev.approvato  || 0;
-      // Usa ordinato dagli ordini se disponibile, altrimenti fallback MEV
       const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : (mev.ordinato || 0);
       const impegnato = mev.impegnato  > 0 ? mev.impegnato : null;
       const residuo   = vt != null ? vt - approvato : null;
       return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
     }
 
-    // Fallback: % × totali ConsumoTow (società senza MEV assegnate, es. Levia, Logica)
+    // Fallback: % × totali ConsumoTow (società senza MEV assegnate)
     const vc   = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
     const approvato = apply(vc.approvato   || 0);
-    // Usa ordinato dagli ordini se disponibile, altrimenti % × ConsumoTow
     const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : apply(vc.ordinatiRda || 0);
     const impegnato = apply(vc.impegnato   || 0);
     const residuo   = vt != null && approvato != null ? vt - approvato : apply(vc.residuo || 0);
