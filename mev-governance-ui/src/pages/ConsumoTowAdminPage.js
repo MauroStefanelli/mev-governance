@@ -1925,11 +1925,58 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
 
-  // Helper: calcola i 5 valori per una riga RTI in base alla % e ai totali del contratto
-  // - valoreTotale: importo manuale se presente, altrimenti % × valore totale contratto
-  // - approvato/ordinatiRda/impegnato/residuo: % × totali aggregati del contratto
+  // ── Mappa MEV per società: aggrega capImporti/subcoImporti per stato ──────────
+  // Struttura: { "NomeSocietà": { totale, approvato, ordinato, impegnato } }
+  const mevImportiPerSocieta = React.useMemo(() => {
+    const map = {};
+    const ensure = (soc) => {
+      if (!map[soc]) map[soc] = { totale: 0, approvato: 0, ordinato: 0, impegnato: 0 };
+    };
+    const parseObj = (raw) => {
+      if (!raw) return null;
+      try { return typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return null; }
+    };
+    (mevRows || []).forEach(r => {
+      const stato = (r.stato || "").trim();
+      if (stato === "Eliminato") return; // escludi eliminati dal totale
+      const ordBdo   = Number(r.ordinatoBdo)  || 0;
+      const fatturato = Number(r.fatturato)   || 0;
+      const importoEx = Number(r.importoExcel) || 0;
+
+      [r.capImporti, r.subcoImporti].forEach(field => {
+        const obj = parseObj(field);
+        if (!obj) return;
+        Object.entries(obj).forEach(([soc, val]) => {
+          const v = Number(val) || 0;
+          ensure(soc);
+          map[soc].totale    += v;
+          if (stato === "Approvato")                     map[soc].approvato += v;
+          if (ordBdo > 0)                                map[soc].ordinato  += v;
+          // Impegnato = quota proporzionale del fatturato
+          if (fatturato > 0 && importoEx > 0)
+            map[soc].impegnato += v * (fatturato / importoEx);
+        });
+      });
+    });
+    return map;
+  }, [mevRows]);
+
+  // Helper: restituisce i 5 valori per una riga RTI dai dati MEV reali.
+  // Fallback su % × ConsumoTow solo se la società non ha dati MEV.
   const calcCampiRiga = (r) => {
-    const vc = valoriContratto[r.contratto] || {};
+    const mev = mevImportiPerSocieta[r.societa];
+    if (mev && mev.totale > 0) {
+      const residuo = mev.approvato - mev.ordinato;
+      return {
+        valoreTotale: mev.totale,
+        approvato:    mev.approvato,
+        ordinatiRda:  mev.ordinato,
+        impegnato:    mev.impegnato > 0 ? mev.impegnato : null,
+        residuo,
+      };
+    }
+    // Fallback: % × totali ConsumoTow (usato finché la società non ha MEV assegnate)
+    const vc   = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
     return {
