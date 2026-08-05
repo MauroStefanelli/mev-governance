@@ -2,12 +2,29 @@ import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { fmtItIT, fmtEuroIt } from "../utils";
+import { tryRefreshToken } from "../services/mevService";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("jwt") || ""}`,
 });
+
+// Fetch con auto-refresh del JWT (come fetchWithRefresh in mevService)
+const fetchAuth = async (url, options = {}) => {
+  const opts = { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } };
+  let res = await fetch(url, opts);
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      opts.headers = { ...authHeaders(), ...(options.headers || {}) };
+      res = await fetch(url, opts);
+    } else {
+      window.dispatchEvent(new CustomEvent("auth:expired"));
+    }
+  }
+  return res;
+};
 
 // ============================================================
 // SERVICE CALLS
@@ -44,7 +61,8 @@ const waitForParser = async (onProgress, maxWaitMs = 90000) => {
 };
 
 const getOrdini = async () => {
-  const res = await fetch(`${API_BASE_URL}/api/tools/ordini`, { headers: authHeaders() });
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/ordini`);
+  if (res.status === 401) throw new Error("401");
   if (!res.ok) throw new Error("Errore recupero ordini");
   return res.json();
 };
@@ -52,9 +70,8 @@ const getOrdini = async () => {
 const uploadPdf = async (file) => {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/tools/upload-pdf`, {
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/upload-pdf`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (!res.ok) {
@@ -67,9 +84,8 @@ const uploadPdf = async (file) => {
 const uploadVap = async (file) => {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/tools/upload-vap`, {
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/upload-vap`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (!res.ok) {
@@ -82,9 +98,8 @@ const uploadVap = async (file) => {
 const debugPdf = async (file) => {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/tools/debug-pdf`, {
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/debug-pdf`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (!res.ok) { const text = await res.text(); throw new Error(text); }
@@ -94,9 +109,8 @@ const debugPdf = async (file) => {
 const debugVap = async (file) => {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE_URL}/api/tools/debug-vap`, {
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/debug-vap`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (!res.ok) { const text = await res.text(); throw new Error(text); }
@@ -104,23 +118,24 @@ const debugVap = async (file) => {
 };
 
 const deleteByPdf = async (nomePdf) => {
-  const res = await fetch(
+  const res = await fetchAuth(
     `${API_BASE_URL}/api/tools/ordini/by-pdf/${encodeURIComponent(nomePdf)}`,
-    { method: "DELETE", headers: authHeaders() }
+    { method: "DELETE" }
   );
   if (!res.ok) throw new Error("Errore eliminazione");
   return res.json();
 };
 
 const getVerbali = async () => {
-  const res = await fetch(`${API_BASE_URL}/api/tools/verbali`, { headers: authHeaders() });
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/verbali`);
+  if (res.status === 401) throw new Error("401");
   if (!res.ok) throw new Error("Errore recupero verbali");
   return res.json();
 };
 
 const deleteVerbale = async (id) => {
-  const res = await fetch(`${API_BASE_URL}/api/tools/verbali/${id}`, {
-    method: "DELETE", headers: authHeaders(),
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/verbali/${id}`, {
+    method: "DELETE",
   });
   if (!res.ok) throw new Error("Errore eliminazione verbale");
   return res.json();
@@ -560,7 +575,7 @@ export default function ToolsPage({ onUnauthorized }) {
   // ── Export Excel lato backend ────────────────────────────────
   const handleExport = async () => {
     try {
-      const r = await fetch(`${API_BASE_URL}/api/tools/export`, { headers: authHeaders() });
+      const r = await fetchAuth(`${API_BASE_URL}/api/tools/export`);
       if (!r.ok) {
         const text = await r.text();
         alert(`Errore export: ${r.status} — ${text}`);
