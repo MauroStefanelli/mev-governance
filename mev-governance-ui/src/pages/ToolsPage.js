@@ -141,6 +141,25 @@ const deleteVerbale = async (id) => {
   return res.json();
 };
 
+// Associa un nome Subco a una lista di righe OrdineConsegna con subappalto=SI
+// items: [{ id, nomeSocieta }]
+const setSubco = async (items) => {
+  const res = await fetchAuth(`${API_BASE_URL}/api/tools/ordini/set-subco`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(items),
+  });
+  if (!res.ok) throw new Error("Errore aggiornamento subappalto");
+  return res.json();
+};
+
+// Carica la lista società RTI (per il selettore Subco)
+const getRtiSocietaLocal = async () => {
+  const res = await fetchAuth(`${API_BASE_URL}/api/rti-societa`);
+  if (!res.ok) throw new Error("Errore caricamento RTI");
+  return res.json();
+};
+
 // ============================================================
 // ERROR PARSING
 // ============================================================
@@ -233,6 +252,12 @@ export default function ToolsPage({ onUnauthorized }) {
   const [governanceBlob, setGovernanceBlob] = useState(null);
   const [exportingGovernance, setExportingGovernance] = useState(false);
   const [showDebugTools, setShowDebugTools] = useState(false);
+
+  // Modale associazione Subco (dopo caricamento verbale con righe SI)
+  const [subcoModal, setSubcoModal] = useState(null);
+  // subcoModal = { righe: [{id, oda, pos, descrizione, qta, importo}], scelte: {id: nomeSocieta} }
+  const [subcoList, setSubcoList] = useState([]); // lista nomi SUBCO da RTI
+  const [savingSubco, setSavingSubco] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -377,6 +402,24 @@ export default function ToolsPage({ onUnauthorized }) {
         text: `✔ "${res.nomePdf}" — ${res.meseAvanzamento} — ${res.righeAggiornate} righe aggiornate su ${res.righeElaborate} elaborate`,
       });
       await load();
+      // Se ci sono righe con subappalto=SI, apri il modale di associazione Subco
+      if (res.subappaltiSI && res.subappaltiSI.length > 0) {
+        // Carica la lista Subco da RTI se non già disponibile
+        let soci = subcoList;
+        if (soci.length === 0) {
+          try {
+            const rti = await getRtiSocietaLocal();
+            soci = rti
+              .filter(r => r.ruolo === "SUBCO")
+              .map(r => r.societa)
+              .filter(Boolean);
+            setSubcoList(soci);
+          } catch { /* ignora, il selettore sarà comunque editabile */ }
+        }
+        const scelte = {};
+        res.subappaltiSI.forEach(r => { scelte[r.id] = soci[0] || ""; });
+        setSubcoModal({ righe: res.subappaltiSI, scelte });
+      }
     } catch (e) {
       setVapMsg({ type: "err", text: `Errore: ${parseApiError(e.message)}` });
     } finally {
@@ -395,6 +438,26 @@ export default function ToolsPage({ onUnauthorized }) {
       alert(`Errore eliminazione verbale: ${e.message}`);
     } finally {
       setDeletingVerbale(null);
+    }
+  };
+
+  // Salva le associazioni Subco scelte nel modale
+  const handleSalvaSubco = async () => {
+    if (!subcoModal) return;
+    setSavingSubco(true);
+    try {
+      const items = Object.entries(subcoModal.scelte)
+        .filter(([, nome]) => nome && nome.trim())
+        .map(([id, nomeSocieta]) => ({ id: Number(id), nomeSocieta }));
+      if (items.length > 0) {
+        await setSubco(items);
+        await load();
+      }
+      setSubcoModal(null);
+    } catch (e) {
+      alert(`Errore salvataggio Subco: ${e.message}`);
+    } finally {
+      setSavingSubco(false);
     }
   };
 
@@ -1341,10 +1404,18 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     {r.subappalto ? (
                       <span style={{
-                        background: r.subappalto === "SI" ? "#fef3c7" : "#f0fdf4",
-                        color: r.subappalto === "SI" ? "#92400e" : "#166534",
+                        background: r.subappalto === "SI" ? "#fef3c7"
+                                  : r.subappalto === "NO" ? "#f0fdf4"
+                                  : "#eff6ff",
+                        color:      r.subappalto === "SI" ? "#92400e"
+                                  : r.subappalto === "NO" ? "#166534"
+                                  : "#1a73e8",
                         padding: "2px 8px", borderRadius: "10px", fontWeight: 600, fontSize: "11px",
-                      }}>{r.subappalto}</span>
+                        display: "inline-block", maxWidth: "160px",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}
+                      title={r.subappalto}
+                      >{r.subappalto}</span>
                     ) : "—"}
                   </td>
                 </tr>
@@ -1547,6 +1618,115 @@ export default function ToolsPage({ onUnauthorized }) {
                   fontSize: "13px", fontWeight: 600,
                 }}
               >Elimina</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modale associazione Subco ── */}
+      {subcoModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: "14px", padding: "28px 32px",
+            maxWidth: "680px", width: "92%", maxHeight: "80vh", overflowY: "auto",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          }}>
+            {/* Header */}
+            <div style={{ marginBottom: "18px" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>
+                Associa Subappaltatore
+              </div>
+              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
+                Le righe seguenti hanno <strong>Subappalto = SI</strong>. Scegli a quale società
+                subappaltatrice associare ciascuna riga.
+              </div>
+            </div>
+
+            {/* Tabella righe SI */}
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", marginBottom: "20px" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>ODA</th>
+                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>Pos.</th>
+                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>Descrizione</th>
+                  <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "#64748b" }}>Q.tà</th>
+                  <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "#64748b" }}>Importo</th>
+                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#1a73e8" }}>Subco</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subcoModal.righe.map((r, idx) => (
+                  <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "8px 10px", fontWeight: 600 }}>{r.oda}</td>
+                    <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.pos || "—"}</td>
+                    <td style={{ padding: "8px 10px", color: "#0f172a", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      title={r.descrizione}>{r.descrizione || "—"}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "#0f766e" }}>{r.qta || "—"}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "#0f766e" }}>{r.importo ? `€ ${fmt(r.importo)}` : "—"}</td>
+                    <td style={{ padding: "8px 6px" }}>
+                      {subcoList.length > 0 ? (
+                        <select
+                          value={subcoModal.scelte[r.id] || ""}
+                          onChange={e => setSubcoModal(prev => ({
+                            ...prev,
+                            scelte: { ...prev.scelte, [r.id]: e.target.value },
+                          }))}
+                          style={{
+                            fontSize: "12px", padding: "4px 8px", borderRadius: "6px",
+                            border: "1px solid #bfdbfe", background: "#eff6ff",
+                            color: "#1a73e8", fontWeight: 600, cursor: "pointer", width: "100%",
+                          }}
+                        >
+                          <option value="">— scegli —</option>
+                          {subcoList.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={subcoModal.scelte[r.id] || ""}
+                          onChange={e => setSubcoModal(prev => ({
+                            ...prev,
+                            scelte: { ...prev.scelte, [r.id]: e.target.value },
+                          }))}
+                          placeholder="Nome Subco..."
+                          style={{
+                            fontSize: "12px", padding: "4px 8px", borderRadius: "6px",
+                            border: "1px solid #d1d5db", width: "100%",
+                          }}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Footer pulsanti */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                onClick={() => setSubcoModal(null)}
+                disabled={savingSubco}
+                style={{
+                  padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0",
+                  background: "#f8fafc", color: "#64748b", fontSize: "13px", fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >Salta</button>
+              <button
+                onClick={handleSalvaSubco}
+                disabled={savingSubco || Object.values(subcoModal.scelte).every(v => !v)}
+                style={{
+                  padding: "9px 24px", borderRadius: "8px", border: "none",
+                  background: savingSubco ? "#93c5fd" : "#1a73e8",
+                  color: "#fff", fontSize: "13px", fontWeight: 700,
+                  cursor: savingSubco ? "default" : "pointer",
+                }}
+              >{savingSubco ? "Salvataggio..." : "Conferma associazione"}</button>
             </div>
           </div>
         </div>

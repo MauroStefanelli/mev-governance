@@ -276,19 +276,79 @@ public class OrdineConsegnaController : BaseController
             });
             await _db.SaveChangesAsync();
 
+            // ── Raccogli le righe con subappalto = "SI" per il frontend ──────────
+            // Per ogni (oda, pos) con SI, recupera l'id del record OrdineConsegna aggiornato
+            var subappaltiSI = new List<object>();
+            foreach (var (oda, pos, qta, importo, subappalto) in righe)
+            {
+                if (!string.Equals(subappalto, "SI", StringComparison.OrdinalIgnoreCase)) continue;
+                List<OrdineConsegnaItem> matching;
+                if (string.IsNullOrEmpty(pos))
+                {
+                    matching = _db.OrdiniConsegna
+                        .Where(r => r.NumeroOrdine == oda && r.AmbienteId == ambienteId)
+                        .ToList();
+                }
+                else
+                {
+                    int posInt = int.TryParse(pos, out var p2) ? p2 : -1;
+                    matching = _db.OrdiniConsegna
+                        .Where(r => r.NumeroOrdine == oda && r.AmbienteId == ambienteId)
+                        .ToList()
+                        .Where(r => int.TryParse(r.Art, out var a) && a == posInt)
+                        .ToList();
+                }
+                foreach (var rec in matching)
+                    subappaltiSI.Add(new { id = rec.Id, oda, pos, qta, importo, descrizione = rec.Descrizione });
+            }
+
             return Ok(new
             {
                 message          = $"Verbale elaborato: {aggiornati} righe aggiornate",
                 meseAvanzamento,
                 righeElaborate   = righe.Count,
                 righeAggiornate  = aggiornati,
-                nomePdf          = file.FileName
+                nomePdf          = file.FileName,
+                subappaltiSI     // lista righe con subappalto=SI da assegnare al Subco
             });
         }
         catch (Exception ex)
         {
             return Problem($"Errore durante l'elaborazione del verbale: {ex.Message}");
         }
+    }
+
+    // ============================================================
+    // PATCH /api/tools/ordini/set-subco  — associa un nome Subco a una o più righe
+    // Body: [{ id: int, nomeSocietà: string }, ...]
+    // ============================================================
+    [HttpPatch("ordini/set-subco")]
+    public async Task<IActionResult> SetSubco([FromBody] List<SetSubcoItem> items)
+    {
+        if (items == null || items.Count == 0)
+            return BadRequest("Nessun elemento fornito");
+
+        var ambienteId = GetAmbienteId();
+        var ids = items.Select(i => i.Id).ToList();
+        var records = _db.OrdiniConsegna
+            .Where(r => ids.Contains(r.Id) && r.AmbienteId == ambienteId)
+            .ToList();
+
+        foreach (var item in items)
+        {
+            var rec = records.FirstOrDefault(r => r.Id == item.Id);
+            if (rec == null) continue;
+            rec.Subappalto = item.NomeSocieta ?? "SI";
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { aggiornati = records.Count });
+    }
+
+    public class SetSubcoItem
+    {
+        public int Id { get; set; }
+        public string? NomeSocieta { get; set; }
     }
 
     // ============================================================
