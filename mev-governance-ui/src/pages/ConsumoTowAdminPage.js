@@ -1205,6 +1205,18 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     setDragOver(null);
   };
 
+  // ── Larghezze colonne calcolate qui così RigheSection può allinearsi ──
+  const _visFields      = FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo"));
+  const _hasImpatto     = Object.keys(towImpatto).length > 0;
+  const _visFields_A    = _visFields.filter(f => f.key === "valoreUnitario");
+  const _visFields_B    = _visFields.filter(f => f.key !== "valoreUnitario");
+  const _contractCols   = [32, 180, 100, 65,
+    ..._visFields_A.map(() => 125),
+    ...(_hasImpatto ? [90] : []),
+    ..._visFields_B.map(f => f.group === "euro" ? 125 : 85),
+  ];
+  const _contractTotalW = _contractCols.reduce((s, w) => s + w, 0);
+
   return (
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
@@ -1687,7 +1699,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         mevRows={mevRows}
         righeInit={rtiRighe}
         righeLoading={rtiLoading}
-        hasImpatto={Object.keys(towImpatto).length > 0}
+        hasImpatto={_hasImpatto}
+        contractTotalW={_contractTotalW}
         onRigheChange={setRtiRighe}
       />
 
@@ -1776,7 +1789,7 @@ function ContrattiSection({ rows }) {
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, hasImpatto = false, onRigheChange }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, onRigheChange }) {
   // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -2045,6 +2058,17 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   // Importo % anteprima nel form
   const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
 
+  // ── Calcolo larghezze colonne RTI (fuori dal return per pulizia) ──────────
+  const COL_AZIONI = 64;
+  const COL_EURO   = 125;
+  const N_EURO     = 5;
+  const rtiW       = contractTotalW > 0 ? contractTotalW : (32 + 88 + 90 + 170 + 60 + 62 + N_EURO * COL_EURO + COL_AZIONI);
+  const infoTot    = rtiW - N_EURO * COL_EURO - COL_AZIONI;
+  // fisso: ID(32) + Ruolo(90) + DataI(60) + DataA(62) = 244
+  const colFlex    = infoTot - 244;
+  const colContr   = Math.round(colFlex * 0.30);
+  const colSoc     = colFlex - colContr;
+
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
       {/* Header */}
@@ -2165,26 +2189,24 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
         </div>
       )}
 
-           {/* info cols: si adattano al colgroup CONTRATTO sopra.
-               Se hasImpatto=true: 32+118+90+230+60+62=592px (≡ 377+125+90 di CONTRATTO)
-               Se hasImpatto=false: 32+88+90+170+60+62=502px (≡ 377+125 di CONTRATTO)
-               poi ValTotale/Approvato/Ordinato/Impegnato/Residuo 125px ciascuna
-               poi Azioni 64px extra */}
+      {/* Tabella RTI & SUBCO — larghezza identica a contractTotalW per allineamento colonne numeriche.
+          Le 5 colonne euro (125px each) e Azioni (64px) sono fisse.
+          Il resto (info-cols) occupa lo spazio residuo distribuito su 6 colonne. */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+        <table style={{ width: `${rtiW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "32px"  }} />{/* ID */}
-            <col style={{ width: hasImpatto ? "118px" : "88px"  }} />{/* Contratto */}
-            <col style={{ width: "90px"  }} />{/* Ruolo */}
-            <col style={{ width: hasImpatto ? "230px" : "170px" }} />{/* Società (+% inline) */}
-            <col style={{ width: "60px"  }} />{/* Data Inizio */}
-            <col style={{ width: "62px"  }} />{/* Data Approv. */}
-            <col style={{ width: "125px" }} />{/* Valore Totale */}
-            <col style={{ width: "125px" }} />{/* Approvato */}
-            <col style={{ width: "125px" }} />{/* Ordinato */}
-            <col style={{ width: "125px" }} />{/* Impegnato */}
-            <col style={{ width: "125px" }} />{/* Residuo */}
-            <col style={{ width: "64px"  }} />{/* Azioni */}
+            <col style={{ width: "32px"     }} />{/* ID */}
+            <col style={{ width: `${colContr}px` }} />{/* Contratto */}
+            <col style={{ width: "90px"     }} />{/* Ruolo */}
+            <col style={{ width: `${colSoc}px`  }} />{/* Società */}
+            <col style={{ width: "60px"     }} />{/* Data Inizio */}
+            <col style={{ width: "62px"     }} />{/* Data Approv. */}
+            <col style={{ width: "125px"    }} />{/* Valore Totale */}
+            <col style={{ width: "125px"    }} />{/* Approvato */}
+            <col style={{ width: "125px"    }} />{/* Ordinato */}
+            <col style={{ width: "125px"    }} />{/* Impegnato */}
+            <col style={{ width: "125px"    }} />{/* Residuo */}
+            <col style={{ width: "64px"     }} />{/* Azioni */}
           </colgroup>
           <thead>
             <tr>
