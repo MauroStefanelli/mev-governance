@@ -1576,18 +1576,18 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                     const tdTot = (f) => {
                       const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                       return (
-                        <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
+                        <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#1a3a6b" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(0.85)" : "none" }}>
                           {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
                         </td>
                       );
                     };
                     return (
-                       <tr style={{ background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)", borderTop: "2px solid #1e293b" }}>
+                       <tr style={{ background: "#e8f0fe", borderTop: "2px solid #c5d8fb" }}>
                          <td />
                          <td style={{ padding: "14px 12px" }}>
                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                             <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
-                             <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{contratti.length} contratti · {allRows.length} TOW</span>
+                             <span style={{ fontSize: "12px", fontWeight: 800, color: "#1a3a6b", textTransform: "uppercase", letterSpacing: "0.8px" }}>Totale Contratti</span>
+                             <span style={{ fontSize: "11px", color: "#5a7ab5" }}>{contratti.length} contratti · {allRows.length} TOW</span>
                            </div>
                          </td>
                          <td />
@@ -1731,13 +1731,17 @@ const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localS
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
 function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, onRigheChange }) {
-  // Calcola valoreTotale per contratto dai dati TOW reali
+  // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
     (rows || []).forEach(r => {
       const k = r.towContratto || "";
-      if (!map[k]) map[k] = 0;
-      map[k] += Number(r.valoreTotale) || 0;
+      if (!map[k]) map[k] = { valoreTotale: 0, approvato: 0, ordinatiRda: 0, impegnato: 0, residuo: 0 };
+      map[k].valoreTotale += Number(r.valoreTotale)  || 0;
+      map[k].approvato    += Number(r.approvato)     || 0;
+      map[k].ordinatiRda  += Number(r.ordinatiRda)   || 0;
+      map[k].impegnato    += Number(r.impegnato)     || 0;
+      map[k].residuo      += Number(r.residuo)       || 0;
     });
     return map;
   }, [rows]);
@@ -1803,7 +1807,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   const cancel = () => { setShowForm(false); setErr(""); };
 
   const calcImporto = (contratto, percStr) => {
-    const vt = valoriContratto[contratto] || 0;
+    const vt = (valoriContratto[contratto] || {}).valoreTotale || 0;
     const perc = parseNum(percStr) / 100;
     return vt * perc;
   };
@@ -1875,12 +1879,26 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   // Righe filtrate per contratto selezionato
   const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
-  const totImporto = righeRti.reduce((s, r) => s + (Number(r.importo) || 0), 0);
-  const totConsumo = righeRti.reduce((s, r) => {
-              const consumatoMev = mevConsumatoMap[r.societa] || 0;
-    return s + (Number(r.consumato) || 0) + consumatoMev;
-  }, 0);
-  const totResiduo = totImporto - totConsumo;
+
+  // Helper: calcola i 5 valori per una riga RTI in base alla % e ai totali del contratto
+  const calcCampiRiga = (r) => {
+    const vc = valoriContratto[r.contratto] || {};
+    const perc = r.percentuale != null ? Number(r.percentuale) : null;
+    const apply = (v) => perc != null ? v * perc : null;
+    return {
+      valoreTotale: r.importo != null ? Number(r.importo) : apply(vc.valoreTotale || 0),
+      approvato:    apply(vc.approvato   || 0),
+      ordinatiRda:  apply(vc.ordinatiRda || 0),
+      impegnato:    apply(vc.impegnato   || 0),
+      residuo:      apply(vc.residuo     || 0),
+    };
+  };
+
+  const totVT       = righeRti.reduce((s, r) => s + (calcCampiRiga(r).valoreTotale || 0), 0);
+  const totApp      = righeRti.reduce((s, r) => s + (calcCampiRiga(r).approvato    || 0), 0);
+  const totOrd      = righeRti.reduce((s, r) => s + (calcCampiRiga(r).ordinatiRda  || 0), 0);
+  const totImp      = righeRti.reduce((s, r) => s + (calcCampiRiga(r).impegnato    || 0), 0);
+  const totRes      = righeRti.reduce((s, r) => s + (calcCampiRiga(r).residuo      || 0), 0);
 
   // Importo % anteprima nel form
   const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
@@ -1955,8 +1973,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                   value={form.percentuale}
                   onChange={e => {
                     const perc = e.target.value;
-                    // Pre-compila importo solo se non è stato inserito manualmente
-                    const vt = valoriContratto[form.contratto] || 0;
+                     // Pre-compila importo solo se non è stato inserito manualmente
+                     const vt = (valoriContratto[form.contratto] || {}).valoreTotale || 0;
                     const calcolato = vt > 0 ? parseNum(perc) / 100 * vt : null;
                     setForm(p => ({
                       ...p,
@@ -1990,9 +2008,9 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
           </div>
 
           {/* Info valore contratto */}
-          {form.contratto && valoriContratto[form.contratto] > 0 && (
+          {form.contratto && (valoriContratto[form.contratto] || {}).valoreTotale > 0 && (
             <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "8px 14px", marginBottom: "10px", fontSize: "12px", color: "#1a73e8" }}>
-              Valore Totale contratto <strong>{form.contratto}</strong>: <strong>{formatEuro(valoriContratto[form.contratto])}</strong>
+              Valore Totale contratto <strong>{form.contratto}</strong>: <strong>{formatEuro((valoriContratto[form.contratto] || {}).valoreTotale)}</strong>
             </div>
           )}
 
@@ -2017,25 +2035,26 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
               <th style={TH2("center")}>Data Inizio</th>
               <th style={TH2("center")}>Data Approv.</th>
               <th style={TH2("right")}>%</th>
-              <th style={TH2("right")}>Importo</th>
-              <th style={TH2("right")}>Consumato</th>
+              <th style={TH2("right")}>Valore Totale</th>
+              <th style={TH2("right")}>Approvato</th>
+              <th style={TH2("right")}>Ordinato</th>
+              <th style={TH2("right")}>Impegnato</th>
               <th style={TH2("right")}>Residuo</th>
-              <th style={TH2("center")}>Azioni</th>
+              <th style={{ ...TH2("center"), width: "64px", minWidth: "64px" }}>Azioni</th>
             </tr>
           </thead>
           <tbody>
             {righeLoading ? (
-              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={13} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>
             ) : righeVisibili.length === 0 ? (
-              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={13} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
-    const consumatoMev = mevConsumatoMap[r.societa] || 0;
-              const consumatoTot = (Number(r.consumato) || 0) + consumatoMev;
-              const residuo = (Number(r.importo) || 0) - consumatoTot;
+              const campi = calcCampiRiga(r);
+              const fmt = (v) => v != null ? formatEuro(v) : "—";
               return (
                 <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
@@ -2049,15 +2068,23 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}) + "%" : "—"}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{r.importo != null ? formatEuro(r.importo) : "—"}</td>
-                   <td style={{ ...TD2("right"), color: "#f59e0b", fontWeight: 600 }}>
-                    {consumatoTot > 0 ? formatEuro(consumatoTot) : "—"}
-                   </td>
-                  <td style={{ ...TD2("right"), fontWeight: 700, color: residuo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(residuo)}</td>
-                  <td style={TD2("center")}>
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                      <button onClick={() => openEdit(r)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #1a73e8", background: "#eff6ff", color: "#1a73e8", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Modifica</button>
-                      <button onClick={() => handleDelete(r.id)} style={{ padding: "3px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>Elimina</button>
+                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>
+                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>
+                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>
+                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>
+                  <td style={{ ...TD2("right"), fontWeight: 700, color: campi.residuo != null && campi.residuo >= 0 ? "#10b981" : "#dc2626" }}>{fmt(campi.residuo)}</td>
+                  <td style={{ ...TD2("center"), width: "64px" }}>
+                    <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+                      <button
+                        onClick={() => openEdit(r)}
+                        title="Modifica"
+                        style={{ width: "28px", height: "28px", borderRadius: "6px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1a73e8", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      >✏️</button>
+                      <button
+                        onClick={() => handleDelete(r.id)}
+                        title="Elimina"
+                        style={{ width: "28px", height: "28px", borderRadius: "6px", border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      >🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -2068,9 +2095,11 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
                 <td colSpan={7} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI (escluso SUBCO)</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totImporto)}</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totConsumo)}</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: totResiduo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totResiduo)}</td>
+                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>
+                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>
+                <td style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>
+                <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>
+                <td style={{ ...TD2("right"), fontWeight: 800, color: totRes >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totRes)}</td>
                 <td style={TD2("center")} />
               </tr>
             </tfoot>
