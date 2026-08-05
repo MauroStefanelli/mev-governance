@@ -747,6 +747,14 @@ export const bulkImportRtiSocieta = async (righe) => {
   return r.json();
 };
 
+// ── Ordini di Consegna ────────────────────────────────────────────────────────
+export const getOrdiniConsegna = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/tools/ordini`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore caricamento ordini');
+  return r.json();
+};
+
 // ── Reset MEV + ConsumoTow ────────────────────────────────────────────────────
 export const resetMevAndConsumoTow = async () => {
   const r = await fetchWithRefresh(`${API_BASE_URL}/api/mev/reset-all`, {
