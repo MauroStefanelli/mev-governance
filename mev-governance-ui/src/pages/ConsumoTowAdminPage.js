@@ -1571,6 +1571,16 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                 <tfoot>
                   {(() => {
                     const allRows = rows.filter(r => contratti.includes(r.towContratto));
+                    const fieldsA = visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key));
+                    const fieldsB = visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key));
+                    const tdTot = (f) => {
+                      const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                      return (
+                        <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
+                          {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
+                        </td>
+                      );
+                    };
                     return (
                        <tr style={{ background: "linear-gradient(90deg, #1e293b 0%, #334155 100%)", borderTop: "2px solid #1e293b" }}>
                          <td />
@@ -1582,18 +1592,12 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                          </td>
                          <td />
                          <td />
-                         {visibleFields.map(f => {
-                           const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                           return (
-                             <td key={f.key} style={{ padding: "14px 12px", textAlign: "right", fontSize: "14px", fontWeight: 800, color: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? "#fff" : f.color) : "transparent", filter: (TOTALE_KEYS.has(f.key) && f.key !== "valoreTotale") ? "brightness(1.4)" : "none" }}>
-                               {TOTALE_KEYS.has(f.key) ? formatEuro(tot) : ""}
-                             </td>
-                            );
-                          })}
-                          {hasImpatto && <td />}
-                        </tr>
-                     );
-                   })()}
+                         {fieldsA.map(tdTot)}
+                         {hasImpatto && <td />}
+                         {fieldsB.map(tdTot)}
+                       </tr>
+                    );
+                  })()}
                  </tfoot>
               </table>
             </div>
@@ -1738,23 +1742,21 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
     return map;
   }, [rows]);
 
-  // Calcola consumato da MEV per contratto+società (da capImporti e subcoImporti)
+  // Calcola consumato da MEV per società (somma tutti i contratti — da capImporti e subcoImporti)
   const mevConsumatoMap = React.useMemo(() => {
     const map = {};
-    const addToMap = (contratto, importiJson) => {
-      if (!contratto || !importiJson) return;
+    const addToMap = (importiJson) => {
+      if (!importiJson) return;
       try {
         const obj = JSON.parse(importiJson);
         Object.entries(obj).forEach(([societa, val]) => {
-          const key = `${contratto}|${societa}`;
-          map[key] = (map[key] || 0) + (Number(val) || 0);
+          map[societa] = (map[societa] || 0) + (Number(val) || 0);
         });
       } catch {}
     };
     (mevRows || []).forEach(r => {
-      const contratto = r.tipoContratto || "";
-      addToMap(contratto, r.capImporti);
-      addToMap(contratto, r.subcoImporti);
+      addToMap(r.capImporti);
+      addToMap(r.subcoImporti);
     });
     return map;
   }, [mevRows]);
@@ -1875,7 +1877,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
   const totImporto = righeRti.reduce((s, r) => s + (Number(r.importo) || 0), 0);
   const totConsumo = righeRti.reduce((s, r) => {
-    const consumatoMev = mevConsumatoMap[`${r.contratto}|${r.societa}`] || 0;
+              const consumatoMev = mevConsumatoMap[r.societa] || 0;
     return s + (Number(r.consumato) || 0) + consumatoMev;
   }, 0);
   const totResiduo = totImporto - totConsumo;
@@ -2031,7 +2033,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
-              const consumatoMev = mevConsumatoMap[`${r.contratto}|${r.societa}`] || 0;
+    const consumatoMev = mevConsumatoMap[r.societa] || 0;
               const consumatoTot = (Number(r.consumato) || 0) + consumatoMev;
               const residuo = (Number(r.importo) || 0) - consumatoTot;
               return (
@@ -2048,14 +2050,9 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}) + "%" : "—"}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{r.importo != null ? formatEuro(r.importo) : "—"}</td>
-                  <td style={{ ...TD2("right"), color: "#f59e0b", fontWeight: 600 }}>
+                   <td style={{ ...TD2("right"), color: "#f59e0b", fontWeight: 600 }}>
                     {consumatoTot > 0 ? formatEuro(consumatoTot) : "—"}
-                    {consumatoMev > 0 && (
-                      <div style={{ fontSize: "10px", color: "#7c3aed", fontWeight: 400 }}>
-                        MEV: {formatEuro(consumatoMev)}
-                      </div>
-                    )}
-                  </td>
+                   </td>
                   <td style={{ ...TD2("right"), fontWeight: 700, color: residuo >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(residuo)}</td>
                   <td style={TD2("center")}>
                     <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
