@@ -1701,6 +1701,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         righeLoading={rtiLoading}
         hasImpatto={_hasImpatto}
         contractTotalW={_contractTotalW}
+        contractCols={_contractCols}
+        contractVisFields={_visFields}
         onRigheChange={setRtiRighe}
       />
 
@@ -1789,7 +1791,7 @@ function ContrattiSection({ rows }) {
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, onRigheChange }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, contractCols = [], contractVisFields = [], onRigheChange }) {
   // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -2058,16 +2060,84 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   // Importo % anteprima nel form
   const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
 
-  // ── Calcolo larghezze colonne RTI (fuori dal return per pulizia) ──────────
+  // ── Calcolo larghezze colonne RTI allineate alla tabella CONTRATTO ──────────
+  // La tabella CONTRATTO ha colgroup:
+  //   [32, 180, 100, 65, 125(valUnit), 90?(impatto), ...visFields_B(euro=125,qta=85)]
+  // I field keys nell'ordine visFields_B sono: valoreTotale, approvato, towApprovati,
+  //   ordinatiRda, towResidui, impegnato, residuo (+ eventuali collaudo*)
+  // Dobbiamo trovare l'offset cumulativo di ciascuna delle 5 colonne euro target
+  // e costruire il colgroup RTI con colonne info + 5 euro + azioni che combaciino.
+
+  const RTI_EURO_KEYS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
+
+  // Ricostruisce l'array ordinato { key, width } dal contractCols + contractVisFields
+  // contractCols = [32,180,100,65, ...fieldsA×125, ...(impatto?90), ...fieldsB×(125|85)]
+  // contractVisFields = FIELDS filtrati per showCollaudo
+  const contractColDefs = React.useMemo(() => {
+    if (!contractCols.length || !contractVisFields.length) return [];
+    const fieldsA = contractVisFields.filter(f => f.key === "valoreUnitario");
+    const fieldsB = contractVisFields.filter(f => f.key !== "valoreUnitario");
+    const defs = [
+      { key: "__arrow__",    width: contractCols[0] || 32  },
+      { key: "__contratto__",width: contractCols[1] || 180 },
+      { key: "__tow__",      width: contractCols[2] || 100 },
+      { key: "__qta__",      width: contractCols[3] || 65  },
+      ...fieldsA.map((f, i) => ({ key: f.key, width: contractCols[4 + i] || 125 })),
+      ...(hasImpatto ? [{ key: "__impatto__", width: 90 }] : []),
+      ...fieldsB.map((f, i) => {
+        const base = 4 + fieldsA.length + (hasImpatto ? 1 : 0);
+        return { key: f.key, width: contractCols[base + i] || (f.group === "euro" ? 125 : 85) };
+      }),
+    ];
+    return defs;
+  }, [contractCols, contractVisFields, hasImpatto]);
+
+  // Offset cumulativi delle 5 colonne euro nella tabella CONTRATTO
+  const euroOffsets = React.useMemo(() => {
+    const result = {};
+    let cum = 0;
+    for (const def of contractColDefs) {
+      if (RTI_EURO_KEYS.includes(def.key)) result[def.key] = cum;
+      cum += def.width;
+    }
+    return result; // { valoreTotale: px, approvato: px, ... }
+  }, [contractColDefs]); // eslint-disable-line
+
+  // Costruisce il colgroup RTI:
+  //   - colonne info: una sola colonna larga sum(col[0..firstEuroIdx-1])
+  //     oppure, se non abbiamo i dati CONTRATTO, fallback fisso
+  //   - 5 colonne euro: ognuna larga come nella tabella CONTRATTO
+  //   - colonna Azioni: 64px
+  // Per avere i 6 campi info (ID, Contratto, Ruolo, Società, DataI, DataA)
+  // distribuiamo lo spazio info in colonne fisse note.
   const COL_AZIONI = 64;
-  const COL_EURO   = 125;
-  const N_EURO     = 5;
-  const rtiW       = contractTotalW > 0 ? contractTotalW : (32 + 88 + 90 + 170 + 60 + 62 + N_EURO * COL_EURO + COL_AZIONI);
-  const infoTot    = rtiW - N_EURO * COL_EURO - COL_AZIONI;
-  // fisso: ID(32) + Ruolo(90) + DataI(60) + DataA(62) = 244
-  const colFlex    = infoTot - 244;
-  const colContr   = Math.round(colFlex * 0.30);
-  const colSoc     = colFlex - colContr;
+  const firstEuroOffset = euroOffsets["valoreTotale"] ?? 0;
+  const totalEuroWidth  = (euroOffsets["residuo"] ?? 0) + 125; // offset residuo + sua larghezza
+  const rtiW = contractTotalW > 0
+    ? contractTotalW + COL_AZIONI  // tabella RTI = tabella CONTRATTO + colonna Azioni
+    : (32 + 88 + 90 + 170 + 60 + 62 + 5 * 125 + COL_AZIONI);
+
+  // Larghezza totale delle 6 colonne info RTI = offset della prima colonna euro
+  const infoTotalW = firstEuroOffset > 0
+    ? firstEuroOffset
+    : (rtiW - 5 * 125 - COL_AZIONI);
+
+  // Distribuiamo infoTotalW sulle 6 colonne info: ID(32) Ruolo(90) DataI(60) DataA(62) fissi,
+  // il resto tra Contratto e Società (30/70)
+  const COL_ID    = 32;
+  const COL_RUOLO = 90;
+  const COL_DATAI = 60;
+  const COL_DATAA = 62;
+  const colFlex   = infoTotalW - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA;
+  const colContr  = Math.max(80, Math.round(colFlex * 0.30));
+  const colSoc    = Math.max(80, colFlex - colContr);
+
+  // Larghezze delle 5 colonne euro dalla tabella CONTRATTO (o 125px default)
+  const euroWidths = RTI_EURO_KEYS.map(k => {
+    if (!contractColDefs.length) return 125;
+    const def = contractColDefs.find(d => d.key === k);
+    return def ? def.width : 125;
+  });
 
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
@@ -2195,18 +2265,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: `${rtiW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "32px"     }} />{/* ID */}
-            <col style={{ width: `${colContr}px` }} />{/* Contratto */}
-            <col style={{ width: "90px"     }} />{/* Ruolo */}
-            <col style={{ width: `${colSoc}px`  }} />{/* Società */}
-            <col style={{ width: "60px"     }} />{/* Data Inizio */}
-            <col style={{ width: "62px"     }} />{/* Data Approv. */}
-            <col style={{ width: "125px"    }} />{/* Valore Totale */}
-            <col style={{ width: "125px"    }} />{/* Approvato */}
-            <col style={{ width: "125px"    }} />{/* Ordinato */}
-            <col style={{ width: "125px"    }} />{/* Impegnato */}
-            <col style={{ width: "125px"    }} />{/* Residuo */}
-            <col style={{ width: "64px"     }} />{/* Azioni */}
+            <col style={{ width: `${COL_ID}px`    }} />{/* ID */}
+            <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
+            <col style={{ width: `${COL_RUOLO}px` }} />{/* Ruolo */}
+            <col style={{ width: `${colSoc}px`    }} />{/* Società */}
+            <col style={{ width: `${COL_DATAI}px` }} />{/* Data Inizio */}
+            <col style={{ width: `${COL_DATAA}px` }} />{/* Data Approv. */}
+            {euroWidths.map((w, i) => <col key={i} style={{ width: `${w}px` }} />)}{/* 5 euro */}
+            <col style={{ width: `${COL_AZIONI}px` }} />{/* Azioni */}
           </colgroup>
           <thead>
             <tr>
