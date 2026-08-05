@@ -1927,10 +1927,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
 
    // ── Mappa MEV per società: aggrega importi per stato ────────────────────────
    // Logica di attribuzione per ogni MEV:
-   //   1. capgemini = "x" (legacy) → tutto l'importo va a "Capgemini Italia S.p.A."
-   //   2. capgemini = array JSON  → legge capImporti se disponibile; altrimenti divide
-   //      proporzionalmente tra le società dell'array
-   //   Stesso criterio per subco / subcoImporti.
+   //   CAP (capgemini field):
+   //     "x" (legacy) → tutto l'importo va a "Capgemini Italia S.p.A."
+   //     array JSON   → legge capImporti se disponibile; altrimenti divide proporzionalmente
+   //   SUBCO (subco field):
+   //     SOLO se subcoImporti è valorizzato (quota esplicita); altrimenti ignorato
+   //     (quando subcoImporti è null la quota subco è inclusa nell'importo CAP)
+   //     Se subcoImporti è valorizzato, la quota subco viene sottratta dalla quota CAP
+   //     per evitare doppio conteggio.
    // Struttura risultante: { "NomeSocietà": { approvato, ordinato, impegnato } }
    const mevImportiPerSocieta = React.useMemo(() => {
      const CAP_MANDATARIA = "Capgemini Italia S.p.A.";
@@ -1944,25 +1948,19 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
        try { return JSON.parse(raw); } catch { return null; }
      };
 
-     // Aggiunge i valori per una singola MEV a una mappa {soc: importo}
-     // Ritorna la mappa { soc: quota } pronta per essere accumulata
-     const allocate = (capField, importiField, totalImporto) => {
-       // Caso 1: campo legacy "x" → tutto a Capgemini
+     // Alloca importoEx tra le società indicate dal campo capField/importiField.
+     // Ritorna { soc: quota } o null.
+     const allocateCap = (capField, importiField, totalImporto) => {
        if (!capField || capField === "x") {
          return totalImporto > 0 ? { [CAP_MANDATARIA]: totalImporto } : null;
        }
-       // Caso 2: array JSON di nomi società
        const soci = parseJSON(capField);
        if (!Array.isArray(soci) || soci.length === 0) return null;
        if (soci.length === 1) {
          return totalImporto > 0 ? { [soci[0]]: totalImporto } : null;
        }
-       // Più società: usa capImporti se disponibile, altrimenti divisione proporzionale
        const importiObj = parseJSON(importiField);
-       if (importiObj && Object.keys(importiObj).length > 0) {
-         return importiObj; // { "Capgemini": 69225, "IET": 38000, ... }
-       }
-       // Divisione proporzionale
+       if (importiObj && Object.keys(importiObj).length > 0) return importiObj;
        const quota = totalImporto / soci.length;
        return Object.fromEntries(soci.map(s => [s, quota]));
      };
@@ -1974,29 +1972,38 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
        const ordBdo    = Number(r.ordinatoBdo)  || 0;
        const fatturato = Number(r.fatturato)    || 0;
 
-       // ── CAP (Mandataria / Mandanti) ──────────────────────────────────────────
-       const capAlloc = allocate(r.capgemini, r.capImporti, importoEx);
-       if (capAlloc) {
-         Object.entries(capAlloc).forEach(([soc, v]) => {
-           v = Number(v) || 0;
-           ensure(soc);
-           if (stato === "Approvato")          map[soc].approvato += v;
-           if (ordBdo > 0 && importoEx > 0)   map[soc].ordinato  += v * (ordBdo    / importoEx);
-           if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
+       // ── CAP allocation ───────────────────────────────────────────────────────
+       const capAlloc = allocateCap(r.capgemini, r.capImporti, importoEx);
+       if (!capAlloc) return; // nessuna società CAP → skip
+
+       // ── SUBCO: solo se subcoImporti è esplicitamente valorizzato ────────────
+       const subcoImportiObj = parseJSON(r.subcoImporti);
+       const hasSubcoQuota   = subcoImportiObj && Object.keys(subcoImportiObj).length > 0;
+
+       // Mappa finale per questa MEV: parte da capAlloc
+       const finalAlloc = { ...capAlloc };
+
+       if (hasSubcoQuota) {
+         // Aggiungi quote subco
+         Object.entries(subcoImportiObj).forEach(([soc, v]) => {
+           finalAlloc[soc] = (finalAlloc[soc] || 0) + Number(v);
          });
+         // Sottrai la quota subco totale da CAP per non contare doppio
+         const subcoTot = Object.values(subcoImportiObj).reduce((s, v) => s + Number(v), 0);
+         if (finalAlloc[CAP_MANDATARIA] != null) {
+           finalAlloc[CAP_MANDATARIA] = Math.max(0, finalAlloc[CAP_MANDATARIA] - subcoTot);
+         }
        }
 
-       // ── SUBCO ────────────────────────────────────────────────────────────────
-       const subcoAlloc = allocate(r.subco, r.subcoImporti, importoEx);
-       if (subcoAlloc) {
-         Object.entries(subcoAlloc).forEach(([soc, v]) => {
-           v = Number(v) || 0;
-           ensure(soc);
-           if (stato === "Approvato")          map[soc].approvato += v;
-           if (ordBdo > 0 && importoEx > 0)   map[soc].ordinato  += v * (ordBdo    / importoEx);
-           if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
-         });
-       }
+       // ── Accumula nella mappa globale ─────────────────────────────────────────
+       Object.entries(finalAlloc).forEach(([soc, v]) => {
+         v = Number(v) || 0;
+         if (v <= 0) return;
+         ensure(soc);
+         if (stato === "Approvato")           map[soc].approvato += v;
+         if (ordBdo > 0 && importoEx > 0)    map[soc].ordinato  += v * (ordBdo    / importoEx);
+         if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
+       });
      });
      return map;
    }, [mevRows]);
