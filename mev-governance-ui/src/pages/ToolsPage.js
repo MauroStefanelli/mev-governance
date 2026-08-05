@@ -4,7 +4,7 @@ import JSZip from "jszip";
 import { fmtItIT, fmtEuroIt } from "../utils";
 import { tryRefreshToken } from "../services/mevService";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("jwt") || ""}`,

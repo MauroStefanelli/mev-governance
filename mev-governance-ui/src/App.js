@@ -12,6 +12,8 @@ import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken } from "./services/mevService";
 
+const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
+
 function App() {
   // ── Stato autenticazione ─────────────────────────────────────────────────────
   // Inizializzato a "" — viene popolato dopo la verifica del token al mount
@@ -94,7 +96,7 @@ function App() {
       } else if (savedRefresh) {
         // JWT scaduto ma refresh disponibile: prova a rinnovare
         try {
-          const res = await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/refresh`, {
+          const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ refreshToken: savedRefresh, currentToken: savedJwt || null }),
@@ -143,7 +145,7 @@ function App() {
       getAppSettings().then(s => {
         if (s.logoutMinutes > 0) setIdleTimeoutMs(s.logoutMinutes * 60 * 1000);
       }).catch(() => {});
-      fetch(`${process.env.REACT_APP_API_URL || ""}/api/tools/parser-warmup`, {
+      fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
         headers: { Authorization: `Bearer ${token}` }
       }).catch(() => {});
     }
@@ -210,7 +212,7 @@ function App() {
   const handleUnauthorized = useCallback(async () => {
     await new Promise(r => setTimeout(r, 4000));
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` }
       });
       if (res.status === 401) {
@@ -224,7 +226,7 @@ function App() {
     const tok = localStorage.getItem("jwt");
     if (tok) {
       try {
-        await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/logout`, {
+        await fetch(`${API_BASE_URL}/api/auth/logout`, {
           method: "POST",
           headers: { Authorization: `Bearer ${tok}` },
           keepalive: true,
