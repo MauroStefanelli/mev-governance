@@ -1961,31 +1961,33 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
     return map;
   }, [mevRows]);
 
-  // Helper: restituisce i 5 valori per una riga RTI dai dati MEV reali.
-  // Fallback su % × ConsumoTow solo se la società non ha dati MEV.
+  // Helper: restituisce i 5 valori per una riga RTI.
+  // - Valore Totale: sempre dall'importo manuale della riga RTI (inserito in fase di configurazione)
+  // - Approvato/Ordinato/Impegnato: dai capImporti/subcoImporti delle MEV-CAP se disponibili,
+  //   altrimenti fallback su % × totali ConsumoTow (finché le MEV non vengono compilate)
+  // - Residuo: Valore Totale − Approvato
   const calcCampiRiga = (r) => {
+    const vt = r.importo != null ? Number(r.importo) : null;
+
+    // Dati da MEV-CAP
     const mev = mevImportiPerSocieta[r.societa];
-    if (mev && mev.totale > 0) {
-      const residuo = mev.approvato - mev.ordinato;
-      return {
-        valoreTotale: mev.totale,
-        approvato:    mev.approvato,
-        ordinatiRda:  mev.ordinato,
-        impegnato:    mev.impegnato > 0 ? mev.impegnato : null,
-        residuo,
-      };
+    if (mev && mev.approvato > 0) {
+      const approvato = mev.approvato;
+      const ordinato  = mev.ordinato;
+      const impegnato = mev.impegnato > 0 ? mev.impegnato : null;
+      const residuo   = vt != null ? vt - approvato : approvato - ordinato;
+      return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
     }
-    // Fallback: % × totali ConsumoTow (usato finché la società non ha MEV assegnate)
+
+    // Fallback: % × totali ConsumoTow
     const vc   = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
-    return {
-      valoreTotale: r.importo != null ? Number(r.importo) : apply(vc.valoreTotale || 0),
-      approvato:    apply(vc.approvato   || 0),
-      ordinatiRda:  apply(vc.ordinatiRda || 0),
-      impegnato:    apply(vc.impegnato   || 0),
-      residuo:      apply(vc.residuo     || 0),
-    };
+    const approvato = apply(vc.approvato   || 0);
+    const ordinato  = apply(vc.ordinatiRda || 0);
+    const impegnato = apply(vc.impegnato   || 0);
+    const residuo   = vt != null && approvato != null ? vt - approvato : apply(vc.residuo || 0);
+    return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
   };
 
   const totVT       = righeRti.reduce((s, r) => s + (calcCampiRiga(r).valoreTotale || 0), 0);
