@@ -1880,21 +1880,15 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
   const righeVisibili = filterContratto ? righe.filter(r => r.contratto === filterContratto) : righe;
   const righeRti = righeVisibili.filter(r => r.ruolo !== "SUBCO");
 
-  // Helper: calcola i 5 valori per una riga RTI
-  // - valoreTotale: somma degli importi assegnati a questa società nelle MEV-CAP (capImporti + subcoImporti)
-  //   Se non ci sono dati MEV, fallback su importo manuale o calcolo da %
-  // - approvato/ordinatiRda/impegnato/residuo: applicano la % ai totali del contratto
+  // Helper: calcola i 5 valori per una riga RTI in base alla % e ai totali del contratto
+  // - valoreTotale: importo manuale se presente, altrimenti % × valore totale contratto
+  // - approvato/ordinatiRda/impegnato/residuo: % × totali aggregati del contratto
   const calcCampiRiga = (r) => {
     const vc = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
-    const mevVT = mevConsumatoMap[r.societa];   // somma capImporti+subcoImporti dalle MEV
     return {
-      valoreTotale: mevVT != null && mevVT > 0
-        ? mevVT                                           // dati reali da MEV-CAP
-        : r.importo != null
-          ? Number(r.importo)                             // importo manuale
-          : apply(vc.valoreTotale || 0),                  // fallback %
+      valoreTotale: r.importo != null ? Number(r.importo) : apply(vc.valoreTotale || 0),
       approvato:    apply(vc.approvato   || 0),
       ordinatiRda:  apply(vc.ordinatiRda || 0),
       impegnato:    apply(vc.impegnato   || 0),
@@ -2076,14 +2070,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}) + "%" : "—"}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
-                      {mevConsumatoMap[r.societa] > 0 && (
-                        <span title="Calcolato dai dati MEV-CAP" style={{ fontSize: "9px", background: "#dbeafe", color: "#1d4ed8", borderRadius: "4px", padding: "1px 4px", fontWeight: 700, letterSpacing: "0.3px" }}>MEV</span>
-                      )}
-                      {fmt(campi.valoreTotale)}
-                    </div>
-                  </td>
+                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>
