@@ -2073,16 +2073,34 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
       {/* Tabella */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          {/* colgroup allineato alla tabella Contratti sopra:
+              32+180+100+65+125 = 502px per le colonne info (chevron|Contratto|NomeTOW|QTA|ValoreUnit)
+              poi 125+85+125+125+125+125+64 per i valori */}
+          <colgroup>
+            <col style={{ width: "28px"  }} />{/* ID */}
+            <col style={{ width: "88px"  }} />{/* Contratto */}
+            <col style={{ width: "90px"  }} />{/* Ruolo */}
+            <col style={{ width: "156px" }} />{/* Società */}
+            <col style={{ width: "72px"  }} />{/* Data Inizio */}
+            <col style={{ width: "72px"  }} />{/* Data Approv. */}
+            <col style={{ width: "125px" }} />{/* Valore Totale */}
+            <col style={{ width: "85px"  }} />{/* % */}
+            <col style={{ width: "125px" }} />{/* Approvato */}
+            <col style={{ width: "125px" }} />{/* Ordinato */}
+            <col style={{ width: "125px" }} />{/* Impegnato */}
+            <col style={{ width: "125px" }} />{/* Residuo */}
+            <col style={{ width: "64px"  }} />{/* Azioni */}
+          </colgroup>
           <thead>
             <tr>
-              <th style={TH2("right")}>ID</th>
+              <th style={{ ...TH2("right"),  fontSize: "10px" }}>ID</th>
               <th style={TH2("left")}>Contratto</th>
               <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("left")}>Società</th>
-              <th style={TH2("center")}>Data Inizio</th>
-              <th style={TH2("center")}>Data Approv.</th>
-              <th style={TH2("right")}>%</th>
+              <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Inizio</th>
+              <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Approv.</th>
               <th style={TH2("right")}>Valore Totale</th>
+              <th style={TH2("right")}>%</th>
               <th style={TH2("right")}>Approvato</th>
               <th style={TH2("right")}>Ordinato</th>
               <th style={TH2("right")}>Impegnato</th>
@@ -2106,16 +2124,16 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                 <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
                   onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
-                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "11px" }}>{r.id}</td>
-                  <td style={{ ...TD2("left") }}>
-                    <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 8px", fontSize: "11px", fontWeight: 700 }}>{r.contratto || "—"}</span>
+                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "10px", padding: "9px 6px" }}>{r.id}</td>
+                  <td style={{ ...TD2("left"), padding: "9px 6px" }}>
+                    <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: 700 }}>{r.contratto || "—"}</span>
                   </td>
-                  <td style={TD2("left")}>{ruoloBadge(r.ruolo)}</td>
-                  <td style={{ ...TD2("left"), fontWeight: 600, color: "#0f172a" }}>{r.societa}</td>
-                  <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
-                  <td style={{ ...TD2("center"), color: "#64748b" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
-                  <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}) + "%" : "—"}</td>
+                  <td style={{ ...TD2("left"), padding: "9px 6px" }}>{ruoloBadge(r.ruolo)}</td>
+                  <td style={{ ...TD2("left"), fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "156px" }}>{r.societa}</td>
+                  <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
+                  <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>
+                  <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:1,maximumFractionDigits:1}) + "%" : "—"}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>
@@ -2141,8 +2159,9 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
           {righeVisibili.length > 0 && (
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td colSpan={7} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI (escluso SUBCO)</td>
+                <td colSpan={6} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI (escluso SUBCO)</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>
+                <td />
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>
