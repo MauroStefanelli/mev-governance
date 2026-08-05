@@ -702,17 +702,20 @@ public class OrdineConsegnaController : BaseController
             RegexOptions.IgnoreCase
         );
 
-        // ── Formato v2b: coda termina con nome abbreviato subappaltatore (1-2 parole, max 20 car)
-        // Ammette solo nomi brevi senza spazi interni multipli e senza parole chiave di stop.
-        // Non ammette stringhe come "CERTIFICAZIONE", "TOTALE", "Per gli", "Flaggare" ecc.
+        // ── Formato v2b: coda ha nome breve subappaltatore (UNA parola, ≥3 lettere) dopo l'importo €.
+        // Il watermark e i frammenti di TOW spezzati (es. "COLLAUDOFUNZI", "DELLACON")
+        // seguono il nome sulla stessa riga assemblata → usiamo solo la PRIMA parola dopo €.
+        // Non richiede fine-riga ($) perché nel blocco assemblato possono esserci residui di testo.
         var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "TOTALE", "EVENTUALI", "CERTIFICAZIONE", "CERTIFICAZIONED", "COLLAUDO",
-              "SERVIZIO", "CANONE", "PRESIDIO", "FORNITURA", "IMPORTO", "FATTURABILE" };
+              "SERVIZIO", "CANONE", "PRESIDIO", "FORNITURA", "IMPORTO", "FATTURABILE",
+              "DELLACON", "COLLAUDOFUNZI", "SOLUZION", "RACCOLTA", "EFORMA",
+              "REALIZZAZIONE", "SUPPORTO" };
         var codaReV2b = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
             @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€\s*" +
-            @"([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ]{1,18}(?:\s[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ]{1,10})?)\s*$",
+            @"([A-Za-zÀ-ÿ]{3,20})\b",          // UNA parola alfanumerica, min 3 char
             RegexOptions.IgnoreCase
         );
 
