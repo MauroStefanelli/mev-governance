@@ -1660,8 +1660,9 @@ export default function ToolsPage({ onUnauthorized }) {
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>ODA</th>
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>Pos.</th>
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#64748b" }}>Descrizione</th>
+                  <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "#64748b" }}>Q.tà</th>
                   <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: "#64748b" }}>Importo</th>
-                  <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#f59e0b" }}>Letto dal PDF</th>
+                  <th style={{ padding: "8px 10px", textAlign: "center", fontWeight: 700, color: "#f59e0b" }}>Subappalto (PDF)</th>
                   <th style={{ padding: "8px 10px", textAlign: "left",  fontWeight: 700, color: "#1a73e8" }}>Assegna Subco</th>
                 </tr>
               </thead>
@@ -1672,9 +1673,10 @@ export default function ToolsPage({ onUnauthorized }) {
                     <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.pos || "—"}</td>
                     <td style={{ padding: "8px 10px", color: "#0f172a", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       title={r.descrizione}>{r.descrizione || "—"}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: "#0f766e" }}>{r.qta || "—"}</td>
                     <td style={{ padding: "8px 10px", textAlign: "right", color: "#0f766e" }}>{r.importo ? `€ ${fmt(r.importo)}` : "—"}</td>
-                    {/* Testo letto dal PDF — badge giallo se nome, arancio se SI */}
-                    <td style={{ padding: "8px 10px" }}>
+                    {/* Testo letto dal PDF nella colonna Subappalto */}
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
                       <span style={{
                         display: "inline-block",
                         background: r.subappaltoLetto === "SI" ? "#fef3c7" : "#fff7ed",
