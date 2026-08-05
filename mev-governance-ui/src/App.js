@@ -46,6 +46,13 @@ function App() {
   const [editingDesc, setEditingDesc]   = useState(false);
   const [descValue, setDescValue]       = useState("");
 
+  // ── Toast globale (sessione scaduta, errori auth) ────────────────────────────
+  const [globalToast, setGlobalToast] = useState(null); // { msg, type: "error"|"warn"|"info" }
+  const showToast = useCallback((msg, type = "error", ms = 6000) => {
+    setGlobalToast({ msg, type });
+    setTimeout(() => setGlobalToast(null), ms);
+  }, []);
+
   // ── Notifiche accesso Editor (solo Admin) ──────────────────────────────────
   const [editorAlerts, setEditorAlerts] = useState([]); // [{id, username, fullName, lastLogin}]
   const lastPollRef = React.useRef(null); // timestamp ISO dell'ultimo poll
@@ -122,7 +129,7 @@ function App() {
       setToken(""); setUsername(""); setFullName(""); setRole("");
       setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
       setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
-      alert("Sessione scaduta. Effettua di nuovo il login.");
+      showToast("Sessione scaduta. Effettua di nuovo il login.", "warn", 8000);
     };
     window.addEventListener("auth:expired", handleAuthExpired);
     return () => window.removeEventListener("auth:expired", handleAuthExpired);
@@ -206,7 +213,10 @@ function App() {
       const res = await fetch(`${process.env.REACT_APP_API_URL || ""}/api/auth/me`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` }
       });
-      if (res.status === 401) handleLogout();
+      if (res.status === 401) {
+        showToast("Sessione scaduta. Effettua di nuovo il login.", "warn", 8000);
+        handleLogout();
+      }
     } catch { /* errore di rete: backend ancora in avvio, non slogare */ }
   }, []); // eslint-disable-line
 
@@ -344,6 +354,25 @@ function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f9fa" }}>
+      {/* ── Toast globale ── */}
+      {globalToast && (
+        <div style={{
+          position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+          zIndex: 9999, padding: "12px 24px", borderRadius: "8px", maxWidth: "480px",
+          background: globalToast.type === "warn" ? "#fff3cd" : globalToast.type === "info" ? "#d1ecf1" : "#f8d7da",
+          color:      globalToast.type === "warn" ? "#856404" : globalToast.type === "info" ? "#0c5460"  : "#721c24",
+          border:     `1px solid ${globalToast.type === "warn" ? "#ffc107" : globalToast.type === "info" ? "#bee5eb" : "#f5c6cb"}`,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.15)", fontSize: "14px", fontWeight: 500,
+          display: "flex", alignItems: "center", gap: "10px",
+        }}>
+          <span>{globalToast.type === "warn" ? "⚠️" : globalToast.type === "info" ? "ℹ️" : "❌"}</span>
+          <span>{globalToast.msg}</span>
+          <button onClick={() => setGlobalToast(null)} style={{
+            marginLeft: "auto", background: "none", border: "none", cursor: "pointer",
+            fontSize: "16px", color: "inherit", lineHeight: 1,
+          }}>×</button>
+        </div>
+      )}
       <header style={{
         background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
         boxShadow: "0 2px 8px rgba(0,0,0,0.18)",

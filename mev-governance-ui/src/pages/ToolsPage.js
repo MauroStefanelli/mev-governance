@@ -223,6 +223,7 @@ export default function ToolsPage({ onUnauthorized }) {
   const [deletingVerbale, setDeletingVerbale] = useState(null);
   const [debugVapResult, setDebugVapResult] = useState(null);
   const [debuggingVap, setDebuggingVap] = useState(false);
+  const [loadError, setLoadError] = useState(null); // messaggio errore caricamento dati
   const debugVapRef = useRef();
   const fileRef = useRef();
   const debugRef = useRef();
@@ -235,11 +236,17 @@ export default function ToolsPage({ onUnauthorized }) {
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await getOrdini();
       setItems(data);
     } catch (e) {
-      if (e.message === "401") onUnauthorized?.();
+      if (e.message === "401") {
+        setLoadError("Sessione scaduta — rieffettua il login per visualizzare i dati.");
+        onUnauthorized?.();
+      } else {
+        setLoadError(`Errore nel caricamento degli ordini: ${e.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -1143,6 +1150,21 @@ export default function ToolsPage({ onUnauthorized }) {
       {loading ? (
         <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
           Caricamento...
+        </div>
+      ) : loadError ? (
+        <div style={{
+          padding: "32px 24px", borderRadius: "10px", margin: "8px 0",
+          background: "#fff3cd", color: "#856404",
+          border: "1px solid #ffc107", fontSize: "14px",
+          display: "flex", alignItems: "center", gap: "12px",
+        }}>
+          <span style={{ fontSize: "20px" }}>⚠️</span>
+          <span>{loadError}</span>
+          <button onClick={load} style={{
+            marginLeft: "auto", padding: "6px 14px", borderRadius: "6px",
+            background: "#ffc107", border: "none", cursor: "pointer",
+            fontWeight: 600, color: "#333", fontSize: "13px",
+          }}>Riprova</button>
         </div>
       ) : filtered.length === 0 ? (
         <div
