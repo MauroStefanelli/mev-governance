@@ -2164,21 +2164,20 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
         </div>
       )}
 
-      {/* Tabella */}
+      {/* Tabella — colgroup speculare alla tabella CONTRATTO sopra:
+           info cols: 32+88+90+170+60+62 = 502px  (≡ 32+180+100+65+125 di CONTRATTO)
+           poi ValTotale/Approvato/Ordinato/Impegnato/Residuo 125px ciascuna
+           poi Azioni 64px extra (fuori dall'allineamento numerico) */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-          {/* colgroup allineato alla tabella Contratti sopra:
-              32+180+100+65+125 = 502px per le colonne info (chevron|Contratto|NomeTOW|QTA|ValoreUnit)
-              poi 125+85+125+125+125+125+64 per i valori */}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "28px"  }} />{/* ID */}
+            <col style={{ width: "32px"  }} />{/* ID */}
             <col style={{ width: "88px"  }} />{/* Contratto */}
             <col style={{ width: "90px"  }} />{/* Ruolo */}
-            <col style={{ width: "156px" }} />{/* Società */}
-            <col style={{ width: "72px"  }} />{/* Data Inizio */}
-            <col style={{ width: "72px"  }} />{/* Data Approv. */}
+            <col style={{ width: "170px" }} />{/* Società (+% inline) */}
+            <col style={{ width: "60px"  }} />{/* Data Inizio */}
+            <col style={{ width: "62px"  }} />{/* Data Approv. */}
             <col style={{ width: "125px" }} />{/* Valore Totale */}
-            <col style={{ width: "85px"  }} />{/* % */}
             <col style={{ width: "125px" }} />{/* Approvato */}
             <col style={{ width: "125px" }} />{/* Ordinato */}
             <col style={{ width: "125px" }} />{/* Impegnato */}
@@ -2194,7 +2193,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
               <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Inizio</th>
               <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Approv.</th>
               <th style={TH2("right")}>Valore Totale</th>
-              <th style={TH2("right")}>%</th>
               <th style={TH2("right")}>Approvato</th>
               <th style={TH2("right")}>Ordinato</th>
               <th style={TH2("right")}>Impegnato</th>
@@ -2204,16 +2202,19 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
           </thead>
           <tbody>
             {righeLoading ? (
-              <tr><td colSpan={13} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>
             ) : righeVisibili.length === 0 ? (
-              <tr><td colSpan={13} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
               const campi = calcCampiRiga(r);
               const fmt = (v) => v != null ? formatEuro(v) : "—";
+              const percLabel = r.percentuale != null
+                ? (r.percentuale * 100).toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%"
+                : null;
               return (
                 <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
@@ -2223,11 +2224,13 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                     <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: 700 }}>{r.contratto || "—"}</span>
                   </td>
                   <td style={{ ...TD2("left"), padding: "9px 6px" }}>{ruoloBadge(r.ruolo)}</td>
-                  <td style={{ ...TD2("left"), fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "156px" }}>{r.societa}</td>
+                  <td style={{ ...TD2("left"), padding: "9px 6px", overflow: "hidden" }}>
+                    <div style={{ fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.societa}</div>
+                    {percLabel && <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "1px" }}>{percLabel}</div>}
+                  </td>
                   <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>
-                  <td style={{ ...TD2("right"), color: "#64748b" }}>{r.percentuale != null ? (r.percentuale * 100).toLocaleString("it-IT",{minimumFractionDigits:1,maximumFractionDigits:1}) + "%" : "—"}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>
@@ -2253,9 +2256,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
           {righeVisibili.length > 0 && (
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td colSpan={6} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI (escluso SUBCO)</td>
+                <td colSpan={6} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>
-                <td />
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>
                 <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>
