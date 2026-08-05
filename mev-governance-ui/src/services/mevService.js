@@ -31,12 +31,17 @@ export const tryRefreshToken = async () => {
 };
 
 // Wrapper fetch che tenta il refresh automatico se riceve 401.
-// Se anche il refresh fallisce, dispatcha un evento "auth:expired" per
-// forzare il logout nell'UI.
+// Se anche il refresh fallisce (es. backend in cold-start su Render),
+// riprova fino a 3 volte con backoff prima di fare logout.
 const fetchWithRefresh = async (url, options = {}) => {
   let res = await fetch(url, options);
   if (res.status === 401) {
-    const refreshed = await tryRefreshToken();
+    // Tenta il refresh con retry (backend Render free può essere in cold-start)
+    let refreshed = false;
+    for (let attempt = 0; attempt < 3 && !refreshed; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 3000 * attempt)); // 3s, 6s
+      refreshed = await tryRefreshToken();
+    }
     if (refreshed) {
       // Riprova con il nuovo JWT
       const newOptions = {
@@ -48,7 +53,7 @@ const fetchWithRefresh = async (url, options = {}) => {
       };
       res = await fetch(url, newOptions);
     } else {
-      // Refresh fallito: sessione scaduta → notifica l'app per il logout
+      // Refresh fallito dopo retry: sessione scaduta → notifica l'app per il logout
       window.dispatchEvent(new CustomEvent("auth:expired"));
     }
   }

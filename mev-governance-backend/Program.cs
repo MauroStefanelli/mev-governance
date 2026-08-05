@@ -193,7 +193,7 @@ builder.Services
             ValidateIssuer           = true,
             ValidateAudience         = true,
             ValidateLifetime         = true,
-            ClockSkew                = TimeSpan.Zero, 
+            ClockSkew                = TimeSpan.FromMinutes(2), // tolleranza sfasamento clock
             ValidateIssuerSigningKey = true,
             ValidIssuer              = jwtIssuer,
             ValidAudience            = jwtAudience,

@@ -147,10 +147,10 @@ function App() {
   // ── Silent token refresh ogni 10 minuti (per tutti gli utenti autenticati) ──
   useEffect(() => {
     if (!token) return;
-    // Rinnova silenziosamente il JWT prima che scada (scade a 15 min)
+    // Rinnova silenziosamente il JWT prima che scada (scade a 60 min, refresh ogni 45 min)
     const interval = setInterval(() => {
       tryRefreshToken().catch(() => {});
-    }, 10 * 60 * 1000); // ogni 10 minuti
+    }, 45 * 60 * 1000); // ogni 45 minuti
     return () => clearInterval(interval);
   }, [token]);
   useEffect(() => {
