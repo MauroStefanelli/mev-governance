@@ -254,10 +254,12 @@ export default function ToolsPage({ onUnauthorized }) {
   const [showDebugTools, setShowDebugTools] = useState(false);
 
   // Modale associazione Subco (dopo caricamento verbale con righe SI)
-  const [subcoModal, setSubcoModal] = useState(null);
+   const [subcoModal, setSubcoModal] = useState(null);
   // subcoModal = { righe: [{id, oda, pos, descrizione, qta, importo}], scelte: {id: nomeSocieta} }
   const [subcoList, setSubcoList] = useState([]); // lista nomi SUBCO da RTI
   const [savingSubco, setSavingSubco] = useState(false);
+  const [editingSubcoId, setEditingSubcoId] = useState(null); // id riga in edit inline
+  const [savingInlineSubco, setSavingInlineSubco] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -464,6 +466,33 @@ export default function ToolsPage({ onUnauthorized }) {
       alert(`Errore salvataggio Subco: ${e.message}`);
     } finally {
       setSavingSubco(false);
+    }
+  };
+
+  // Carica la lista Subco da RTI se non ancora disponibile
+  const ensureSubcoList = async () => {
+    if (subcoList.length > 0) return subcoList;
+    try {
+      const rti = await getRtiSocietaLocal();
+      const soci = rti.filter(r => r.ruolo === "SUBCO").map(r => r.societa).filter(Boolean);
+      setSubcoList(soci);
+      return soci;
+    } catch {
+      return [];
+    }
+  };
+
+  // Salva il Subco scelto inline per una singola riga
+  const handleInlineSubco = async (id, nomeSocieta) => {
+    setSavingInlineSubco(true);
+    try {
+      await setSubco([{ id, nomeSocieta }]);
+      setItems(prev => prev.map(r => r.id === id ? { ...r, subappalto: nomeSocieta } : r));
+    } catch (e) {
+      alert(`Errore aggiornamento Subco: ${e.message}`);
+    } finally {
+      setSavingInlineSubco(false);
+      setEditingSubcoId(null);
     }
   };
 
@@ -1407,22 +1436,51 @@ export default function ToolsPage({ onUnauthorized }) {
                   <td style={{ ...tdStyle, textAlign: "right", fontWeight: r.importoFatturabile ? 600 : 400, color: r.importoFatturabile ? "#0f766e" : "#ccc" }}>
                     {r.importoFatturabile ? `€ ${fmt(r.importoFatturabile)}` : "—"}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    {r.subappalto ? (
-                      <span style={{
-                        background: r.subappalto === "SI" ? "#fef3c7"
-                                  : r.subappalto === "NO" ? "#f0fdf4"
-                                  : "#eff6ff",
-                        color:      r.subappalto === "SI" ? "#92400e"
-                                  : r.subappalto === "NO" ? "#166534"
-                                  : "#1a73e8",
-                        padding: "2px 8px", borderRadius: "10px", fontWeight: 600, fontSize: "11px",
-                        display: "inline-block", maxWidth: "160px",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}
-                      title={r.subappalto}
-                      >{r.subappalto}</span>
-                    ) : "—"}
+                  <td style={{ ...tdStyle, textAlign: "center", position: "relative" }}>
+                    {editingSubcoId === r.id ? (
+                      <select
+                        autoFocus
+                        defaultValue={r.subappalto || ""}
+                        disabled={savingInlineSubco}
+                        onChange={e => { if (e.target.value) handleInlineSubco(r.id, e.target.value); }}
+                        onBlur={() => setEditingSubcoId(null)}
+                        style={{
+                          fontSize: "12px", padding: "2px 4px", borderRadius: "6px",
+                          border: "1px solid #1a73e8", outline: "none",
+                          minWidth: "120px", maxWidth: "180px", cursor: "pointer",
+                        }}
+                      >
+                        <option value="">— scegli —</option>
+                        {subcoList.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    ) : (
+                      <span
+                        title="Clicca per modificare"
+                        onClick={async () => {
+                          const list = await ensureSubcoList();
+                          if (list.length > 0) setEditingSubcoId(r.id);
+                        }}
+                        style={{
+                          cursor: "pointer",
+                          background: !r.subappalto        ? "#f1f5f9"
+                                    : r.subappalto === "SI" ? "#fef3c7"
+                                    : r.subappalto === "NO" ? "#f0fdf4"
+                                    : "#eff6ff",
+                          color:     !r.subappalto        ? "#94a3b8"
+                                    : r.subappalto === "SI" ? "#92400e"
+                                    : r.subappalto === "NO" ? "#166534"
+                                    : "#1a73e8",
+                          padding: "2px 8px", borderRadius: "10px", fontWeight: 600, fontSize: "11px",
+                          display: "inline-block", maxWidth: "160px",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          border: "1px dashed transparent",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = "#1a73e8"}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
+                      >
+                        {r.subappalto || "—"}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

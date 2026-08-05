@@ -1406,7 +1406,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         return (
           <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+              <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                 {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
                 {(() => {
                   const fieldsA = visibleFields.filter(f => f.key === "valoreUnitario");
@@ -1503,7 +1503,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                           <tr>
                             <td colSpan={4 + visibleFields.length + (hasImpatto ? 1 : 0)} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
                               <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+                                 <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                                    <colgroup>
                                      <col style={{ width: "32px" }} />
                                      <col style={{ width: "180px" }} />
@@ -2171,7 +2171,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                poi ValTotale/Approvato/Ordinato/Impegnato/Residuo 125px ciascuna
                poi Azioni 64px extra */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+        <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "32px"  }} />{/* ID */}
             <col style={{ width: hasImpatto ? "118px" : "88px"  }} />{/* Contratto */}
