@@ -18,6 +18,10 @@ public class RtiSocietaController : BaseController
         _db = db;
     }
 
+    // Helper: converte una DateTime in UTC (evita errore Npgsql "Kind=Unspecified")
+    private static DateTime? ToUtc(DateTime? dt) =>
+        dt.HasValue ? DateTime.SpecifyKind(dt.Value, DateTimeKind.Utc) : null;
+
     // Helper: risolve l'ambienteId effettivo (fallback al primo ambiente se claim == 0)
     private int ResolveAmbienteId()
     {
@@ -63,8 +67,8 @@ public class RtiSocietaController : BaseController
             Contratto       = dto.Contratto ?? "",
             Ruolo           = dto.Ruolo ?? "",
             Societa         = dto.Societa ?? "",
-            DataInizio      = dto.DataInizio,
-            DataApprovazione = dto.DataApprovazione,
+            DataInizio      = ToUtc(dto.DataInizio),
+            DataApprovazione = ToUtc(dto.DataApprovazione),
             Percentuale     = dto.Percentuale,
             Importo         = dto.Importo,
             Consumato       = dto.Consumato,
@@ -91,8 +95,8 @@ public class RtiSocietaController : BaseController
             Contratto        = dto.Contratto ?? "",
             Ruolo            = dto.Ruolo ?? "",
             Societa          = dto.Societa ?? "",
-            DataInizio       = dto.DataInizio,
-            DataApprovazione = dto.DataApprovazione,
+            DataInizio       = ToUtc(dto.DataInizio),
+            DataApprovazione = ToUtc(dto.DataApprovazione),
             Percentuale      = dto.Percentuale,
             Importo          = dto.Importo,
             Consumato        = dto.Consumato,
@@ -115,8 +119,8 @@ public class RtiSocietaController : BaseController
         riga.Contratto        = dto.Contratto ?? riga.Contratto;
         riga.Ruolo            = dto.Ruolo ?? riga.Ruolo;
         riga.Societa          = dto.Societa ?? riga.Societa;
-        riga.DataInizio       = dto.DataInizio;
-        riga.DataApprovazione = dto.DataApprovazione;
+        riga.DataInizio       = ToUtc(dto.DataInizio);
+        riga.DataApprovazione = ToUtc(dto.DataApprovazione);
         riga.Percentuale      = dto.Percentuale;
         riga.Importo          = dto.Importo;
         riga.Consumato        = dto.Consumato;

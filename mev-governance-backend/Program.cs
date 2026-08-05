@@ -298,6 +298,65 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PATCH] Colonne Sconto/IsCatalogo verificate e corrette.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
+
+    // Patch RtiSocietaRighe: aggiunge sequence per Id (se non già serial) e converte date in timestamptz
+    try
+    {
+#pragma warning disable EF1002
+        db.Database.ExecuteSqlRaw($@"
+            -- Crea sequence per RtiSocietaRighe.Id se non esiste
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '{sch}'
+                  AND table_name   = 'RtiSocietaRighe'
+                  AND column_name  = 'Id'
+                  AND column_default LIKE 'nextval%'
+              ) THEN
+                CREATE SEQUENCE IF NOT EXISTS ""{sch}"".""RtiSocietaRighe_Id_seq"";
+                SELECT setval('""{sch}"".""RtiSocietaRighe_Id_seq""', COALESCE((SELECT MAX(""Id"") FROM ""{sch}"".""RtiSocietaRighe""), 0) + 1, false);
+                ALTER TABLE ""{sch}"".""RtiSocietaRighe"" ALTER COLUMN ""Id"" SET DEFAULT nextval('""{sch}"".""RtiSocietaRighe_Id_seq""');
+              END IF;
+            END$$;
+
+            -- Converti DataInizio e DataApprovazione da TEXT/timestamp a timestamptz se necessario
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '{sch}'
+                  AND table_name   = 'RtiSocietaRighe'
+                  AND column_name  = 'DataInizio'
+                  AND data_type IN ('text', 'timestamp without time zone')
+              ) THEN
+                ALTER TABLE ""{sch}"".""RtiSocietaRighe""
+                  ALTER COLUMN ""DataInizio"" TYPE timestamptz USING ""DataInizio""::timestamptz,
+                  ALTER COLUMN ""DataApprovazione"" TYPE timestamptz USING ""DataApprovazione""::timestamptz;
+              END IF;
+            END$$;
+
+            -- Converti Percentuale, Importo, Consumato da TEXT a numeric se necessario
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '{sch}'
+                  AND table_name   = 'RtiSocietaRighe'
+                  AND column_name  = 'Importo'
+                  AND data_type    = 'text'
+              ) THEN
+                ALTER TABLE ""{sch}"".""RtiSocietaRighe""
+                  ALTER COLUMN ""Percentuale"" TYPE numeric USING NULLIF(""Percentuale"", '')::numeric,
+                  ALTER COLUMN ""Importo""     TYPE numeric USING NULLIF(""Importo"", '')::numeric,
+                  ALTER COLUMN ""Consumato""   TYPE numeric USING NULLIF(""Consumato"", '')::numeric;
+              END IF;
+            END$$;
+        ");
+#pragma warning restore EF1002
+        Console.WriteLine("[PATCH] RtiSocietaRighe: Id serial e colonne tipo verificate.");
+    }
+    catch (Exception ex) { Console.Error.WriteLine($"[PATCH RTI ERROR] {ex.Message}"); }
     }
 
     // Seed admin — inserisce MSTEFANE se non esiste, aggiorna la password se esiste già
