@@ -1409,38 +1409,38 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                 {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
                 {(() => {
-                  const fieldsA = visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key));
-                  const fieldsB = visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key));
-                  return (
-                    <colgroup>
-                      <col style={{ width: "32px" }} />
-                      <col style={{ width: "180px" }} />
-                      <col style={{ width: "100px" }} />
-                      <col style={{ width: "65px" }} />
-                      {fieldsA.map(f => <col key={f.key} style={{ width: "125px" }} />)}
-                      {hasImpatto && <col style={{ width: "90px" }} />}
-                      {fieldsB.map(f => <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />)}
-                    </colgroup>
-                  );
+                  const fieldsA = visibleFields.filter(f => f.key === "valoreUnitario");
+                  const fieldsB = visibleFields.filter(f => f.key !== "valoreUnitario");
+                   return (
+                     <colgroup>
+                       <col style={{ width: "32px" }} />
+                       <col style={{ width: "180px" }} />
+                       <col style={{ width: "100px" }} />
+                       <col style={{ width: "65px" }} />
+                       {fieldsA.map(f => <col key={f.key} style={{ width: "125px" }} />)}
+                       {hasImpatto && <col style={{ width: "90px" }} />}
+                       {fieldsB.map(f => <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />)}
+                     </colgroup>
+                   );
                 })()}
 
                 {/* Header */}
                 {(() => {
-                  const fieldsA = visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key));
-                  const fieldsB = visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key));
-                  return (
-                    <thead>
-                      <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                        <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
-                        <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
-                        <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>Nome TOW</th>
-                        <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
-                        {fieldsA.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
-                        {hasImpatto && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
-                        {fieldsB.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
-                      </tr>
-                    </thead>
-                  );
+                  const fieldsA = visibleFields.filter(f => f.key === "valoreUnitario");
+                  const fieldsB = visibleFields.filter(f => f.key !== "valoreUnitario");
+                   return (
+                     <thead>
+                       <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+                         <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
+                         <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
+                         <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>Nome TOW</th>
+                         <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
+                         {fieldsA.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
+                         {hasImpatto && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
+                         {fieldsB.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
+                       </tr>
+                     </thead>
+                   );
                 })()}
 
                 <tbody>
@@ -1479,7 +1479,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                           <td />
                           <td />
                           {/* Totali per ogni field — rispettando l'ordine con % Impatto dopo valoreTotale */}
-                          {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
+                          {visibleFields.filter(f => f.key === "valoreUnitario").map(f => {
                             const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                             return (
                               <td key={f.key} style={{ ...TD("right"), fontWeight: TOTALE_KEYS.has(f.key) ? (f.key === "valoreTotale" ? 800 : 600) : 400, color: TOTALE_KEYS.has(f.key) ? f.color : "#94a3b8" }}>
@@ -1488,7 +1488,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                             );
                           })}
                           {hasImpatto && <td />}
-                          {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
+                          {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => {
                             const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                             return (
                               <td key={f.key} style={{ ...TD("right"), fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400, color: TOTALE_KEYS.has(f.key) ? f.color : "#94a3b8" }}>
@@ -1509,11 +1509,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                      <col style={{ width: "180px" }} />
                                      <col style={{ width: "100px" }} />
                                      <col style={{ width: "65px" }} />
-                                     {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                     {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
                                        <col key={f.key} style={{ width: "125px" }} />
                                      ))}
                                      {hasImpatto && <col style={{ width: "90px" }} />}
-                                     {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                     {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
                                        <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
                                      ))}
                                    </colgroup>
@@ -1536,7 +1536,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                         <td style={{ ...TD("right"), color: "#64748b" }}>
                                           {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
                                         </td>
-                                        {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                        {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
                                           <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
                                             {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
                                           </td>
@@ -1564,7 +1564,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                             </div>
                                           </td>
                                         )}
-                                        {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => (
+                                        {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
                                           <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
                                             {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
                                           </td>
@@ -1579,7 +1579,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                         <td />
                                         <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
                                         <td />
-                                       {visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
+                                       {visibleFields.filter(f => f.key === "valoreUnitario").map(f => {
                                          if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                                          const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                                          return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
@@ -1596,7 +1596,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                             })()}
                                           </td>
                                         )}
-                                       {visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key)).map(f => {
+                                       {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => {
                                          if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                                          const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                                          return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
@@ -1616,8 +1616,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                 <tfoot>
                   {(() => {
                     const allRows = rows.filter(r => contratti.includes(r.towContratto));
-                    const fieldsA = visibleFields.filter(f => ["valoreUnitario","valoreTotale"].includes(f.key));
-                    const fieldsB = visibleFields.filter(f => !["valoreUnitario","valoreTotale"].includes(f.key));
+                    const fieldsA = visibleFields.filter(f => f.key === "valoreUnitario");
+                    const fieldsB = visibleFields.filter(f => f.key !== "valoreUnitario");
                     const tdTot = (f) => {
                       const tot = allRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                       return (
@@ -2192,11 +2192,11 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
               <th style={TH2("left")}>Società</th>
               <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Inizio</th>
               <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Approv.</th>
-              <th style={TH2("right")}>Valore Totale</th>
-              <th style={TH2("right")}>Approvato</th>
-              <th style={TH2("right")}>Ordinato</th>
-              <th style={TH2("right")}>Impegnato</th>
-              <th style={TH2("right")}>Residuo</th>
+              <th style={{ ...TH2("right"), color: "#1e293b" }}>Valore Totale</th>
+              <th style={{ ...TH2("right"), color: "#1a73e8" }}>Approvato</th>
+              <th style={{ ...TH2("right"), color: "#10b981" }}>Ordinato</th>
+              <th style={{ ...TH2("right"), color: "#f59e0b" }}>Impegnato</th>
+              <th style={{ ...TH2("right"), color: "#f97316" }}>Residuo</th>
               <th style={{ ...TH2("center"), width: "64px", minWidth: "64px" }}>Azioni</th>
             </tr>
           </thead>
@@ -2234,7 +2234,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], righeInit = [],
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>
                   <td style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 700, color: campi.residuo != null && campi.residuo >= 0 ? "#10b981" : "#dc2626" }}>{fmt(campi.residuo)}</td>
+                  <td style={{ ...TD2("right"), fontWeight: 700, color: "#f97316" }}>{fmt(campi.residuo)}</td>
                   <td style={{ ...TD2("center"), width: "64px" }}>
                     <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
                       <button

@@ -7,6 +7,7 @@ using MevGovernanceBackend.Models;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -692,16 +693,26 @@ public class OrdineConsegnaController : BaseController
         // Pattern ODA + POS all'inizio del blocco riassemblato
         var odaRe = new Regex(@"^(4\d{9})\s+(\d{1,4})\b");
 
-        // ── Formato v2 (template corrente): ODA POS [Cod] Descr [TOW] PREZZO€ QTA IMPORTO€ SI/NO|NomeParziale
-        // Il campo subappalto può essere:
-        //   - "SI" / "NO"  (caso standard)
-        //   - un nome abbreviato della società subappaltatrice (es. "Logica", "Levia")
-        // Catturiamo qualsiasi token non-numerico dopo l'importo€
+        // ── Formato v2a (template corrente): coda termina con SI o NO (caso standard)
         var codaReV2 = new Regex(
             @"(\d[\d,]*)\s*€\s+" +
             @"(\d[\d.,]*)\s+" +
             @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€\s*" +
-            @"([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\.]{0,40}?)(?:\s*$|\s+\d|\s+[/\(])",
+            @"(SI|NO)\b",
+            RegexOptions.IgnoreCase
+        );
+
+        // ── Formato v2b: coda termina con nome abbreviato subappaltatore (1-2 parole, max 20 car)
+        // Ammette solo nomi brevi senza spazi interni multipli e senza parole chiave di stop.
+        // Non ammette stringhe come "CERTIFICAZIONE", "TOTALE", "Per gli", "Flaggare" ecc.
+        var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "TOTALE", "EVENTUALI", "CERTIFICAZIONE", "CERTIFICAZIONED", "COLLAUDO",
+              "SERVIZIO", "CANONE", "PRESIDIO", "FORNITURA", "IMPORTO", "FATTURABILE" };
+        var codaReV2b = new Regex(
+            @"(\d[\d,]*)\s*€\s+" +
+            @"(\d[\d.,]*)\s+" +
+            @"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€\s*" +
+            @"([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ]{1,18}(?:\s[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ]{1,10})?)\s*$",
             RegexOptions.IgnoreCase
         );
 
@@ -738,20 +749,33 @@ public class OrdineConsegnaController : BaseController
             var pos = odaM.Groups[2].Value.TrimStart('0');
             if (string.IsNullOrEmpty(pos)) pos = "0";
 
-            // Prova prima il formato v2 (più recente, con SI/NO)
+            // Prova prima il formato v2a (SI/NO esplicito)
             var codaMatchesV2 = codaReV2.Matches(b);
             if (codaMatchesV2.Count > 0)
             {
-                var codaM  = codaMatchesV2[0];
+                var codaM      = codaMatchesV2[0];
                 var qta        = codaM.Groups[2].Value;
                 var importo    = codaM.Groups[3].Value;
-                // Normalizza il campo subappalto:
-                //   "si"/"no" → uppercase; qualsiasi altro testo → preserva come letto (trim)
-                var subRaw = codaM.Groups[4].Value.Trim();
-                var subappalto = string.Equals(subRaw, "SI", StringComparison.OrdinalIgnoreCase) ? "SI"
-                               : string.Equals(subRaw, "NO", StringComparison.OrdinalIgnoreCase) ? "NO"
-                               : subRaw; // nome abbreviato o testo libero
+                var subappalto = codaM.Groups[4].Value.ToUpper(); // "SI" o "NO"
                 righe.Add((oda, pos == "0" ? "" : pos, qta, importo, subappalto));
+                continue;
+            }
+
+            // Prova formato v2b (nome breve subappaltatore dopo importo€)
+            var codaMatchV2b = codaReV2b.Match(b);
+            if (codaMatchV2b.Success)
+            {
+                var qta     = codaMatchV2b.Groups[2].Value;
+                var importo = codaMatchV2b.Groups[3].Value;
+                var subRaw  = codaMatchV2b.Groups[4].Value.Trim();
+                // Valida: non deve essere una stop-word
+                if (!stopWords.Contains(subRaw) && !stopWords.Contains(subRaw.Split(' ')[0]))
+                {
+                    righe.Add((oda, pos == "0" ? "" : pos, qta, importo, subRaw));
+                    continue;
+                }
+                // Altrimenti tratta come v3 (subappalto vuoto) — cade nel fallback sotto
+                righe.Add((oda, pos == "0" ? "" : pos, qta, importo, ""));
                 continue;
             }
 
