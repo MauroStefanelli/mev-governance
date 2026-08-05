@@ -16,12 +16,14 @@ public class MevController : BaseController
     private readonly AppDbContext _db;
     private readonly EmailService _email;
     private readonly ContrattoController _contrattoCtrl;
+    private readonly IConfiguration _config;
 
-    public MevController(AppDbContext db, EmailService email)
+    public MevController(AppDbContext db, EmailService email, IConfiguration config)
     {
         _db = db;
         _email = email;
         _contrattoCtrl = new ContrattoController(db);
+        _config = config;
     }
 
     // ============================================================
@@ -655,5 +657,62 @@ public class MevController : BaseController
             "MEV_Export.xlsx"
         );
     }
+    // ============================================================
+    // DELETE /api/mev/reset-all
+    // Svuota MevItems e ConsumoTow per l'ambiente corrente e resetta i serial ID.
+    // Riservato a SuperAdmin.
+    // ============================================================
+    [HttpDelete("reset-all")]
+    [Authorize(Policy = "AdminOrSuper")]
+    public IActionResult ResetAll()
+    {
+        var ambienteId = GetAmbienteId();
+
+        // Legge lo schema dal config (stesso meccanismo di Program.cs)
+        var rawSchema = (_config["DB_SCHEMA"] ?? "public").Trim().ToLower();
+        var sch = System.Text.RegularExpressions.Regex.IsMatch(rawSchema, @"^[a-zA-Z0-9_]+$")
+            ? rawSchema : "public";
+
+        // 1. Cancella le righe dell'ambiente corrente
+        var mevDeleted  = _db.MevItems.Where(m => m.AmbienteId == ambienteId).Count();
+        var towDeleted  = _db.ConsumoTow.Where(t => t.AmbienteId == ambienteId).Count();
+
+        _db.MevItems.RemoveRange(_db.MevItems.Where(m => m.AmbienteId == ambienteId));
+        _db.ConsumoTow.RemoveRange(_db.ConsumoTow.Where(t => t.AmbienteId == ambienteId));
+        _db.SaveChanges();
+
+        // 2. Resetta la sequenza PostgreSQL solo se non ci sono più righe nelle tabelle
+        //    (altri ambienti potrebbero avere ancora righe — in quel caso non resettiamo)
+        try
+        {
+#pragma warning disable EF1002
+            if (!_db.MevItems.Any())
+                _db.Database.ExecuteSqlRaw($@"
+                    SELECT setval(
+                        pg_get_serial_sequence('""{sch}"".""MevItems""', 'Id'),
+                        1, false
+                    );");
+
+            if (!_db.ConsumoTow.Any())
+                _db.Database.ExecuteSqlRaw($@"
+                    SELECT setval(
+                        pg_get_serial_sequence('""{sch}"".""ConsumoTow""', 'Id'),
+                        1, false
+                    );");
+#pragma warning restore EF1002
+        }
+        catch (Exception ex)
+        {
+            // Il reset della sequenza è best-effort: non blocca l'operazione
+            Console.Error.WriteLine($"[RESET-ALL] Sequence reset warning: {ex.Message}");
+        }
+
+        return Ok(new {
+            message = $"Reset completato per ambienteId={ambienteId}.",
+            mevDeleted,
+            towDeleted
+        });
+    }
 
 }
+

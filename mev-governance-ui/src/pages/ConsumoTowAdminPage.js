@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
   getTowImpatto, setTowImpatto as saveTowImpattoToDb, getMevList,
   getRtiSocieta, createRtiSocieta, updateRtiSocieta, deleteRtiSocieta, bulkImportRtiSocieta,
+  resetMevAndConsumoTow,
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
@@ -1150,6 +1151,30 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     }
   };
 
+  // ── Reset MEV + ConsumoTow ──────────────────────────────────────────────────
+  const [resetting, setResetting] = useState(false);
+  const handleResetAll = async () => {
+    if (!window.confirm(
+      "ATTENZIONE: questa operazione eliminerà TUTTE le righe MEV e TUTTI i dati ConsumoTow (contratti + TOW) per questo ambiente.\n\nI dati RTI & SUBCO, Ordini di Consegna e Verbali NON verranno toccati.\n\nL'operazione è IRREVERSIBILE. Continuare?"
+    )) return;
+    setResetting(true);
+    setError("");
+    try {
+      const res = await resetMevAndConsumoTow();
+      setRows([]);
+      setContratti([]);
+      setMevRows([]);
+      setSelectedContratto("");
+      localStorage.removeItem(CONTRATTI_ORDER_KEY);
+      setSuccessMsg(`Reset completato — ${res.mevDeleted} righe MEV e ${res.towDeleted} righe ConsumoTow eliminate.`);
+      setTimeout(() => setSuccessMsg(""), 6000);
+    } catch (e) {
+      setError(e.message || "Errore durante il reset");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   // ── Drag & drop handlers ────────────────────────────────────────────────────
   const handleDragStart = (e, c) => {
     dragItem.current = c;
@@ -1193,6 +1218,26 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       {/* Messaggi */}
       {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>⚠ {error}</div>}
       {successMsg && <div style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>✓ {successMsg}</div>}
+
+      {/* ── Zona pericolosa: Reset MEV + ConsumoTow ── */}
+      <div style={{ background: "#fff", borderRadius: "14px", border: "1.5px solid #fecaca", padding: "14px 20px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+        <div>
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Reset dati</div>
+          <div style={{ fontSize: "12px", color: "#64748b" }}>
+            Elimina tutte le righe <strong>MEV</strong> e tutti i dati <strong>ConsumoTow</strong> (contratti + TOW) per questo ambiente e azzera i contatori ID.
+            RTI &amp; SUBCO, Ordini e Verbali non vengono toccati.
+          </div>
+        </div>
+        <button
+          onClick={handleResetAll}
+          disabled={resetting}
+          style={{ flexShrink: 0, padding: "8px 20px", borderRadius: "8px", border: "1.5px solid #dc2626", background: resetting ? "#fef2f2" : "#fff", color: resetting ? "#fca5a5" : "#dc2626", fontSize: "12px", fontWeight: 700, cursor: resetting ? "default" : "pointer", whiteSpace: "nowrap", transition: "background 0.15s" }}
+          onMouseEnter={e => { if (!resetting) { e.currentTarget.style.background = "#fef2f2"; } }}
+          onMouseLeave={e => { if (!resetting) { e.currentTarget.style.background = "#fff"; } }}
+        >
+          {resetting ? "Reset in corso..." : "🗑 Reset MEV + ConsumoTow"}
+        </button>
+      </div>
 
       {/* Selezione contratto */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
