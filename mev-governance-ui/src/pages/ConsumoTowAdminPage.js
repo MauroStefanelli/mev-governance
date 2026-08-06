@@ -2195,12 +2195,12 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
 
   // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
   const COL_ID    = CW.arrow;           // 32px
-  const COL_RUOLO = 82;
+  const COL_RUOLO = 115;
   const COL_DATAI = 58;
   const COL_DATAA = 58;
   const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
-  const colContr  = Math.max(60, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
-  const colSoc    = Math.max(60, colFlex - colContr);          // 87px
+  const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
+  const colSoc    = Math.max(79, colFlex - colContr);          // 87px
 
   // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
   // Semplificato: somma le colonne che compaiono realmente
@@ -2385,7 +2385,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                 <tr key={r.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
                   onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
-                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "10px", padding: "9px 6px" }}>{r.id}</td>
+                  <td style={{ ...TD2("right"), color: "#94a3b8", fontSize: "10px", padding: "9px 12px" }}>{r.id}</td>
                   <td style={{ ...TD2("left"), padding: "9px 6px" }}>
                     <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: 700 }}>{r.contratto || "—"}</span>
                   </td>
