@@ -2183,6 +2183,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
         });
       });
+      console.log("[RTI-DIAG] mevImportiPerSocieta:", JSON.stringify(map));
       return map;
    }, [mevRows]);
 
