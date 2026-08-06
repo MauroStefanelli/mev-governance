@@ -1881,9 +1881,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
       console.log("[RTI-DEBUG] ordiniRows:", ordiniRows.length, "sample:", ordiniRows[0]);
       console.log("[RTI-DEBUG] righeInit:", righeInit.length, "sample:", righeInit[0]);
       console.log("[RTI-DEBUG] ordiniOrdinatoMap:", ordiniOrdinatoMap);
-      console.log("[RTI-DEBUG] mevImportiPerSocieta:", mevImportiPerSocieta);
     }
-  }, [ordiniRows, righeInit, ordiniOrdinatoMap, mevImportiPerSocieta]); // eslint-disable-line
+  }, [ordiniRows, righeInit, ordiniOrdinatoMap]); // eslint-disable-line
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRigheLocal] = React.useState([]);
