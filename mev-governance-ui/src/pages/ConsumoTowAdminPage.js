@@ -111,7 +111,8 @@ const CW = {
   azioni:            64,   // solo tabella RTI
 };
 // Larghezza totale delle prime 4 colonne info (uguale in entrambe le tabelle)
-const CW_INFO_TOTAL = CW.arrow + CW.contratto + CW.tow + CW.qta; // 377px
+// ORIGINALE const CW_INFO_TOTAL = CW.arrow + CW.contratto + CW.tow + CW.qta; // 377px
+const CW_INFO_TOTAL = 345;
 
 const FIELDS = [
   { key: "valoreUnitario",    label: "Valore Unitario",     group: "euro", color: "#64748b" },
