@@ -534,11 +534,11 @@ export const updateConsumoTow = async (id, data) => {
   return response.json();
 };
 
-export const createConsumoTow = async (towContratto, valoriUnitari, qta) => {
+export const createConsumoTow = async (towContratto, valoriUnitari, qta, isCatalogo = {}) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ towContratto, valoriUnitari, qta })
+    body: JSON.stringify({ towContratto, valoriUnitari, qta, isCatalogo })
   });
   if (response.status === 401) throw new Error("401");
   if (!response.ok) {

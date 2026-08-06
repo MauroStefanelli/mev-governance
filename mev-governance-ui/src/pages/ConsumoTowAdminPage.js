@@ -163,6 +163,7 @@ function NewContrattoBaseModal({ onClose, onCreated, onImpattoSaved }) {
   const [valori, setValori]       = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, ""])));
   const [qta, setQta]             = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, ""])));
   const [perc, setPerc]           = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, ""])));
+  const [isCat, setIsCat]         = useState(() => Object.fromEntries(INIT_TOWS.map(k => [k, false])));
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
 
@@ -177,6 +178,7 @@ function NewContrattoBaseModal({ onClose, onCreated, onImpattoSaved }) {
       setValori(p  => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
       setQta(p     => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
       setPerc(p    => { const n = { ...p }; n[val] = p[oldKey] || ""; delete n[oldKey]; return n; });
+      setIsCat(p   => { const n = { ...p }; n[val] = p[oldKey] || false; delete n[oldKey]; return n; });
       return next;
     });
   };
@@ -194,9 +196,10 @@ function NewContrattoBaseModal({ onClose, onCreated, onImpattoSaved }) {
     }
     setSaving(true); setError("");
     try {
-      const valoriByName = Object.fromEntries(towNames.map(k => [k, parsedValori[k]]));
-      const qtaByName    = Object.fromEntries(towNames.map(k => [k, parsedQta[k]]));
-      const newRows = await createConsumoTow(nomeContratto.trim(), valoriByName, qtaByName);
+      const valoriByName  = Object.fromEntries(towNames.map(k => [k, parsedValori[k]]));
+      const qtaByName     = Object.fromEntries(towNames.map(k => [k, parsedQta[k]]));
+      const isCatalogoMap = Object.fromEntries(towNames.map(k => [k, !!(isCat[k])]));
+      const newRows = await createConsumoTow(nomeContratto.trim(), valoriByName, qtaByName, isCatalogoMap);
       // Salva le % impatto per questo contratto in localStorage
       const percMap = {};
       towNames.forEach(k => { const v = parseNum(perc[k]); if (v > 0) percMap[k] = v; });
@@ -239,6 +242,7 @@ function NewContrattoBaseModal({ onClose, onCreated, onImpattoSaved }) {
                 <th style={{ padding: "8px 12px", textAlign: "left",  fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Nome TOW</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>QTA</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Valore €</th>
+                <th style={{ padding: "8px 8px",  textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#10b981", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Cat.</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>
                 <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase", borderBottom: "2px solid #e2e8f0" }}>Subtotale</th>
               </tr>
@@ -256,6 +260,14 @@ function NewContrattoBaseModal({ onClose, onCreated, onImpattoSaved }) {
                     </td>
                     <td style={{ padding: "6px 12px" }}>
                       <input style={{ ...inputBase, textAlign: "right", width: "140px" }} placeholder="0,00" value={valori[tow] ?? ""} onChange={e => setValore(idx, e.target.value)} onBlur={e => setValore(idx, formatForInput(parseNum(e.target.value), "euro"))} />
+                    </td>
+                    <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!(isCat[tow])}
+                        onChange={e => setIsCat(p => ({ ...p, [tow]: e.target.checked }))}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#10b981" }}
+                      />
                     </td>
                     <td style={{ padding: "6px 12px" }}>
                       <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>

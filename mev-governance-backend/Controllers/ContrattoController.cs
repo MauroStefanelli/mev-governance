@@ -592,14 +592,16 @@ public class ContrattoController : BaseController
         var tows = new[] { "TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6" };
         var newRows = tows.Select(t =>
         {
-            var vu  = request.ValoriUnitari.TryGetValue(t, out var v)  ? v  : 0m;
-            var qta = request.Qta.TryGetValue(t, out var q)            ? q  : 0m;
+            var vu         = request.ValoriUnitari.TryGetValue(t, out var v)  ? v  : 0m;
+            var qta        = request.Qta.TryGetValue(t, out var q)            ? q  : 0m;
+            var isCatalogo = request.IsCatalogo.TryGetValue(t, out var cat) && cat;
             return new ConsumoTow
             {
                 Tow            = t,
                 TowContratto   = request.TowContratto,
                 ValoreUnitario = vu,
                 ValoreTotale   = vu * qta,
+                IsCatalogo     = isCatalogo,
                 AmbienteId     = ambienteId,
             };
         }).ToList();
@@ -788,6 +790,8 @@ public class CreateConsumoTowRequest
     public Dictionary<string, decimal> ValoriUnitari { get; set; } = new();
     // Chiave = nome TOW, Valore = quantità TOW
     public Dictionary<string, decimal> Qta { get; set; } = new();
+    // Chiave = nome TOW, Valore = flag Catalogo
+    public Dictionary<string, bool> IsCatalogo { get; set; } = new();
 }
 
 public class CreateConsumoTowFiglioRequest
