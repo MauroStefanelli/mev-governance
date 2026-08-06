@@ -1009,6 +1009,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [righe] = useState([]); // eslint-disable-line
   const [towImpatto, setTowImpatto] = useState(loadTowImpatto);
   const dragItem = useRef(null);
+  const scrollRef = useRef(null);    // scroll orizzontale condiviso tra tabella CONTRATTO e RTI
+  const rtiScrollRef = useRef(null); // scroll orizzontale della tabella RTI
 
   // Il contratto BASE è il primo della lista (indice 0 nell'ordine salvato)
   const baseContratto = contratti[0] || "";
@@ -1421,7 +1423,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 
         return (
           <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
-            <div style={{ overflowX: "auto" }}>
+            <div
+              ref={scrollRef}
+              onScroll={e => { if (rtiScrollRef.current) rtiScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+              style={{ overflowX: "auto" }}
+            >
               <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                 {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
                 {(() => {
@@ -1709,6 +1715,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         contractCols={_contractCols}
         contractVisFields={_visFields}
         onRigheChange={setRtiRighe}
+        scrollRef={rtiScrollRef}
+        onScroll={e => { if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
       />
 
     </div>
@@ -1796,7 +1804,7 @@ function ContrattiSection({ rows }) {
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, contractCols = [], contractVisFields = [], onRigheChange }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, contractCols = [], contractVisFields = [], onRigheChange, scrollRef, onScroll }) {
   // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -2319,7 +2327,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           Le prime 4 colonne CONTRATTO (arrow+contratto+tow+qta) diventano 6 colonne info RTI
           con la stessa larghezza totale. Le colonne non-euro CONTRATTO (valoreUnitario,
           towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote. */}
-      <div style={{ overflowX: "auto" }}>
+      <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: "auto" }}>
         <table style={{ width: `${rtiW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: `${COL_ID}px`    }} />{/* ID */}
