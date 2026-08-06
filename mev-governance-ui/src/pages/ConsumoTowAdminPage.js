@@ -89,6 +89,30 @@ const formatForInput = (v, group) => {
 // Campi con totale abilitato
 const TOTALE_KEYS = new Set(["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"]);
 
+// ─── Larghezze colonne condivise tra tabella CONTRATTO e tabella RTI ──────────
+// Modificare QUI per cambiare qualsiasi larghezza: entrambe le tabelle le usano.
+const CW = {
+  arrow:             32,   // freccia expand/collapse (CONTRATTO) / ID (RTI)
+  contratto:        180,   // nome contratto (CONTRATTO) / flex split (RTI)
+  tow:              100,   // nome TOW (CONTRATTO) / ruolo (RTI)
+  qta:               65,   // quantità (CONTRATTO) / società+% (RTI)
+  valoreUnitario:   125,
+  impatto:           90,   // colonna % impatto (opzionale)
+  valoreTotale:     125,
+  approvato:        125,
+  ordinatiRda:      125,
+  impegnato:        125,
+  residuo:          125,
+  towApprovati:      85,
+  towResidui:        85,
+  collaudoApprovato:125,
+  collaudoOrdinato: 125,
+  collaudoFatturato:125,
+  azioni:            64,   // solo tabella RTI
+};
+// Larghezza totale delle prime 4 colonne info (uguale in entrambe le tabelle)
+const CW_INFO_TOTAL = CW.arrow + CW.contratto + CW.tow + CW.qta; // 377px
+
 const FIELDS = [
   { key: "valoreUnitario",    label: "Valore Unitario",     group: "euro", color: "#64748b" },
   { key: "valoreTotale",      label: "Valore Totale",        group: "euro", color: "#1e293b" },
@@ -1429,22 +1453,22 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
               style={{ overflowX: "auto" }}
             >
               <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
-                {/* Colgroup: stessa struttura della tabella interna, più colonna freccia+contratto */}
-                {(() => {
-                  const fieldsA = visibleFields.filter(f => f.key === "valoreUnitario");
-                  const fieldsB = visibleFields.filter(f => f.key !== "valoreUnitario");
-                   return (
-                     <colgroup>
-                       <col style={{ width: "32px" }} />
-                       <col style={{ width: "180px" }} />
-                       <col style={{ width: "100px" }} />
-                       <col style={{ width: "65px" }} />
-                       {fieldsA.map(f => <col key={f.key} style={{ width: "125px" }} />)}
-                       {hasImpatto && <col style={{ width: "90px" }} />}
-                       {fieldsB.map(f => <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />)}
-                     </colgroup>
-                   );
-                })()}
+                 {/* Colgroup: usa CW (condiviso con tabella RTI) per allineamento garantito */}
+                 {(() => {
+                   const fieldsA = visibleFields.filter(f => f.key === "valoreUnitario");
+                   const fieldsB = visibleFields.filter(f => f.key !== "valoreUnitario");
+                    return (
+                      <colgroup>
+                        <col style={{ width: `${CW.arrow}px` }} />
+                        <col style={{ width: `${CW.contratto}px` }} />
+                        <col style={{ width: `${CW.tow}px` }} />
+                        <col style={{ width: `${CW.qta}px` }} />
+                        {fieldsA.map(f => <col key={f.key} style={{ width: `${CW[f.key] || 125}px` }} />)}
+                        {hasImpatto && <col style={{ width: `${CW.impatto}px` }} />}
+                        {fieldsB.map(f => <col key={f.key} style={{ width: `${CW[f.key] || (f.group === "euro" ? 125 : 85)}px` }} />)}
+                      </colgroup>
+                    );
+                 })()}
 
                 {/* Header */}
                 {(() => {
@@ -2151,57 +2175,41 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   //   [valoreTotale 125] [approvato 125] [towApprovati 85] [ordinatiRda 125]
   //   [towResidui 85] [impegnato 125] [residuo 125] [collaudo* 125…]
   //
-  // Strategia: emettere la STESSA colgroup, ma le prime 4 colonne
-  // (arrow+contratto+tow+qta = firstInfoW) diventano le 6 info-colonne RTI
-  // distribuite con lo stesso pixel totale. Le colonne non-euro (valoreUnitario,
-  // towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote
-  // invisibili. Così le 5 colonne euro si allineano pixel-perfect.
+  // Strategia: usare CW (costante condivisa a livello modulo) per definire le
+  // larghezze di tutte le colonne. Questo garantisce allineamento pixel-perfect
+  // senza alcun calcolo dinamico o passaggio di props.
 
   const RTI_EURO_KEYS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
 
-  // Ricostruisce l'array ordinato { key, width } per la tabella CONTRATTO
-  const contractColDefs = React.useMemo(() => {
-    if (!contractCols.length || !contractVisFields.length) return [];
-    const fieldsA = contractVisFields.filter(f => f.key === "valoreUnitario");
-    const fieldsB = contractVisFields.filter(f => f.key !== "valoreUnitario");
+  // Colonne dopo le info (da valoreUnitario in poi) — costruite da CW, identiche alla tabella CONTRATTO
+  const visFields = contractVisFields.length > 0 ? contractVisFields : FIELDS.filter(f => !f.key.startsWith("collaudo"));
+  const afterInfoCols = React.useMemo(() => {
+    const fieldsA = visFields.filter(f => f.key === "valoreUnitario");
+    const fieldsB = visFields.filter(f => f.key !== "valoreUnitario");
     return [
-      { key: "__arrow__",     width: contractCols[0] || 32  },
-      { key: "__contratto__", width: contractCols[1] || 180 },
-      { key: "__tow__",       width: contractCols[2] || 100 },
-      { key: "__qta__",       width: contractCols[3] || 65  },
-      ...fieldsA.map((f, i) => ({ key: f.key, width: contractCols[4 + i] || 125 })),
-      ...(hasImpatto ? [{ key: "__impatto__", width: 90 }] : []),
-      ...fieldsB.map((f, i) => {
-        const base = 4 + fieldsA.length + (hasImpatto ? 1 : 0);
-        return { key: f.key, width: contractCols[base + i] || (f.group === "euro" ? 125 : 85) };
-      }),
+      ...fieldsA.map(f => ({ key: f.key, width: CW[f.key] || 125 })),
+      ...(hasImpatto ? [{ key: "__impatto__", width: CW.impatto }] : []),
+      ...fieldsB.map(f => ({ key: f.key, width: CW[f.key] || (f.group === "euro" ? 125 : 85) })),
     ];
-  }, [contractCols, contractVisFields, hasImpatto]);
+  }, [visFields, hasImpatto]);
 
-  const COL_AZIONI = 64;
-
-  // Larghezze delle colonne info (prime 4 colonne CONTRATTO: arrow+contratto+tow+qta)
-  const firstInfoW = contractColDefs.slice(0, 4).reduce((s, d) => s + d.width, 0)
-    || (32 + 180 + 100 + 65);  // fallback 377px
-
-  // Totale larghezza tabella = tabella CONTRATTO + colonna Azioni
-  const contractTotalWCalc = contractColDefs.reduce((s, d) => s + d.width, 0);
-  const rtiW = (contractTotalWCalc > 0 ? contractTotalWCalc : (contractTotalW > 0 ? contractTotalW : 877)) + COL_AZIONI;
-
-  // 6 colonne info distribuite nel firstInfoW
-  const COL_ID    = 32;
+  // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
+  const COL_ID    = CW.arrow;           // 32px
   const COL_RUOLO = 82;
   const COL_DATAI = 58;
   const COL_DATAA = 58;
-  const colFlex   = Math.max(0, firstInfoW - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA);
-  const colContr  = Math.max(60, Math.round(colFlex * 0.30));
-  const colSoc    = Math.max(60, colFlex - colContr);
+  const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
+  const colContr  = Math.max(60, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
+  const colSoc    = Math.max(60, colFlex - colContr);          // 87px
 
-  // Colonne del colgroup RTI:
-  // info(6) + tutte le colonne CONTRATTO eccetto le prime 4 + azioni
-  // Le colonne non-euro della tabella CONTRATTO (valoreUnitario, towApprovati, towResidui,
-  // impatto, collaudo) vengono emesse nel colgroup ma tenute come <td/> vuote.
-  const contractAfterInfo = contractColDefs.slice(4); // da valoreUnitario in poi
+  // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
+  // Semplificato: somma le colonne che compaiono realmente
+  const contractBaseW = CW.arrow + CW.contratto + CW.tow + CW.qta
+    + afterInfoCols.reduce((s, d) => s + d.width, 0);
+  const rtiTableW = contractBaseW + CW.azioni;
+
+  // contractAfterInfo → rinominato afterInfoCols sopra
+  const contractAfterInfo = afterInfoCols;
 
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
@@ -2328,7 +2336,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           con la stessa larghezza totale. Le colonne non-euro CONTRATTO (valoreUnitario,
           towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote. */}
       <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: "auto" }}>
-        <table style={{ width: `${rtiW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+        <table style={{ width: `${rtiTableW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: `${COL_ID}px`    }} />{/* ID */}
             <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
@@ -2337,7 +2345,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <col style={{ width: `${COL_DATAI}px` }} />{/* Data Inizio */}
             <col style={{ width: `${COL_DATAA}px` }} />{/* Data Approv. */}
             {contractAfterInfo.map((d, i) => <col key={i} style={{ width: `${d.width}px` }} />)}
-            <col style={{ width: `${COL_AZIONI}px` }} />{/* Azioni */}
+            <col style={{ width: `${CW.azioni}px` }} />{/* Azioni */}
           </colgroup>
           <thead>
             <tr>
