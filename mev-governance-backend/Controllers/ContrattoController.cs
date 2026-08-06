@@ -589,7 +589,11 @@ public class ContrattoController : BaseController
         if (exists)
             return Conflict($"Il contratto '{request.TowContratto}' esiste già.");
 
-        var tows = new[] { "TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6" };
+        // Usa i nomi TOW inviati dal frontend (chiavi di ValoriUnitari),
+        // con fallback ai nomi default se il dizionario è vuoto.
+        var tows = request.ValoriUnitari.Keys.Count > 0
+            ? request.ValoriUnitari.Keys.ToArray()
+            : new[] { "TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5", "TOW02.6" };
         var newRows = tows.Select(t =>
         {
             var vu         = request.ValoriUnitari.TryGetValue(t, out var v)  ? v  : 0m;

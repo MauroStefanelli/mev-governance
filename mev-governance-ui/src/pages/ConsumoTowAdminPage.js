@@ -775,35 +775,42 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
     return r.towApprovati ?? 0;
   };
 
-  const [righe, setRighe] = useState(() =>
-    towRows.map(r => ({
-      id: r.id,
-      tow: r.tow || "",
-      valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
-      qta: formatForInput(calcQtaFromRow(r), "qta"),
-      sconto: formatForInput(r.sconto ?? 0, "qta"),
-      subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
-      isCatalogo: !!(r.isCatalogo),
-    }))
-  );
+  const rowsToRighe = (src) => src.map(r => ({
+    id: r.id,
+    tow: r.tow || "",
+    valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
+    qta: formatForInput(calcQtaFromRow(r), "qta"),
+    sconto: formatForInput(r.sconto ?? 0, "qta"),
+    subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
+    isCatalogo: !!(r.isCatalogo),
+  }));
 
-  // Risincronizza righe se towRows arriva dopo il mount (es. primo contratto appena creato).
-  // Dipende dalla firma degli id, non dal riferimento array, per non sovrascrivere modifiche in corso.
-  const towRowsKey = towRows.map(r => r.id).join(",");
+  const [righe, setRighe] = useState(() => rowsToRighe(towRows));
+  const [loadingRighe, setLoadingRighe] = useState(towRows.length === 0);
+
+  // Se towRows era vuoto al mount (timing: contratto appena creato),
+  // recupera le righe direttamente dal backend.
   React.useEffect(() => {
-    if (towRows.length > 0 && righe.length === 0) {
-      setRighe(towRows.map(r => ({
-        id: r.id,
-        tow: r.tow || "",
-        valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
-        qta: formatForInput(calcQtaFromRow(r), "qta"),
-        sconto: formatForInput(r.sconto ?? 0, "qta"),
-        subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
-        isCatalogo: !!(r.isCatalogo),
-      })));
+    if (towRows.length > 0) {
+      // Aggiorna solo se righe è ancora vuoto (non sovrascrive modifiche in corso)
+      setRighe(prev => prev.length === 0 ? rowsToRighe(towRows) : prev);
+      setLoadingRighe(false);
+      return;
     }
+    // towRows vuoto → fetch dal backend
+    let cancelled = false;
+    setLoadingRighe(true);
+    getConsumoTow()
+      .then(all => {
+        if (cancelled) return;
+        const filtered = all.filter(r => r.towContratto === contratto);
+        setRighe(rowsToRighe(filtered));
+        setLoadingRighe(false);
+      })
+      .catch(() => { if (!cancelled) setLoadingRighe(false); });
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [towRowsKey]);
+  }, [contratto, towRows.length]);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
 
@@ -964,7 +971,9 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
               </tr>
             </thead>
             <tbody>
-              {righe.map((r, idx) => {
+              {loadingRighe ? (
+                <tr><td colSpan={isBase ? 5 : 7} style={{ padding: "32px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Caricamento in corso...</td></tr>
+              ) : righe.map((r, idx) => {
                 const baseVal   = isBase ? 0 : getBaseValore(r.tow);
                 const scontoNum = parseNum(r.sconto);
                 const scontato  = isBase ? parseNum(r.valoreUnitario) : baseVal * (1 - scontoNum / 100);
