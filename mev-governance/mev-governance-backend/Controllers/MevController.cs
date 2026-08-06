@@ -158,6 +158,53 @@ public class MevController : BaseController
     }
 
     // ============================================================
+    // POST /api/mev/reset-all   — solo Admin
+    // Elimina MevItems, Contratti, BuoniConsegna, ConsumoTow
+    // e azzera i contatori di sequenza (SERIAL / autoincrement).
+    // Users, AppSettings e UserAccessLogs NON vengono toccati.
+    // ============================================================
+    [HttpPost("reset-all")]
+    [Authorize(Roles = "Admin")]
+    public IActionResult ResetAll()
+    {
+        try
+        {
+            _db.MevItems.RemoveRange(_db.MevItems);
+            _db.Contratti.RemoveRange(_db.Contratti);
+            _db.BuoniConsegna.RemoveRange(_db.BuoniConsegna);
+            _db.ConsumoTow.RemoveRange(_db.ConsumoTow);
+            _db.SaveChanges();
+
+            // Azzera i contatori di sequenza
+            // PostgreSQL: ALTER SEQUENCE … RESTART WITH 1
+            // SQLite:     non ha sequenze — il DELETE è sufficiente
+            var isPostgres = _db.Database.ProviderName?.Contains("Npgsql") == true;
+            if (isPostgres)
+            {
+                _db.Database.ExecuteSqlRaw(@"
+                    ALTER SEQUENCE ""MevItems_Id_seq""    RESTART WITH 1;
+                    ALTER SEQUENCE ""Contratti_Id_seq""   RESTART WITH 1;
+                    ALTER SEQUENCE ""BuoniConsegna_Id_seq"" RESTART WITH 1;
+                    ALTER SEQUENCE ""ConsumoTow_Id_seq""  RESTART WITH 1;
+                ");
+            }
+            else
+            {
+                // SQLite: azzera autoincrement tramite delete dalla tabella interna
+                _db.Database.ExecuteSqlRaw(@"
+                    DELETE FROM sqlite_sequence WHERE name IN ('MevItems','Contratti','BuoniConsegna','ConsumoTow');
+                ");
+            }
+
+            return Ok(new { message = "Reset completato: MEV e ConsumoTow eliminati, contatori azzerati." });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore durante il reset: {ex.Message}");
+        }
+    }
+
+    // ============================================================
     // GET /api/mev/ping
     // ============================================================
     [HttpGet("ping")]

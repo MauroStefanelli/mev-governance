@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getUsers, createUser, toggleUser, toggleEmailUser, resetPassword, deleteUser, getUserAccessLog } from "../services/mevService";
+import { getUsers, createUser, toggleUser, toggleEmailUser, resetPassword, deleteUser, getUserAccessLog, resetAll } from "../services/mevService";
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -26,6 +26,7 @@ function AdminPage() {
   const [success, setSuccess] = useState("");
   const [accessLogModal, setAccessLogModal] = useState(null); // { userId, username, fullName, logs: [] }
   const [accessLogLoading, setAccessLogLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const formatDateTime = (iso) => {
 
@@ -138,6 +139,28 @@ function AdminPage() {
       setAccessLogModal(null);
     } finally {
       setAccessLogLoading(false);
+    }
+  };
+
+  const handleResetAll = async () => {
+    if (!window.confirm(
+      "ATTENZIONE: questa operazione è irreversibile.\n\n" +
+      "Verranno eliminati:\n" +
+      "  • tutte le righe MEV\n" +
+      "  • tutti i dati ConsumoTow (contratti + TOW + buoni consegna)\n" +
+      "I contatori ID verranno azzerati.\n\n" +
+      "RTI & SUBCO, Ordini e Verbali NON verranno toccati.\n\n" +
+      "Continuare?"
+    )) return;
+    setResetting(true);
+    setError("");
+    try {
+      const result = await resetAll();
+      notify(result.message || "Reset completato");
+    } catch (err) {
+      setError(err.message || "Errore durante il reset");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -313,6 +336,50 @@ function AdminPage() {
           ))}
         </tbody>
       </table>
+
+      {/* ── Reset dati ── */}
+      <div style={{
+        marginTop: "32px",
+        border: "1.5px solid #fecaca",
+        borderRadius: "10px",
+        padding: "16px 20px",
+        background: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "16px",
+      }}>
+        <div>
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+            Reset dati
+          </div>
+          <div style={{ fontSize: "12px", color: "#64748b", lineHeight: 1.5 }}>
+            Elimina tutte le righe <strong>MEV</strong> e tutti i dati <strong>ConsumoTow</strong> (contratti + TOW) per questo ambiente e azzera i contatori ID.
+            RTI &amp; SUBCO, Ordini e Verbali non vengono toccati.
+          </div>
+        </div>
+        <button
+          onClick={handleResetAll}
+          disabled={resetting}
+          style={{
+            flexShrink: 0,
+            padding: "8px 20px",
+            borderRadius: "8px",
+            border: "1.5px solid #dc2626",
+            background: resetting ? "#fef2f2" : "#fff",
+            color: resetting ? "#fca5a5" : "#dc2626",
+            fontSize: "12px",
+            fontWeight: 700,
+            cursor: resetting ? "default" : "pointer",
+            whiteSpace: "nowrap",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={e => { if (!resetting) e.currentTarget.style.background = "#fef2f2"; }}
+          onMouseLeave={e => { if (!resetting) e.currentTarget.style.background = "#fff"; }}
+        >
+          {resetting ? "Reset in corso..." : "🗑 Reset MEV + ConsumoTow"}
+        </button>
+      </div>
 
       {/* ── Modale storico accessi ── */}
       {accessLogModal && (

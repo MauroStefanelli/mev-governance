@@ -264,3 +264,16 @@ export const deleteUser = async (id) => {
   if (!response.ok) throw new Error("Errore eliminazione utente");
   return response.json();
 };
+
+export const resetAll = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/mev/reset-all`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
