@@ -432,25 +432,27 @@ const EuroEditField = ({ label, field, width, form, onChange }) => {
   );
 };
 
-// TOW keys → field nel form
-const TOW_FIELDS = [
-  { key: "TOW02.1", field: "tow021" }, { key: "TOW02.2", field: "tow022" },
-  { key: "TOW02.3", field: "tow023" }, { key: "TOW02.4", field: "tow024" },
-  { key: "TOW02.5", field: "tow025" }, { key: "TOW02.6", field: "tow026" },
-];
+// TOW fields nel form (posizione 0→5 corrispondono ai TOW del contratto in ordine)
+const TOW_FORM_FIELDS = ["tow021", "tow022", "tow023", "tow024", "tow025", "tow026"];
 
 // Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto.
-// TOW02.5 è un importo diretto in €: viene sommato senza moltiplicazione.
+// Usa i nomi TOW reali dal priceMap (non hardcoded), mappandoli per posizione ai field del form.
+// Se un TOW ha valoreUnitario = 0 viene trattato come importo diretto in € (catalogo).
 const calcImporto = (form, priceMap) => {
   const prices = priceMap?.[form.tipoContratto];
   if (!prices) return 0;
-  return TOW_FIELDS.reduce((sum, { key, field }) => {
+  // Ordina le chiavi TOW come appaiono nel contratto (stesso ordine del DB)
+  const towKeys = Object.keys(prices).sort();
+  return towKeys.reduce((sum, key, idx) => {
+    const field = TOW_FORM_FIELDS[idx];
+    if (!field) return sum;
     const qty = parseFloat(form[field]) || 0;
-    if (key === "TOW02.5") {
-      // importo diretto in €
+    const price = prices[key] ?? 0;
+    if (price === 0) {
+      // valoreUnitario = 0 → importo diretto in € (voce a catalogo)
       return sum + qty;
     }
-    return sum + qty * (prices[key] ?? 0);
+    return sum + qty * price;
   }, 0);
 };
 
@@ -1349,6 +1351,12 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     setRows((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...updated } : r)));
     setSavedRows((prev) => ({ ...prev, [form.id]: true }));
     setTimeout(() => setSavedRows((prev) => ({ ...prev, [form.id]: false })), 2000);
+    // Aggiorna le opzioni in memoria con i nuovi valori digitati (pmCap, releaseExcel, pRelease)
+    setMevOptions(prev => ({
+      ...prev,
+      pmCap:       form.pmCap       && !prev.pmCap.includes(form.pmCap)       ? [...prev.pmCap,       form.pmCap].sort()       : prev.pmCap,
+      releaseExcel: form.releaseExcel && !prev.releaseExcel.includes(form.releaseExcel) ? [...prev.releaseExcel, form.releaseExcel].sort() : prev.releaseExcel,
+    }));
   };
 
   // ── Crea nuova riga ───────────────────────────────────────────────────────
@@ -1395,6 +1403,12 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     });
     setRows((prev) => [...prev, newItem]);
     onRowsChange?.([...rows, newItem]);
+    // Aggiorna le opzioni in memoria con i nuovi valori digitati
+    setMevOptions(prev => ({
+      ...prev,
+      pmCap:        form.pmCap        && !prev.pmCap.includes(form.pmCap)               ? [...prev.pmCap,        form.pmCap].sort()        : prev.pmCap,
+      releaseExcel: form.releaseExcel && !prev.releaseExcel.includes(form.releaseExcel)  ? [...prev.releaseExcel, form.releaseExcel].sort()  : prev.releaseExcel,
+    }));
     // Reset filtri: la nuova riga deve essere visibile subito,
     // indipendentemente dai filtri attivi al momento della creazione.
     resetFilters();
@@ -1434,7 +1448,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
   // ── Render principale ─────────────────────────────────────────────────────
   return (
-    <div style={{ padding: "20px 24px" }}>
+   <div style={{ padding: "20px 24px 40px" }}>
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
@@ -1516,7 +1530,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       </div>
 
       {/* Tabella */}
-      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 320px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
             {/* Riga filtri */}
