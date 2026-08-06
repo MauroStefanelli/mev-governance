@@ -2198,13 +2198,11 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   const CW_INFO_TOTAL = 377;
   const COL_ID    = 32;           // CW.arrow
   const COL_RUOLO = 90;
-  const COL_DATAI = 20;
-  const COL_DATAA = 20;
-  // const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
+   // const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
   // const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
   //const colSoc    = Math.max(79, colFlex - colContr);          // 87px
-  const colContr = 10;
-  const colSoc = 205;
+  const colContr = 20;
+  const colSoc = 235;
   
 
   // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
@@ -2347,8 +2345,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
             <col style={{ width: `${COL_RUOLO}px` }} />{/* Ruolo */}
             <col style={{ width: `${colSoc}px`    }} />{/* Società */}
-            <col style={{ width: `${COL_DATAI}px` }} />{/* Data Inizio */}
-            <col style={{ width: `${COL_DATAA}px` }} />{/* Data Approv. */}
             {contractAfterInfo.map((d, i) => <col key={i} style={{ width: `${d.width}px` }} />)}
             <col style={{ width: `${CW.azioni}px` }} />{/* Azioni */}
           </colgroup>
@@ -2358,8 +2354,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
               <th style={TH2("left")}>Contratto</th>
               <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("left")}>Società</th>
-              <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Inizio</th>
-              <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Approv.</th>
               {contractAfterInfo.map(d => {
                 if (d.key === "valoreTotale") return <th key={d.key} style={{ ...TH2("right"), color: "#1e293b" }}>Valore Totale</th>;
                 if (d.key === "approvato")    return <th key={d.key} style={{ ...TH2("right"), color: "#1a73e8" }}>Approvato</th>;
@@ -2410,8 +2404,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                       )}
                     </div>
                   </td>
-                  <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
-                  <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   {contractAfterInfo.map(d => {
                     if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>;
                     if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>;
@@ -2441,7 +2433,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           {righeVisibili.length > 0 && (
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td colSpan={6} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
+                <td colSpan={4} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
                 {contractAfterInfo.map(d => {
                   if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>;
                   if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>;
