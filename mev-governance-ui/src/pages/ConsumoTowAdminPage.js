@@ -1599,7 +1599,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                         {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
                         {expanded && (
                           <tr>
-                            <td colSpan={4 + visibleFields.length + (hasImpatto ? 1 : 0)} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
+                             <td colSpan={5 + visibleFields.length + (hasImpatto ? 1 : 0)} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
                               <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
                                  <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
                                    <colgroup>
