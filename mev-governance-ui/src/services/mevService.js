@@ -357,7 +357,7 @@ export const deleteUser = async (id) => {
 
 export const resetAll = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/reset-all`, {
-    method: "POST",
+    method: "DELETE",
     headers: authHeaders(),
   });
   if (response.status === 401) throw new Error("401");
