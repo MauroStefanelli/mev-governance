@@ -780,3 +780,15 @@ export const resetMevAndConsumoTow = async () => {
   }
   return r.json();
 };
+
+export const deleteMev = async (id) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/mev/${id}`, {
+    method: 'DELETE', headers: authHeaders(),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) {
+    const msg = await r.text().catch(() => 'Errore sconosciuto');
+    throw new Error(msg);
+  }
+  return r.json();
+};

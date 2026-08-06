@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel,
-  getConsumoTow, getTowImpatto, getRtiSocieta,
+  getConsumoTow, getTowImpatto, getRtiSocieta, deleteMev,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
 import { NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
@@ -608,7 +608,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
 }
 
 // ── Modale di modifica / creazione ───────────────────────────────────────────
-function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll: towImpattoAllProp = null, rtiRows: rtiRowsProp = [] }) {
+function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towImpattoAll: towImpattoAllProp = null, rtiRows: rtiRowsProp = [] }) {
   const isCreate = mode === "create";
 
   const emptyForm = {
@@ -764,6 +764,22 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
     finally { setSaving(false); }
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!row?.id) return;
+    if (!window.confirm(`Eliminare definitivamente la riga GoTo "${row.goTo || row.excelId}"?\nL'operazione non è reversibile.`)) return;
+    setDeleting(true);
+    try {
+      await deleteMev(row.id);
+      onDelete?.();
+      onClose();
+    } catch (e) {
+      alert(`Errore eliminazione: ${e.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Colori sezioni
   const sectionColor = isCreate ? "#0d6e3d" : "#1a73e8"; // eslint-disable-line no-unused-vars
   // eslint-disable-next-line no-unused-vars
@@ -856,91 +872,106 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
 
           {/* Sezione: TOW Offerta — griglia tabellare allineata */}
           <ModalSection title="TOW Offerta" color={sectionColor}>
-            {/* Pulsante Calcola */}
-            {TOW_FIELDS.some(({ key }) => key in towImpatto) && (
-              <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
-                <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
-                  Inserisci il valore in TOW02.5 e clicca Calcola per distribuire proporzionalmente
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const importo025 = parseFloat(form.tow025) || 0;
-                    if (!importo025) { alert("Inserisci prima il valore in € per TOW02.5"); return; }
-                    if (!form.tipoContratto) { alert("Seleziona prima il Tipo Contratto"); return; }
-                    const perc025 = towImpatto["TOW02.5"];
-                    if (!perc025) { alert("Configura la % impatto per TOW02.5 in Gestione Contratto"); return; }
-                    const prices = effectivePriceMap[form.tipoContratto] || {};
-                    const totaleIntervento = importo025 / (perc025 / 100);
-                    const updates = {};
-                    TOW_FIELDS.forEach(({ key, field }) => {
-                      if (field === "tow025") return;
-                      const perc = towImpatto[key];
-                      if (!perc) return;
-                      const importoTow = totaleIntervento * perc / 100;
-                      const valUnit = Number(prices[key]) || 0;
-                      updates[field] = valUnit > 0
-                        ? parseFloat((importoTow / valUnit).toFixed(3))
-                        : parseFloat(importoTow.toFixed(2));
-                    });
-                    setForm(prev => ({ ...prev, ...updates }));
-                  }}
-                  style={{ padding: "5px 16px", borderRadius: "6px", border: "none", background: "#7c3aed", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  Calcola
-                </button>
-              </div>
-            )}
-            {/* Griglia tabellare: 6 colonne, una per TOW */}
-            <div style={{ width: "100%", overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "6px 0", tableLayout: "fixed" }}>
-                <colgroup>
-                  {TOW_FIELDS.map(({ key }) => <col key={key} style={{ width: `${100 / TOW_FIELDS.length}%` }} />)}
-                </colgroup>
-                {/* Intestazioni: TOW key — % — importo€ */}
-                <thead>
-                  <tr>
-                    {TOW_FIELDS.map(({ key, field }) => {
-                      const perc = towImpatto[key];
-                      const val = parseFloat(form[field]) || 0;
-                      const prices = effectivePriceMap[form.tipoContratto] || {};
-                      const valUnitTow = Number(prices[key]) || 0;
-                      // TOW02.5: importo diretto in € (qty = €, nessuna moltiplicazione)
-                      const importoTow = key === "TOW02.5"
-                        ? (val > 0 ? val : null)
-                        : (val > 0 && valUnitTow > 0 ? val * valUnitTow : null);
-                      const perc025 = towImpatto["TOW02.5"];
-                      const importo025 = parseFloat(form.tow025) || 0;
-                      const totaleIntervento = perc025 && importo025 ? importo025 / (perc025 / 100) : null;
-                      const atesoQty = totaleIntervento && perc && valUnitTow && field !== "tow025"
-                        ? (totaleIntervento * perc / 100) / valUnitTow : null;
-                      const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
-                      const isError = atesoQty != null && val > 0 && scostamento > 0.5;
-                      return (
-                        <th key={key} style={{ padding: "0 0 4px 0", textAlign: "center", verticalAlign: "bottom", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555", whiteSpace: "nowrap" }}>
-                          <div>{key}{isError && <span title={`Atteso: ${atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} — scost.: ${scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`} style={{ marginLeft: "3px", cursor: "help" }}>⚠</span>}</div>
-                          {perc && <div style={{ fontWeight: 600, fontSize: "10px", color: "#7c3aed" }}>{perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</div>}
-                          {importoTow != null && <div style={{ fontWeight: 700, fontSize: "10px", color: isError ? "#dc2626" : "#1a73e8", marginTop: "1px" }}>{formatEuro(importoTow)}</div>}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Riga quantità (qty) */}
-                  <tr>
-                    {TOW_FIELDS.map(({ key, field }) => {
-                      const prices = effectivePriceMap[form.tipoContratto] || {};
-                      const valUnitTow = Number(prices[key]) || 0;
-                      const val = parseFloat(form[field]) || 0;
-                      const perc = towImpatto[key];
-                      const perc025 = towImpatto["TOW02.5"];
-                      const importo025 = parseFloat(form.tow025) || 0;
-                      const totaleIntervento = perc025 && importo025 ? importo025 / (perc025 / 100) : null;
-                      const atesoQty = totaleIntervento && perc && valUnitTow && field !== "tow025"
-                        ? (totaleIntervento * perc / 100) / valUnitTow : null;
-                      const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
-                      const isError = atesoQty != null && val > 0 && scostamento > 0.5;
+            {(() => {
+              // Nomi TOW reali del contratto selezionato, ordinati come nel priceMap
+              const prices = effectivePriceMap[form.tipoContratto] || {};
+              const dynamicTowKeys = Object.keys(prices).sort();
+              // Mappa posizionale: indice 0→tow021, 1→tow022, …, 5→tow026
+              const dynamicTowFields = dynamicTowKeys.map((key, i) => ({
+                key,
+                field: TOW_FORM_FIELDS[i] || `tow0${i + 1}`,
+              }));
+              // Il TOW che funge da "importo diretto in €" è quello con valoreUnitario = 0
+              // (nella convenzione usata: priceMap[key] === 0 → è importo diretto)
+              const towDirettoKey = dynamicTowKeys.find(k => Number(prices[k]) === 0) || dynamicTowKeys[4] || null;
+              const towDirettoField = dynamicTowFields.find(f => f.key === towDirettoKey)?.field || "tow025";
+              const hasImpatto = dynamicTowFields.some(({ key }) => key in towImpatto);
+              return (
+                <>
+                  {/* Pulsante Calcola */}
+                  {hasImpatto && (
+                    <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", padding: "8px 12px", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd8fe" }}>
+                      <span style={{ fontSize: "12px", color: "#7c3aed", fontWeight: 600, flex: 1 }}>
+                        Inserisci il valore in {towDirettoKey || "TOW importo diretto"} e clicca Calcola per distribuire proporzionalmente
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const importoDiretto = parseFloat(form[towDirettoField]) || 0;
+                          if (!importoDiretto) { alert(`Inserisci prima il valore in € per ${towDirettoKey}`); return; }
+                          if (!form.tipoContratto) { alert("Seleziona prima il Tipo Contratto"); return; }
+                          const percDiretto = towImpatto[towDirettoKey];
+                          if (!percDiretto) { alert(`Configura la % impatto per ${towDirettoKey} in Gestione Contratto`); return; }
+                          const totaleIntervento = importoDiretto / (percDiretto / 100);
+                          const updates = {};
+                          dynamicTowFields.forEach(({ key, field }) => {
+                            if (field === towDirettoField) return;
+                            const perc = towImpatto[key];
+                            if (!perc) return;
+                            const importoTow = totaleIntervento * perc / 100;
+                            const valUnit = Number(prices[key]) || 0;
+                            updates[field] = valUnit > 0
+                              ? parseFloat((importoTow / valUnit).toFixed(3))
+                              : parseFloat(importoTow.toFixed(2));
+                          });
+                          setForm(prev => ({ ...prev, ...updates }));
+                        }}
+                        style={{ padding: "5px 16px", borderRadius: "6px", border: "none", background: "#7c3aed", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >
+                        Calcola
+                      </button>
+                    </div>
+                  )}
+                  {/* Griglia tabellare: N colonne, una per TOW */}
+                  <div style={{ width: "100%", overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "6px 0", tableLayout: "fixed" }}>
+                      <colgroup>
+                        {dynamicTowFields.map(({ key }) => <col key={key} style={{ width: `${100 / (dynamicTowFields.length || 6)}%` }} />)}
+                      </colgroup>
+                      {/* Intestazioni: TOW key reale — % — importo€ */}
+                      <thead>
+                        <tr>
+                          {dynamicTowFields.map(({ key, field }) => {
+                            const perc = towImpatto[key];
+                            const val = parseFloat(form[field]) || 0;
+                            const valUnitTow = Number(prices[key]) || 0;
+                            // TOW diretto in €: valoreUnitario = 0 → qty è già €
+                            const isTowDiretto = key === towDirettoKey;
+                            const importoTow = isTowDiretto
+                              ? (val > 0 ? val : null)
+                              : (val > 0 && valUnitTow > 0 ? val * valUnitTow : null);
+                            const percDiretto = towImpatto[towDirettoKey];
+                            const importoDiretto = parseFloat(form[towDirettoField]) || 0;
+                            const totaleIntervento = percDiretto && importoDiretto ? importoDiretto / (percDiretto / 100) : null;
+                            const atesoQty = totaleIntervento && perc && valUnitTow && !isTowDiretto
+                              ? (totaleIntervento * perc / 100) / valUnitTow : null;
+                            const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
+                            const isError = atesoQty != null && val > 0 && scostamento > 0.5;
+                            return (
+                              <th key={key} style={{ padding: "0 0 4px 0", textAlign: "center", verticalAlign: "bottom", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.4px", color: isError ? "#dc2626" : perc ? "#7c3aed" : "#555", whiteSpace: "nowrap" }}>
+                                <div>{key}{isError && <span title={`Atteso: ${atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} — scost.: ${scostamento.toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`} style={{ marginLeft: "3px", cursor: "help" }}>⚠</span>}</div>
+                                {perc && <div style={{ fontWeight: 600, fontSize: "10px", color: "#7c3aed" }}>{perc.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</div>}
+                                {importoTow != null && <div style={{ fontWeight: 700, fontSize: "10px", color: isError ? "#dc2626" : "#1a73e8", marginTop: "1px" }}>{formatEuro(importoTow)}</div>}
+                              </th>
+                            );
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Riga quantità (qty) */}
+                        <tr>
+                          {dynamicTowFields.map(({ key, field }) => {
+                            const valUnitTow = Number(prices[key]) || 0;
+                            const val = parseFloat(form[field]) || 0;
+                            const perc = towImpatto[key];
+                            const isTowDiretto = key === towDirettoKey;
+                            const percDiretto = towImpatto[towDirettoKey];
+                            const importoDiretto = parseFloat(form[towDirettoField]) || 0;
+                            const totaleIntervento = percDiretto && importoDiretto ? importoDiretto / (percDiretto / 100) : null;
+                            const atesoQty = totaleIntervento && perc && valUnitTow && !isTowDiretto
+                              ? (totaleIntervento * perc / 100) / valUnitTow : null;
+                            const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
+                            const isError = atesoQty != null && val > 0 && scostamento > 0.5;
                       return (
                         <td key={field} style={{ padding: "0 0 4px 0", verticalAlign: "top" }}>
                           <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white" }}>
@@ -966,38 +997,40 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
                       );
                     })}
                   </tr>
-                  {/* Riga importo € (visibile solo se almeno un TOW ha valoreUnitario, oppure TOW02.5 è presente) */}
-                  {(TOW_FIELDS.some(({ key }) => Number((effectivePriceMap[form.tipoContratto] || {})[key]) > 0) || form.tow025) && (
-                    <tr>
-                      {TOW_FIELDS.map(({ key, field }) => {
-                        const prices = effectivePriceMap[form.tipoContratto] || {};
-                        const valUnitRaw = Number(prices[key]) || 0;
-                        // TOW02.5: importo diretto in € → valUnitTow virtuale = 1
-                        const valUnitTow = key === "TOW02.5" ? 1 : valUnitRaw;
-                        const val = parseFloat(form[field]) || 0;
-                        // TOW02.5: importoTow = qty stessa (è già in €)
-                        const importoTow = key === "TOW02.5"
-                          ? (val > 0 ? val : null)
-                          : (val > 0 && valUnitTow > 0 ? val * valUnitTow : null);
-                        return (
-                          <td key={field} style={{ padding: "0 0 2px 0", verticalAlign: "top" }}>
-                            {valUnitTow > 0 ? (
-                              <TowEuroInput
-                                importoTow={importoTow}
-                                valUnitTow={valUnitTow}
-                                onCommit={qty => set(field, qty)}
-                              />
-                            ) : (
-                              <div style={{ height: "22px" }} />
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        {/* Riga importo € (visibile solo se almeno un TOW ha valoreUnitario) */}
+                        {dynamicTowFields.some(({ key }) => Number(prices[key]) > 0) && (
+                          <tr>
+                            {dynamicTowFields.map(({ key, field }) => {
+                              const valUnitRaw = Number(prices[key]) || 0;
+                              const isTowDiretto2 = key === towDirettoKey;
+                              // TOW diretto in €: valUnitTow virtuale = 1
+                              const valUnitTow = isTowDiretto2 ? 1 : valUnitRaw;
+                              const val = parseFloat(form[field]) || 0;
+                              const importoTow = isTowDiretto2
+                                ? (val > 0 ? val : null)
+                                : (val > 0 && valUnitTow > 0 ? val * valUnitTow : null);
+                              return (
+                                <td key={field} style={{ padding: "0 0 2px 0", verticalAlign: "top" }}>
+                                  {valUnitTow > 0 ? (
+                                    <TowEuroInput
+                                      importoTow={importoTow}
+                                      valUnitTow={valUnitTow}
+                                      onCommit={qty => set(field, qty)}
+                                    />
+                                  ) : (
+                                    <div style={{ height: "22px" }} />
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
           </ModalSection>
 
           {/* Sezione: Importi — tutti in € */}
@@ -1122,24 +1155,81 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, towImpattoAll:
 
         {/* ── Footer fisso ── */}
         <div style={{
-          padding: "16px 28px", borderTop: "1px solid #e2e8f0", background: "#f8fafc",
+          padding: "14px 28px", borderTop: "1px solid #e2e8f0",
+          background: "linear-gradient(to right, #f8fafc, #f1f5f9)",
           display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0,
+          boxShadow: "0 -1px 4px rgba(0,0,0,0.06)",
         }}>
-          <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+          <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>
             {isCreate ? "Compila tutti i campi obbligatori (*)" : `Modifica riga ID ${row.excelId}`}
           </div>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button style={btn("ghost")} onClick={onClose}>Annulla</button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {/* Annulla */}
             <button
+              onClick={onClose}
               style={{
-                ...btn(isCreate ? "success" : "primary"),
-                opacity: saving ? 0.7 : 1,
-                minWidth: "140px",
+                display: "inline-flex", alignItems: "center", gap: "6px",
+                padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                cursor: "pointer", border: "1.5px solid #cbd5e1",
+                background: "white", color: "#64748b",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+                transition: "all 0.15s",
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#f1f5f9"; e.currentTarget.style.borderColor = "#94a3b8"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.borderColor = "#cbd5e1"; }}
+            >
+              ✕ Annulla
+            </button>
+
+            {/* Elimina GoTo — solo in edit mode */}
+            {!isCreate && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  padding: "8px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                  cursor: deleting ? "not-allowed" : "pointer",
+                  border: "none",
+                  background: deleting ? "#fca5a5" : "linear-gradient(135deg, #ef4444, #dc2626)",
+                  color: "white",
+                  boxShadow: "0 2px 6px rgba(220,38,38,0.35)",
+                  opacity: deleting ? 0.7 : 1,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { if (!deleting) e.currentTarget.style.boxShadow = "0 4px 12px rgba(220,38,38,0.5)"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 6px rgba(220,38,38,0.35)"; }}
+              >
+                🗑 {deleting ? "Eliminazione..." : "Elimina GoTo"}
+              </button>
+            )}
+
+            {/* Salva modifiche / Crea GoTo */}
+            <button
               onClick={handleSave}
               disabled={saving}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "6px",
+                padding: "8px 22px", borderRadius: "8px", fontSize: "13px", fontWeight: 700,
+                cursor: saving ? "not-allowed" : "pointer",
+                border: "none",
+                background: saving
+                  ? "#93c5fd"
+                  : isCreate
+                    ? "linear-gradient(135deg, #22c55e, #16a34a)"
+                    : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                color: "white",
+                boxShadow: isCreate
+                  ? "0 2px 6px rgba(22,163,74,0.35)"
+                  : "0 2px 6px rgba(29,78,216,0.35)",
+                minWidth: "150px", justifyContent: "center",
+                opacity: saving ? 0.8 : 1,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { if (!saving) e.currentTarget.style.boxShadow = isCreate ? "0 4px 12px rgba(22,163,74,0.5)" : "0 4px 12px rgba(29,78,216,0.5)"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = isCreate ? "0 2px 6px rgba(22,163,74,0.35)" : "0 2px 6px rgba(29,78,216,0.35)"; }}
             >
-              {saving ? "Salvataggio..." : isCreate ? "Crea GoTo" : "Salva modifiche"}
+              {saving ? "⏳ Salvataggio..." : isCreate ? "✚ Crea GoTo" : "✔ Salva modifiche"}
             </button>
           </div>
         </div>
@@ -1363,6 +1453,11 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       pmCap:       form.pmCap       && !prev.pmCap.includes(form.pmCap)       ? [...prev.pmCap,       form.pmCap].sort()       : prev.pmCap,
       releaseExcel: form.releaseExcel && !prev.releaseExcel.includes(form.releaseExcel) ? [...prev.releaseExcel, form.releaseExcel].sort() : prev.releaseExcel,
     }));
+  };
+
+  const handleDeleteRow = (id) => {
+    setRows(prev => prev.filter(r => r.id !== id));
+    setEditRow(null);
   };
 
   // ── Crea nuova riga ───────────────────────────────────────────────────────
@@ -1727,6 +1822,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           rtiRows={rtiRows}
           onClose={() => setEditRow(null)}
           onSave={handleModalSave}
+          onDelete={() => handleDeleteRow(editRow.id)}
         />
       )}
 

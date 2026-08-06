@@ -658,6 +658,24 @@ public class MevController : BaseController
         );
     }
     // ============================================================
+    // DELETE /api/mev/{id}
+    // Elimina una singola riga MEV per l'ambiente corrente.
+    // ============================================================
+    [HttpDelete("{id:int}")]
+    public IActionResult DeleteMev(int id)
+    {
+        var ambienteId = GetAmbienteId();
+        var item = _db.MevItems.FirstOrDefault(x => x.Id == id && x.AmbienteId == ambienteId);
+        if (item == null)
+            return NotFound($"Riga MEV {id} non trovata in questo ambiente");
+
+        _db.MevItems.Remove(item);
+        _db.SaveChanges();
+
+        return Ok(new { deleted = id });
+    }
+
+    // ============================================================
     // DELETE /api/mev/reset-all
     // Svuota MevItems e ConsumoTow per l'ambiente corrente e resetta i serial ID.
     // Riservato a SuperAdmin.
