@@ -2039,66 +2039,75 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
        return Object.fromEntries(soci.map(s => [s, quota]));
      };
 
-     (mevRows || []).forEach(r => {
-       const stato        = (r.stato || "").trim();
-       if (stato === "Eliminato") return;
-       const importoEx    = Number(r.importoExcel) || 0;
-       const ordBdo       = Number(r.ordinatoBdo)  || 0;
-       const fatturato    = Number(r.fatturato)    || 0;
+      (mevRows || []).forEach(r => {
+        const stato        = (r.stato || "").trim();
+        if (stato === "Eliminato") return;
+        const importoEx    = Number(r.importoExcel) || 0;
+        const ordBdo       = Number(r.ordinatoBdo)  || 0;
+        const fatturato    = Number(r.fatturato)    || 0;
 
-       // ── CAP allocation ───────────────────────────────────────────────────────
-       const capAlloc = allocateCap(r.capgemini, r.capImporti, importoEx);
-       if (!capAlloc) return; // nessuna società CAP → skip
+        // ── CAP allocation ───────────────────────────────────────────────────────
+        const capAlloc = allocateCap(r.capgemini, r.capImporti, importoEx);
 
-       // ── SUBCO: solo se subcoImporti è esplicitamente valorizzato ────────────
-       const subcoImportiObj = parseJSON(r.subcoImporti);
-       const hasSubcoQuota   = subcoImportiObj && Object.keys(subcoImportiObj).length > 0;
+        // ── SUBCO: legge subcoImporti se valorizzato ─────────────────────────────
+        const subcoImportiObj = parseJSON(r.subcoImporti);
+        const hasSubcoQuota   = subcoImportiObj && Object.keys(subcoImportiObj).length > 0;
 
-       // Mappa finale per questa MEV: parte da capAlloc
-       const finalAlloc = { ...capAlloc };
+        // Se non c'è né CAP né SUBCO → skip
+        if (!capAlloc && !hasSubcoQuota) return;
 
-       if (hasSubcoQuota) {
-         // Aggiungi quote subco
-         Object.entries(subcoImportiObj).forEach(([soc, v]) => {
-           finalAlloc[soc] = (finalAlloc[soc] || 0) + Number(v);
-         });
-         // Sottrai la quota subco totale da CAP per non contare doppio
-         const subcoTot = Object.values(subcoImportiObj).reduce((s, v) => s + Number(v), 0);
-         if (finalAlloc[CAP_MANDATARIA] != null) {
-           finalAlloc[CAP_MANDATARIA] = Math.max(0, finalAlloc[CAP_MANDATARIA] - subcoTot);
-         }
-       }
+        // Mappa finale: parte da capAlloc (o vuota se assente)
+        const finalAlloc = capAlloc ? { ...capAlloc } : {};
 
-       // ── Accumula nella mappa per società ─────────────────────────────────────
-       Object.entries(finalAlloc).forEach(([soc, v]) => {
-         v = Number(v) || 0;
-         if (v <= 0) return;
-         ensure(soc);
-         if (stato === "Approvato")           map[soc].approvato += v;
-         if (ordBdo > 0 && importoEx > 0)    map[soc].ordinato  += v * (ordBdo    / importoEx);
-         if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
-       });
-     });
-     return map;
+        if (hasSubcoQuota) {
+          // Aggiungi quote SUBCO
+          Object.entries(subcoImportiObj).forEach(([soc, v]) => {
+            finalAlloc[soc] = (finalAlloc[soc] || 0) + Number(v);
+          });
+          // Sottrai la quota subco totale da CAP Mandataria per evitare doppio conteggio
+          if (capAlloc) {
+            const subcoTot = Object.values(subcoImportiObj).reduce((s, v) => s + Number(v), 0);
+            if (finalAlloc[CAP_MANDATARIA] != null) {
+              finalAlloc[CAP_MANDATARIA] = Math.max(0, finalAlloc[CAP_MANDATARIA] - subcoTot);
+            }
+          }
+        }
+
+        // ── Accumula nella mappa per società ─────────────────────────────────────
+        Object.entries(finalAlloc).forEach(([soc, v]) => {
+          v = Number(v) || 0;
+          if (v <= 0) return;
+          ensure(soc);
+          if (stato === "Approvato")           map[soc].approvato += v;
+          if (ordBdo > 0 && importoEx > 0)    map[soc].ordinato  += v * (ordBdo    / importoEx);
+          if (fatturato > 0 && importoEx > 0) map[soc].impegnato += v * (fatturato / importoEx);
+        });
+      });
+      return map;
    }, [mevRows]);
 
-  // Helper: restituisce i 5 valori per una riga RTI.
-  // - Valore Totale: importo manuale della riga RTI
-  // - Approvato/Impegnato: da mevImportiPerSocieta (somma tutte le MEV di quella società)
-  // - Ordinato: dagli Ordini di Consegna (fonte primaria); fallback MEV ordinatoBdo
-  // - Residuo: Valore Totale − Approvato
+  // Helper: restituisce i 5 valori per una riga RTI/SUBCO.
+  // - Valore Totale : importo manuale della riga RTI
+  // - Approvato     : da mevImportiPerSocieta (somma MEV in stato Approvato per quella società)
+  // - Ordinato      : dagli Ordini di Consegna (fonte primaria); fallback MEV ordinatoBdo
+  // - Impegnato     : proporzionale al fatturato MEV
+  // - Residuo       : per RTI  → VT − Approvato
+  //                   per SUBCO → VT − Ordinato
   const calcCampiRiga = (r) => {
-    const vt  = r.importo != null ? Number(r.importo) : null;
-    const mev = mevImportiPerSocieta[r.societa];
+    const vt       = r.importo != null ? Number(r.importo) : null;
+    const isSubco  = r.ruolo === "SUBCO";
+    const mev      = mevImportiPerSocieta[r.societa];
 
     // Ordinato dagli ordini di consegna (fonte primaria, flat per società)
     const ordiniOrdinato = ordiniOrdinatoMap[r.societa] || 0;
 
     if (mev) {
-      const approvato = mev.approvato  || 0;
+      const approvato = mev.approvato || 0;
       const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : (mev.ordinato || 0);
-      const impegnato = mev.impegnato  > 0 ? mev.impegnato : null;
-      const residuo   = vt != null ? vt - approvato : null;
+      const impegnato = mev.impegnato > 0 ? mev.impegnato : null;
+      const residuo   = vt != null
+        ? (isSubco ? vt - ordinato : vt - approvato)
+        : null;
       return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
     }
 
@@ -2109,7 +2118,11 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
     const approvato = apply(vc.approvato   || 0);
     const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : apply(vc.ordinatiRda || 0);
     const impegnato = apply(vc.impegnato   || 0);
-    const residuo   = vt != null && approvato != null ? vt - approvato : apply(vc.residuo || 0);
+    const residuo   = vt != null
+      ? (isSubco
+          ? vt - (ordinato ?? 0)
+          : (approvato != null ? vt - approvato : apply(vc.residuo || 0)))
+      : apply(vc.residuo || 0);
     return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
   };
 
@@ -2122,28 +2135,31 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   // Importo % anteprima nel form
   const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
 
-  // ── Calcolo larghezze colonne RTI allineate alla tabella CONTRATTO ──────────
-  // La tabella CONTRATTO ha colgroup:
-  //   [32, 180, 100, 65, 125(valUnit), 90?(impatto), ...visFields_B(euro=125,qta=85)]
-  // I field keys nell'ordine visFields_B sono: valoreTotale, approvato, towApprovati,
-  //   ordinatiRda, towResidui, impegnato, residuo (+ eventuali collaudo*)
-  // Dobbiamo trovare l'offset cumulativo di ciascuna delle 5 colonne euro target
-  // e costruire il colgroup RTI con colonne info + 5 euro + azioni che combaciino.
+  // ── Colgroup RTI speculare alla tabella CONTRATTO ─────────────────────────────
+  // La tabella CONTRATTO ha colgroup (ricostruito da contractCols + contractVisFields):
+  //   [arrow 32] [contratto 180] [tow 100] [qta 65]
+  //   [valoreUnitario 125] [impatto? 90]
+  //   [valoreTotale 125] [approvato 125] [towApprovati 85] [ordinatiRda 125]
+  //   [towResidui 85] [impegnato 125] [residuo 125] [collaudo* 125…]
+  //
+  // Strategia: emettere la STESSA colgroup, ma le prime 4 colonne
+  // (arrow+contratto+tow+qta = firstInfoW) diventano le 6 info-colonne RTI
+  // distribuite con lo stesso pixel totale. Le colonne non-euro (valoreUnitario,
+  // towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote
+  // invisibili. Così le 5 colonne euro si allineano pixel-perfect.
 
   const RTI_EURO_KEYS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
 
-  // Ricostruisce l'array ordinato { key, width } dal contractCols + contractVisFields
-  // contractCols = [32,180,100,65, ...fieldsA×125, ...(impatto?90), ...fieldsB×(125|85)]
-  // contractVisFields = FIELDS filtrati per showCollaudo
+  // Ricostruisce l'array ordinato { key, width } per la tabella CONTRATTO
   const contractColDefs = React.useMemo(() => {
     if (!contractCols.length || !contractVisFields.length) return [];
     const fieldsA = contractVisFields.filter(f => f.key === "valoreUnitario");
     const fieldsB = contractVisFields.filter(f => f.key !== "valoreUnitario");
-    const defs = [
-      { key: "__arrow__",    width: contractCols[0] || 32  },
-      { key: "__contratto__",width: contractCols[1] || 180 },
-      { key: "__tow__",      width: contractCols[2] || 100 },
-      { key: "__qta__",      width: contractCols[3] || 65  },
+    return [
+      { key: "__arrow__",     width: contractCols[0] || 32  },
+      { key: "__contratto__", width: contractCols[1] || 180 },
+      { key: "__tow__",       width: contractCols[2] || 100 },
+      { key: "__qta__",       width: contractCols[3] || 65  },
       ...fieldsA.map((f, i) => ({ key: f.key, width: contractCols[4 + i] || 125 })),
       ...(hasImpatto ? [{ key: "__impatto__", width: 90 }] : []),
       ...fieldsB.map((f, i) => {
@@ -2151,55 +2167,32 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         return { key: f.key, width: contractCols[base + i] || (f.group === "euro" ? 125 : 85) };
       }),
     ];
-    return defs;
   }, [contractCols, contractVisFields, hasImpatto]);
 
-  // Offset cumulativi delle 5 colonne euro nella tabella CONTRATTO
-  const euroOffsets = React.useMemo(() => {
-    const result = {};
-    let cum = 0;
-    for (const def of contractColDefs) {
-      if (RTI_EURO_KEYS.includes(def.key)) result[def.key] = cum;
-      cum += def.width;
-    }
-    return result; // { valoreTotale: px, approvato: px, ... }
-  }, [contractColDefs]); // eslint-disable-line
-
-  // Costruisce il colgroup RTI:
-  //   - colonne info: una sola colonna larga sum(col[0..firstEuroIdx-1])
-  //     oppure, se non abbiamo i dati CONTRATTO, fallback fisso
-  //   - 5 colonne euro: ognuna larga come nella tabella CONTRATTO
-  //   - colonna Azioni: 64px
-  // Per avere i 6 campi info (ID, Contratto, Ruolo, Società, DataI, DataA)
-  // distribuiamo lo spazio info in colonne fisse note.
   const COL_AZIONI = 64;
-  const firstEuroOffset = euroOffsets["valoreTotale"] ?? 0;
-  const totalEuroWidth  = (euroOffsets["residuo"] ?? 0) + 125; // offset residuo + sua larghezza
-  const rtiW = contractTotalW > 0
-    ? contractTotalW + COL_AZIONI  // tabella RTI = tabella CONTRATTO + colonna Azioni
-    : (32 + 88 + 90 + 170 + 60 + 62 + 5 * 125 + COL_AZIONI);
 
-  // Larghezza totale delle 6 colonne info RTI = offset della prima colonna euro
-  const infoTotalW = firstEuroOffset > 0
-    ? firstEuroOffset
-    : (rtiW - 5 * 125 - COL_AZIONI);
+  // Larghezze delle colonne info (prime 4 colonne CONTRATTO: arrow+contratto+tow+qta)
+  const firstInfoW = contractColDefs.slice(0, 4).reduce((s, d) => s + d.width, 0)
+    || (32 + 180 + 100 + 65);  // fallback 377px
 
-  // Distribuiamo infoTotalW sulle 6 colonne info: ID(32) Ruolo(90) DataI(60) DataA(62) fissi,
-  // il resto tra Contratto e Società (30/70)
+  // Totale larghezza tabella = tabella CONTRATTO + colonna Azioni
+  const contractTotalWCalc = contractColDefs.reduce((s, d) => s + d.width, 0);
+  const rtiW = (contractTotalWCalc > 0 ? contractTotalWCalc : (contractTotalW > 0 ? contractTotalW : 877)) + COL_AZIONI;
+
+  // 6 colonne info distribuite nel firstInfoW
   const COL_ID    = 32;
-  const COL_RUOLO = 90;
-  const COL_DATAI = 60;
-  const COL_DATAA = 62;
-  const colFlex   = infoTotalW - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA;
-  const colContr  = Math.max(80, Math.round(colFlex * 0.30));
-  const colSoc    = Math.max(80, colFlex - colContr);
+  const COL_RUOLO = 82;
+  const COL_DATAI = 58;
+  const COL_DATAA = 58;
+  const colFlex   = Math.max(0, firstInfoW - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA);
+  const colContr  = Math.max(60, Math.round(colFlex * 0.30));
+  const colSoc    = Math.max(60, colFlex - colContr);
 
-  // Larghezze delle 5 colonne euro dalla tabella CONTRATTO (o 125px default)
-  const euroWidths = RTI_EURO_KEYS.map(k => {
-    if (!contractColDefs.length) return 125;
-    const def = contractColDefs.find(d => d.key === k);
-    return def ? def.width : 125;
-  });
+  // Colonne del colgroup RTI:
+  // info(6) + tutte le colonne CONTRATTO eccetto le prime 4 + azioni
+  // Le colonne non-euro della tabella CONTRATTO (valoreUnitario, towApprovati, towResidui,
+  // impatto, collaudo) vengono emesse nel colgroup ma tenute come <td/> vuote.
+  const contractAfterInfo = contractColDefs.slice(4); // da valoreUnitario in poi
 
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
@@ -2321,9 +2314,10 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         </div>
       )}
 
-      {/* Tabella RTI & SUBCO — larghezza identica a contractTotalW per allineamento colonne numeriche.
-          Le 5 colonne euro (125px each) e Azioni (64px) sono fisse.
-          Il resto (info-cols) occupa lo spazio residuo distribuito su 6 colonne. */}
+      {/* Tabella RTI & SUBCO — colgroup speculare alla tabella CONTRATTO per allineamento pixel-perfect.
+          Le prime 4 colonne CONTRATTO (arrow+contratto+tow+qta) diventano 6 colonne info RTI
+          con la stessa larghezza totale. Le colonne non-euro CONTRATTO (valoreUnitario,
+          towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote. */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: `${rtiW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
@@ -2333,7 +2327,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <col style={{ width: `${colSoc}px`    }} />{/* Società */}
             <col style={{ width: `${COL_DATAI}px` }} />{/* Data Inizio */}
             <col style={{ width: `${COL_DATAA}px` }} />{/* Data Approv. */}
-            {euroWidths.map((w, i) => <col key={i} style={{ width: `${w}px` }} />)}{/* 5 euro */}
+            {contractAfterInfo.map((d, i) => <col key={i} style={{ width: `${d.width}px` }} />)}
             <col style={{ width: `${COL_AZIONI}px` }} />{/* Azioni */}
           </colgroup>
           <thead>
@@ -2344,21 +2338,24 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
               <th style={TH2("left")}>Società</th>
               <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Inizio</th>
               <th style={{ ...TH2("center"), fontSize: "10px", whiteSpace: "normal", lineHeight: "1.2" }}>Data<br/>Approv.</th>
-              <th style={{ ...TH2("right"), color: "#1e293b" }}>Valore Totale</th>
-              <th style={{ ...TH2("right"), color: "#1a73e8" }}>Approvato</th>
-              <th style={{ ...TH2("right"), color: "#10b981" }}>Ordinato</th>
-              <th style={{ ...TH2("right"), color: "#f59e0b" }}>Impegnato</th>
-              <th style={{ ...TH2("right"), color: "#f97316" }}>Residuo</th>
-              <th style={{ ...TH2("center"), width: "64px", minWidth: "64px" }}>Azioni</th>
+              {contractAfterInfo.map(d => {
+                if (d.key === "valoreTotale") return <th key={d.key} style={{ ...TH2("right"), color: "#1e293b" }}>Valore Totale</th>;
+                if (d.key === "approvato")    return <th key={d.key} style={{ ...TH2("right"), color: "#1a73e8" }}>Approvato</th>;
+                if (d.key === "ordinatiRda")  return <th key={d.key} style={{ ...TH2("right"), color: "#10b981" }}>Ordinato</th>;
+                if (d.key === "impegnato")    return <th key={d.key} style={{ ...TH2("right"), color: "#f59e0b" }}>Impegnato</th>;
+                if (d.key === "residuo")      return <th key={d.key} style={{ ...TH2("right"), color: "#f97316" }}>Residuo</th>;
+                return <th key={d.key} style={{ ...TH2("right"), color: "transparent" }}></th>;
+              })}
+              <th style={{ ...TH2("center") }}>Azioni</th>
             </tr>
           </thead>
           <tbody>
             {righeLoading ? (
-              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={6 + contractAfterInfo.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>
             ) : righeVisibili.length === 0 ? (
-              <tr><td colSpan={12} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={6 + contractAfterInfo.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
@@ -2382,12 +2379,15 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                   </td>
                   <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>
-                  <td style={{ ...TD2("right"), fontWeight: 700, color: "#f97316" }}>{fmt(campi.residuo)}</td>
-                  <td style={{ ...TD2("center"), width: "64px" }}>
+                  {contractAfterInfo.map(d => {
+                    if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>;
+                    if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>;
+                    if (d.key === "ordinatiRda")  return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>;
+                    if (d.key === "impegnato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>;
+                    if (d.key === "residuo")      return <td key={d.key} style={{ ...TD2("right"), fontWeight: 700, color: "#f97316" }}>{fmt(campi.residuo)}</td>;
+                    return <td key={d.key} />;  {/* colonne non-euro: vuote */}
+                  })}
+                  <td style={{ ...TD2("center") }}>
                     <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
                       <button
                         onClick={() => openEdit(r)}
@@ -2409,11 +2409,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
                 <td colSpan={6} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: totRes >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totRes)}</td>
+                {contractAfterInfo.map(d => {
+                  if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>;
+                  if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>;
+                  if (d.key === "ordinatiRda")  return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>;
+                  if (d.key === "impegnato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>;
+                  if (d.key === "residuo")      return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: totRes >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totRes)}</td>;
+                  return <td key={d.key} />;
+                })}
                 <td style={TD2("center")} />
               </tr>
             </tfoot>
