@@ -1224,35 +1224,36 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     <div style={{ padding: "28px 24px", minHeight: "100vh", background: "#f1f5f9" }}>
 
       {/* ── Titolo ── */}
-      <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Gestione Contratto</div>
-        <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Monitoraggio</h2>
-        <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
+      <div style={{ marginBottom: "24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Gestione Contratto</div>
+          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Monitoraggio</h2>
+          <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
+        </div>
+        <button
+          onClick={handleResetAll}
+          disabled={resetting}
+          title="Reset MEV + ConsumoTow — elimina MEV e dati contratto per questo ambiente"
+          style={{
+            marginTop: "4px", flexShrink: 0,
+            width: "34px", height: "34px", borderRadius: "8px",
+            border: "1.5px solid #fecaca",
+            background: resetting ? "#fef2f2" : "#fff",
+            color: resetting ? "#fca5a5" : "#dc2626",
+            fontSize: "16px", cursor: resetting ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "background 0.15s, border-color 0.15s",
+          }}
+          onMouseEnter={e => { if (!resetting) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; } }}
+          onMouseLeave={e => { if (!resetting) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; } }}
+        >
+          {resetting ? "⏳" : "🗑"}
+        </button>
       </div>
 
       {/* Messaggi */}
       {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>⚠ {error}</div>}
       {successMsg && <div style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "12px 16px", marginBottom: "18px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>✓ {successMsg}</div>}
-
-      {/* ── Zona pericolosa: Reset MEV + ConsumoTow ── */}
-      <div style={{ background: "#fff", borderRadius: "14px", border: "1.5px solid #fecaca", padding: "14px 20px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
-        <div>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Reset dati</div>
-          <div style={{ fontSize: "12px", color: "#64748b" }}>
-            Elimina tutte le righe <strong>MEV</strong> e tutti i dati <strong>ConsumoTow</strong> (contratti + TOW) per questo ambiente e azzera i contatori ID.
-            RTI &amp; SUBCO, Ordini e Verbali non vengono toccati.
-          </div>
-        </div>
-        <button
-          onClick={handleResetAll}
-          disabled={resetting}
-          style={{ flexShrink: 0, padding: "8px 20px", borderRadius: "8px", border: "1.5px solid #dc2626", background: resetting ? "#fef2f2" : "#fff", color: resetting ? "#fca5a5" : "#dc2626", fontSize: "12px", fontWeight: 700, cursor: resetting ? "default" : "pointer", whiteSpace: "nowrap", transition: "background 0.15s" }}
-          onMouseEnter={e => { if (!resetting) { e.currentTarget.style.background = "#fef2f2"; } }}
-          onMouseLeave={e => { if (!resetting) { e.currentTarget.style.background = "#fff"; } }}
-        >
-          {resetting ? "Reset in corso..." : "🗑 Reset MEV + ConsumoTow"}
-        </button>
-      </div>
 
       {/* Selezione contratto */}
       <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", padding: "20px 24px", marginBottom: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
@@ -2374,8 +2375,19 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                   </td>
                   <td style={{ ...TD2("left"), padding: "9px 6px" }}>{ruoloBadge(r.ruolo)}</td>
                   <td style={{ ...TD2("left"), padding: "9px 6px", overflow: "hidden" }}>
-                    <div style={{ fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.societa}</div>
-                    {percLabel && <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "1px" }}>{percLabel}</div>}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.societa}</span>
+                      {percLabel && (
+                        <span style={{
+                          display: "inline-flex", alignItems: "center",
+                          background: "#f5f3ff", color: "#7c3aed",
+                          border: "1.5px solid #c4b5fd",
+                          borderRadius: "6px", padding: "2px 8px",
+                          fontSize: "12px", fontWeight: 800,
+                          letterSpacing: "0.2px", flexShrink: 0,
+                        }}>{percLabel}</span>
+                      )}
+                    </div>
                   </td>
                   <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataInizio ? new Date(r.dataInizio).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
                   <td style={{ ...TD2("center"), color: "#64748b", fontSize: "11px", padding: "9px 4px" }}>{r.dataApprovazione ? new Date(r.dataApprovazione).toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}</td>
