@@ -2136,6 +2136,16 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         const ordBdo       = Number(r.ordinatoBdo)  || 0;
         const fatturato    = Number(r.fatturato)    || 0;
 
+        // ── DIAGNOSTICA temporanea ──────────────────────────────────────────────
+        if (stato === "Approvato") {
+          console.log("[RTI-DIAG] GoTo approvato:", {
+            excelId: r.excelId, goTo: r.goTo, stato,
+            capgemini: r.capgemini, capImporti: r.capImporti,
+            importoExcel: importoEx,
+          });
+        }
+        // ───────────────────────────────────────────────────────────────────────
+
         // ── CAP allocation ───────────────────────────────────────────────────────
         const capAlloc = allocateCap(r.capgemini, r.capImporti, importoEx);
 
