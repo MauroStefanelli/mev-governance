@@ -112,7 +112,7 @@ const CW = {
 };
 // Larghezza totale delle prime 4 colonne info (uguale in entrambe le tabelle)
 // ORIGINALE const CW_INFO_TOTAL = CW.arrow + CW.contratto + CW.tow + CW.qta; // 377px
-const CW_INFO_TOTAL = 345;
+const CW_INFO_TOTAL = 390;
 
 const FIELDS = [
   { key: "valoreUnitario",    label: "Valore Unitario",     group: "euro", color: "#64748b" },
@@ -2195,13 +2195,15 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   }, [visFields, hasImpatto]);
 
   // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
-  const COL_ID    = CW.arrow;           // 32px
-  const COL_RUOLO = 115;
-  const COL_DATAI = 58;
-  const COL_DATAA = 58;
+  const COL_ID    = 32;           // CW.arrow
+  const COL_RUOLO = 110;
+  const COL_DATAI = 45;
+  const COL_DATAA = 45;
   const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
-  const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
-  const colSoc    = Math.max(79, colFlex - colContr);          // 87px
+  // const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
+  //const colSoc    = Math.max(79, colFlex - colContr);          // 87px
+  const colContr = 35;
+  const colSoc = 120;
 
   // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
   // Semplificato: somma le colonne che compaiono realmente
