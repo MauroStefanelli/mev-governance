@@ -2197,14 +2197,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
   const CW_INFO_TOTAL = 377;
   const COL_ID    = 32;           // CW.arrow
-  const COL_RUOLO = 110;
-  const COL_DATAI = 25;
-  const COL_DATAA = 25;
+  const COL_RUOLO = 90;
+  const COL_DATAI = 20;
+  const COL_DATAA = 20;
   // const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
   // const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
   //const colSoc    = Math.max(79, colFlex - colContr);          // 87px
   const colContr = 10;
-  const colSoc = 175;
+  const colSoc = 205;
   
 
   // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
@@ -2396,7 +2396,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                   </td>
                   <td style={{ ...TD2("left"), padding: "9px 14px" }}>{ruoloBadge(r.ruolo)}</td>
                   <td style={{ ...TD2("left"), padding: "9px 14px", overflow: "hidden" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", whiteSpace: "nowrap", overflow: "hidden" }}>
                       <span style={{ fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.societa}</span>
                       {percLabel && (
                         <span style={{
