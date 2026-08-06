@@ -2336,7 +2336,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           con la stessa larghezza totale. Le colonne non-euro CONTRATTO (valoreUnitario,
           towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote. */}
       <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: "auto" }}>
-        <table style={{ width: `${rtiTableW}px`, borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
+        <table style={{ width: `max-content`, minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: `${COL_ID}px`    }} />{/* ID */}
             <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
