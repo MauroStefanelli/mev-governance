@@ -432,7 +432,13 @@ const EuroEditField = ({ label, field, width, form, onChange }) => {
   );
 };
 
-// TOW fields nel form (posizione 0→5 corrispondono ai TOW del contratto in ordine)
+// TOW keys → field nel form (struttura usata nel modal per label, colonne, input)
+const TOW_FIELDS = [
+  { key: "TOW02.1", field: "tow021" }, { key: "TOW02.2", field: "tow022" },
+  { key: "TOW02.3", field: "tow023" }, { key: "TOW02.4", field: "tow024" },
+  { key: "TOW02.5", field: "tow025" }, { key: "TOW02.6", field: "tow026" },
+];
+// TOW form field names per posizione (usato in calcImporto con nomi TOW dinamici)
 const TOW_FORM_FIELDS = ["tow021", "tow022", "tow023", "tow024", "tow025", "tow026"];
 
 // Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto.
