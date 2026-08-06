@@ -96,6 +96,7 @@ const CW = {
   contratto:        180,   // nome contratto (CONTRATTO) / flex split (RTI)
   tow:              100,   // nome TOW (CONTRATTO) / ruolo (RTI)
   qta:               65,   // quantità (CONTRATTO) / società+% (RTI)
+  cat:               50,   // isCatalogo checkbox
   valoreUnitario:   125,
   impatto:           90,   // colonna % impatto (opzionale)
   valoreTotale:     125,
@@ -1428,6 +1429,14 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         // Mostra colonna % Impatto sempre se ci sono impatti configurati (allineamento garantito)
         const hasImpatto = Object.keys(towImpatto).length > 0;
 
+        // Salva isCatalogo direttamente dalla tabella principale
+        const handleCatChange = async (row, checked) => {
+          try {
+            const updated = await updateConsumoTow(row.id, { ...row, isCatalogo: checked });
+            handleSaved(updated);
+          } catch (e) { console.error("Errore salvataggio Catalogo:", e); }
+        };
+
         const handleImpattoChange = (contratto, tow, val) => {
           const prev = typeof Object.values(towImpatto)[0] === "number"
             ? { [contratti[0] || "BASE"]: { ...towImpatto } } // migra da flat a per-contratto
@@ -1464,6 +1473,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                         <col style={{ width: `${CW.contratto}px` }} />
                         <col style={{ width: `${CW.tow}px` }} />
                         <col style={{ width: `${CW.qta}px` }} />
+                        <col style={{ width: `${CW.cat}px` }} />
                         {fieldsA.map(f => <col key={f.key} style={{ width: `${CW[f.key] || 125}px` }} />)}
                         {hasImpatto && <col style={{ width: `${CW.impatto}px` }} />}
                         {fieldsB.map(f => <col key={f.key} style={{ width: `${CW[f.key] || (f.group === "euro" ? 125 : 85)}px` }} />)}
@@ -1481,7 +1491,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                          <th style={{ ...TH(), borderBottom: "2px solid #e2e8f0" }} />
                          <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0" }}>Contratto</th>
                          <th style={{ ...TH("left"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>Nome TOW</th>
-                         <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
+                          <th style={{ ...TH("right"), borderBottom: "2px solid #e2e8f0", color: "#64748b" }}>QTA</th>
+                          <th style={{ ...TH("center"), borderBottom: "2px solid #e2e8f0", color: "#10b981" }}>Cat.</th>
                          {fieldsA.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
                          {hasImpatto && <th style={{ ...TH("right"), color: "#8b5cf6", borderBottom: "2px solid #e2e8f0" }}>% Impatto</th>}
                          {fieldsB.map(f => <th key={f.key} style={{ ...TH("right"), color: f.color, borderBottom: "2px solid #e2e8f0" }}>{f.label}</th>)}
@@ -1522,7 +1533,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                               <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cRows.length} TOW</span>
                             </div>
                           </td>
-                          {/* Celle vuote per TOW e QTA — allineano con le colonne interne */}
+                          {/* Celle vuote per TOW, QTA e CAT. — allineano con le colonne interne */}
+                          <td />
                           <td />
                           <td />
                           {/* Totali per ogni field — rispettando l'ordine con % Impatto dopo valoreTotale */}
@@ -1556,6 +1568,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                      <col style={{ width: "180px" }} />
                                      <col style={{ width: "100px" }} />
                                      <col style={{ width: "65px" }} />
+                                     <col style={{ width: `${CW.cat}px` }} />
                                      {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
                                        <col key={f.key} style={{ width: "125px" }} />
                                      ))}
@@ -1582,6 +1595,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                         {/* QTA */}
                                         <td style={{ ...TD("right"), color: "#64748b" }}>
                                           {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
+                                        </td>
+                                        {/* CAT. — checkbox isCatalogo */}
+                                        <td style={{ ...TD("center"), padding: "6px 4px" }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={!!(row.isCatalogo)}
+                                            onChange={e => handleCatChange(row, e.target.checked)}
+                                            style={{ width: "15px", height: "15px", cursor: "pointer", accentColor: "#10b981" }}
+                                          />
                                         </td>
                                         {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
                                           <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
@@ -1625,7 +1647,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                         <td />
                                         <td />
                                         <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
-                                        <td />
+                                        <td />{/* QTA */}
+                                        <td />{/* CAT. */}
                                        {visibleFields.filter(f => f.key === "valoreUnitario").map(f => {
                                          if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
                                          const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
@@ -1684,6 +1707,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                          </td>
                          <td />
                          <td />
+                         <td />{/* CAT. */}
                          {fieldsA.map(tdTot)}
                          {hasImpatto && <td />}
                          {fieldsB.map(tdTot)}
