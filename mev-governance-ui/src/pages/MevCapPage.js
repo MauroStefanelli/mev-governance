@@ -1395,6 +1395,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     });
     setRows((prev) => [...prev, newItem]);
     onRowsChange?.([...rows, newItem]);
+    // Reset filtri: la nuova riga deve essere visibile subito,
+    // indipendentemente dai filtri attivi al momento della creazione.
+    resetFilters();
   };
 
   // ── Loading ───────────────────────────────────────────────────────────────
