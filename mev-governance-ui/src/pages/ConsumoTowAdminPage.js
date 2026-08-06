@@ -786,6 +786,24 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
       isCatalogo: !!(r.isCatalogo),
     }))
   );
+
+  // Risincronizza righe se towRows arriva dopo il mount (es. primo contratto appena creato).
+  // Dipende dalla firma degli id, non dal riferimento array, per non sovrascrivere modifiche in corso.
+  const towRowsKey = towRows.map(r => r.id).join(",");
+  React.useEffect(() => {
+    if (towRows.length > 0 && righe.length === 0) {
+      setRighe(towRows.map(r => ({
+        id: r.id,
+        tow: r.tow || "",
+        valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
+        qta: formatForInput(calcQtaFromRow(r), "qta"),
+        sconto: formatForInput(r.sconto ?? 0, "qta"),
+        subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
+        isCatalogo: !!(r.isCatalogo),
+      })));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [towRowsKey]);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
 
