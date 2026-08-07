@@ -2239,15 +2239,23 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   const RTI_EURO_KEYS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
 
   // Colonne dopo le info (da valoreUnitario in poi) — costruite da CW, identiche alla tabella CONTRATTO
-  const visFields = contractVisFields.length > 0 ? contractVisFields : FIELDS.filter(f => !f.key.startsWith("collaudo"));
-  (() => {
+  const afterInfoCols = React.useMemo(() => {
     const fieldsA = visFields.filter(f => f.key === "valoreUnitario");
     const fieldsB = visFields.filter(f => f.key !== "valoreUnitario");
+
     return [
-      ...fieldsA.map(f => ({ key: f.key, width: CW[f.key] || 125 })),
-      ...(hasImpatto ? [{ key: "__impatto__", width: CW.impatto }] : []),
-      ...fieldsB.map(f => ({ key: f.key, width: CW[f.key] || (f.group === "euro" ? 125 : 85) })),
-    ];const afterInfoCols = React.useMemo
+      ...fieldsA.map(f => ({
+        key: f.key,
+        width: CW[f.key] || 125
+      })),
+      ...(hasImpatto
+        ? [{ key: "__impatto__", width: CW.impatto }]
+        : []),
+      ...fieldsB.map(f => ({
+        key: f.key,
+        width: CW[f.key] || (f.group === "euro" ? 125 : 85)
+      })),
+    ];
   }, [visFields, hasImpatto]);
 
   // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
