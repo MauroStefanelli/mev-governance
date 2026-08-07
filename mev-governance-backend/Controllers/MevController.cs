@@ -219,25 +219,29 @@ public class MevController : BaseController
                 .OrderBy(v => v);
 
         // Prezzi unitari per tipo contratto: { "BASE": { "TOW02.1": 123.45, ... }, "QDO": { ... } }
-        // Se l'ambiente non ha ConsumoTow, usa i prezzi da qualsiasi altro ambiente (fallback globale).
+        // Se l'ambiente non ha ConsumoTow, usa SOLO LA STRUTTURA (chiavi TOW) da un altro ambiente,
+        // ma azzera i ValoreUnitario per evitare calcoli errati con prezzi di un contratto diverso.
         var towRows = _db.ConsumoTow
             .AsNoTracking()
             .Where(t => t.AmbienteId == ambienteId && t.TowContratto != null)
             .ToList();
 
+        bool priceMapIsFallback = false;
         if (towRows.Count == 0)
         {
             towRows = _db.ConsumoTow
                 .AsNoTracking()
                 .Where(t => t.TowContratto != null)
                 .ToList();
+            priceMapIsFallback = towRows.Count > 0;
         }
 
+        // Se fallback: ValoreUnitario = 0 per tutti (struttura visibile, importo non calcolabile)
         var priceMap = towRows
             .GroupBy(t => t.TowContratto!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 g => g.Key,
-                g => g.ToDictionary(t => t.Tow, t => t.ValoreUnitario)
+                g => g.ToDictionary(t => t.Tow, t => priceMapIsFallback ? 0m : t.ValoreUnitario)
             );
 
         return Ok(new
@@ -254,6 +258,7 @@ public class MevController : BaseController
             stato         = new[] { "Approvato", "In analisi / Stima", "In approvazione", "Sospeso", "Eliminato" },
             tipoContratto = new[] { "BASE", "QDO" },
             priceMap,
+            priceMapIsFallback,
         });
     }
 

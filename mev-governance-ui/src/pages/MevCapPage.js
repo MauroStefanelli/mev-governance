@@ -614,7 +614,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
 }
 
 // ── Modale di modifica / creazione ───────────────────────────────────────────
-function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towImpattoAll: towImpattoAllProp = null, rtiRows: rtiRowsProp = [] }) {
+function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towImpattoAll: towImpattoAllProp = null, rtiRows: rtiRowsProp = [], priceMapIsFallback = false }) {
   const isCreate = mode === "create";
 
   const emptyForm = {
@@ -731,18 +731,22 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
   }, []); // eslint-disable-line
 
   // priceMap effettivo: preferisce localPriceMap (dal DB), fallback su options.priceMap
-  const effectivePriceMap = Object.keys(localPriceMap).length > 0 ? localPriceMap : (options.priceMap || {});
+  // isFallback = true se i prezzi vengono da un altro ambiente (ValoreUnitario non affidabile)
+  const localPriceMapHasData = Object.keys(localPriceMap).length > 0;
+  const effectivePriceMap = localPriceMapHasData ? localPriceMap : (options.priceMap || {});
+  // Se localPriceMap è vuoto ma options.priceMapIsFallback è true, i prezzi non sono dell'ambiente corrente
+  const effectiveIsFallback = !localPriceMapHasData && priceMapIsFallback;
 
-  // Ricalcolo importo fornitura dai TOW — funziona sia in create che in edit
-  const computedImporto = calcImporto(form, effectivePriceMap);
+  // Ricalcolo importo fornitura dai TOW — solo se i prezzi sono dell'ambiente corrente
+  const computedImporto = effectiveIsFallback ? 0 : calcImporto(form, effectivePriceMap);
   const hasPriceMap     = !!(effectivePriceMap[form.tipoContratto]);
   // In edit, se non c'è priceMap per il tipoContratto corrente, mantieni il valore originale
-  const displayImporto  = (hasPriceMap && computedImporto > 0) ? computedImporto : (form.importoExcel ?? 0);
+  const displayImporto  = (!effectiveIsFallback && hasPriceMap && computedImporto > 0) ? computedImporto : (form.importoExcel ?? 0);
   // Importo scontato: ricalcolato proporzionalmente se l'importo originale era > 0
   const origImporto     = parseFloat(row?.importoExcel) || 0;
   const origScontato    = parseFloat(row?.importoFornituraScontato) || 0;
   const scontoRatio     = origImporto > 0 ? origScontato / origImporto : 1;
-  const displayScontato = hasPriceMap && origImporto > 0
+  const displayScontato = !effectiveIsFallback && hasPriceMap && origImporto > 0
     ? computedImporto * scontoRatio
     : (form.importoFornituraScontato ?? 0);
 
@@ -771,10 +775,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
       if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
     }
     setSaving(true);
-    // towTotale = importo calcolato: usa sempre computedImporto se priceMap disponibile
-    const towTotale = hasPriceMap ? computedImporto : null;
+    // towTotale: calcolato solo se i prezzi sono dell'ambiente corrente (non fallback)
+    const towTotale = (!effectiveIsFallback && hasPriceMap) ? computedImporto : null;
     const formToSave = isCreate
-      ? { ...form, importoExcel: computedImporto, towTotale, capgemini: form.capMandanti }
+      ? { ...form, importoExcel: effectiveIsFallback ? 0 : computedImporto, towTotale, capgemini: form.capMandanti }
       : { ...form, importoExcel: displayImporto, importoFornituraScontato: displayScontato, towTotale, capgemini: form.capMandanti };
     try { await onSave(formToSave); onClose(); }
     catch (e) { alert(`Errore salvataggio: ${e.message}`); }
@@ -899,9 +903,20 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
                 key,
                 field: keyToField[key] || null,
               })).filter(f => f.field !== null);
-              // Il TOW che funge da "importo diretto in €" è quello con valoreUnitario = 0
-              // (nella convenzione usata: priceMap[key] === 0 → è importo diretto)
-              const towDirettoKey = dynamicTowKeys.find(k => Number(prices[k]) === 0) || dynamicTowKeys[4] || null;
+              // Il TOW che funge da "importo diretto in €":
+              // - Se prezzi reali: quello con valoreUnitario = 0
+              // - Se fallback (prezzi da altro ambiente, tutti a 0): quello con % impatto più alta
+              let towDirettoKey;
+              if (!effectiveIsFallback) {
+                towDirettoKey = dynamicTowKeys.find(k => Number(prices[k]) === 0) || dynamicTowKeys[4] || null;
+              } else {
+                // Usa towImpatto per trovare il TOW con percentuale maggiore (tipicamente il catalogo)
+                towDirettoKey = dynamicTowKeys.reduce((best, k) => {
+                  const p = Number(towImpatto[k]) || 0;
+                  const pb = Number(towImpatto[best]) || 0;
+                  return p > pb ? k : best;
+                }, dynamicTowKeys[4] || dynamicTowKeys[0] || null);
+              }
               const towDirettoField = dynamicTowFields.find(f => f.key === towDirettoKey)?.field || "tow025";
               const hasImpatto = dynamicTowFields.some(({ key }) => key in towImpatto);
               return (
@@ -1285,7 +1300,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [rtiRows, setRtiRows] = useState([]);
   const [mevOptions, setMevOptions] = useState({
     applicativo: [], pmPoste: [], pmCap: [], annoCompetenza: [],
-    releaseExcel: [], stato: [], tipoContratto: [], priceMap: {},
+    releaseExcel: [], stato: [], tipoContratto: [], priceMap: {}, priceMapIsFallback: false,
   });
   const role = localStorage.getItem("role") || "";
 
@@ -1317,14 +1332,15 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       setRows(data);
       onRowsChange?.(data);
       setMevOptions({
-        applicativo:    opts.applicativo    || [],
-        pmPoste:        opts.pmPoste        || [],
-        pmCap:          opts.pmCap          || [],
-        annoCompetenza: opts.annoCompetenza || [],
-        releaseExcel:   opts.releaseExcel   || [],
-        stato:          opts.stato          || [],
-        tipoContratto:  opts.tipoContratto  || [],
-        priceMap:       opts.priceMap       || {},
+        applicativo:         opts.applicativo    || [],
+        pmPoste:             opts.pmPoste        || [],
+        pmCap:               opts.pmCap          || [],
+        annoCompetenza:      opts.annoCompetenza || [],
+        releaseExcel:        opts.releaseExcel   || [],
+        stato:               opts.stato          || [],
+        tipoContratto:       opts.tipoContratto  || [],
+        priceMap:            opts.priceMap       || {},
+        priceMapIsFallback:  opts.priceMapIsFallback || false,
       });
       if (impatto && Object.keys(impatto).length > 0) {
         setTowImpattoAll(impatto);
@@ -1841,6 +1857,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           options={mevOptions}
           towImpattoAll={towImpattoAll}
           rtiRows={rtiRows}
+          priceMapIsFallback={mevOptions.priceMapIsFallback}
           onClose={() => setEditRow(null)}
           onSave={handleModalSave}
           onDelete={() => handleDeleteRow(editRow.id)}
@@ -1855,6 +1872,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           options={mevOptions}
           towImpattoAll={towImpattoAll}
           rtiRows={rtiRows}
+          priceMapIsFallback={mevOptions.priceMapIsFallback}
           nextId={(() => {
             const nums = rows
               .map((r) => parseInt(r.excelId, 10))
