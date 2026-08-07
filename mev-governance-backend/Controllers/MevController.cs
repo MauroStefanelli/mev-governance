@@ -219,10 +219,19 @@ public class MevController : BaseController
                 .OrderBy(v => v);
 
         // Prezzi unitari per tipo contratto: { "BASE": { "TOW02.1": 123.45, ... }, "QDO": { ... } }
+        // Se l'ambiente non ha ConsumoTow, usa i prezzi da qualsiasi altro ambiente (fallback globale).
         var towRows = _db.ConsumoTow
             .AsNoTracking()
             .Where(t => t.AmbienteId == ambienteId && t.TowContratto != null)
             .ToList();
+
+        if (towRows.Count == 0)
+        {
+            towRows = _db.ConsumoTow
+                .AsNoTracking()
+                .Where(t => t.TowContratto != null)
+                .ToList();
+        }
 
         var priceMap = towRows
             .GroupBy(t => t.TowContratto!, StringComparer.OrdinalIgnoreCase)
