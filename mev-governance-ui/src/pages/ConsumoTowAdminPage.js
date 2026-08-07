@@ -1972,15 +1972,6 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
     return map;
   }, [mevRows]);
 
-  // DEBUG — rimuovere dopo verifica
-  React.useEffect(() => {
-    if (ordiniRows.length > 0 || righeInit.length > 0) {
-      console.log("[RTI-DEBUG] ordiniRows:", ordiniRows.length, "sample:", ordiniRows[0]);
-      console.log("[RTI-DEBUG] righeInit:", righeInit.length, "sample:", righeInit[0]);
-      console.log("[RTI-DEBUG] ordiniOrdinatoMap:", ordiniOrdinatoMap);
-    }
-  }, [ordiniRows, righeInit, ordiniOrdinatoMap]); // eslint-disable-line
-
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRigheLocal] = React.useState([]);
   const [loadingRighe] = React.useState(false); // il loading è gestito dal padre
@@ -2125,8 +2116,10 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
        if (!capField || capField === "x") {
          return totalImporto > 0 ? { [CAP_MANDATARIA]: totalImporto } : null;
        }
-       const soci = parseJSON(capField);
-       if (!Array.isArray(soci) || soci.length === 0) return null;
+       const parsed = parseJSON(capField);
+       // Se parseJSON fallisce (stringa pura non-JSON) trattala come nome singolo società
+       const soci = Array.isArray(parsed) ? parsed : (capField ? [capField] : []);
+       if (soci.length === 0) return null;
        if (soci.length === 1) {
          return totalImporto > 0 ? { [soci[0]]: totalImporto } : null;
        }
