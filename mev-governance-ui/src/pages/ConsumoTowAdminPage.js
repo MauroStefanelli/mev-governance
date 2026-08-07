@@ -2240,14 +2240,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
 
   // Colonne dopo le info (da valoreUnitario in poi) — costruite da CW, identiche alla tabella CONTRATTO
   const visFields = contractVisFields.length > 0 ? contractVisFields : FIELDS.filter(f => !f.key.startsWith("collaudo"));
-  const afterInfoCols = React.useMemo(() => {
+  (() => {
     const fieldsA = visFields.filter(f => f.key === "valoreUnitario");
     const fieldsB = visFields.filter(f => f.key !== "valoreUnitario");
     return [
       ...fieldsA.map(f => ({ key: f.key, width: CW[f.key] || 125 })),
       ...(hasImpatto ? [{ key: "__impatto__", width: CW.impatto }] : []),
       ...fieldsB.map(f => ({ key: f.key, width: CW[f.key] || (f.group === "euro" ? 125 : 85) })),
-    ];
+    ];const afterInfoCols = React.useMemo
   }, [visFields, hasImpatto]);
 
   // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
@@ -2257,8 +2257,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
    // const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
   // const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
   //const colSoc    = Math.max(79, colFlex - colContr);          // 87px
-  const colContr = 20;
-  const colSoc = 235;
+  const colContr = 60;
+  const colSoc = 195;
   
 
   // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
@@ -2412,14 +2412,33 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
               <th style={TH2("left")}>Società</th>
               {contractAfterInfo.map(d => {
 
-                if (
-                  d.key === "valoreUnitario" ||
-                  d.key === "__impatto__" ||
-                  d.key === "towApprovati" ||
-                  d.key === "towResidui"
-                ) {
-                  return <th key={d.key} />;
-                }
+                if (d.key === "valoreUnitario")
+                  return (
+                    <th key={d.key} style={TH2("right")}>
+                      Valore Unitario
+                    </th>
+                  );
+
+                if (d.key === "__impatto__")
+                  return (
+                    <th key={d.key} style={TH2("right")}>
+                      % Impatto
+                    </th>
+                  );
+
+                if (d.key === "towApprovati")
+                  return (
+                    <th key={d.key} style={TH2("right")}>
+                      TOW Approvati
+                    </th>
+                  );
+
+                if (d.key === "towResidui")
+                  return (
+                    <th key={d.key} style={TH2("right")}>
+                      TOW Residui
+                    </th>
+                  );
 
                 if (d.key === "valoreTotale")
                   return (
