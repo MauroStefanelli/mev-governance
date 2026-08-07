@@ -2239,6 +2239,10 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   const RTI_EURO_KEYS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
 
   // Colonne dopo le info (da valoreUnitario in poi) — costruite da CW, identiche alla tabella CONTRATTO
+  const visFields = contractVisFields.length > 0
+    ? contractVisFields
+    : FIELDS.filter(f => !f.key.startsWith("collaudo"));
+
   const afterInfoCols = React.useMemo(() => {
     const fieldsA = visFields.filter(f => f.key === "valoreUnitario");
     const fieldsB = visFields.filter(f => f.key !== "valoreUnitario");
