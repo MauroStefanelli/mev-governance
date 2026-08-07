@@ -207,6 +207,92 @@ public class ContrattoController : BaseController
     }
 
     // ============================================================
+    // GET /api/contratti/debug-recalc
+    // Diagnostica: mostra i dati usati dal RecalcConsumoTow
+    // senza modificare nulla nel DB.
+    // ============================================================
+    [HttpGet("debug-recalc")]
+    public IActionResult DebugRecalc()
+    {
+        var ambienteId = GetAmbienteId();
+
+        var towRows = _db.ConsumoTow
+            .Where(t => t.AmbienteId == ambienteId)
+            .ToList();
+
+        var mevItems = _db.MevItems
+            .AsNoTracking()
+            .Where(m => m.AmbienteId == ambienteId)
+            .ToList();
+
+        var towQtaSelectors = new Func<MevItem, decimal?>[]
+        {
+            m => m.Tow021,
+            m => m.Tow022,
+            m => m.Tow023,
+            m => m.Tow024,
+            m => m.Tow025,
+            m => m.Tow026,
+        };
+
+        var towContratti = towRows
+            .Where(t => !string.IsNullOrWhiteSpace(t.TowContratto))
+            .Select(t => t.TowContratto!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var dettaglio = towContratti.Select(contratto =>
+        {
+            var towsOrdinati = towRows
+                .Where(t => string.Equals(t.TowContratto, contratto, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(t => t.Tow, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var mevContratto = mevItems
+                .Where(m => string.Equals(m.TipoContratto, contratto, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var statiMev = mevContratto
+                .GroupBy(m => m.Stato ?? "(null)")
+                .Select(g => new { stato = g.Key, count = g.Count(), sumImporto = g.Sum(m => m.ImportoFornituraScontato) });
+
+            var towCalc = towsOrdinati.Select((towRow, i) =>
+            {
+                if (i >= towQtaSelectors.Length) return new { tow = towRow.Tow, pos = i + 1, errore = "posizione > 6", mevConQtaPos = 0, mevApprovatiConQtaPos = 0, towApprovatiCalcolato = 0m, valUnitario = towRow.ValoreUnitario };
+                var sel = towQtaSelectors[i];
+                int conQta    = mevContratto.Count(m => (sel(m) ?? 0) > 0);
+                int appQta    = mevContratto.Count(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase) && (sel(m) ?? 0) > 0);
+                decimal towApp = mevContratto.Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase) && (sel(m) ?? 0) > 0).Sum(m => sel(m) ?? 0);
+                return new { tow = towRow.Tow, pos = i + 1, errore = (string?)null, mevConQtaPos = conQta, mevApprovatiConQtaPos = appQta, towApprovatiCalcolato = towApp, valUnitario = towRow.ValoreUnitario };
+            }).ToList();
+
+            return new
+            {
+                contratto,
+                mevTotali       = mevContratto.Count,
+                mevApprovati    = mevContratto.Count(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)),
+                sumImportoScontato = mevContratto.Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)).Sum(m => m.ImportoFornituraScontato),
+                sumOrdinato     = mevContratto.Where(m => m.OrdinatoBdo > 0).Sum(m => m.OrdinatoBdo),
+                statiMev,
+                towsOrdinati    = towsOrdinati.Select(t => t.Tow).ToList(),
+                towCalc
+            };
+        }).ToList();
+
+        return Ok(new
+        {
+            ambienteId,
+            mevTotali   = mevItems.Count,
+            towRowsTotali = towRows.Count,
+            tipoContrattoDistinti = mevItems
+                .GroupBy(m => m.TipoContratto ?? "(null)")
+                .Select(g => new { tipoContratto = g.Key, count = g.Count() })
+                .ToList(),
+            dettaglio
+        });
+    }
+
+    // ============================================================
     // POST /api/contratti/recalc-consumo-tow
     // Ricalcola Approvato/Ordinato/Impegnato/Residuo su ConsumoTow
     // direttamente dai dati MevItem presenti nel DB, senza Excel.
