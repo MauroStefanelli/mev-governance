@@ -438,27 +438,26 @@ const TOW_FIELDS = [
   { key: "TOW02.3", field: "tow023" }, { key: "TOW02.4", field: "tow024" },
   { key: "TOW02.5", field: "tow025" }, { key: "TOW02.6", field: "tow026" },
 ];
-// TOW form field names per posizione (usato in calcImporto con nomi TOW dinamici)
-const TOW_FORM_FIELDS = ["tow021", "tow022", "tow023", "tow024", "tow025", "tow026"];
+// Mappa nome-chiave TOW → field del form (es. "TOW02.5" → "tow025")
+const TOW_KEY_TO_FIELD = Object.fromEntries(
+  TOW_FIELDS.map(({ key, field }) => [key, field])
+);
 
 // Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto.
-// Usa i nomi TOW reali dal priceMap (non hardcoded), mappandoli per posizione ai field del form.
-// Se un TOW ha valoreUnitario = 0 viene trattato come importo diretto in € (catalogo).
+// Mappa per NOME CHIAVE (non per posizione) per evitare disallineamenti.
+// Se un TOW ha valoreUnitario = 0 viene trattato come importo diretto in € (catalogo/TOW02.5).
 const calcImporto = (form, priceMap) => {
   const prices = priceMap?.[form.tipoContratto];
   if (!prices) return 0;
-  // Ordina le chiavi TOW come appaiono nel contratto (stesso ordine del DB)
-  const towKeys = Object.keys(prices).sort();
-  return towKeys.reduce((sum, key, idx) => {
-    const field = TOW_FORM_FIELDS[idx];
+  return Object.entries(prices).reduce((sum, [key, price]) => {
+    const field = TOW_KEY_TO_FIELD[key];
     if (!field) return sum;
     const qty = parseFloat(form[field]) || 0;
-    const price = prices[key] ?? 0;
-    if (price === 0) {
-      // valoreUnitario = 0 → importo diretto in € (voce a catalogo)
+    if (Number(price) === 0) {
+      // valoreUnitario = 0 → importo diretto in € (voce a catalogo / TOW02.5)
       return sum + qty;
     }
-    return sum + qty * price;
+    return sum + qty * Number(price);
   }, 0);
 };
 
@@ -748,14 +747,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
       if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
     }
     setSaving(true);
-    // towTotale = importo totale calcolato dai TOW (qty×valoreUnitario + TOW02.5 diretto)
-    // coincide con computedImporto quando la priceMap è disponibile,
-    // altrimenti usa la somma grezza come fallback
-    const towTotale = hasPriceMap ? computedImporto
-      : TOW_FIELDS.reduce((s, { key, field }) => {
-          const v = parseFloat(form[field]) || 0;
-          return s + (key === "TOW02.5" ? v : v);
-        }, 0);
+    // towTotale = importo calcolato: usa sempre computedImporto se priceMap disponibile
+    const towTotale = hasPriceMap ? computedImporto : null;
     const formToSave = isCreate
       ? { ...form, importoExcel: computedImporto, towTotale, capgemini: form.capMandanti }
       : { ...form, importoExcel: displayImporto, importoFornituraScontato: displayScontato, towTotale, capgemini: form.capMandanti };
@@ -876,11 +869,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
               // Nomi TOW reali del contratto selezionato, ordinati come nel priceMap
               const prices = effectivePriceMap[form.tipoContratto] || {};
               const dynamicTowKeys = Object.keys(prices).sort();
-              // Mappa posizionale: indice 0→tow021, 1→tow022, …, 5→tow026
-              const dynamicTowFields = dynamicTowKeys.map((key, i) => ({
+              // Mappa per NOME CHIAVE (non per posizione) — usa TOW_KEY_TO_FIELD
+              const dynamicTowFields = dynamicTowKeys.map((key) => ({
                 key,
-                field: TOW_FORM_FIELDS[i] || `tow0${i + 1}`,
-              }));
+                field: TOW_KEY_TO_FIELD[key] || null,
+              })).filter(f => f.field !== null);
               // Il TOW che funge da "importo diretto in €" è quello con valoreUnitario = 0
               // (nella convenzione usata: priceMap[key] === 0 → è importo diretto)
               const towDirettoKey = dynamicTowKeys.find(k => Number(prices[k]) === 0) || dynamicTowKeys[4] || null;
@@ -1399,8 +1392,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
   );
 
-  const totCap    = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
-  const totPoste  = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
+  // Tot CAP: solo righe con stato "Approvato"
+  const approvedRows = filteredRows.filter((r) => (r.stato || "").trim().toLowerCase() === "approvato");
+  const totCap    = approvedRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
+  const totPoste  = approvedRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
   const hasActive = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : !!v);
 
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
@@ -1609,19 +1604,20 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         <button style={btn("success")} onClick={() => setCreateModal(true)}>
           + Nuovo GoTo
         </button>
+      </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>
-          <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
-            <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot CAP</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8" }}>{formatEuro(totCap)}</div>
-          </div>
-          <div style={{
-            background: isScostamento(totCap, totPoste) ? "#fce8e6" : "#e6f4ea",
-            borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px"
-          }}>
-            <div style={{ fontSize: "11px", color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot Poste</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853" }}>{formatEuro(totPoste)}</div>
-          </div>
+      {/* ── KPI Totali (solo righe Approvate) ──────────────────────────────── */}
+      <div style={{ display: "flex", gap: "16px", marginBottom: "12px", flexWrap: "wrap" }}>
+        <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
+          <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot CAP <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8" }}>{formatEuro(totCap)}</div>
+        </div>
+        <div style={{
+          background: isScostamento(totCap, totPoste) ? "#fce8e6" : "#e6f4ea",
+          borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px"
+        }}>
+          <div style={{ fontSize: "11px", color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot Poste <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853" }}>{formatEuro(totPoste)}</div>
         </div>
       </div>
 
