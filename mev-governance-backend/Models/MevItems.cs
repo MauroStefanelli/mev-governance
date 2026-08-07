@@ -86,4 +86,10 @@ public class MevItem
 
     // ── Ambiente ─────────────────────────────────────────────────────────────
     public int AmbienteId { get; set; }
+
+    /// <summary>
+    /// true = riga creata manualmente dalla UI (non da Excel).
+    /// Queste righe NON vengono eliminate durante "Allinea Dati".
+    /// </summary>
+    public bool IsManual { get; set; }
 }
