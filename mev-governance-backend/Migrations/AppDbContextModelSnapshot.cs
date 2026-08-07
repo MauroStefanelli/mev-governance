@@ -327,7 +327,7 @@ namespace mevgovernancebackend.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsManual")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Nel")
                         .HasColumnType("TEXT");

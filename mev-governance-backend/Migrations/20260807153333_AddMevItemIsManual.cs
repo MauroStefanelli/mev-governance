@@ -13,7 +13,7 @@ namespace mevgovernancebackend.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsManual",
                 table: "MevItems",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 defaultValue: false);
         }

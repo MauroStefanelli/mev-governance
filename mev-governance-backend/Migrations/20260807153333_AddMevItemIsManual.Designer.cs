@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace mevgovernancebackend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260807152441_AddMevItemIsManual")]
+    [Migration("20260807153333_AddMevItemIsManual")]
     partial class AddMevItemIsManual
     {
         /// <inheritdoc />
@@ -330,7 +330,7 @@ namespace mevgovernancebackend.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsManual")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Nel")
                         .HasColumnType("TEXT");
