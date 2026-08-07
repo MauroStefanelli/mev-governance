@@ -938,6 +938,7 @@ public class ContrattoController : BaseController
 
                 if (valUnitario > 0)
                 {
+                    // TOW a tariffa: somma qty × ValoreUnitario per righe MEV Approvate
                     approvato = mevContratto
                         .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
                                  && (qtaSelector(m) ?? 0) > 0)
@@ -945,23 +946,33 @@ public class ContrattoController : BaseController
                 }
                 else
                 {
-                    // Catalogo/canone: ripartizione proporzionale su ImportoFornituraScontato
+                    // TOW a importo diretto (ValoreUnitario = 0, es. TOW02.5):
+                    // il campo memorizza già l'importo in €, somma direttamente.
                     approvato = mevContratto
                         .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
-                                 && (qtaSelector(m) ?? 0) > 0
-                                 && (m.TowTotale ?? 0) > 0)
-                        .Sum(m => m.ImportoFornituraScontato * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
+                                 && (qtaSelector(m) ?? 0) > 0)
+                        .Sum(m => qtaSelector(m) ?? 0);
                 }
 
-                // OrdinatiRda: quota proporzionale di OrdinatoBdo attribuibile a questo TOW.
-                // Formula: OrdinatoBdo × (qtaTow_X / TowTotale) — vale sia per contratti a tariffa
-                // sia per catalogo. Si usa sempre la proporzione per evitare di contare lo stesso
-                // ordine N volte (una per ogni TOW della riga MEV).
-                decimal ordinati = mevContratto
-                    .Where(m => (qtaSelector(m) ?? 0) > 0
-                             && (m.TowTotale ?? 0) > 0
-                             && m.OrdinatoBdo > 0)
-                    .Sum(m => m.OrdinatoBdo * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
+                // OrdinatiRda: per TOW a tariffa usa proporzione (OrdinatoBdo × qtaTow/TowTotale).
+                // Per TOW a importo diretto (ValoreUnitario=0) usa OrdinatoBdo direttamente
+                // (il campo è già l'importo totale ordinato per la riga, non da ripartire).
+                decimal ordinati;
+                if (valUnitario > 0)
+                {
+                    ordinati = mevContratto
+                        .Where(m => (qtaSelector(m) ?? 0) > 0
+                                 && (m.TowTotale ?? 0) > 0
+                                 && m.OrdinatoBdo > 0)
+                        .Sum(m => m.OrdinatoBdo * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
+                }
+                else
+                {
+                    // TOW diretto: OrdinatoBdo è già l'importo ordinato per questo TOW
+                    ordinati = mevContratto
+                        .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
+                        .Sum(m => m.OrdinatoBdo);
+                }
 
                 // TowApprovati = SUM delle quantità TOW delle righe MEV con Stato="Approvato"
                 decimal towApprovati = mevContratto
