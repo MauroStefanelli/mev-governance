@@ -2225,13 +2225,26 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   // Importo % anteprima nel form
   const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
 
-  // Colonne euro mostrate nella tabella RTI — stesse larghezze CW della tabella CONTRATTO
-  const RTI_EURO_COLS = [
-    { key: "valoreTotale", label: "Valore Totale", color: "#1e293b", width: CW.valoreTotale },
-    { key: "approvato",    label: "Approvato",     color: "#1a73e8", width: CW.approvato    },
-    { key: "ordinatiRda",  label: "Ordinato",      color: "#10b981", width: CW.ordinatiRda  },
-    { key: "impegnato",    label: "Impegnato",     color: "#f59e0b", width: CW.impegnato    },
-    { key: "residuo",      label: "Residuo",       color: "#f97316", width: CW.residuo      },
+  // Colonne della sezione "dati" della tabella RTI — speculari a quelle della tabella CONTRATTO
+  // per garantire allineamento pixel-perfect verticale tra le due tabelle.
+  // Le colonne non-euro (valoreUnitario, impatto, towApprovati, towResidui, collaudo*)
+  // diventano spacer vuoti con la stessa larghezza.
+  const visFields = contractVisFields.length > 0 ? contractVisFields : FIELDS.filter(f => !f.key.startsWith("collaudo"));
+  const RTI_ALL_COLS = [
+    { key: "valoreUnitario", spacer: true,  width: CW.valoreUnitario },
+    ...(hasImpatto ? [{ key: "__impatto__", spacer: true, width: CW.impatto }] : []),
+    ...visFields
+      .filter(f => f.key !== "valoreUnitario")
+      .map(f => {
+        const isEuro = ["valoreTotale","approvato","ordinatiRda","impegnato","residuo"].includes(f.key);
+        return {
+          key:    f.key,
+          label:  f.label,
+          color:  f.color,
+          width:  CW[f.key] || (f.group === "euro" ? 125 : 85),
+          spacer: !isEuro,
+        };
+      }),
   ];
 
   // Larghezze colonne info RTI
@@ -2360,7 +2373,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         </div>
       )}
 
-      {/* Tabella RTI & SUBCO — solo le 5 colonne euro, stesse larghezze CW della tabella CONTRATTO */}
+      {/* Tabella RTI & SUBCO — colonne speculari a CONTRATTO per allineamento pixel-perfect */}
       <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: "auto" }}>
         <table style={{ width: `max-content`, minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
@@ -2368,7 +2381,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
             <col style={{ width: `${COL_RUOLO}px` }} />{/* Ruolo */}
             <col style={{ width: `${colSoc}px`    }} />{/* Società */}
-            {RTI_EURO_COLS.map(d => <col key={d.key} style={{ width: `${d.width}px` }} />)}
+            {RTI_ALL_COLS.map(d => <col key={d.key} style={{ width: `${d.width}px` }} />)}
             <col style={{ width: `${CW.azioni}px` }} />{/* Azioni */}
           </colgroup>
           <thead>
@@ -2377,19 +2390,21 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
               <th style={TH2("left")}>Contratto</th>
               <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("left")}>Società</th>
-              {RTI_EURO_COLS.map(d => (
-                <th key={d.key} style={{ ...TH2("right"), color: d.color }}>{d.label}</th>
-              ))}
+              {RTI_ALL_COLS.map(d =>
+                d.spacer
+                  ? <th key={d.key} style={{ ...TH2("right"), color: "transparent", userSelect: "none" }} />
+                  : <th key={d.key} style={{ ...TH2("right"), color: d.color }}>{d.label}</th>
+              )}
               <th style={{ ...TH2("center") }}>Azioni</th>
             </tr>
           </thead>
           <tbody>
             {righeLoading ? (
-              <tr><td colSpan={4 + RTI_EURO_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={4 + RTI_ALL_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>
             ) : righeVisibili.length === 0 ? (
-              <tr><td colSpan={4 + RTI_EURO_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={4 + RTI_ALL_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
@@ -2422,7 +2437,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                       )}
                     </div>
                   </td>
-                  {RTI_EURO_COLS.map(d => {
+                  {RTI_ALL_COLS.map(d => {
+                    if (d.spacer) return <td key={d.key} />;
                     const v = campi[d.key];
                     return (
                       <td key={d.key} style={{ ...TD2("right"), fontWeight: d.key === "residuo" ? 700 : 600, color: d.key === "residuo" && v != null && v < 0 ? "#dc2626" : d.color }}>
@@ -2446,7 +2462,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
                 <td colSpan={4} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
-                {RTI_EURO_COLS.map(d => {
+                {RTI_ALL_COLS.map(d => {
+                  if (d.spacer) return <td key={d.key} />;
                   const tot = d.key === "valoreTotale" ? totVT
                     : d.key === "approvato"   ? totApp
                     : d.key === "ordinatiRda" ? totOrd
