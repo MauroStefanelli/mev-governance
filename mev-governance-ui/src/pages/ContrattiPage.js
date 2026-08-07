@@ -79,7 +79,7 @@ const TOW_CANONE_LEGACY = ["TOW02.6"];
 // Calcola task/canone dinamicamente dai nomi TOW reali di un contratto.
 // Convenzione: l'ultimo TOW (sort alfabetico) è il canone, gli altri sono task.
 const getTowGroups = (rows) => {
-  const towNames = [...new Set(rows.map(r => r.tow).filter(Boolean))].sort();
+  const towNames = [...new Set(rows.map(r => r.tow?.trim()).filter(Boolean))].sort();
   if (towNames.length === 0) return { taskKeys: TOW_TASK_LEGACY, canoneKeys: TOW_CANONE_LEGACY };
   const canoneKey = towNames[towNames.length - 1];
   const taskKeys  = towNames.slice(0, -1);
@@ -423,6 +423,13 @@ function ConsumoTowSection({ towRows }) {
   // ── Calcola task/canone dinamicamente in base ai TOW reali del contratto ──
   const { taskKeys, canoneKeys } = getTowGroups(filtered);
 
+  // DEBUG — rimuovere dopo diagnosi
+  if (filtered.length > 0) {
+    console.log("[TOW DEBUG] selectedTipo:", selectedTipo);
+    console.log("[TOW DEBUG] filtered rows:", filtered.map(r => ({ tow: r.tow, towContratto: r.towContratto, valoreTotale: r.valoreTotale, approvato: r.approvato })));
+    console.log("[TOW DEBUG] taskKeys:", taskKeys, "canoneKeys:", canoneKeys);
+  }
+
   // ✅ CALCOLO PERCENTUALI PER TOW
 
   const percentData = filtered.map(t => {
@@ -446,7 +453,7 @@ function ConsumoTowSection({ towRows }) {
 
 
   const group = (keys) =>
-    filtered.filter(r => keys.some(k => r.tow?.toUpperCase() === k.toUpperCase()));
+    filtered.filter(r => keys.some(k => r.tow?.trim().toUpperCase() === k.trim().toUpperCase()));
   const sum = (rows, field) =>
     rows.reduce((s, r) => s + (r[field] || 0), 0);
 
