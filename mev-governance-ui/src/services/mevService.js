@@ -223,6 +223,19 @@ export const getConsumoTow = async () => {
   return response.json();
 };
 
+export const recalcConsumoTow = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/recalc-consumo-tow`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const txt = await response.text().catch(() => "");
+    throw new Error(txt || "Errore durante il ricalcolo");
+  }
+  return response.json();
+};
+
 export const getLastAlign = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/last-align`, {
     headers: authHeaders()

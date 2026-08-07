@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
   getTowImpatto, setTowImpatto as saveTowImpattoToDb, getMevList,
   getRtiSocieta, createRtiSocieta, updateRtiSocieta, deleteRtiSocieta, bulkImportRtiSocieta,
-  resetMevAndConsumoTow, getOrdiniConsegna,
+  resetMevAndConsumoTow, getOrdiniConsegna, recalcConsumoTow,
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
@@ -1245,6 +1245,25 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     }
   };
 
+  // ── Ricalcola Approvato/Ordinato/Impegnato/Residuo da MevItem ──────────────
+  const [recalcLoading, setRecalcLoading] = useState(false);
+  const handleRecalc = async () => {
+    setRecalcLoading(true);
+    setError("");
+    try {
+      const res = await recalcConsumoTow();
+      // Ricarica i dati aggiornati
+      await load();
+      setSuccessMsg(`Ricalcolo completato — ${res.countTow} righe aggiornate.`);
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (e) {
+      if (e.message === "401") onUnauthorized?.();
+      else setError(e.message || "Errore durante il ricalcolo");
+    } finally {
+      setRecalcLoading(false);
+    }
+  };
+
   // ── Drag & drop handlers ────────────────────────────────────────────────────
   const handleDragStart = (e, c) => {
     dragItem.current = c;
@@ -1297,25 +1316,46 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
           <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Monitoraggio</h2>
           <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
         </div>
-        <button
-          onClick={handleResetAll}
-          disabled={resetting}
-          title="Reset MEV + ConsumoTow — elimina MEV e dati contratto per questo ambiente"
-          style={{
-            marginTop: "4px", flexShrink: 0,
-            width: "34px", height: "34px", borderRadius: "8px",
-            border: "1.5px solid #fecaca",
-            background: resetting ? "#fef2f2" : "#fff",
-            color: resetting ? "#fca5a5" : "#dc2626",
-            fontSize: "16px", cursor: resetting ? "default" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.15s, border-color 0.15s",
-          }}
-          onMouseEnter={e => { if (!resetting) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; } }}
-          onMouseLeave={e => { if (!resetting) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; } }}
-        >
-          {resetting ? "⏳" : "🗑"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexShrink: 0 }}>
+          {/* Ricalcola da MEV */}
+          <button
+            onClick={handleRecalc}
+            disabled={recalcLoading}
+            title="Ricalcola Approvato / Ordinato / Impegnato / Residuo dai dati MEV-CAP e Ordini di Consegna"
+            style={{
+              padding: "6px 14px", borderRadius: "8px",
+              border: "1.5px solid #bfdbfe",
+              background: recalcLoading ? "#eff6ff" : "#fff",
+              color: recalcLoading ? "#93c5fd" : "#1a73e8",
+              fontSize: "12px", fontWeight: 600, cursor: recalcLoading ? "default" : "pointer",
+              display: "flex", alignItems: "center", gap: "6px",
+              transition: "background 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={e => { if (!recalcLoading) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.borderColor = "#1a73e8"; } }}
+            onMouseLeave={e => { if (!recalcLoading) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#bfdbfe"; } }}
+          >
+            {recalcLoading ? "⏳" : "⟳"} Ricalcola da MEV
+          </button>
+          {/* Reset */}
+          <button
+            onClick={handleResetAll}
+            disabled={resetting}
+            title="Reset MEV + ConsumoTow — elimina MEV e dati contratto per questo ambiente"
+            style={{
+              width: "34px", height: "34px", borderRadius: "8px",
+              border: "1.5px solid #fecaca",
+              background: resetting ? "#fef2f2" : "#fff",
+              color: resetting ? "#fca5a5" : "#dc2626",
+              fontSize: "16px", cursor: resetting ? "default" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={e => { if (!resetting) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; } }}
+            onMouseLeave={e => { if (!resetting) { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; } }}
+          >
+            {resetting ? "⏳" : "🗑"}
+          </button>
+        </div>
       </div>
 
       {/* Messaggi */}
