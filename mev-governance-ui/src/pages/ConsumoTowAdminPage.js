@@ -2247,11 +2247,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
       }),
   ];
 
-  // Larghezze colonne info RTI
-  const COL_ID    = CW.arrow;
-  const COL_RUOLO = 90;
-  const colContr  = 20;
-  const colSoc    = 235;
+  // Larghezze colonne info RTI — speculari alle 5 colonne info di CONTRATTO
+  // CONTRATTO: arrow(32) + contratto(180) + tow(100) + qta(65) + cat(50) = 427px
+  // RTI:       ID(32)    + contratto(20)  + ruolo(90)+ società(235)+ spacer(50) = 427px
+  const COL_ID      = CW.arrow;   // 32
+  const COL_RUOLO   = 90;
+  const colContr    = 20;
+  const colSoc      = 235;
+  const COL_SPACER  = CW.cat;     // 50 — allinea alla colonna "Cat." di CONTRATTO
 
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
@@ -2377,19 +2380,21 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
       <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: "auto" }}>
         <table style={{ width: `max-content`, minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: `${COL_ID}px`    }} />{/* ID */}
-            <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
-            <col style={{ width: `${COL_RUOLO}px` }} />{/* Ruolo */}
-            <col style={{ width: `${colSoc}px`    }} />{/* Società */}
+            <col style={{ width: `${COL_ID}px`     }} />{/* ID       — allineato a arrow     32px */}
+            <col style={{ width: `${colContr}px`   }} />{/* Contr.   — allineato a contratto 180px (troncato) */}
+            <col style={{ width: `${COL_RUOLO}px`  }} />{/* Ruolo    — allineato a tow       100px */}
+            <col style={{ width: `${colSoc}px`     }} />{/* Società  — allineato a qta        65px */}
+            <col style={{ width: `${COL_SPACER}px` }} />{/* spacer   — allineato a cat        50px */}
             {RTI_ALL_COLS.map(d => <col key={d.key} style={{ width: `${d.width}px` }} />)}
-            <col style={{ width: `${CW.azioni}px` }} />{/* Azioni */}
+            <col style={{ width: `${CW.azioni}px`  }} />{/* Azioni */}
           </colgroup>
           <thead>
             <tr>
               <th style={{ ...TH2("right"), fontSize: "10px" }}>ID</th>
               <th style={TH2("left")}>Contratto</th>
               <th style={TH2("left")}>Ruolo</th>
-              <th style={TH2("left")}>Società</th>
+              <th style={{ ...TH2("left"), overflow: "hidden" }}>Società</th>
+              <th style={{ ...TH2(), background: "#f8fafc" }} />{/* spacer cat */}
               {RTI_ALL_COLS.map(d =>
                 d.spacer
                   ? <th key={d.key} style={{ ...TH2("right"), color: "transparent", userSelect: "none" }} />
@@ -2400,11 +2405,11 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           </thead>
           <tbody>
             {righeLoading ? (
-              <tr><td colSpan={4 + RTI_ALL_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={5 + RTI_ALL_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>
             ) : righeVisibili.length === 0 ? (
-              <tr><td colSpan={4 + RTI_ALL_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={5 + RTI_ALL_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
@@ -2437,6 +2442,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                       )}
                     </div>
                   </td>
+                  <td />{/* spacer cat */}
                   {RTI_ALL_COLS.map(d => {
                     if (d.spacer) return <td key={d.key} />;
                     const v = campi[d.key];
@@ -2461,7 +2467,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
           {righeVisibili.length > 0 && (
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td colSpan={4} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
+                <td colSpan={5} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
                 {RTI_ALL_COLS.map(d => {
                   if (d.spacer) return <td key={d.key} />;
                   const tot = d.key === "valoreTotale" ? totVT
