@@ -2225,50 +2225,20 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
   // Importo % anteprima nel form
   const importoPreview = form.percentuale !== "" ? calcImporto(form.contratto, form.percentuale) : null;
 
-  // ── Colgroup RTI speculare alla tabella CONTRATTO ─────────────────────────────
-  // La tabella CONTRATTO ha colgroup (ricostruito da contractCols + contractVisFields):
-  //   [arrow 32] [contratto 180] [tow 100] [qta 65]
-  //   [valoreUnitario 125] [impatto? 90]
-  //   [valoreTotale 125] [approvato 125] [towApprovati 85] [ordinatiRda 125]
-  //   [towResidui 85] [impegnato 125] [residuo 125] [collaudo* 125…]
-  //
-  // Strategia: usare CW (costante condivisa a livello modulo) per definire le
-  // larghezze di tutte le colonne. Questo garantisce allineamento pixel-perfect
-  // senza alcun calcolo dinamico o passaggio di props.
+  // Colonne euro mostrate nella tabella RTI — stesse larghezze CW della tabella CONTRATTO
+  const RTI_EURO_COLS = [
+    { key: "valoreTotale", label: "Valore Totale", color: "#1e293b", width: CW.valoreTotale },
+    { key: "approvato",    label: "Approvato",     color: "#1a73e8", width: CW.approvato    },
+    { key: "ordinatiRda",  label: "Ordinato",      color: "#10b981", width: CW.ordinatiRda  },
+    { key: "impegnato",    label: "Impegnato",     color: "#f59e0b", width: CW.impegnato    },
+    { key: "residuo",      label: "Residuo",       color: "#f97316", width: CW.residuo      },
+  ];
 
-  const RTI_EURO_KEYS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
-
-  // Colonne dopo le info (da valoreUnitario in poi) — costruite da CW, identiche alla tabella CONTRATTO
-  const visFields = contractVisFields.length > 0 ? contractVisFields : FIELDS.filter(f => !f.key.startsWith("collaudo"));
-  const afterInfoCols = React.useMemo(() => {
-    const fieldsA = visFields.filter(f => f.key === "valoreUnitario");
-    const fieldsB = visFields.filter(f => f.key !== "valoreUnitario");
-    return [
-      ...fieldsA.map(f => ({ key: f.key, width: CW[f.key] || 125 })),
-      ...(hasImpatto ? [{ key: "__impatto__", width: CW.impatto }] : []),
-      ...fieldsB.map(f => ({ key: f.key, width: CW[f.key] || (f.group === "euro" ? 125 : 85) })),
-    ];
-  }, [visFields, hasImpatto]);
-
-  // Larghezze info RTI: le 6 colonne devono sommare esattamente CW_INFO_TOTAL (377px)
-  const CW_INFO_TOTAL = 377;
-  const COL_ID    = 32;           // CW.arrow
+  // Larghezze colonne info RTI
+  const COL_ID    = CW.arrow;
   const COL_RUOLO = 90;
-   // const colFlex   = Math.max(0, CW_INFO_TOTAL - COL_ID - COL_RUOLO - COL_DATAI - COL_DATAA); // 147px
-  // const colContr  = Math.max(35, Math.round(colFlex * 0.30));  // ~44 → clamp → 60px
-  //const colSoc    = Math.max(79, colFlex - colContr);          // 87px
-  const colContr = 20;
-  const colSoc = 235;
-  
-
-  // Larghezza totale tabella RTI = tabella CONTRATTO + colonna Azioni
-  // Semplificato: somma le colonne che compaiono realmente
-  const contractBaseW = CW.arrow + CW.contratto + CW.tow + CW.qta
-    + afterInfoCols.reduce((s, d) => s + d.width, 0);
-  const rtiTableW = contractBaseW + CW.azioni;
-
-  // contractAfterInfo → rinominato afterInfoCols sopra
-  const contractAfterInfo = afterInfoCols;
+  const colContr  = 20;
+  const colSoc    = 235;
 
   return (
     <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
@@ -2390,10 +2360,7 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         </div>
       )}
 
-      {/* Tabella RTI & SUBCO — colgroup speculare alla tabella CONTRATTO per allineamento pixel-perfect.
-          Le prime 4 colonne CONTRATTO (arrow+contratto+tow+qta) diventano 6 colonne info RTI
-          con la stessa larghezza totale. Le colonne non-euro CONTRATTO (valoreUnitario,
-          towApprovati, towResidui, impatto, collaudo) appaiono come <td/> vuote. */}
+      {/* Tabella RTI & SUBCO — solo le 5 colonne euro, stesse larghezze CW della tabella CONTRATTO */}
       <div ref={scrollRef} onScroll={onScroll} style={{ overflowX: "auto" }}>
         <table style={{ width: `max-content`, minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
           <colgroup>
@@ -2401,33 +2368,28 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <col style={{ width: `${colContr}px`  }} />{/* Contratto */}
             <col style={{ width: `${COL_RUOLO}px` }} />{/* Ruolo */}
             <col style={{ width: `${colSoc}px`    }} />{/* Società */}
-            {contractAfterInfo.map((d, i) => <col key={i} style={{ width: `${d.width}px` }} />)}
+            {RTI_EURO_COLS.map(d => <col key={d.key} style={{ width: `${d.width}px` }} />)}
             <col style={{ width: `${CW.azioni}px` }} />{/* Azioni */}
           </colgroup>
           <thead>
             <tr>
-              <th style={{ ...TH2("right"),  fontSize: "10px" }}>ID</th>
+              <th style={{ ...TH2("right"), fontSize: "10px" }}>ID</th>
               <th style={TH2("left")}>Contratto</th>
               <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("left")}>Società</th>
-              {contractAfterInfo.map(d => {
-                if (d.key === "valoreTotale") return <th key={d.key} style={{ ...TH2("right"), color: "#1e293b" }}>Valore Totale</th>;
-                if (d.key === "approvato")    return <th key={d.key} style={{ ...TH2("right"), color: "#1a73e8" }}>Approvato</th>;
-                if (d.key === "ordinatiRda")  return <th key={d.key} style={{ ...TH2("right"), color: "#10b981" }}>Ordinato</th>;
-                if (d.key === "impegnato")    return <th key={d.key} style={{ ...TH2("right"), color: "#f59e0b" }}>Impegnato</th>;
-                if (d.key === "residuo")      return <th key={d.key} style={{ ...TH2("right"), color: "#f97316" }}>Residuo</th>;
-                return <th key={d.key} style={{ ...TH2("right"), color: "transparent" }}></th>;
-              })}
+              {RTI_EURO_COLS.map(d => (
+                <th key={d.key} style={{ ...TH2("right"), color: d.color }}>{d.label}</th>
+              ))}
               <th style={{ ...TH2("center") }}>Azioni</th>
             </tr>
           </thead>
           <tbody>
             {righeLoading ? (
-              <tr><td colSpan={6 + contractAfterInfo.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={4 + RTI_EURO_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 Caricamento in corso...
               </td></tr>
             ) : righeVisibili.length === 0 ? (
-              <tr><td colSpan={6 + contractAfterInfo.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <tr><td colSpan={4 + RTI_EURO_COLS.length + 1} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
                 {filterContratto ? `Nessuna riga per il contratto ${filterContratto}` : "Nessuna riga inserita"}
               </td></tr>
             ) : righeVisibili.map((r, idx) => {
@@ -2460,26 +2422,20 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                       )}
                     </div>
                   </td>
-                  {contractAfterInfo.map(d => {
-                    if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}>{fmt(campi.valoreTotale)}</td>;
-                    if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}>{fmt(campi.approvato)}</td>;
-                    if (d.key === "ordinatiRda")  return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}>{fmt(campi.ordinatiRda)}</td>;
-                    if (d.key === "impegnato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}>{fmt(campi.impegnato)}</td>;
-                    if (d.key === "residuo")      return <td key={d.key} style={{ ...TD2("right"), fontWeight: 700, color: "#f97316" }}>{fmt(campi.residuo)}</td>;
-                    return <td key={d.key} />;  {/* colonne non-euro: vuote */}
+                  {RTI_EURO_COLS.map(d => {
+                    const v = campi[d.key];
+                    return (
+                      <td key={d.key} style={{ ...TD2("right"), fontWeight: d.key === "residuo" ? 700 : 600, color: d.key === "residuo" && v != null && v < 0 ? "#dc2626" : d.color }}>
+                        {fmt(v)}
+                      </td>
+                    );
                   })}
                   <td style={{ ...TD2("center") }}>
                     <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
-                      <button
-                        onClick={() => openEdit(r)}
-                        title="Modifica"
-                        style={{ width: "28px", height: "28px", borderRadius: "6px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1a73e8", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                      >✏️</button>
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        title="Elimina"
-                        style={{ width: "28px", height: "28px", borderRadius: "6px", border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                      >🗑️</button>
+                      <button onClick={() => openEdit(r)} title="Modifica"
+                        style={{ width: "28px", height: "28px", borderRadius: "6px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1a73e8", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✏️</button>
+                      <button onClick={() => handleDelete(r.id)} title="Elimina"
+                        style={{ width: "28px", height: "28px", borderRadius: "6px", border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -2490,13 +2446,17 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
             <tfoot>
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
                 <td colSpan={4} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
-                {contractAfterInfo.map(d => {
-                  if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>;
-                  if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>;
-                  if (d.key === "ordinatiRda")  return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>;
-                  if (d.key === "impegnato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>;
-                  if (d.key === "residuo")      return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: totRes >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totRes)}</td>;
-                  return <td key={d.key} />;
+                {RTI_EURO_COLS.map(d => {
+                  const tot = d.key === "valoreTotale" ? totVT
+                    : d.key === "approvato"   ? totApp
+                    : d.key === "ordinatiRda" ? totOrd
+                    : d.key === "impegnato"   ? totImp
+                    : totRes;
+                  return (
+                    <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: d.key === "residuo" && tot < 0 ? "#dc2626" : d.color }}>
+                      {formatEuro(tot)}
+                    </td>
+                  );
                 })}
                 <td style={TD2("center")} />
               </tr>
