@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Npgsql;
+using System.Security.Claims;
 using System.Text.Json;
 using MevGovernanceBackend.Data;
 
@@ -272,6 +273,40 @@ public class SettingsController : ControllerBase
             });
         }
     }
+
+    // ── POST /api/settings/reset-data ─────────────────────────────────────────
+    // Azzera tutti i dati operativi del contratto/ambiente selezionato.
+    [HttpPost("reset-data")]
+    public IActionResult ResetData()
+    {
+        // Legge ambienteId dal claim JWT (stessa logica di BaseController.GetAmbienteId)
+        var claim = User.FindFirst("ambienteId")?.Value;
+        if (!int.TryParse(claim, out var ambienteId) || ambienteId <= 0)
+            return Unauthorized(new { message = "ambienteId non valido nel token." });
+
+        // Conta prima di cancellare (per il messaggio di risposta)
+        var mevCount       = _db.MevItems.Count(m => m.AmbienteId == ambienteId);
+        var towCount       = _db.ConsumoTow.Count(t => t.AmbienteId == ambienteId);
+        var contrattiCount = _db.Contratti.Count(c => c.AmbienteId == ambienteId);
+        var bcCount        = _db.BuoniConsegna.Count(b => b.AmbienteId == ambienteId);
+        var ocCount        = _db.OrdiniConsegna.Count(o => o.AmbienteId == ambienteId);
+        var vaCount        = _db.VerbaliAvanzamento.Count(v => v.AmbienteId == ambienteId);
+
+        // Cancella nell'ordine corretto (figlio prima del padre per le FK)
+        _db.VerbaliAvanzamento.RemoveRange(_db.VerbaliAvanzamento.Where(v => v.AmbienteId == ambienteId));
+        _db.OrdiniConsegna.RemoveRange(_db.OrdiniConsegna.Where(o => o.AmbienteId == ambienteId));
+        _db.BuoniConsegna.RemoveRange(_db.BuoniConsegna.Where(b => b.AmbienteId == ambienteId));
+        _db.Contratti.RemoveRange(_db.Contratti.Where(c => c.AmbienteId == ambienteId));
+        _db.ConsumoTow.RemoveRange(_db.ConsumoTow.Where(t => t.AmbienteId == ambienteId));
+        _db.MevItems.RemoveRange(_db.MevItems.Where(m => m.AmbienteId == ambienteId));
+        _db.SaveChanges();
+
+        return Ok(new
+        {
+            message  = $"Dati operativi eliminati per ambienteId={ambienteId}.",
+            deleted  = new { mevCount, towCount, contrattiCount, bcCount, ocCount, vaCount }
+        });
+    }
 }
 public class DbConfigDto
 {
@@ -290,5 +325,10 @@ public class AppSettingsDto
 {
     public int LogoutMinutes { get; set; } = 60;
 }
+
+// ── Reset dati operativi per l'ambiente corrente ───────────────────────────────
+// Cancella: MevItems, ConsumoTow, Contratti, BuoniConsegna, OrdiniConsegna, VerbaliAvanzamento
+// Filtra per ambienteId estratto dal JWT — non tocca altri ambienti né utenti/settings.
+// ─────────────────────────────────────────────────────────────────────────────
 
 
