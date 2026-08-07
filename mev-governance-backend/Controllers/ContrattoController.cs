@@ -607,6 +607,55 @@ public class ContrattoController : BaseController
     }
 
     // ============================================================
+    // GET /api/contratti/consumo-tow/prezzi
+    // Restituisce la mappa prezzi (TowContratto → Tow → ValoreUnitario + Sconto + IsCatalogo)
+    // da qualsiasi ambiente che abbia dati ConsumoTow.
+    // Usato come fallback per ambienti nuovi/vuoti che non hanno ancora ConsumoTow caricato.
+    // ============================================================
+    [HttpGet("consumo-tow/prezzi")]
+    public IActionResult GetConsumoTowPrezzi()
+    {
+        try
+        {
+            var ambienteId = GetAmbienteId();
+
+            // Prima prova l'ambiente corrente
+            var rows = _db.ConsumoTow.AsNoTracking()
+                .Where(t => t.AmbienteId == ambienteId && t.TowContratto != null)
+                .ToList();
+
+            // Se l'ambiente corrente è vuoto, usa il primo ambiente che ha dati
+            if (rows.Count == 0)
+            {
+                rows = _db.ConsumoTow.AsNoTracking()
+                    .Where(t => t.TowContratto != null)
+                    .ToList();
+            }
+
+            // Costruisce priceMap: { "NomeContratto": { "TOW02.1": { valoreUnitario, sconto, isCatalogo } } }
+            var priceMap = rows
+                .GroupBy(t => t.TowContratto!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(t => t.Tow, StringComparer.OrdinalIgnoreCase)
+                          .ToDictionary(
+                              tg => tg.Key,
+                              tg => new {
+                                  valoreUnitario = tg.First().ValoreUnitario,
+                                  sconto         = tg.First().Sconto,
+                                  isCatalogo     = tg.First().IsCatalogo,
+                              })
+                );
+
+            return Ok(priceMap);
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore recupero prezzi ConsumoTOW: {ex.Message}");
+        }
+    }
+
+    // ============================================================
     // DELETE /api/contratti/consumo-tow/contratto/{nome}
     // Elimina tutte le righe di un contratto (solo Admin)
     // ============================================================

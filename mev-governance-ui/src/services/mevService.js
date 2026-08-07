@@ -223,6 +223,15 @@ export const getConsumoTow = async () => {
   return response.json();
 };
 
+export const getConsumoTowPrezzi = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/consumo-tow/prezzi`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) throw new Error("Errore nel recupero prezzi ConsumoTOW");
+  return response.json();
+};
+
 export const recalcConsumoTow = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/recalc-consumo-tow`, {
     method: "POST",

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   getMevList, updateMev, createMev, getMevOptions, alignMevData, exportMev, uploadExcel,
-  getConsumoTow, getTowImpatto, getRtiSocieta, deleteMev,
+  getConsumoTow, getConsumoTowPrezzi, getTowImpatto, getRtiSocieta, deleteMev,
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
 import { NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
@@ -702,9 +702,26 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
         if (!pm[r.towContratto]) pm[r.towContratto] = {};
         pm[r.towContratto][r.tow] = Number(r.valoreUnitario) || 0;
       });
-      setLocalPriceMap(pm);
+      if (Object.keys(pm).length > 0) {
+        setLocalPriceMap(pm);
+      } else {
+        // Ambiente senza ConsumoTow: usa i prezzi da un altro ambiente come fallback
+        getConsumoTowPrezzi().then(prezzi => {
+          const pmFallback = {};
+          Object.entries(prezzi).forEach(([contratto, tows]) => {
+            pmFallback[contratto] = {};
+            Object.entries(tows).forEach(([tow, info]) => {
+              pmFallback[contratto][tow] = Number(info.valoreUnitario) || 0;
+            });
+          });
+          setLocalPriceMap(pmFallback);
+          // Popola anche il dropdown Tipo Contratto con i contratti disponibili
+          const contrattiGlobali = Object.keys(prezzi);
+          setContrattiTow(prev => prev.length > 0 ? prev : contrattiGlobali);
+        }).catch(() => {});
+      }
     }).catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line
 
   // priceMap effettivo: preferisce localPriceMap (dal DB), fallback su options.priceMap
   const effectivePriceMap = Object.keys(localPriceMap).length > 0 ? localPriceMap : (options.priceMap || {});
