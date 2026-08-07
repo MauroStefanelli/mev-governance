@@ -326,7 +326,7 @@ namespace mevgovernancebackend.Migrations
                     b.Property<string>("InVita")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsManual")
+                    b.Property<int>("IsManual")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Nel")

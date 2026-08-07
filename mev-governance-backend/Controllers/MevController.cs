@@ -313,7 +313,7 @@ public class MevController : BaseController
             CapImporti              = request.CapImporti,
             SubcoImporti            = request.SubcoImporti,
             AmbienteId              = ambienteId,
-            IsManual                = true,   // creata dalla UI, protetta da align
+            IsManual                = 1,   // creata dalla UI, protetta da align
         };
 
         _db.MevItems.Add(item);
@@ -594,7 +594,7 @@ public class MevController : BaseController
 
         // Rimuove le righe che non sono più presenti nell'Excel (escluse le righe manuali)
         var toRemove = existingItems.Values
-            .Where(x => !excelIds.Contains(x.ExcelId) && !x.IsManual)
+            .Where(x => !excelIds.Contains(x.ExcelId) && x.IsManual == 0)
             .ToList();
         _db.MevItems.RemoveRange(toRemove);
 
