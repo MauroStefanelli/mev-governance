@@ -206,6 +206,38 @@ public class ContrattoController : BaseController
         return AlignInternal(ambienteId);
     }
 
+    // ============================================================
+    // POST /api/contratti/recalc-consumo-tow
+    // Ricalcola Approvato/Ordinato/Impegnato/Residuo su ConsumoTow
+    // direttamente dai dati MevItem presenti nel DB, senza Excel.
+    // ============================================================
+    [HttpPost("recalc-consumo-tow")]
+    public IActionResult RecalcConsumoTowEndpoint()
+    {
+        try
+        {
+            var ambienteId = GetAmbienteId();
+
+            // Carica le righe ConsumoTow dal DB (non dal ChangeTracker come in Align)
+            var towRows = _db.ConsumoTow
+                .Where(t => t.AmbienteId == ambienteId)
+                .ToList();
+
+            if (towRows.Count == 0)
+                return BadRequest("Nessuna riga ConsumoTow trovata per questo ambiente. Inserisci prima i TOW dalla pagina admin.");
+
+            // Ricalcola (usa la stessa logica di AlignInternal)
+            RecalcConsumoTow(ambienteId);
+            _db.SaveChanges();
+
+            return Ok(new { message = "Ricalcolo completato", countTow = towRows.Count });
+        }
+        catch (Exception ex)
+        {
+            return Problem($"Errore ricalcolo ConsumoTow: {ex.Message}");
+        }
+    }
+
     /// <summary>Chiamato anche da MevController durante l'allineamento globale.</summary>
     public IActionResult AlignInternal(int ambienteId)
     {
@@ -743,11 +775,18 @@ public class ContrattoController : BaseController
     // per quel TowContratto (stessa convenzione del frontend: sort() → pos 1..N).
     private void RecalcConsumoTow(int ambienteId)
     {
-        // Leggi le righe ConsumoTow appena inserite (ancora in ChangeTracker)
-        var towRows = _db.ConsumoTow
-            .Local
+        // Leggi le righe ConsumoTow: prima dal ChangeTracker (Align appena eseguito),
+        // poi — se vuoto — dal DB (chiamata standalone dall'endpoint recalc).
+        var towRows = _db.ConsumoTow.Local
             .Where(t => t.AmbienteId == ambienteId)
             .ToList();
+
+        if (towRows.Count == 0)
+        {
+            towRows = _db.ConsumoTow
+                .Where(t => t.AmbienteId == ambienteId)
+                .ToList();
+        }
 
         if (towRows.Count == 0) return;
 
