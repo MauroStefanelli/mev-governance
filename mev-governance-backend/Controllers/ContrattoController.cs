@@ -269,6 +269,9 @@ public class ContrattoController : BaseController
                 Console.WriteLine("[TOW] Header NON trovato nel foglio CONTRATTO");
             }
 
+            // ── Ricalcola valori ConsumoTow da MevItem ────────────────────────
+            RecalcConsumoTow(ambienteId);
+
             _db.SaveChanges();
 
             return Ok(new
@@ -717,6 +720,121 @@ public class ContrattoController : BaseController
             count++;
         }
         Console.WriteLine($"[TOW] Righe importate: {count}");
+    }
+
+    // ── Ricalcola Approvato / OrdinatiRda / Impegnato / Residuo su ConsumoTow ──
+    // Chiamato dopo ImportConsumoTow, prima di SaveChanges.
+    // Usa MevItem (approvato) e MevItem.OrdinatoBdo (ordinato) già in memoria/DB.
+    //
+    // Logica:
+    //   Approvato (TOW pos P) = SUM(MevItem.ImportoFornituraScontato)
+    //                           WHERE Stato = "Approvato"
+    //                           AND   TipoContratto = towContratto
+    //                           AND   il campo TowXXX corrispondente alla posizione P > 0
+    //
+    //   OrdinatiRda (TOW pos P) = SUM(MevItem.OrdinatoBdo)
+    //                             WHERE TipoContratto = towContratto
+    //                             AND   TowXXX (pos P) > 0
+    //
+    //   Impegnato = Approvato - OrdinatiRda
+    //   Residuo   = ValoreTotale - Approvato
+    //
+    // La posizione P è determinata dall'ordinamento alfabetico dei Tow distinti
+    // per quel TowContratto (stessa convenzione del frontend: sort() → pos 1..N).
+    private void RecalcConsumoTow(int ambienteId)
+    {
+        // Leggi le righe ConsumoTow appena inserite (ancora in ChangeTracker)
+        var towRows = _db.ConsumoTow
+            .Local
+            .Where(t => t.AmbienteId == ambienteId)
+            .ToList();
+
+        if (towRows.Count == 0) return;
+
+        // Leggi tutti i MevItem dell'ambiente
+        var mevItems = _db.MevItems
+            .AsNoTracking()
+            .Where(m => m.AmbienteId == ambienteId)
+            .ToList();
+
+        // Per ogni gruppo towContratto, determina la posizione (1-based) di ogni TOW
+        // usando ordinamento alfabetico (coerente con il frontend)
+        var towContratti = towRows
+            .Where(t => !string.IsNullOrWhiteSpace(t.TowContratto))
+            .Select(t => t.TowContratto!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Selettori per i 6 campi TowXXX di MevItem (per posizione 1-6)
+        var towSelectors = new Func<MevItem, decimal?>[]
+        {
+            m => m.Tow021,
+            m => m.Tow022,
+            m => m.Tow023,
+            m => m.Tow024,
+            m => m.Tow025,
+            m => m.Tow026,
+        };
+
+        foreach (var contratto in towContratti)
+        {
+            // Ordina alfabeticamente i TOW di questo contratto → posizione 1..N
+            var towsOrdinati = towRows
+                .Where(t => string.Equals(t.TowContratto, contratto, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(t => t.Tow, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // MEV filtrati per questo tipo contratto
+            var mevContratto = mevItems
+                .Where(m => string.Equals(m.TipoContratto, contratto, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            for (int i = 0; i < towsOrdinati.Count; i++)
+            {
+                var towRow = towsOrdinati[i];
+                int pos = i; // 0-based index → selettore array
+
+                if (pos >= towSelectors.Length)
+                {
+                    Console.WriteLine($"[TOW RECALC] TOW pos {pos+1} supera i 6 campi disponibili, skip {towRow.Tow}");
+                    continue;
+                }
+
+                var selector = towSelectors[pos];
+
+                // Approvato = somma ImportoFornituraScontato delle righe MEV "Approvato"
+                //             che hanno il campo TOW corrispondente > 0
+                decimal approvato = mevContratto
+                    .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
+                             && (selector(m) ?? 0) > 0)
+                    .Sum(m => m.ImportoFornituraScontato);
+
+                // OrdinatiRda = somma OrdinatoBdo delle righe MEV (tutti gli stati)
+                //               che hanno il campo TOW corrispondente > 0
+                decimal ordinati = mevContratto
+                    .Where(m => (selector(m) ?? 0) > 0)
+                    .Sum(m => m.OrdinatoBdo);
+
+                decimal impegnato = approvato - ordinati;
+                decimal residuo   = towRow.ValoreTotale - approvato;
+
+                // Aggiorna solo se il calcolo produce valori non nulli
+                // (non sovrascrivere se tutto è 0 e anche il foglio Excel aveva dati)
+                bool calcolatoHaDati = approvato != 0 || ordinati != 0;
+                if (calcolatoHaDati)
+                {
+                    towRow.Approvato   = approvato;
+                    towRow.OrdinatiRda = ordinati;
+                    towRow.Impegnato   = impegnato;
+                    towRow.Residuo     = residuo;
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2}");
+                }
+                else
+                {
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → nessun dato MEV, mantengo valori Excel");
+                }
+            }
+        }
     }
 
     // ── Helper: costruisce mappa colonne da riga intestazione ─────────────────
