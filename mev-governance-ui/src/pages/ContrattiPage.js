@@ -69,8 +69,22 @@ const formatEuroK = (value) => {
 };
 
 // ── Costanti TOW ──────────────────────────────────────────────────────────────
-const TOW_TASK = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5"];
-const TOW_CANONE = ["TOW02.6"];
+// I nomi reali dipendono dal contratto (es. TOW02.x o TOW01.x).
+// La distinzione task/canone si basa sulla posizione: l'ultimo TOW (ordinato)
+// è il canone, tutti gli altri sono task. Questi array restano come fallback
+// per contratti con naming TOW02.x (contratto BASE storico).
+const TOW_TASK_LEGACY   = ["TOW02.1", "TOW02.2", "TOW02.3", "TOW02.4", "TOW02.5"];
+const TOW_CANONE_LEGACY = ["TOW02.6"];
+
+// Calcola task/canone dinamicamente dai nomi TOW reali di un contratto.
+// Convenzione: l'ultimo TOW (sort alfabetico) è il canone, gli altri sono task.
+const getTowGroups = (rows) => {
+  const towNames = [...new Set(rows.map(r => r.tow).filter(Boolean))].sort();
+  if (towNames.length === 0) return { taskKeys: TOW_TASK_LEGACY, canoneKeys: TOW_CANONE_LEGACY };
+  const canoneKey = towNames[towNames.length - 1];
+  const taskKeys  = towNames.slice(0, -1);
+  return { taskKeys, canoneKeys: [canoneKey] };
+};
 
 // Palette colori per le 5 voci
 const COLORS = {
@@ -406,6 +420,8 @@ function ConsumoTowSection({ towRows }) {
     ? towRows.filter(r => r.towContratto === selectedTipo)
     : [];
 
+  // ── Calcola task/canone dinamicamente in base ai TOW reali del contratto ──
+  const { taskKeys, canoneKeys } = getTowGroups(filtered);
 
   // ✅ CALCOLO PERCENTUALI PER TOW
 
@@ -430,22 +446,24 @@ function ConsumoTowSection({ towRows }) {
 
 
   const group = (keys) =>
-    filtered.filter(r => keys.some(k => r.tow?.toUpperCase().includes(k.toUpperCase())));
+    filtered.filter(r => keys.some(k => r.tow?.toUpperCase() === k.toUpperCase()));
   const sum = (rows, field) =>
     rows.reduce((s, r) => s + (r[field] || 0), 0);
 
 
-  const taskRows = group(TOW_TASK);
+  const taskRows = group(taskKeys);
 
-  const canoneRows = group(TOW_CANONE);
+  const canoneRows = group(canoneKeys);
 
+  // Le righe collaudo sono i task TOW che hanno dati collaudo valorizzati
   const collaudoRows = taskRows.filter(
-    r => r.tow?.toUpperCase() === "TOW02.3"
+    r => r.collaudoApprovato != null || r.collaudoOrdinato != null || r.collaudoFatturato != null
   );
 
   // Righe task senza collaudo (per altri usi)
+  const collaudoTowNames = new Set(collaudoRows.map(r => r.tow?.toUpperCase()));
   const taskOnlyRows = taskRows.filter(
-    r => r.tow?.toUpperCase() !== "TOW02.3"
+    r => !collaudoTowNames.has(r.tow?.toUpperCase())
   );
 
   // Totali riga blu = somma grezza di tutti i taskRows (Servizi a Task netto + Collaudo)
@@ -464,12 +482,11 @@ function ConsumoTowSection({ towRows }) {
     impegnato: sum(collaudoRows, "collaudoFatturato"),
   };
 
-  // Totali per la riga "Servizi a Task" = taskRows ma TOW02.3 al netto del collaudo
-  const tow023Row = collaudoRows[0];
+  // Totali per la riga "Servizi a Task" = task TOW al netto della quota collaudo
   const taskNetTotals = {
-    approvato: sum(taskOnlyRows, "approvato") + (tow023Row ? tow023Row.approvato - tow023Row.collaudoApprovato : 0),
-    ordinatiRda: sum(taskOnlyRows, "ordinatiRda") + (tow023Row ? tow023Row.ordinatiRda - tow023Row.collaudoOrdinato : 0),
-    impegnato: sum(taskOnlyRows, "impegnato") + (tow023Row ? tow023Row.impegnato - tow023Row.collaudoFatturato : 0),
+    approvato: sum(taskOnlyRows, "approvato") + collaudoRows.reduce((s, r) => s + r.approvato - (r.collaudoApprovato || 0), 0),
+    ordinatiRda: sum(taskOnlyRows, "ordinatiRda") + collaudoRows.reduce((s, r) => s + r.ordinatiRda - (r.collaudoOrdinato || 0), 0),
+    impegnato: sum(taskOnlyRows, "impegnato") + collaudoRows.reduce((s, r) => s + r.impegnato - (r.collaudoFatturato || 0), 0),
     residuo: sum(taskRows, "residuo"),
   };
 
@@ -731,7 +748,7 @@ function ConsumoTowSection({ towRows }) {
                               <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
                                 <td style={TD("left", { fontSize: "12px", paddingLeft: "60px", color: "#555" })}>{row.tow}</td>
 
-                                {sec.key !== "collaudo" && (
+                                 {sec.key !== "collaudo" && (
                                   <td style={TD("right", { fontSize: "12px" })}>
                                     {formatEuro(row.valoreTotale)}
                                   </td>
@@ -747,30 +764,26 @@ function ConsumoTowSection({ towRows }) {
                                   </>
                                 ) : (
                                    <>
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(
-                                        row.tow?.toUpperCase() === "TOW02.3"
-                                          ? row.approvato - row.collaudoApprovato
-                                          : row.approvato
-                                      )}
-                                    </td>
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(
-                                        row.tow?.toUpperCase() === "TOW02.3"
-                                          ? row.ordinatiRda - row.collaudoOrdinato
-                                          : row.ordinatiRda
-                                      )}
-                                    </td>
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(
-                                        row.tow?.toUpperCase() === "TOW02.3"
-                                          ? row.impegnato - row.collaudoFatturato
-                                          : row.impegnato
-                                      )}
-                                    </td>
-                                    <td style={TD("right", { fontSize: "12px" })}>
-                                      {formatEuro(row.residuo)}
-                                    </td>
+                                    {/* Per i TOW con collaudo mostra i valori al netto */}
+                                    {(() => {
+                                      const isCollaudo = collaudoTowNames.has(row.tow?.toUpperCase());
+                                      return (
+                                        <>
+                                          <td style={TD("right", { fontSize: "12px" })}>
+                                            {formatEuro(isCollaudo ? row.approvato - (row.collaudoApprovato || 0) : row.approvato)}
+                                          </td>
+                                          <td style={TD("right", { fontSize: "12px" })}>
+                                            {formatEuro(isCollaudo ? row.ordinatiRda - (row.collaudoOrdinato || 0) : row.ordinatiRda)}
+                                          </td>
+                                          <td style={TD("right", { fontSize: "12px" })}>
+                                            {formatEuro(isCollaudo ? row.impegnato - (row.collaudoFatturato || 0) : row.impegnato)}
+                                          </td>
+                                          <td style={TD("right", { fontSize: "12px" })}>
+                                            {formatEuro(row.residuo)}
+                                          </td>
+                                        </>
+                                      );
+                                    })()}
                                   </>
                                 )}
 
