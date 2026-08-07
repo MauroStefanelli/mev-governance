@@ -423,13 +423,6 @@ function ConsumoTowSection({ towRows }) {
   // ── Calcola task/canone dinamicamente in base ai TOW reali del contratto ──
   const { taskKeys, canoneKeys } = getTowGroups(filtered);
 
-  // DEBUG — rimuovere dopo diagnosi
-  if (filtered.length > 0) {
-    console.log("[TOW DEBUG] selectedTipo:", selectedTipo);
-    console.log("[TOW DEBUG] filtered rows:", filtered.map(r => ({ tow: r.tow, towContratto: r.towContratto, valoreTotale: r.valoreTotale, approvato: r.approvato })));
-    console.log("[TOW DEBUG] taskKeys:", taskKeys, "canoneKeys:", canoneKeys);
-  }
-
   // ✅ CALCOLO PERCENTUALI PER TOW
 
   const percentData = filtered.map(t => {
