@@ -2418,12 +2418,67 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
               <th style={TH2("left")}>Ruolo</th>
               <th style={TH2("left")}>Società</th>
               {contractAfterInfo.map(d => {
-                if (d.key === "valoreTotale") return <th key={d.key} style={{ ...TH2("right"), color: "#1e293b" }}>Valore Totale</th>;
-                if (d.key === "approvato")    return <th key={d.key} style={{ ...TH2("right"), color: "#1a73e8" }}>Approvato</th>;
-                if (d.key === "ordinatiRda")  return <th key={d.key} style={{ ...TH2("right"), color: "#10b981" }}>Ordinato</th>;
-                if (d.key === "impegnato")    return <th key={d.key} style={{ ...TH2("right"), color: "#f59e0b" }}>Impegnato</th>;
-                if (d.key === "residuo")      return <th key={d.key} style={{ ...TH2("right"), color: "#f97316" }}>Residuo</th>;
-                return <th key={d.key} style={{ ...TH2("right"), color: "transparent" }}></th>;
+
+                if (
+                  d.key === "valoreUnitario" ||
+                  d.key === "__impatto__" ||
+                  d.key === "towApprovati" ||
+                  d.key === "towResidui"
+                ) {
+                  return <td key={d.key} />;
+                }
+
+                if (d.key === "valoreTotale")
+                  return (
+                    <td
+                      key={d.key}
+                      style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}
+                    >
+                      {fmt(campi.valoreTotale)}
+                    </td>
+                  );
+
+                if (d.key === "approvato")
+                  return (
+                    <td
+                      key={d.key}
+                      style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}
+                    >
+                      {fmt(campi.approvato)}
+                    </td>
+                  );
+
+                if (d.key === "ordinatiRda")
+                  return (
+                    <td
+                      key={d.key}
+                      style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}
+                    >
+                      {fmt(campi.ordinatiRda)}
+                    </td>
+                  );
+
+                if (d.key === "impegnato")
+                  return (
+                    <td
+                      key={d.key}
+                      style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}
+                    >
+                      {fmt(campi.impegnato)}
+                    </td>
+                  );
+
+                if (d.key === "residuo")
+                  return (
+                    <td
+                      key={d.key}
+                      style={{ ...TD2("right"), fontWeight: 700, color: "#f97316" }}
+                    >
+                      {fmt(campi.residuo)}
+                    </td>
+                  );
+
+                return <td key={d.key} />;
               })}
               <th style={{ ...TH2("center") }}>Azioni</th>
             </tr>
@@ -2498,13 +2553,64 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
               <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
                 <td colSpan={4} style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale RTI &amp; SUBCO</td>
                 {contractAfterInfo.map(d => {
-                  if (d.key === "valoreTotale") return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b" }}>{formatEuro(totVT)}</td>;
-                  if (d.key === "approvato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#1a73e8" }}>{formatEuro(totApp)}</td>;
-                  if (d.key === "ordinatiRda")  return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#10b981" }}>{formatEuro(totOrd)}</td>;
-                  if (d.key === "impegnato")    return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: "#f59e0b" }}>{formatEuro(totImp)}</td>;
-                  if (d.key === "residuo")      return <td key={d.key} style={{ ...TD2("right"), fontWeight: 800, color: totRes >= 0 ? "#10b981" : "#dc2626" }}>{formatEuro(totRes)}</td>;
-                  return <td key={d.key} />;
+
+                  if (
+                    d.key === "valoreUnitario" ||
+                    d.key === "__impatto__" ||
+                    d.key === "towApprovati" ||
+                    d.key === "towResidui"
+                  ) {
+                    return (
+                      <th
+                        key={d.key}
+                        style={{
+                          ...TH2("right"),
+                          color: "transparent"
+                        }}
+                      >
+                        .
+                      </th>
+                    );
+                  }
+
+                  if (d.key === "valoreTotale")
+                    return (
+                      <th key={d.key} style={{ ...TH2("right"), color: "#1e293b" }}>
+                        Valore Totale
+                      </th>
+                    );
+
+                  if (d.key === "approvato")
+                    return (
+                      <th key={d.key} style={{ ...TH2("right"), color: "#1a73e8" }}>
+                        Approvato
+                      </th>
+                    );
+
+                  if (d.key === "ordinatiRda")
+                    return (
+                      <th key={d.key} style={{ ...TH2("right"), color: "#10b981" }}>
+                        Ordinato
+                      </th>
+                    );
+
+                  if (d.key === "impegnato")
+                    return (
+                      <th key={d.key} style={{ ...TH2("right"), color: "#f59e0b" }}>
+                        Impegnato
+                      </th>
+                    );
+
+                  if (d.key === "residuo")
+                    return (
+                      <th key={d.key} style={{ ...TH2("right"), color: "#f97316" }}>
+                        Residuo
+                      </th>
+                    );
+
+                  return <th key={d.key} />;
                 })}
+
                 <td style={TD2("center")} />
               </tr>
             </tfoot>

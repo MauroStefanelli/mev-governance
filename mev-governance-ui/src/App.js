@@ -575,10 +575,10 @@ function App() {
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
                   {[
-                    { id: "tools",      label: "Caricamento Ordini" },
+                    { id: "tools",      label: "Gestione Ordini" },
                     { id: "admin",      label: "Utenti" },
-                    { id: "consumotow", label: "TOW Contratti" },
-                    { id: "dbconfig",   label: "Configurazione" },
+                    { id: "consumotow", label: "Contratti" },
+                    { id: "dbconfig",   label: "App Config" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
