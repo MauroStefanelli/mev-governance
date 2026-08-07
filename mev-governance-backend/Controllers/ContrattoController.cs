@@ -876,18 +876,34 @@ public class ContrattoController : BaseController
                         .Sum(m => m.OrdinatoBdo * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
                 }
 
+                // TowApprovati = SUM delle quantità TOW delle righe MEV con Stato="Approvato"
+                decimal towApprovati = mevContratto
+                    .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
+                             && (qtaSelector(m) ?? 0) > 0)
+                    .Sum(m => qtaSelector(m) ?? 0);
+
+                // Quantità totale del TOW = ValoreTotale / ValoreUnitario (se ValoreUnitario > 0)
+                decimal qtaTotale = valUnitario > 0
+                    ? towRow.ValoreTotale / valUnitario
+                    : 0;
+
+                // TowResidui = quantità totale - quantità approvata
+                decimal towResidui = qtaTotale - towApprovati;
+
                 decimal impegnato = approvato - ordinati;
                 decimal residuo   = towRow.ValoreTotale - approvato;
 
                 // Aggiorna solo se il calcolo produce valori non nulli
-                bool calcolatoHaDati = approvato != 0 || ordinati != 0;
+                bool calcolatoHaDati = approvato != 0 || ordinati != 0 || towApprovati != 0;
                 if (calcolatoHaDati)
                 {
-                    towRow.Approvato   = approvato;
-                    towRow.OrdinatiRda = ordinati;
-                    towRow.Impegnato   = impegnato;
-                    towRow.Residuo     = residuo;
-                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} (pos{i+1}, VU={valUnitario}) → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2}");
+                    towRow.Approvato     = approvato;
+                    towRow.OrdinatiRda   = ordinati;
+                    towRow.Impegnato     = impegnato;
+                    towRow.Residuo       = residuo;
+                    towRow.TowApprovati  = towApprovati;
+                    towRow.TowResidui    = towResidui;
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} (pos{i+1}, VU={valUnitario}) → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2} | TowApp={towApprovati:F3} QtaTot={qtaTotale:F3} TowRes={towResidui:F3}");
                 }
                 else
                 {
