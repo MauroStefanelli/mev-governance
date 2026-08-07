@@ -2418,61 +2418,62 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
                   d.key === "towApprovati" ||
                   d.key === "towResidui"
                 ) {
-                  return <td key={d.key} />;
+                  return <th key={d.key} />;
                 }
 
                 if (d.key === "valoreTotale")
                   return (
-                    <td
+                    <th
                       key={d.key}
-                      style={{ ...TD2("right"), fontWeight: 600, color: "#1e293b" }}
+                      style={{ ...TH2("right"), color: "#1e293b" }}
                     >
-                      {fmt(campi.valoreTotale)}
-                    </td>
+                      Valore Totale
+                    </th>
                   );
 
                 if (d.key === "approvato")
                   return (
-                    <td
+                    <th
                       key={d.key}
-                      style={{ ...TD2("right"), fontWeight: 600, color: "#1a73e8" }}
+                      style={{ ...TH2("right"), color: "#1a73e8" }}
                     >
-                      {fmt(campi.approvato)}
-                    </td>
+                      Approvato
+                    </th>
                   );
 
                 if (d.key === "ordinatiRda")
                   return (
-                    <td
+                    <th
                       key={d.key}
-                      style={{ ...TD2("right"), fontWeight: 600, color: "#10b981" }}
+                      style={{ ...TH2("right"), color: "#10b981" }}
                     >
-                      {fmt(campi.ordinatiRda)}
-                    </td>
+                      Ordinato
+                    </th>
                   );
 
                 if (d.key === "impegnato")
                   return (
-                    <td
+                    <th
                       key={d.key}
-                      style={{ ...TD2("right"), fontWeight: 600, color: "#f59e0b" }}
+                      style={{ ...TH2("right"), color: "#f59e0b" }}
                     >
-                      {fmt(campi.impegnato)}
-                    </td>
+                      Impegnato
+                    </th>
                   );
 
                 if (d.key === "residuo")
                   return (
-                    <td
+                    <th
                       key={d.key}
-                      style={{ ...TD2("right"), fontWeight: 700, color: "#f97316" }}
+                      style={{ ...TH2("right"), color: "#f97316" }}
                     >
-                      {fmt(campi.residuo)}
-                    </td>
+                      Residuo
+                    </th>
                   );
 
-                return <td key={d.key} />;
+                return <th key={d.key} />;
               })}
+
               <th style={{ ...TH2("center") }}>Azioni</th>
             </tr>
           </thead>
