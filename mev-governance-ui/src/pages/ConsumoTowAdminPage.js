@@ -1712,11 +1712,13 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                             </div>
                                           </td>
                                         )}
-                                        {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
-                                          <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
-                                            {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
-                                          </td>
-                                        ))}
+                                         {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
+                                           <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                             {row.isCatalogo && (f.key === "towApprovati" || f.key === "towResidui")
+                                               ? "—"
+                                               : f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                           </td>
+                                         ))}
                                       </tr>
                                     ))}
                                   </tbody>
@@ -1747,7 +1749,11 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                                         )}
                                        {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => {
                                          if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                                         const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                         // Per towApprovati e towResidui escludere le righe catalogo dal totale
+                                         const rows = (f.key === "towApprovati" || f.key === "towResidui")
+                                           ? cRows.filter(r => !r.isCatalogo)
+                                           : cRows;
+                                         const tot = rows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
                                          return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
                                        })}                                    </tr>
                                    </tfoot>
