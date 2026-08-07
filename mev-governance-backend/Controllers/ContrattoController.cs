@@ -854,9 +854,11 @@ public class ContrattoController : BaseController
                                  && (qtaSelector(m) ?? 0) > 0)
                         .Sum(m => (qtaSelector(m) ?? 0) * valUnitario);
 
+                    // OrdinatiRda = somma OrdinatoBdo (dal foglio MEV) solo per le righe
+                    // che hanno sia la quantità TOW > 0 sia un ordine reale (OrdinatoBdo > 0)
                     ordinati = mevContratto
-                        .Where(m => (qtaSelector(m) ?? 0) > 0)
-                        .Sum(m => (qtaSelector(m) ?? 0) * valUnitario);
+                        .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
+                        .Sum(m => m.OrdinatoBdo);
                 }
                 else
                 {
@@ -869,7 +871,8 @@ public class ContrattoController : BaseController
 
                     ordinati = mevContratto
                         .Where(m => (qtaSelector(m) ?? 0) > 0
-                                 && (m.TowTotale ?? 0) > 0)
+                                 && (m.TowTotale ?? 0) > 0
+                                 && m.OrdinatoBdo > 0)
                         .Sum(m => m.OrdinatoBdo * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
                 }
 
