@@ -796,6 +796,18 @@ public class ContrattoController : BaseController
             .Where(m => m.AmbienteId == ambienteId)
             .ToList();
 
+        // ── DIAGNOSTICA ──────────────────────────────────────────────────────
+        Console.WriteLine($"[TOW RECALC] Ambiente={ambienteId} | MevItems totali={mevItems.Count}");
+        var statoCounts = mevItems.GroupBy(m => m.Stato ?? "(null)").Select(g => $"{g.Key}={g.Count()}");
+        Console.WriteLine($"[TOW RECALC] Stati: {string.Join(", ", statoCounts)}");
+        var contrattiCounts = mevItems.GroupBy(m => m.TipoContratto ?? "(null)").Select(g => $"{g.Key}={g.Count()}");
+        Console.WriteLine($"[TOW RECALC] TipoContratto: {string.Join(", ", contrattiCounts)}");
+        var approvati = mevItems.Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)).ToList();
+        Console.WriteLine($"[TOW RECALC] Approvati={approvati.Count} | SumImportoScontato={approvati.Sum(m => m.ImportoFornituraScontato):F2} | SumOrdinato={mevItems.Where(m => m.OrdinatoBdo > 0).Sum(m => m.OrdinatoBdo):F2}");
+        Console.WriteLine($"[TOW RECALC] TOW non-null: Tow021={mevItems.Count(m => m.Tow021 > 0)}, Tow022={mevItems.Count(m => m.Tow022 > 0)}, Tow023={mevItems.Count(m => m.Tow023 > 0)}, Tow024={mevItems.Count(m => m.Tow024 > 0)}, Tow025={mevItems.Count(m => (m.Tow025 ?? 0) > 0)}, Tow026={mevItems.Count(m => (m.Tow026 ?? 0) > 0)}");
+        Console.WriteLine($"[TOW RECALC] ConsumoTow rows={towRows.Count} | TowContratti: {string.Join(", ", towRows.Where(t => !string.IsNullOrWhiteSpace(t.TowContratto)).Select(t => t.TowContratto).Distinct())}");
+        // ── FINE DIAGNOSTICA ─────────────────────────────────────────────────
+
         // Selettori per i 6 campi quantità Tow (posizione 1-6)
         var towQtaSelectors = new Func<MevItem, decimal?>[]
         {
