@@ -419,12 +419,6 @@ public class MevController : BaseController
                 return v;
             }
 
-            // Legge un TOW per nome colonna (non per posizione)
-            decimal? GetTow(string towName) =>
-                columnMap.TryGetValue(towName, out var col)
-                    ? (decimal?)GetDecimalByCol(col)
-                    : null;
-
             int GetInt(string col)
             {
                 if (!columnMap.ContainsKey(col))
@@ -451,15 +445,25 @@ public class MevController : BaseController
             string bc          = GetString("BC");
             string contratto   = GetString("Contratto");
             string atId        = GetString("AT ID");
-            // Legge le colonne TOW per posizione (ordine nel foglio), supportando
-            // Legge ogni TOW per nome colonna (non per posizione) per garantire
-            // che TOW02.5 → tow025 indipendentemente dall'ordine nel foglio
-            decimal? tow021 = GetTow("TOW02.1");
-            decimal? tow022 = GetTow("TOW02.2");
-            decimal? tow023 = GetTow("TOW02.3");
-            decimal? tow024 = GetTow("TOW02.4");
-            decimal? tow025 = GetTow("TOW02.5");
-            decimal? tow026 = GetTow("TOW02.6");
+            // Legge le colonne TOW per POSIZIONE ORDINALE:
+            // tutte le colonne "TOWxx.x" trovate nell'header, ordinate alfabeticamente,
+            // vengono mappate in sequenza a tow021…tow026 (1°→tow021, 2°→tow022, ecc.)
+            // Questo supporta qualsiasi serie (TOW01.x, TOW02.x, ecc.)
+            var towColumnsOrdered = columnMap
+                .Where(kv => System.Text.RegularExpressions.Regex.IsMatch(
+                    kv.Key, @"^TOW\d+\.\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            decimal? GetTowByPos(int pos) =>
+                pos < towColumnsOrdered.Count
+                    ? (decimal?)GetDecimalByCol(towColumnsOrdered[pos].Value)
+                    : null;
+            decimal? tow021 = GetTowByPos(0);
+            decimal? tow022 = GetTowByPos(1);
+            decimal? tow023 = GetTowByPos(2);
+            decimal? tow024 = GetTowByPos(3);
+            decimal? tow025 = GetTowByPos(4);
+            decimal? tow026 = GetTowByPos(5);
             decimal towTotale  = GetDecimal("Totale");
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
             decimal fatturato  = GetDecimal("Fatturato");

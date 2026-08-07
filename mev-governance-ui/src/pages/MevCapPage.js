@@ -432,29 +432,36 @@ const EuroEditField = ({ label, field, width, form, onChange }) => {
   );
 };
 
-// TOW keys → field nel form (struttura usata nel modal per label, colonne, input)
-const TOW_FIELDS = [
-  { key: "TOW02.1", field: "tow021" }, { key: "TOW02.2", field: "tow022" },
-  { key: "TOW02.3", field: "tow023" }, { key: "TOW02.4", field: "tow024" },
-  { key: "TOW02.5", field: "tow025" }, { key: "TOW02.6", field: "tow026" },
-];
-// Mappa nome-chiave TOW → field del form (es. "TOW02.5" → "tow025")
-const TOW_KEY_TO_FIELD = Object.fromEntries(
-  TOW_FIELDS.map(({ key, field }) => [key, field])
-);
+// Colonne DB disponibili per i valori TOW (sempre 6, per posizione ordinale)
+const TOW_DB_FIELDS = ["tow021", "tow022", "tow023", "tow024", "tow025", "tow026"];
+
+// Costruisce la mappa nome-TOW → field del form per un dato set di prezzi.
+// La mappatura è POSIZIONALE: il 1° TOW ordinato alfabeticamente → tow021,
+// il 2° → tow022, … indipendentemente dal prefisso (TOW01.x, TOW02.x, ecc.).
+// Supporta fino a 6 TOW per contratto.
+const buildTowKeyToField = (prices) => {
+  if (!prices) return {};
+  const sortedKeys = Object.keys(prices).sort();
+  const map = {};
+  sortedKeys.forEach((key, idx) => {
+    if (idx < TOW_DB_FIELDS.length) map[key] = TOW_DB_FIELDS[idx];
+  });
+  return map;
+};
 
 // Calcola importo fornitura = sum(tow * valoreUnitario) per il tipo contratto scelto.
-// Mappa per NOME CHIAVE (non per posizione) per evitare disallineamenti.
-// Se un TOW ha valoreUnitario = 0 viene trattato come importo diretto in € (catalogo/TOW02.5).
+// Mappa per POSIZIONE ORDINALE: 1° TOW (sort) → tow021, 2° → tow022, ecc.
+// Se un TOW ha valoreUnitario = 0 viene trattato come importo diretto in €.
 const calcImporto = (form, priceMap) => {
   const prices = priceMap?.[form.tipoContratto];
   if (!prices) return 0;
+  const keyToField = buildTowKeyToField(prices);
   return Object.entries(prices).reduce((sum, [key, price]) => {
-    const field = TOW_KEY_TO_FIELD[key];
+    const field = keyToField[key];
     if (!field) return sum;
     const qty = parseFloat(form[field]) || 0;
     if (Number(price) === 0) {
-      // valoreUnitario = 0 → importo diretto in € (voce a catalogo / TOW02.5)
+      // valoreUnitario = 0 → importo diretto in € (voce a catalogo)
       return sum + qty;
     }
     return sum + qty * Number(price);
@@ -883,13 +890,14 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
           {/* Sezione: TOW Offerta — griglia tabellare allineata */}
           <ModalSection title="TOW Offerta" color={sectionColor}>
             {(() => {
-              // Nomi TOW reali del contratto selezionato, ordinati come nel priceMap
+              // Nomi TOW reali del contratto selezionato, ordinati alfabeticamente
               const prices = effectivePriceMap[form.tipoContratto] || {};
               const dynamicTowKeys = Object.keys(prices).sort();
-              // Mappa per NOME CHIAVE (non per posizione) — usa TOW_KEY_TO_FIELD
+              // Mappa per POSIZIONE ORDINALE: 1°TOW→tow021, 2°→tow022, …
+              const keyToField = buildTowKeyToField(prices);
               const dynamicTowFields = dynamicTowKeys.map((key) => ({
                 key,
-                field: TOW_KEY_TO_FIELD[key] || null,
+                field: keyToField[key] || null,
               })).filter(f => f.field !== null);
               // Il TOW che funge da "importo diretto in €" è quello con valoreUnitario = 0
               // (nella convenzione usata: priceMap[key] === 0 → è importo diretto)

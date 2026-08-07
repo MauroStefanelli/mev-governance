@@ -943,15 +943,16 @@ public class ContrattoController : BaseController
         Console.WriteLine($"[TOW RECALC] ConsumoTow rows={towRows.Count} | TowContratti: {string.Join(", ", towRows.Where(t => !string.IsNullOrWhiteSpace(t.TowContratto)).Select(t => t.TowContratto).Distinct())}");
         // ── FINE DIAGNOSTICA ─────────────────────────────────────────────────
 
-        // Mappa nome TOW → selettore campo quantità su MevItem (per nome, non per posizione)
-        var towQtaByName = new Dictionary<string, Func<MevItem, decimal?>>(StringComparer.OrdinalIgnoreCase)
+        // Selettori campo quantità su MevItem per POSIZIONE ORDINALE (0-based)
+        // Il 1° TOW ordinato alfabeticamente del contratto → Tow021, il 2° → Tow022, ecc.
+        var towQtaByPosition = new List<Func<MevItem, decimal?>>
         {
-            { "TOW02.1", m => m.Tow021 },
-            { "TOW02.2", m => m.Tow022 },
-            { "TOW02.3", m => m.Tow023 },
-            { "TOW02.4", m => m.Tow024 },
-            { "TOW02.5", m => m.Tow025 },
-            { "TOW02.6", m => m.Tow026 },
+            m => m.Tow021,
+            m => m.Tow022,
+            m => m.Tow023,
+            m => m.Tow024,
+            m => m.Tow025,
+            m => m.Tow026,
         };
 
         var towContratti = towRows
@@ -964,6 +965,7 @@ public class ContrattoController : BaseController
         {
             var towsContratto = towRows
                 .Where(t => string.Equals(t.TowContratto, contratto, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(t => t.Tow, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             // MEV filtrati per questo tipo contratto
@@ -971,14 +973,15 @@ public class ContrattoController : BaseController
                 .Where(m => string.Equals(m.TipoContratto, contratto, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
-            foreach (var towRow in towsContratto)
+            foreach (var (towRow, posIdx) in towsContratto.Select((t, i) => (t, i)))
             {
-                // Seleziona il selettore corretto per NOME TOW (non per posizione)
-                if (!towQtaByName.TryGetValue(towRow.Tow, out var qtaSelector))
+                // Seleziona il selettore corretto per POSIZIONE ORDINALE
+                if (posIdx >= towQtaByPosition.Count)
                 {
-                    Console.WriteLine($"[TOW RECALC] TOW '{towRow.Tow}' non mappato, skip");
+                    Console.WriteLine($"[TOW RECALC] TOW '{towRow.Tow}' posizione {posIdx} fuori range (max {towQtaByPosition.Count - 1}), skip");
                     continue;
                 }
+                var qtaSelector = towQtaByPosition[posIdx];
                 decimal valUnitario = towRow.ValoreUnitario;
 
                 // Approvato = SUM(quantità_TOW × ValoreUnitario) per righe MEV con Stato="Approvato"
