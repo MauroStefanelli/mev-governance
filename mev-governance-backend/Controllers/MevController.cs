@@ -371,6 +371,21 @@ public class MevController : BaseController
         var dataRows = ws.RowsUsed()
             .Where(r => r.RowNumber() > headerRow.RowNumber());
 
+        // Colonne TOW ordinate per posizione nel foglio (supporta TOW01.x, TOW02.x, ecc.)
+        // Pattern: il nome inizia con "TOW" e contiene un punto seguito da cifra
+        var towColsByPos = columnMap
+            .Where(kv => System.Text.RegularExpressions.Regex.IsMatch(
+                kv.Key, @"^TOW\d+\.\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            .OrderBy(kv => kv.Value) // ordine colonna nel foglio
+            .Select(kv => kv.Value)
+            .ToList();
+
+        Console.WriteLine($"[MEV ALIGN] Colonne TOW trovate ({towColsByPos.Count}): " +
+            string.Join(", ", columnMap
+                .Where(kv => System.Text.RegularExpressions.Regex.IsMatch(kv.Key, @"^TOW\d+\.\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                .OrderBy(kv => kv.Value)
+                .Select(kv => $"{kv.Key}=col{kv.Value}")));
+
         // Costruisco un dizionario delle righe esistenti per ExcelId (filtrato per ambiente)
         var existingItems = _db.MevItems
             .Where(x => x.AmbienteId == ambienteId)
@@ -394,6 +409,12 @@ public class MevController : BaseController
                 if (!columnMap.ContainsKey(col))
                     return 0;
                 row.Cell(columnMap[col]).TryGetValue(out decimal v);
+                return v;
+            }
+
+            decimal GetDecimalByCol(int colNum)
+            {
+                row.Cell(colNum).TryGetValue(out decimal v);
                 return v;
             }
 
@@ -423,12 +444,14 @@ public class MevController : BaseController
             string bc          = GetString("BC");
             string contratto   = GetString("Contratto");
             string atId        = GetString("AT ID");
-            decimal? tow021    = columnMap.ContainsKey("TOW02.1") ? (decimal?)GetDecimal("TOW02.1") : null;
-            decimal? tow022    = columnMap.ContainsKey("TOW02.2") ? (decimal?)GetDecimal("TOW02.2") : null;
-            decimal? tow023    = columnMap.ContainsKey("TOW02.3") ? (decimal?)GetDecimal("TOW02.3") : null;
-            decimal? tow024    = columnMap.ContainsKey("TOW02.4") ? (decimal?)GetDecimal("TOW02.4") : null;
-            decimal? tow025    = columnMap.ContainsKey("TOW02.5") ? (decimal?)GetDecimal("TOW02.5") : null;
-            decimal? tow026    = columnMap.ContainsKey("TOW02.6") ? (decimal?)GetDecimal("TOW02.6") : null;
+            // Legge le colonne TOW per posizione (ordine nel foglio), supportando
+            // qualsiasi naming: TOW02.x, TOW01.x, TOW03.x, ecc.
+            decimal? tow021 = towColsByPos.Count > 0 ? (decimal?)GetDecimalByCol(towColsByPos[0]) : null;
+            decimal? tow022 = towColsByPos.Count > 1 ? (decimal?)GetDecimalByCol(towColsByPos[1]) : null;
+            decimal? tow023 = towColsByPos.Count > 2 ? (decimal?)GetDecimalByCol(towColsByPos[2]) : null;
+            decimal? tow024 = towColsByPos.Count > 3 ? (decimal?)GetDecimalByCol(towColsByPos[3]) : null;
+            decimal? tow025 = towColsByPos.Count > 4 ? (decimal?)GetDecimalByCol(towColsByPos[4]) : null;
+            decimal? tow026 = towColsByPos.Count > 5 ? (decimal?)GetDecimalByCol(towColsByPos[5]) : null;
             decimal towTotale  = GetDecimal("Totale");
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
             decimal fatturato  = GetDecimal("Fatturato");

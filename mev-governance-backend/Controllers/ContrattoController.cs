@@ -796,16 +796,8 @@ public class ContrattoController : BaseController
             .Where(m => m.AmbienteId == ambienteId)
             .ToList();
 
-        // Per ogni gruppo towContratto, determina la posizione (1-based) di ogni TOW
-        // usando ordinamento alfabetico (coerente con il frontend)
-        var towContratti = towRows
-            .Where(t => !string.IsNullOrWhiteSpace(t.TowContratto))
-            .Select(t => t.TowContratto!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        // Selettori per i 6 campi TowXXX di MevItem (per posizione 1-6)
-        var towSelectors = new Func<MevItem, decimal?>[]
+        // Selettori per i 6 campi quantità Tow (posizione 1-6)
+        var towQtaSelectors = new Func<MevItem, decimal?>[]
         {
             m => m.Tow021,
             m => m.Tow022,
@@ -815,9 +807,17 @@ public class ContrattoController : BaseController
             m => m.Tow026,
         };
 
+        // Per ogni gruppo towContratto, determina la posizione (0-based) di ogni TOW
+        // usando ordinamento alfabetico (coerente con il frontend getTowGroups)
+        var towContratti = towRows
+            .Where(t => !string.IsNullOrWhiteSpace(t.TowContratto))
+            .Select(t => t.TowContratto!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         foreach (var contratto in towContratti)
         {
-            // Ordina alfabeticamente i TOW di questo contratto → posizione 1..N
+            // Ordina alfabeticamente i TOW di questo contratto → posizione 0..N-1
             var towsOrdinati = towRows
                 .Where(t => string.Equals(t.TowContratto, contratto, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(t => t.Tow, StringComparer.OrdinalIgnoreCase)
@@ -831,34 +831,52 @@ public class ContrattoController : BaseController
             for (int i = 0; i < towsOrdinati.Count; i++)
             {
                 var towRow = towsOrdinati[i];
-                int pos = i; // 0-based index → selettore array
 
-                if (pos >= towSelectors.Length)
+                if (i >= towQtaSelectors.Length)
                 {
-                    Console.WriteLine($"[TOW RECALC] TOW pos {pos+1} supera i 6 campi disponibili, skip {towRow.Tow}");
+                    Console.WriteLine($"[TOW RECALC] TOW pos {i+1} supera i 6 campi disponibili, skip {towRow.Tow}");
                     continue;
                 }
 
-                var selector = towSelectors[pos];
+                var qtaSelector = towQtaSelectors[i];
+                decimal valUnitario = towRow.ValoreUnitario;
 
-                // Approvato = somma ImportoFornituraScontato delle righe MEV "Approvato"
-                //             che hanno il campo TOW corrispondente > 0
-                decimal approvato = mevContratto
-                    .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
-                             && (selector(m) ?? 0) > 0)
-                    .Sum(m => m.ImportoFornituraScontato);
+                // Approvato = SUM(quantità_TOW × ValoreUnitario) per righe MEV con Stato="Approvato"
+                // Se ValoreUnitario = 0 (es. TOW catalogo o canone a quantità fissa),
+                // usa ImportoFornituraScontato × (quota TOW / TowTotale) come fallback proporzionale.
+                decimal approvato;
+                decimal ordinati;
 
-                // OrdinatiRda = somma OrdinatoBdo delle righe MEV (tutti gli stati)
-                //               che hanno il campo TOW corrispondente > 0
-                decimal ordinati = mevContratto
-                    .Where(m => (selector(m) ?? 0) > 0)
-                    .Sum(m => m.OrdinatoBdo);
+                if (valUnitario > 0)
+                {
+                    approvato = mevContratto
+                        .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
+                                 && (qtaSelector(m) ?? 0) > 0)
+                        .Sum(m => (qtaSelector(m) ?? 0) * valUnitario);
+
+                    ordinati = mevContratto
+                        .Where(m => (qtaSelector(m) ?? 0) > 0)
+                        .Sum(m => (qtaSelector(m) ?? 0) * valUnitario);
+                }
+                else
+                {
+                    // ValoreUnitario = 0 → ripartizione proporzionale sull'ImportoFornituraScontato
+                    approvato = mevContratto
+                        .Where(m => m.Stato.Equals("Approvato", StringComparison.OrdinalIgnoreCase)
+                                 && (qtaSelector(m) ?? 0) > 0
+                                 && (m.TowTotale ?? 0) > 0)
+                        .Sum(m => m.ImportoFornituraScontato * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
+
+                    ordinati = mevContratto
+                        .Where(m => (qtaSelector(m) ?? 0) > 0
+                                 && (m.TowTotale ?? 0) > 0)
+                        .Sum(m => m.OrdinatoBdo * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
+                }
 
                 decimal impegnato = approvato - ordinati;
                 decimal residuo   = towRow.ValoreTotale - approvato;
 
                 // Aggiorna solo se il calcolo produce valori non nulli
-                // (non sovrascrivere se tutto è 0 e anche il foglio Excel aveva dati)
                 bool calcolatoHaDati = approvato != 0 || ordinati != 0;
                 if (calcolatoHaDati)
                 {
@@ -866,11 +884,11 @@ public class ContrattoController : BaseController
                     towRow.OrdinatiRda = ordinati;
                     towRow.Impegnato   = impegnato;
                     towRow.Residuo     = residuo;
-                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2}");
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} (pos{i+1}, VU={valUnitario}) → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2}");
                 }
                 else
                 {
-                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → nessun dato MEV, mantengo valori Excel");
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → nessun dato MEV (Tow0{i+1} tutti null/0), mantengo valori Excel");
                 }
             }
         }
