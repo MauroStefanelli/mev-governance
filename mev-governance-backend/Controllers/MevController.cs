@@ -237,11 +237,12 @@ public class MevController : BaseController
         }
 
         // Se fallback: ValoreUnitario = 0 per tutti (struttura visibile, importo non calcolabile)
+        // Se IsCatalogo = true: ValoreUnitario = 0 (importo diretto €, non tariffa × qty)
         var priceMap = towRows
             .GroupBy(t => t.TowContratto!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 g => g.Key,
-                g => g.ToDictionary(t => t.Tow, t => priceMapIsFallback ? 0m : t.ValoreUnitario)
+                g => g.ToDictionary(t => t.Tow, t => (priceMapIsFallback || t.IsCatalogo) ? 0m : t.ValoreUnitario)
             );
 
         return Ok(new

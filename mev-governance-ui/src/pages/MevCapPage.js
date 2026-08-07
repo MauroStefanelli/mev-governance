@@ -707,7 +707,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
       data.forEach(r => {
         if (!r.towContratto || !r.tow) return;
         if (!pm[r.towContratto]) pm[r.towContratto] = {};
-        pm[r.towContratto][r.tow] = Number(r.valoreUnitario) || 0;
+        // IsCatalogo=true → ValoreUnitario trattato come 0 (importo diretto €, non tariffa)
+        pm[r.towContratto][r.tow] = r.isCatalogo ? 0 : (Number(r.valoreUnitario) || 0);
       });
       if (Object.keys(pm).length > 0) {
         setLocalPriceMap(pm);
@@ -775,12 +776,6 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
       if (!form.descrizione?.trim()) { alert("Descrizione obbligatoria"); return; }
     }
     setSaving(true);
-    // DEBUG — rimuovere dopo verifica
-    console.log("[MEV-CAP DEBUG] effectiveIsFallback=", effectiveIsFallback,
-      "localPriceMap=", JSON.stringify(localPriceMap),
-      "prices=", JSON.stringify(effectivePriceMap[form.tipoContratto]),
-      "form tow fields=", { tow021: form.tow021, tow022: form.tow022, tow023: form.tow023, tow024: form.tow024, tow025: form.tow025, tow026: form.tow026 },
-      "computedImporto=", computedImporto);
     // towTotale: calcolato solo se i prezzi sono dell'ambiente corrente (non fallback)
     const towTotale = (!effectiveIsFallback && hasPriceMap) ? computedImporto : null;
     const formToSave = isCreate
@@ -953,10 +948,6 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
                               ? parseFloat((importoTow / valUnit).toFixed(3))
                               : parseFloat(importoTow.toFixed(2));
                           });
-                          // DEBUG — rimuovere dopo verifica
-                          console.log("[MEV-CAP CALCOLA DEBUG] towDirettoKey=", towDirettoKey, "towDirettoField=", towDirettoField,
-                            "importoDiretto=", importoDiretto, "percDiretto=", percDiretto, "totaleIntervento=", totaleIntervento,
-                            "prices=", JSON.stringify(prices), "towImpatto=", JSON.stringify(towImpatto), "updates=", JSON.stringify(updates));
                           setForm(prev => ({ ...prev, ...updates }));
                         }}
                         style={{ padding: "5px 16px", borderRadius: "6px", border: "none", background: "#7c3aed", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
