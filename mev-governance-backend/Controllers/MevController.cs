@@ -371,16 +371,7 @@ public class MevController : BaseController
         var dataRows = ws.RowsUsed()
             .Where(r => r.RowNumber() > headerRow.RowNumber());
 
-        // Colonne TOW ordinate per posizione nel foglio (supporta TOW01.x, TOW02.x, ecc.)
-        // Pattern: il nome inizia con "TOW" e contiene un punto seguito da cifra
-        var towColsByPos = columnMap
-            .Where(kv => System.Text.RegularExpressions.Regex.IsMatch(
-                kv.Key, @"^TOW\d+\.\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            .OrderBy(kv => kv.Value) // ordine colonna nel foglio
-            .Select(kv => kv.Value)
-            .ToList();
-
-        Console.WriteLine($"[MEV ALIGN] Colonne TOW trovate ({towColsByPos.Count}): " +
+        Console.WriteLine($"[MEV ALIGN] Colonne TOW trovate: " +
             string.Join(", ", columnMap
                 .Where(kv => System.Text.RegularExpressions.Regex.IsMatch(kv.Key, @"^TOW\d+\.\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                 .OrderBy(kv => kv.Value)
@@ -418,6 +409,12 @@ public class MevController : BaseController
                 return v;
             }
 
+            // Legge un TOW per nome colonna (non per posizione)
+            decimal? GetTow(string towName) =>
+                columnMap.TryGetValue(towName, out var col)
+                    ? (decimal?)GetDecimalByCol(col)
+                    : null;
+
             int GetInt(string col)
             {
                 if (!columnMap.ContainsKey(col))
@@ -445,13 +442,14 @@ public class MevController : BaseController
             string contratto   = GetString("Contratto");
             string atId        = GetString("AT ID");
             // Legge le colonne TOW per posizione (ordine nel foglio), supportando
-            // qualsiasi naming: TOW02.x, TOW01.x, TOW03.x, ecc.
-            decimal? tow021 = towColsByPos.Count > 0 ? (decimal?)GetDecimalByCol(towColsByPos[0]) : null;
-            decimal? tow022 = towColsByPos.Count > 1 ? (decimal?)GetDecimalByCol(towColsByPos[1]) : null;
-            decimal? tow023 = towColsByPos.Count > 2 ? (decimal?)GetDecimalByCol(towColsByPos[2]) : null;
-            decimal? tow024 = towColsByPos.Count > 3 ? (decimal?)GetDecimalByCol(towColsByPos[3]) : null;
-            decimal? tow025 = towColsByPos.Count > 4 ? (decimal?)GetDecimalByCol(towColsByPos[4]) : null;
-            decimal? tow026 = towColsByPos.Count > 5 ? (decimal?)GetDecimalByCol(towColsByPos[5]) : null;
+            // Legge ogni TOW per nome colonna (non per posizione) per garantire
+            // che TOW02.5 → tow025 indipendentemente dall'ordine nel foglio
+            decimal? tow021 = GetTow("TOW02.1");
+            decimal? tow022 = GetTow("TOW02.2");
+            decimal? tow023 = GetTow("TOW02.3");
+            decimal? tow024 = GetTow("TOW02.4");
+            decimal? tow025 = GetTow("TOW02.5");
+            decimal? tow026 = GetTow("TOW02.6");
             decimal towTotale  = GetDecimal("Totale");
             decimal ordinatoBdo = GetDecimal("Ordinato (BdO)");
             decimal fatturato  = GetDecimal("Fatturato");

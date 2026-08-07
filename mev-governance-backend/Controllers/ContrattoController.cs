@@ -894,19 +894,17 @@ public class ContrattoController : BaseController
         Console.WriteLine($"[TOW RECALC] ConsumoTow rows={towRows.Count} | TowContratti: {string.Join(", ", towRows.Where(t => !string.IsNullOrWhiteSpace(t.TowContratto)).Select(t => t.TowContratto).Distinct())}");
         // ── FINE DIAGNOSTICA ─────────────────────────────────────────────────
 
-        // Selettori per i 6 campi quantità Tow (posizione 1-6)
-        var towQtaSelectors = new Func<MevItem, decimal?>[]
+        // Mappa nome TOW → selettore campo quantità su MevItem (per nome, non per posizione)
+        var towQtaByName = new Dictionary<string, Func<MevItem, decimal?>>(StringComparer.OrdinalIgnoreCase)
         {
-            m => m.Tow021,
-            m => m.Tow022,
-            m => m.Tow023,
-            m => m.Tow024,
-            m => m.Tow025,
-            m => m.Tow026,
+            { "TOW02.1", m => m.Tow021 },
+            { "TOW02.2", m => m.Tow022 },
+            { "TOW02.3", m => m.Tow023 },
+            { "TOW02.4", m => m.Tow024 },
+            { "TOW02.5", m => m.Tow025 },
+            { "TOW02.6", m => m.Tow026 },
         };
 
-        // Per ogni gruppo towContratto, determina la posizione (0-based) di ogni TOW
-        // usando ordinamento alfabetico (coerente con il frontend getTowGroups)
         var towContratti = towRows
             .Where(t => !string.IsNullOrWhiteSpace(t.TowContratto))
             .Select(t => t.TowContratto!)
@@ -915,10 +913,8 @@ public class ContrattoController : BaseController
 
         foreach (var contratto in towContratti)
         {
-            // Ordina alfabeticamente i TOW di questo contratto → posizione 0..N-1
-            var towsOrdinati = towRows
+            var towsContratto = towRows
                 .Where(t => string.Equals(t.TowContratto, contratto, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(t => t.Tow, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             // MEV filtrati per questo tipo contratto
@@ -926,17 +922,14 @@ public class ContrattoController : BaseController
                 .Where(m => string.Equals(m.TipoContratto, contratto, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
-            for (int i = 0; i < towsOrdinati.Count; i++)
+            foreach (var towRow in towsContratto)
             {
-                var towRow = towsOrdinati[i];
-
-                if (i >= towQtaSelectors.Length)
+                // Seleziona il selettore corretto per NOME TOW (non per posizione)
+                if (!towQtaByName.TryGetValue(towRow.Tow, out var qtaSelector))
                 {
-                    Console.WriteLine($"[TOW RECALC] TOW pos {i+1} supera i 6 campi disponibili, skip {towRow.Tow}");
+                    Console.WriteLine($"[TOW RECALC] TOW '{towRow.Tow}' non mappato, skip");
                     continue;
                 }
-
-                var qtaSelector = towQtaSelectors[i];
                 decimal valUnitario = towRow.ValoreUnitario;
 
                 // Approvato = SUM(quantità_TOW × ValoreUnitario) per righe MEV con Stato="Approvato"
@@ -997,11 +990,11 @@ public class ContrattoController : BaseController
                     towRow.Residuo       = residuo;
                     towRow.TowApprovati  = towApprovati;
                     towRow.TowResidui    = towResidui;
-                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} (pos{i+1}, VU={valUnitario}) → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2} | TowApp={towApprovati:F3} QtaTot={qtaTotale:F3} TowRes={towResidui:F3}");
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} (VU={valUnitario}) → App={approvato:F2} Ord={ordinati:F2} Imp={impegnato:F2} Res={residuo:F2} | TowApp={towApprovati:F3} QtaTot={qtaTotale:F3} TowRes={towResidui:F3}");
                 }
                 else
                 {
-                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → nessun dato MEV (Tow0{i+1} tutti null/0), mantengo valori Excel");
+                    Console.WriteLine($"[TOW RECALC] {contratto}/{towRow.Tow} → nessun dato MEV, mantengo valori Excel");
                 }
             }
         }
