@@ -299,6 +299,28 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
 
+    // Patch permessi Client: crea tabelle UserPagePermissions e UserClientContratti se non esistono
+    try
+    {
+#pragma warning disable EF1002
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""UserPagePermissions"" (
+                ""Id""     SERIAL PRIMARY KEY,
+                ""UserId"" INTEGER NOT NULL,
+                ""PageId"" TEXT    NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""UserClientContratti"" (
+                ""Id""           SERIAL PRIMARY KEY,
+                ""UserId""       INTEGER NOT NULL,
+                ""AmbienteId""   INTEGER NOT NULL,
+                ""TowContratto"" TEXT    NOT NULL DEFAULT ''
+            );
+        ");
+#pragma warning restore EF1002
+        Console.WriteLine("[PATCH] Tabelle UserPagePermissions e UserClientContratti verificate.");
+    }
+    catch (Exception ex) { Console.Error.WriteLine($"[PATCH CLIENT PERM ERROR] {ex.Message}"); }
+
     // Patch RtiSocietaRighe: aggiunge sequence per Id (se non già serial) e converte date in timestamptz
     try
     {

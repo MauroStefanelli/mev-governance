@@ -34,7 +34,7 @@ services:
         # postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
         # Lo schema "dev" viene creato automaticamente dal backend al primo avvio (DB_SCHEMA=dev)
       - key: CORS_ORIGINS
-        value: https://mev-governance-frontend-dev.onrender.com
+        value: https://mev-governance-frontend-dev.onrender.com,https://mev-governance-frontend-dev-olka.onrender.com
       - key: PDF_PARSER_URL
         value: https://mev-pdf-parser-dev.onrender.com
       - key: ASPNETCORE_ENVIRONMENT
