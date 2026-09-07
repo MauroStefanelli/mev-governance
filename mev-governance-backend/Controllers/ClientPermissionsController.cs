@@ -100,11 +100,13 @@ public class ClientPermissionsController : BaseController
     }
 
     // PUT /api/client-permissions/contratti/{userId}
-    // Sostituisce integralmente i contratti assegnati a un utente per un ambiente
+    // Sostituisce integralmente i contratti assegnati a un utente per un ambiente.
+    // Aggiunge/rimuove automaticamente la riga in UserAmbienti in base alla presenza di contratti.
     [HttpPut("contratti/{userId}")]
     [Authorize(Policy = "AdminOrSuper")]
     public IActionResult SetContratti(int userId, [FromBody] SetContrattiRequest request)
     {
+        // 1. Sostituisce i contratti Client
         var existing = _db.UserClientContratti
             .Where(r => r.UserId == userId && r.AmbienteId == request.AmbienteId)
             .ToList();
@@ -115,6 +117,21 @@ public class ClientPermissionsController : BaseController
             AmbienteId   = request.AmbienteId,
             TowContratto = tc,
         }));
+
+        // 2. Sincronizza UserAmbienti: se ha almeno un contratto → assicura sia nell'ambiente;
+        //    se non ha più contratti → rimuove dall'ambiente
+        var ua = _db.UserAmbienti.FirstOrDefault(x => x.UserId == userId && x.AmbienteId == request.AmbienteId);
+        if (request.TowContratti.Count > 0)
+        {
+            if (ua == null)
+                _db.UserAmbienti.Add(new UserAmbiente { UserId = userId, AmbienteId = request.AmbienteId, Ruolo = "Editor" });
+        }
+        else
+        {
+            if (ua != null)
+                _db.UserAmbienti.Remove(ua);
+        }
+
         _db.SaveChanges();
         return Ok(request.TowContratti);
     }

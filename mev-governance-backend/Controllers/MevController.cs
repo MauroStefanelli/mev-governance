@@ -47,9 +47,9 @@ public class MevController : BaseController
             {
                 var allowedContratti = _db.UserClientContratti
                     .Where(r => r.UserId == userId && r.AmbienteId == ambienteId)
-                    .Select(r => r.TowContratto)
+                    .Select(r => r.TowContratto!.ToUpper())
                     .ToList();
-                query = query.Where(m => allowedContratti.Contains(m.TipoContratto));
+                query = query.Where(m => allowedContratti.Contains(m.TipoContratto!.ToUpper()));
             }
             else
             {
@@ -237,9 +237,9 @@ public class MevController : BaseController
             {
                 clientContratti = _db.UserClientContratti
                     .Where(r => r.UserId == userId && r.AmbienteId == ambienteId)
-                    .Select(r => r.TowContratto)
+                    .Select(r => r.TowContratto!.ToUpper())
                     .ToList();
-                itemsQuery = itemsQuery.Where(m => clientContratti.Contains(m.TipoContratto));
+                itemsQuery = itemsQuery.Where(m => clientContratti.Contains(m.TipoContratto!.ToUpper()));
             }
         }
 
