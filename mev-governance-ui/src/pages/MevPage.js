@@ -1,8 +1,57 @@
 import { useEffect, useState, useRef } from "react";
 import {
-  getMevList, updateMev, alignMevData, exportMev, uploadExcel
+  getMevList, updateMev, alignMevData, exportMev, uploadExcel, getRtiSocieta
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
+
+// ── Helpers RTI (stessa logica di MevCapPage) ─────────────────────────────────
+const parseSocietà = (val) => {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return val ? [val] : [];
+};
+
+const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => {
+  const byId = (id) => {
+    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
+    return found?.societa || null;
+  };
+  const fromCap = (() => {
+    if (!capVal) return [];
+    const trimmed = String(capVal).trim().toLowerCase();
+    if (trimmed === "x") { const soc = byId(1); return soc ? [soc] : ["Capgemini Italia S.p.A."]; }
+    return parseSocietà(capVal);
+  })();
+  const fromIet = (() => {
+    if (!ietVal) return [];
+    const trimmed = String(ietVal).trim().toLowerCase();
+    if (trimmed === "x") { const soc = byId(2); return soc ? [soc] : ["I&T"]; }
+    return parseSocietà(ietVal);
+  })();
+  const combined = [...fromCap];
+  fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
+  return combined;
+};
+
+const resolveSubco = (subcoVal, rtiRows = []) => {
+  if (!subcoVal) return [];
+  const byId = (id) => {
+    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
+    return found?.societa || null;
+  };
+  // prova prima come JSON array di id
+  try {
+    const parsed = JSON.parse(subcoVal);
+    if (Array.isArray(parsed)) {
+      return parsed.map(id => byId(id) || String(id)).filter(Boolean);
+    }
+  } catch {}
+  // fallback: stringa separata da virgola/punto e virgola
+  return subcoVal.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+};
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 
@@ -196,6 +245,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [aligning, setAligning] = useState(false);
   const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
   const [viewRow, setViewRow] = useState(null); // riga aperta in sola lettura
+  const [rtiRows, setRtiRows] = useState([]);
   const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
@@ -223,6 +273,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   };
 
   useEffect(() => { loadMev(); }, [ambienteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { getRtiSocieta().then(setRtiRows).catch(() => {}); }, [ambienteId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
@@ -666,20 +717,19 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { val: viewRow.capgemini, ruolo: "Capgemini" },
-                      { val: viewRow.iet,       ruolo: "IET" },
-                    ].filter(({ val }) => val && val.trim() !== "").map(({ val, ruolo }) => (
-                      <tr key={ruolo}>
-                        <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0", color: val.trim().toLowerCase() === "x" ? "#12c937" : "#1a1a1a", fontWeight: val.trim().toLowerCase() === "x" ? 700 : 400 }}>
-                          {val.trim().toLowerCase() === "x" ? "✓" : val}
-                        </td>
-                        <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0", color: "#555" }}>{ruolo}</td>
-                      </tr>
-                    ))}
-                    {!viewRow.capgemini && !viewRow.iet && (
-                      <tr><td colSpan={2} style={{ padding: "5px 10px", color: "#aaa", fontStyle: "italic" }}>—</td></tr>
-                    )}
+                    {(() => {
+                      const mandanti = resolveCapMandanti(viewRow.capgemini, viewRow.iet, rtiRows);
+                      return mandanti.length > 0
+                        ? mandanti.map((s, i) => (
+                            <tr key={i}>
+                              <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0" }}>{s}</td>
+                              <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0", color: "#555" }}>
+                                {rtiRows.find(r => r.societa === s)?.ruolo || "Mandataria/Mandante"}
+                              </td>
+                            </tr>
+                          ))
+                        : <tr><td colSpan={2} style={{ padding: "5px 10px", color: "#aaa", fontStyle: "italic" }}>—</td></tr>;
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -694,7 +744,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   </thead>
                   <tbody>
                     {(() => {
-                      const subs = viewRow.subco ? viewRow.subco.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : [];
+                      const subs = resolveSubco(viewRow.subco, rtiRows);
                       return subs.length > 0
                         ? subs.map((s, i) => (
                             <tr key={i}>
