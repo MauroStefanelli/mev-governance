@@ -456,20 +456,21 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
               <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Importo BDO */}</th>
-              <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}>{/* Importo ODA */}</th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
+               <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
+               <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "Importo BDO", "P Note", "Azioni"].map((h) => (
+              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
               ))}
             </tr>
@@ -527,6 +528,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.bc ?? ""}</td>
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.ordinatoBdo)}</td>
 
                   <td style={{ ...TD, textAlign: "center" }}>{r.capgemini?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.capgemini ?? "")}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{r.iet?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.iet ?? "")}</td>
@@ -549,8 +551,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, textAlign: "right" }}>
                     <input
                       type="text"
-                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro((r.importoBdo && r.importoBdo !== 0) ? r.importoBdo : (r.ordinatoBdo ?? 0))}
-                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: (r.importoBdo && r.importoBdo !== 0) ? r.importoBdo : (r.ordinatoBdo ?? "") }))}
+                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro(r.importoBdo ?? 0)}
+                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: r.importoBdo ?? "" }))}
                       onChange={(e) => setEditingBdo((prev) => ({ ...prev, [r.id]: e.target.value }))}
                       onBlur={(e) => {
                         let raw = e.target.value.trim();

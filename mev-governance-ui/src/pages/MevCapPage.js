@@ -1175,11 +1175,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
 
           {/* Sezione: PMO Poste */}
           <ModalSection title="PMO Poste" color={sectionColor}>
-            <ModalField   label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
-            <ComboField   label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
-            <EuroEditField label="P Importo"  field="pImporto"   form={form} onChange={set} width="calc(20% - 8px)" />
-            <EuroEditField label="P Importo BDO" field="importoBdo" form={form} onChange={set} width="calc(20% - 8px)" />
-            <div style={{ width: "calc(28% - 8px)" }}>
+             <ModalField   label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
+             <ComboField   label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
+             <EuroEditField label="P Importo"  field="pImporto"   form={form} onChange={set} width="calc(20% - 8px)" />
+             <div style={{ width: "calc(28% - 8px)" }}>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
               <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
                 style={{ ...inputStyle(), minHeight: "56px", resize: "vertical" }} />
@@ -1820,7 +1819,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   {/* PMO */}
                   <td style={{ ...TD, textAlign: "center" }}>{r.pAnno}</td>
                   <td style={{ ...TD }}>{r.pRelease}</td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoBdo && r.importoBdo !== 0 ? r.importoBdo : r.ordinatoBdo)}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoBdo)}</td>
                   <td style={{ ...TD, maxWidth: "180px", fontSize: "12px", color: "#666" }}>{r.pNote ?? ""}</td>
                 </tr>
               );
