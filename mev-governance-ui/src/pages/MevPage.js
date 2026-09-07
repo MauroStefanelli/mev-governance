@@ -250,7 +250,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], capgemini: [], iet: [], subco: [], importoExcel: [] };
+    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [] };
     if (!saved) return defaults;
     const parsed = JSON.parse(saved);
     return { ...defaults, ...parsed };
@@ -277,7 +277,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], capgemini: [], iet: [], subco: [], importoExcel: [] });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], mandataria: [], subco: [], importoExcel: [] });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -293,11 +293,13 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const annoOptions = buildOptions("annoCompetenza");
   const pAnnoOptions = buildOptions("pAnno");
   const pReleaseOptions = buildOptions("pRelease");
-  // const rdaOptions         = buildOptions("rda");
-  const capgeminiOptions = buildOptions("capgemini");
-  const ietOptions = buildOptions("iet");
   const subcoOptions = buildOptions("subco");
   const importoExcelOptions = [...new Set(rows.map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
+
+  // Opzioni filtro Mandataria/Mandante: nomi reali risolti da rtiRows
+  const mandatariaOptions = [...new Set(
+    rows.flatMap(r => resolveCapMandanti(r.capgemini, r.iet, rtiRows))
+  )].filter(Boolean).sort();
 
   // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
   const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
@@ -355,8 +357,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     matchRda(r) &&
     (filters.pAnno.length === 0 || filters.pAnno.includes(String(r.pAnno))) &&
     (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
-    (filters.capgemini.length === 0 || filters.capgemini.includes(String(r.capgemini ?? ""))) &&
-    (filters.iet.length === 0 || filters.iet.includes(String(r.iet ?? ""))) &&
+    (filters.mandataria.length === 0 || resolveCapMandanti(r.capgemini, r.iet, rtiRows).some(s => filters.mandataria.includes(s))) &&
     (filters.subco.length === 0 || filters.subco.includes(String(r.subco ?? ""))) &&
     (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
   );
@@ -526,8 +527,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}>{/* Importo ODA */}</th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={capgeminiOptions} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={ietOptions} selected={filters.iet} onChange={(v) => handleFilterChange("iet", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect options={mandatariaOptions} selected={filters.mandataria} onChange={(v) => handleFilterChange("mandataria", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
@@ -537,7 +537,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Capgemini", "IET", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
+              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Mandataria/Mandante", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
               ))}
             </tr>
@@ -603,8 +603,16 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{formatEuro(r.ordinatoBdo)}</td>
 
-                  <td style={{ ...TD, textAlign: "center" }}>{r.capgemini?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.capgemini ?? "")}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{r.iet?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.iet ?? "")}</td>
+                  <td style={{ ...TD }}>
+                    {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
+                      ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                          {resolveCapMandanti(r.capgemini, r.iet, rtiRows).map(s => (
+                            <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                          ))}
+                        </div>
+                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
+                    }
+                  </td>
                   <td style={{ ...TD, textAlign: "center" }}>{r.subco?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.subco ?? "")}</td>
 
                   <td style={{ ...TD }}>
