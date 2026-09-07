@@ -1710,22 +1710,22 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="80px">Recupero</TH>
               <TH minW="130px">Importo CAP</TH>
               <TH minW="60px">Note</TH>
-              <TH minW="120px">ODA (BC)</TH>
-              <TH minW="100px">RDA (AT ID)</TH>
-              <TH minW="120px">Importo ODA</TH>
-              <TH minW="140px">Mandataria/Mandante</TH>
-              <TH minW="120px">Subco</TH>
-              <TH minW="75px">TOW01</TH>
-              <TH minW="75px">TOW02</TH>
-              <TH minW="75px">TOW03</TH>
-              <TH minW="75px">TOW04</TH>
-              <TH minW="75px">TOW05</TH>
-              <TH minW="75px">TOW06</TH>
-              <TH minW="90px">Tot TOW</TH>
-              <TH minW="70px">P Anno</TH>
-              <TH minW="90px">P Release</TH>
-              <TH minW="120px">P Importo</TH>
-              <TH minW="130px">P Note</TH>
+               <TH minW="120px">ODA (BC)</TH>
+               <TH minW="100px">RDA (AT ID)</TH>
+               <TH minW="120px">Importo ODA</TH>
+               <TH minW="120px">P Importo</TH>
+               <TH minW="140px">Mandataria/Mandante</TH>
+               <TH minW="120px">Subco</TH>
+               <TH minW="75px">TOW01</TH>
+               <TH minW="75px">TOW02</TH>
+               <TH minW="75px">TOW03</TH>
+               <TH minW="75px">TOW04</TH>
+               <TH minW="75px">TOW05</TH>
+               <TH minW="75px">TOW06</TH>
+               <TH minW="90px">Tot TOW</TH>
+               <TH minW="70px">P Anno</TH>
+               <TH minW="90px">P Release</TH>
+               <TH minW="130px">P Note</TH>
             </tr>
           </thead>
 
@@ -1786,6 +1786,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.ordinatoBdo)}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoBdo)}</td>
                   <td style={{ ...TD }}>
                     {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
@@ -1819,7 +1820,6 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   {/* PMO */}
                   <td style={{ ...TD, textAlign: "center" }}>{r.pAnno}</td>
                   <td style={{ ...TD }}>{r.pRelease}</td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoBdo)}</td>
                   <td style={{ ...TD, maxWidth: "180px", fontSize: "12px", color: "#666" }}>{r.pNote ?? ""}</td>
                 </tr>
               );
