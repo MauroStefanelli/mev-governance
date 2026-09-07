@@ -392,8 +392,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
           ✕ Reset filtri
         </button>
 
-        {/* Carica Excel — solo Admin */}
-        {role === "Admin" && (
+        {/* Carica Excel — Admin e SuperAdmin */}
+        {["Admin", "SuperAdmin"].includes(role) && (
           <>
             <input
               id="upload-excel"

@@ -814,3 +814,53 @@ export const deleteMev = async (id) => {
   }
   return r.json();
 };
+
+// ── Permessi Client ───────────────────────────────────────────────────────────
+
+export const getClientPages = async (userId) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/pages/${userId}`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore recupero pagine utente');
+  return r.json();
+};
+
+export const setClientPages = async (userId, pageIds) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/pages/${userId}`, {
+    method: 'PUT', headers: authHeaders(),
+    body: JSON.stringify(pageIds),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore salvataggio pagine utente');
+  return r.json();
+};
+
+export const getClientContratti = async (userId) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/contratti/${userId}`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore recupero contratti utente');
+  return r.json();
+};
+
+export const setClientContratti = async (userId, ambienteId, towContratti) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/contratti/${userId}`, {
+    method: 'PUT', headers: authHeaders(),
+    body: JSON.stringify({ ambienteId, towContratti }),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore salvataggio contratti utente');
+  return r.json();
+};
+
+export const getMyPages = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/my-pages`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) return [];
+  return r.json();
+};
+
+export const getMyContratti = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/my-contratti`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) return [];
+  return r.json();
+};

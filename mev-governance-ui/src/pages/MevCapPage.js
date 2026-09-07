@@ -886,10 +886,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
               contrattiOptions={contrattiTow.length > 0 ? contrattiTow : (options.tipoContratto || [])}
               onCrea={() => setShowCreaContratto(true)}
             />
-            <ModalField label="BC"             field="bc"            form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="Contratto"      field="contratto"     form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="RDA"            field="rda"           form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="BC"             field="bc"            form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="Contratto"      field="contratto"     form={form} onChange={set} width="calc(12% - 8px)" />
+            <ModalField label="RDA"            field="rda"           form={form} onChange={set} width="calc(12% - 8px)" />
             <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(10% - 8px)" />
+            <EuroField  label="Importo ODA"    value={form.ordinatoBdo}           width="calc(16% - 8px)" />
           </ModalSection>
 
           {/* Sezione: TOW Offerta — griglia tabellare allineata */}
@@ -1092,7 +1093,6 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
                 {formatEuro(displayScontato)}
               </div>
             </div>
-            <EuroField label="Ordinato (BdO)"  value={form.ordinatoBdo}        width="calc(20% - 8px)" />
             <EuroField label="Fatturato"        value={form.fatturato}          width="calc(20% - 8px)" />
             <ModalField label="Recupero"        field="recupero"  form={form} onChange={set} width="calc(12% - 8px)" />
             <EuroField label="Residuo Fatt."    value={form.residuoFatturabile} width="calc(15% - 8px)" />
@@ -1178,7 +1178,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
             <ModalField   label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
             <ComboField   label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
             <EuroEditField label="P Importo"  field="pImporto"   form={form} onChange={set} width="calc(20% - 8px)" />
-            <EuroEditField label="Importo BDO" field="importoBdo" form={form} onChange={set} width="calc(20% - 8px)" />
+            <EuroEditField label="P Importo BDO" field="importoBdo" form={form} onChange={set} width="calc(20% - 8px)" />
             <div style={{ width: "calc(28% - 8px)" }}>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
               <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
@@ -1713,6 +1713,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="60px">Note</TH>
               <TH minW="120px">ODA (BC)</TH>
               <TH minW="100px">RDA (AT ID)</TH>
+              <TH minW="120px">Importo ODA</TH>
               <TH minW="140px">Mandataria/Mandante</TH>
               <TH minW="120px">Subco</TH>
               <TH minW="75px">TOW01</TH>
@@ -1724,7 +1725,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="90px">Tot TOW</TH>
               <TH minW="70px">P Anno</TH>
               <TH minW="90px">P Release</TH>
-              <TH minW="120px">Importo BDO</TH>
+              <TH minW="120px">P Importo</TH>
               <TH minW="130px">P Note</TH>
             </tr>
           </thead>
@@ -1785,6 +1786,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.ordinatoBdo)}</td>
                   <td style={{ ...TD }}>
                     {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>

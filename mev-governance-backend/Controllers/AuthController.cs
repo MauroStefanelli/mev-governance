@@ -260,9 +260,9 @@ public class AuthController : ControllerBase
         if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
         if (!validRoles.Contains(request.Role))
-            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor");
+            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client");
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null)

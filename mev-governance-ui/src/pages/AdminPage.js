@@ -10,6 +10,11 @@ import {
   getUserAccessLog,
   updateUserRole,
   resetAll,
+  getClientPages,
+  setClientPages,
+  getClientContratti,
+  setClientContratti,
+  getConsumoTow,
 } from "../services/mevService";
 
 
@@ -40,6 +45,7 @@ function AdminPage() {
   const [accessLogLoading, setAccessLogLoading] = useState(false);
   const [savingRole, setSavingRole] = useState({}); // { [userId]: true/false }
   const [resetting, setResetting] = useState(false);
+  const [permessiModal, setPermessiModal] = useState(null); // { user }
 
   const formatDateTime = (iso) => {
 
@@ -259,6 +265,7 @@ function AdminPage() {
             >
               <option value="Editor">Editor</option>
               <option value="Admin">Admin</option>
+              <option value="Client">Client</option>
             </select>
           </div>
           <button type="submit" style={{ padding: "6px 16px", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
@@ -297,14 +304,15 @@ function AdminPage() {
                   style={{
                     padding: "3px 6px", border: "1px solid #ccc", borderRadius: "4px",
                     fontSize: "12px", cursor: savingRole[u.id] ? "wait" : "pointer",
-                    background: u.role === "Admin" ? "#fff3cd" : "#f8f9fa",
-                    color: u.role === "Admin" ? "#856404" : "#333",
+                    background: u.role === "Admin" ? "#fff3cd" : u.role === "Client" ? "#eff6ff" : "#f8f9fa",
+                    color: u.role === "Admin" ? "#856404" : u.role === "Client" ? "#1a73e8" : "#333",
                     fontWeight: 600,
                     opacity: savingRole[u.id] ? 0.6 : 1,
                   }}
                 >
                   <option value="Editor">Editor</option>
                   <option value="Admin">Admin</option>
+                  <option value="Client">Client</option>
                 </select>
               </td>
               <td style={{ textAlign: "center" }}>
@@ -360,8 +368,17 @@ function AdminPage() {
                     style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px" }}
                     title="Storico accessi"
                   >
-                    📋 Storico
+                    Storico
                   </button>
+                  {u.role === "Client" && (
+                    <button
+                      onClick={() => setPermessiModal({ user: u })}
+                      style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#7c3aed", color: "white", border: "none", borderRadius: "4px" }}
+                      title="Gestisci permessi pagine e contratti"
+                    >
+                      Permessi
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(u.id, u.username)}
                     style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#dc3545", color: "white", border: "none", borderRadius: "4px" }}
@@ -515,6 +532,131 @@ function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* ── Modale Permessi Client ── */}
+      {permessiModal && (
+        <PermessiClientModal
+          user={permessiModal.user}
+          onClose={() => setPermessiModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modale permessi per utente Client ─────────────────────────────────────────
+const ALL_PAGES = [
+  { id: "mev",               label: "MEV" },
+  { id: "mevcap",            label: "MEV-CAP" },
+  { id: "contratti",         label: "Contratti" },
+  { id: "contratti_interni", label: "Ordini" },
+  { id: "chart",             label: "Grafici" },
+  { id: "tools",             label: "Gestione Ordini" },
+  { id: "consumotow",        label: "TOW Contratti" },
+  { id: "superadmin",        label: "Gestione Contratti" },
+];
+
+function PermessiClientModal({ user, onClose }) {
+  const [pages, setPages] = useState([]);
+  const [contratti, setContratti] = useState([]); // [{ ambienteId, towContratto }]
+  const [availContratti, setAvailContratti] = useState([]); // nomi contratti disponibili
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getClientPages(user.id).then(setPages).catch(() => {});
+    getClientContratti(user.id).then(setContratti).catch(() => {});
+    getConsumoTow().then(data => {
+      const nomi = [...new Set(data.map(r => r.towContratto).filter(Boolean))];
+      setAvailContratti(nomi);
+    }).catch(() => {});
+  }, [user.id]);
+
+  const ambienteId = parseInt(localStorage.getItem("ambienteId") || "0", 10);
+
+  const togglePage = (id) =>
+    setPages(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+
+  const toggleContratto = (nome) =>
+    setContratti(prev => {
+      const exists = prev.some(r => r.ambienteId === ambienteId && r.towContratto === nome);
+      if (exists) return prev.filter(r => !(r.ambienteId === ambienteId && r.towContratto === nome));
+      return [...prev, { ambienteId, towContratto: nome }];
+    });
+
+  const isContrattoChecked = (nome) =>
+    contratti.some(r => r.ambienteId === ambienteId && r.towContratto === nome);
+
+  const handleSave = async () => {
+    setSaving(true); setError("");
+    try {
+      await setClientPages(user.id, pages);
+      const towNomi = contratti
+        .filter(r => r.ambienteId === ambienteId)
+        .map(r => r.towContratto);
+      await setClientContratti(user.id, ambienteId, towNomi);
+      onClose();
+    } catch (e) {
+      setError(e.message || "Errore salvataggio");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: "12px", padding: "28px 32px", width: "480px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+        <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px", color: "#1a1a1a" }}>
+          Permessi — {user.fullName || user.username}
+        </div>
+        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "20px" }}>Ruolo Client</div>
+
+        {error && <div style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "6px", padding: "8px 12px", marginBottom: "14px", fontSize: "12px" }}>{error}</div>}
+
+        {/* Pagine visibili */}
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Pagine visibili</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {ALL_PAGES.map(p => (
+              <label key={p.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer",
+                background: pages.includes(p.id) ? "#eff6ff" : "#f8f9fa",
+                border: `1px solid ${pages.includes(p.id) ? "#93c5fd" : "#e2e8f0"}`,
+                borderRadius: "6px", padding: "5px 10px", userSelect: "none" }}>
+                <input type="checkbox" checked={pages.includes(p.id)} onChange={() => togglePage(p.id)} />
+                {p.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Contratti visibili */}
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
+            Contratti visibili (ambiente corrente)
+          </div>
+          {availContratti.length === 0
+            ? <div style={{ fontSize: "12px", color: "#94a3b8" }}>Nessun contratto disponibile in questo ambiente.</div>
+            : <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {availContratti.map(nome => (
+                  <label key={nome} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer",
+                    background: isContrattoChecked(nome) ? "#f0fdf4" : "#f8f9fa",
+                    border: `1px solid ${isContrattoChecked(nome) ? "#86efac" : "#e2e8f0"}`,
+                    borderRadius: "6px", padding: "5px 10px", userSelect: "none" }}>
+                    <input type="checkbox" checked={isContrattoChecked(nome)} onChange={() => toggleContratto(nome)} />
+                    {nome}
+                  </label>
+                ))}
+              </div>
+          }
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: "6px", border: "1px solid #dadce0", background: "#f1f3f4", cursor: "pointer", fontSize: "13px" }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: "6px", border: "none", background: saving ? "#a78bfa" : "#7c3aed", color: "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 600 }}>
+            {saving ? "Salvataggio..." : "Salva Permessi"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

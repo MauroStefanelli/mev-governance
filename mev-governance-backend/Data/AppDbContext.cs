@@ -26,6 +26,8 @@ public class AppDbContext : DbContext
     public DbSet<Ambiente> Ambienti => Set<Ambiente>();
     public DbSet<UserAmbiente> UserAmbienti => Set<UserAmbiente>();
     public DbSet<RtiSocietaRiga> RtiSocietaRighe => Set<RtiSocietaRiga>();
+    public DbSet<UserClientContratto> UserClientContratti => Set<UserClientContratto>();
+    public DbSet<UserPagePermission> UserPagePermissions => Set<UserPagePermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

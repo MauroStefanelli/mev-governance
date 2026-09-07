@@ -34,12 +34,30 @@ public class MevController : BaseController
     public IActionResult GetMev()
     {
         var ambienteId = GetAmbienteId();
-        var items = _db.MevItems
-            .AsNoTracking()
-            .Where(m => m.AmbienteId == ambienteId)
-            .OrderBy(m => m.ExcelOrder)
-            .ToList();
 
+        IQueryable<MevItem> query = _db.MevItems
+            .AsNoTracking()
+            .Where(m => m.AmbienteId == ambienteId);
+
+        // Ruolo Client: filtra solo le righe con TipoContratto assegnato
+        if (User.IsInRole("Client"))
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdClaim, out var userId))
+            {
+                var allowedContratti = _db.UserClientContratti
+                    .Where(r => r.UserId == userId && r.AmbienteId == ambienteId)
+                    .Select(r => r.TowContratto)
+                    .ToList();
+                query = query.Where(m => allowedContratti.Contains(m.TipoContratto));
+            }
+            else
+            {
+                return Unauthorized();
+            }
+        }
+
+        var items = query.OrderBy(m => m.ExcelOrder).ToList();
         return Ok(items);
     }
 
@@ -206,10 +224,26 @@ public class MevController : BaseController
     {
         var ambienteId = GetAmbienteId();
 
-        var items = _db.MevItems
+        IQueryable<MevItem> itemsQuery = _db.MevItems
             .AsNoTracking()
-            .Where(m => m.AmbienteId == ambienteId)
-            .ToList();
+            .Where(m => m.AmbienteId == ambienteId);
+
+        // Ruolo Client: restringe anche le opzioni ai contratti assegnati
+        List<string>? clientContratti = null;
+        if (User.IsInRole("Client"))
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdClaim, out var userId))
+            {
+                clientContratti = _db.UserClientContratti
+                    .Where(r => r.UserId == userId && r.AmbienteId == ambienteId)
+                    .Select(r => r.TowContratto)
+                    .ToList();
+                itemsQuery = itemsQuery.Where(m => clientContratti.Contains(m.TipoContratto));
+            }
+        }
+
+        var items = itemsQuery.ToList();
 
         static IEnumerable<string> Distinct(IEnumerable<string?> source) =>
             source
@@ -240,10 +274,16 @@ public class MevController : BaseController
         // Se IsCatalogo = true: ValoreUnitario = 0 (importo diretto €, non tariffa × qty)
         var priceMap = towRows
             .GroupBy(t => t.TowContratto!, StringComparer.OrdinalIgnoreCase)
+            .Where(g => clientContratti == null || clientContratti.Contains(g.Key, StringComparer.OrdinalIgnoreCase))
             .ToDictionary(
                 g => g.Key,
                 g => g.ToDictionary(t => t.Tow, t => (priceMapIsFallback || t.IsCatalogo) ? 0m : t.ValoreUnitario)
             );
+
+        // Per Client: tipoContratto limitato ai contratti assegnati
+        var tipoContrattoOptions = clientContratti != null
+            ? (IEnumerable<string>)clientContratti
+            : new[] { "BASE", "QDO" };
 
         return Ok(new
         {
@@ -257,7 +297,7 @@ public class MevController : BaseController
                                   .Select(a => a.ToString()),
             releaseExcel  = Distinct(items.Select(i => i.ReleaseExcel)),
             stato         = new[] { "Approvato", "In analisi / Stima", "In approvazione", "Sospeso", "Eliminato" },
-            tipoContratto = new[] { "BASE", "QDO" },
+            tipoContratto = tipoContrattoOptions,
             priceMap,
             priceMapIsFallback,
         });

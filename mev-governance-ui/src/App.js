@@ -10,7 +10,7 @@ import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -43,6 +43,9 @@ function App() {
   const [ambienteId, setAmbienteId]     = useState(() => parseInt(localStorage.getItem("ambienteId") || "0", 10));
   const [showAmbienteMenu, setShowAmbienteMenu] = useState(false);
   const [switchingAmbiente, setSwitchingAmbiente] = useState(false);
+
+  // Permessi pagine per ruolo Client
+  const [clientPages, setClientPages] = useState(null); // null = non ancora caricato / non Client
 
   // Modifica descrizione ambiente inline
   const [editingDesc, setEditingDesc]   = useState(false);
@@ -85,9 +88,14 @@ function App() {
         setToken(jwt);
         setUsername(p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || localStorage.getItem("XUSER") || "");
         setFullName(p?.fullName || localStorage.getItem("fullName") || "");
-        setRole(p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || localStorage.getItem("role") || "");
+        const restoredRole = p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || localStorage.getItem("role") || "";
+        setRole(restoredRole);
         try { setAmbienti(JSON.parse(localStorage.getItem("ambienti") || "[]")); } catch {}
         setAmbienteId(parseInt(localStorage.getItem("ambienteId") || "0", 10));
+        // Per Client: carica pagine permesse
+        if (restoredRole === "Client") {
+          getMyPages().then(pages => setClientPages(pages)).catch(() => setClientPages([]));
+        }
       };
 
       if (savedJwt && !isExpired(savedJwt)) {
@@ -205,6 +213,13 @@ function App() {
     localStorage.setItem("ambienteId", String(activeId));
 
     setPage("mev");
+
+    // Per utenti Client: carica le pagine permesse
+    if (data.role === "Client") {
+      getMyPages().then(pages => setClientPages(pages)).catch(() => setClientPages([]));
+    } else {
+      setClientPages(null);
+    }
   };
 
   // Evita falsi logout su cold-start backend Render free:
@@ -337,13 +352,18 @@ function App() {
 */
 
 
-  const navItems = [
-    { id: "mev",     label: "MEV" },
-    { id: "mevcap",  label: "MEV-CAP" },
-    { id: "contratti", label: "Contratti" },
+  const ALL_NAV_ITEMS = [
+    { id: "mev",               label: "MEV" },
+    { id: "mevcap",            label: "MEV-CAP" },
+    { id: "contratti",         label: "Contratti" },
     { id: "contratti_interni", label: "Ordini" },
-    { id: "chart", label: "Grafici" },
+    { id: "chart",             label: "Grafici" },
   ];
+
+  // Per Client: filtra le voci in base alle pagine permesse
+  const navItems = role === "Client" && clientPages !== null
+    ? ALL_NAV_ITEMS.filter(item => clientPages.includes(item.id))
+    : ALL_NAV_ITEMS;
 
   // Aspetta la verifica della sessione prima di rendere qualsiasi cosa
   if (bootstrapping) return (
@@ -659,6 +679,53 @@ function App() {
               )}
             </div>
           )}
+
+          {/* Menu pagine extra per Client */}
+          {role === "Client" && clientPages !== null && (() => {
+            const extraPages = [
+              { id: "tools",      label: "Gestione Ordini" },
+              { id: "consumotow", label: "TOW Contratti" },
+              { id: "superadmin", label: "Gestione Contratti" },
+            ].filter(p => clientPages.includes(p.id));
+            if (extraPages.length === 0) return null;
+            return (
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setShowAdminMenu(!showAdminMenu)}
+                  style={{
+                    background: extraPages.some(p => p.id === page) ? "rgba(255,255,255,0.22)" : "transparent",
+                    color: "white", border: "1px solid transparent", cursor: "pointer",
+                    padding: "6px 16px", borderRadius: "6px", fontSize: "13px",
+                  }}
+                >
+                  Altro {showAdminMenu ? "▲" : "▼"}
+                </button>
+                {showAdminMenu && (
+                  <div style={{
+                    position: "absolute", top: "38px", right: 0,
+                    background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                    borderRadius: "8px", minWidth: "180px",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}>
+                    {extraPages.map(({ id, label }) => (
+                      <div key={id} onClick={() => { setPage(id); setShowAdminMenu(false); }}
+                        style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px",
+                          fontWeight: page === id ? 600 : 400, color: "white",
+                          background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
+                          borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                        onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                        onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </nav>
 
         {/* Utente + cambio password + logout */}
@@ -751,9 +818,9 @@ function App() {
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
         {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
-        {page === "tools"             && ["Admin","SuperAdmin"].includes(role) && <ToolsPage onUnauthorized={handleUnauthorized} />}
-        {page === "consumotow"        && ["Admin","SuperAdmin"].includes(role) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "superadmin"        && role === "SuperAdmin" && <SuperAdminPage />}
+        {page === "tools"             && (["Admin","SuperAdmin"].includes(role) || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
+        {page === "consumotow"        && (["Admin","SuperAdmin"].includes(role) || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "superadmin"        && (role === "SuperAdmin" || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}
