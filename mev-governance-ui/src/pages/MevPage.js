@@ -171,6 +171,21 @@ const inputStyle = (extra = {}) => ({
   fontSize: "13px", background: "white", color: "#333", ...extra,
 });
 
+// ── Modale dettaglio sola lettura ─────────────────────────────────────────────
+const ViewSection = ({ title, children }) => (
+  <div style={{ marginBottom: "18px" }}>
+    <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.6px", borderBottom: "1px solid #e8f0fe", paddingBottom: "4px", marginBottom: "10px" }}>{title}</div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 16px" }}>{children}</div>
+  </div>
+);
+
+const ViewField = ({ label, value, wide, green }) => (
+  <div style={{ minWidth: wide ? "100%" : "160px", flex: wide ? "1 1 100%" : "1 1 160px" }}>
+    <div style={{ fontSize: "11px", color: "#888", marginBottom: "2px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px" }}>{label}</div>
+    <div style={{ fontSize: "13px", color: green ? "#12c937" : "#1a1a1a", fontWeight: green ? 700 : 400, padding: "4px 8px", background: "#f8f9fa", borderRadius: "4px", minHeight: "28px" }}>{value || "—"}</div>
+  </div>
+);
+
 // ── Componente ───────────────────────────────────────────────────────────────
 function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned, ambienteId }) {
   const [rows, setRows] = useState([]);
@@ -180,6 +195,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
   const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
+  const [viewRow, setViewRow] = useState(null); // riga aperta in sola lettura
   const role = localStorage.getItem("role") || "";
 
   const [filters, setFilters] = useState(() => {
@@ -486,6 +502,12 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                     backgroundColor: scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa",
                     borderBottom: "1px solid #f0f0f0",
                     transition: "background-color 0.1s",
+                    cursor: "pointer",
+                  }}
+                  onClick={(e) => {
+                    // non aprire il modale se si clicca su input, button o select
+                    if (["INPUT","BUTTON","SELECT","TEXTAREA"].includes(e.target.tagName)) return;
+                    setViewRow(r);
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = scost ? "#ffe8e8" : "#f0f4ff"}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa"}
@@ -528,7 +550,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.bc ?? ""}</td>
                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.ordinatoBdo)}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{formatEuro(r.ordinatoBdo)}</td>
 
                   <td style={{ ...TD, textAlign: "center" }}>{r.capgemini?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.capgemini ?? "")}</td>
                   <td style={{ ...TD, textAlign: "center" }}>{r.iet?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.iet ?? "")}</td>
@@ -602,6 +624,67 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
           </div>
         )}
       </div>
+
+      {/* ── Modale dettaglio riga (sola lettura) ── */}
+      {viewRow && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setViewRow(null)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: "12px", padding: "28px 32px", width: "700px", maxWidth: "95vw", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>{viewRow.goTo || "—"}</div>
+                <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>{viewRow.descrizione || ""}</div>
+              </div>
+              <button onClick={() => setViewRow(null)} style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Sezione Identificazione */}
+            <ViewSection title="Identificazione">
+              <ViewField label="ID"          value={viewRow.excelId} />
+              <ViewField label="GoTo"        value={viewRow.goTo} />
+              <ViewField label="Applicativo" value={viewRow.applicativo} />
+              <ViewField label="Descrizione" value={viewRow.descrizione} wide />
+            </ViewSection>
+
+            {/* Sezione Responsabili */}
+            <ViewSection title="Responsabili">
+              <ViewField label="PM Poste"    value={viewRow.pmPoste} />
+              <ViewField label="PM CAP"      value={viewRow.pmCap} />
+              <ViewField label="Capgemini"   value={viewRow.capgemini} />
+              <ViewField label="IET"         value={viewRow.iet} />
+              <ViewField label="Subco"       value={viewRow.subco} />
+            </ViewSection>
+
+            {/* Sezione Release */}
+            <ViewSection title="Release">
+              <ViewField label="Anno"        value={viewRow.annoCompetenza} />
+              <ViewField label="Release"     value={viewRow.releaseExcel} />
+              <ViewField label="P Anno"      value={viewRow.pAnno} />
+              <ViewField label="P Release"   value={viewRow.pRelease} />
+            </ViewSection>
+
+            {/* Sezione Stato e Contratto */}
+            <ViewSection title="Stato e Contratto">
+              <ViewField label="Stato"          value={viewRow.stato} />
+              <ViewField label="Tipo Contratto" value={viewRow.tipoContratto} />
+              <ViewField label="BC (ODA)"       value={viewRow.bc} green />
+              <ViewField label="RDA (AT ID)"    value={viewRow.atId} green />
+              <ViewField label="Contratto"      value={viewRow.contratto} />
+              <ViewField label="RDA"            value={viewRow.rda} />
+              <ViewField label="Importo ODA"    value={viewRow.ordinatoBdo != null ? formatEuro(viewRow.ordinatoBdo) : "—"} green />
+              <ViewField label="P Importo"      value={viewRow.importoBdo != null ? formatEuro(viewRow.importoBdo) : "—"} />
+              <ViewField label="Importo CAP"    value={viewRow.importoExcel != null ? formatEuro(viewRow.importoExcel) : "—"} />
+            </ViewSection>
+
+          </div>
+        </div>
+      )}
 
       {/* ── Popover Note ── */}
       {notePopover && (
