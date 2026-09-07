@@ -293,7 +293,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const annoOptions = buildOptions("annoCompetenza");
   const pAnnoOptions = buildOptions("pAnno");
   const pReleaseOptions = buildOptions("pRelease");
-  const subcoOptions = buildOptions("subco");
+  const subcoOptions = [...new Set(
+    rows.flatMap(r => resolveSubco(r.subco, rtiRows))
+  )].filter(Boolean).sort();
   const importoExcelOptions = [...new Set(rows.map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
 
   // Opzioni filtro Mandataria/Mandante: nomi reali risolti da rtiRows
@@ -358,7 +360,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     (filters.pAnno.length === 0 || filters.pAnno.includes(String(r.pAnno))) &&
     (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
     (filters.mandataria.length === 0 || resolveCapMandanti(r.capgemini, r.iet, rtiRows).some(s => filters.mandataria.includes(s))) &&
-    (filters.subco.length === 0 || filters.subco.includes(String(r.subco ?? ""))) &&
+    (filters.subco.length === 0 || resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) &&
     (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
   );
 
@@ -613,7 +615,16 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
                     }
                   </td>
-                  <td style={{ ...TD, textAlign: "center" }}>{r.subco?.trim().toLowerCase() === "x" ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>✓</span> : (r.subco ?? "")}</td>
+                  <td style={{ ...TD }}>
+                    {resolveSubco(r.subco, rtiRows).length > 0
+                      ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                          {resolveSubco(r.subco, rtiRows).map(s => (
+                            <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                          ))}
+                        </div>
+                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
+                    }
+                  </td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}
