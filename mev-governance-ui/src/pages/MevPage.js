@@ -636,10 +636,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
               <div>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>{viewRow.goTo || "—"}</div>
-                <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>{viewRow.descrizione || ""}</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", marginTop: "2px" }}>{viewRow.descrizione || ""}</div>
               </div>
               <button onClick={() => setViewRow(null)} style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
             </div>
@@ -649,16 +649,63 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <ViewField label="ID"          value={viewRow.excelId} />
               <ViewField label="GoTo"        value={viewRow.goTo} />
               <ViewField label="Applicativo" value={viewRow.applicativo} />
-              <ViewField label="Descrizione" value={viewRow.descrizione} wide />
             </ViewSection>
 
             {/* Sezione Responsabili */}
             <ViewSection title="Responsabili">
               <ViewField label="PM Poste"    value={viewRow.pmPoste} />
               <ViewField label="PM CAP"      value={viewRow.pmCap} />
-              <ViewField label="Capgemini"   value={viewRow.capgemini} />
-              <ViewField label="IET"         value={viewRow.iet} />
-              <ViewField label="Subco"       value={viewRow.subco} />
+              {/* Tabella Mandataria/Mandante */}
+              <div style={{ width: "100%", marginTop: "6px" }}>
+                <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: "4px" }}>Mandataria / Mandante</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ background: "#f0f4ff" }}>
+                      <th style={{ padding: "5px 10px", textAlign: "left", fontWeight: 600, color: "#1a73e8", border: "1px solid #dbeafe" }}>Società</th>
+                      <th style={{ padding: "5px 10px", textAlign: "left", fontWeight: 600, color: "#1a73e8", border: "1px solid #dbeafe" }}>Ruolo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { val: viewRow.capgemini, ruolo: "Capgemini" },
+                      { val: viewRow.iet,       ruolo: "IET" },
+                    ].filter(({ val }) => val && val.trim() !== "").map(({ val, ruolo }) => (
+                      <tr key={ruolo}>
+                        <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0", color: val.trim().toLowerCase() === "x" ? "#12c937" : "#1a1a1a", fontWeight: val.trim().toLowerCase() === "x" ? 700 : 400 }}>
+                          {val.trim().toLowerCase() === "x" ? "✓" : val}
+                        </td>
+                        <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0", color: "#555" }}>{ruolo}</td>
+                      </tr>
+                    ))}
+                    {!viewRow.capgemini && !viewRow.iet && (
+                      <tr><td colSpan={2} style={{ padding: "5px 10px", color: "#aaa", fontStyle: "italic" }}>—</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {/* Tabella SubCo */}
+              <div style={{ width: "100%", marginTop: "10px" }}>
+                <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: "4px" }}>SubCo</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ background: "#fffbeb" }}>
+                      <th style={{ padding: "5px 10px", textAlign: "left", fontWeight: 600, color: "#d97706", border: "1px solid #fde68a" }}>Società</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const subs = viewRow.subco ? viewRow.subco.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : [];
+                      return subs.length > 0
+                        ? subs.map((s, i) => (
+                            <tr key={i}>
+                              <td style={{ padding: "5px 10px", border: "1px solid #f0f0f0" }}>{s}</td>
+                            </tr>
+                          ))
+                        : <tr><td style={{ padding: "5px 10px", color: "#aaa", fontStyle: "italic" }}>—</td></tr>;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </ViewSection>
 
             {/* Sezione Release */}
