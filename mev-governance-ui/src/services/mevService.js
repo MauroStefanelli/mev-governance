@@ -678,6 +678,19 @@ export const removeUtenteAmbiente = async (ambienteId, userId) => {
   return response.json();
 };
 
+export const updateUtenteAmbienteRuolo = async (ambienteId, userId, ruolo) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti/${userId}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ ruolo })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const updateDescrizioneAmbiente = async (ambienteId, descrizione) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/descrizione`, {
     method: "PATCH",

@@ -183,12 +183,34 @@ public class AmbienteController : ControllerBase
         if (_db.UserAmbienti.Any(ua => ua.UserId == req.UserId && ua.AmbienteId == id))
             return BadRequest("L'utente è già associato a questo ambiente.");
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
         if (!validRoles.Contains(req.Ruolo))
-            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor");
+            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client");
 
         var ua = new UserAmbiente { UserId = req.UserId, AmbienteId = id, Ruolo = req.Ruolo };
         _db.UserAmbienti.Add(ua);
+        _db.SaveChanges();
+
+        return Ok(new { ua.Id, ua.UserId, ua.AmbienteId, ua.Ruolo });
+    }
+
+    // ----------------------------------------------------------------
+    // PUT /api/ambienti/{id}/utenti/{userId} — modifica ruolo
+    // ----------------------------------------------------------------
+    [HttpPut("{id}/utenti/{userId}")]
+    public IActionResult UpdateUtenteRuolo(int id, int userId, [FromBody] UpdateRuoloRequest req)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
+        if (!validRoles.Contains(req.Ruolo))
+            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client");
+
+        var ua = _db.UserAmbienti.FirstOrDefault(x => x.AmbienteId == id && x.UserId == userId);
+        if (ua == null) return NotFound();
+
+        ua.Ruolo = req.Ruolo;
         _db.SaveChanges();
 
         return Ok(new { ua.Id, ua.UserId, ua.AmbienteId, ua.Ruolo });
@@ -218,4 +240,5 @@ public class AmbienteController : ControllerBase
 // ----------------------------------------------------------------
 public record AmbienteRequest(string CodiceContratto, string Descrizione, bool? IsActive = null);
 public record UserAmbienteRequest(int UserId, string Ruolo);
+public record UpdateRuoloRequest(string Ruolo);
 public record DescrizioneRequest(string? Descrizione);

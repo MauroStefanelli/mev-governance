@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   getAllAmbienti, createAmbiente,
-  getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente
+  getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente, updateUtenteAmbienteRuolo
 } from "../services/mevService";
 
 export default function SuperAdminPage() {
@@ -21,6 +21,7 @@ export default function SuperAdminPage() {
   const [addUserId, setAddUserId]               = useState("");
   const [addRuolo, setAddRuolo]                 = useState("Editor");
   const [addingUtente, setAddingUtente]         = useState(false);
+  const [editingRuolo, setEditingRuolo]         = useState({}); // { [userId]: ruolo } — righe in modifica
 
   const load = async () => {
     setLoading(true);
@@ -83,6 +84,18 @@ export default function SuperAdminPage() {
       await removeUtenteAmbiente(selectedAmbiente.id, userId);
       const u = await getAmbientiUtenti(selectedAmbiente.id);
       setUtentiAmbiente(u);
+    } catch (e) {
+      alert("Errore: " + e.message);
+    }
+  };
+
+  const handleUpdateRuolo = async (userId, ruolo) => {
+    if (!selectedAmbiente) return;
+    try {
+      await updateUtenteAmbienteRuolo(selectedAmbiente.id, userId, ruolo);
+      const u = await getAmbientiUtenti(selectedAmbiente.id);
+      setUtentiAmbiente(u);
+      setEditingRuolo(prev => { const n = { ...prev }; delete n[userId]; return n; });
     } catch (e) {
       alert("Errore: " + e.message);
     }
@@ -244,38 +257,65 @@ export default function SuperAdminPage() {
                     <th style={th}>Nome</th>
                     <th style={th}>Email</th>
                     <th style={th}>Ruolo Ambiente</th>
-                    <th style={th}></th>
+                    <th style={th}>Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {utentiAmbiente.map(ua => (
-                    <tr key={ua.id}>
-                      <td style={{ ...td, fontWeight: 600 }}>{ua.username}</td>
-                      <td style={td}>{ua.fullName}</td>
-                      <td style={td}>{ua.email}</td>
-                      <td style={td}>
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-                          background: ua.ruolo === "Admin" ? "#e8f0fe" : "#f1f3f4",
-                          color: ua.ruolo === "Admin" ? "#1a73e8" : "#555",
-                        }}>
-                          {ua.ruolo}
-                        </span>
-                      </td>
-                      <td style={td}>
-                        <button
-                          onClick={() => handleRemoveUtente(ua.userId)}
-                          style={{
-                            padding: "3px 10px", background: "#fce8e6", color: "#c5221f",
-                            border: "1px solid #f5c6c2", borderRadius: 6, fontSize: 12,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Rimuovi
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {utentiAmbiente.map(ua => {
+                    const isEditing = editingRuolo[ua.userId] !== undefined;
+                    const ruoloColor = ua.ruolo === "Admin" ? { bg: "#e8f0fe", fg: "#1a73e8" }
+                      : ua.ruolo === "Client" ? { bg: "#eff6ff", fg: "#2563eb" }
+                      : { bg: "#f1f3f4", fg: "#555" };
+                    return (
+                      <tr key={ua.id}>
+                        <td style={{ ...td, fontWeight: 600 }}>{ua.username}</td>
+                        <td style={td}>{ua.fullName}</td>
+                        <td style={td}>{ua.email}</td>
+                        <td style={td}>
+                          {isEditing ? (
+                            <select
+                              value={editingRuolo[ua.userId]}
+                              onChange={e => setEditingRuolo(prev => ({ ...prev, [ua.userId]: e.target.value }))}
+                              style={{ padding: "4px 8px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12 }}
+                            >
+                              <option>Admin</option>
+                              <option>Editor</option>
+                              <option>Client</option>
+                            </select>
+                          ) : (
+                            <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: ruoloColor.bg, color: ruoloColor.fg }}>
+                              {ua.ruolo}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ ...td, display: "flex", gap: 6 }}>
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => handleUpdateRuolo(ua.userId, editingRuolo[ua.userId])}
+                                style={{ padding: "3px 10px", background: "#e6f4ea", color: "#137333", border: "1px solid #a8d5b5", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                              >Salva</button>
+                              <button
+                                onClick={() => setEditingRuolo(prev => { const n = { ...prev }; delete n[ua.userId]; return n; })}
+                                style={{ padding: "3px 10px", background: "#f1f3f4", color: "#555", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
+                              >Annulla</button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setEditingRuolo(prev => ({ ...prev, [ua.userId]: ua.ruolo }))}
+                                style={{ padding: "3px 10px", background: "#e8f0fe", color: "#1a73e8", border: "1px solid #c5d8fb", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                              >Modifica</button>
+                              <button
+                                onClick={() => handleRemoveUtente(ua.userId)}
+                                style={{ padding: "3px 10px", background: "#fce8e6", color: "#c5221f", border: "1px solid #f5c6c2", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
+                              >Rimuovi</button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
