@@ -243,6 +243,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [editingImporto, setEditingImporto] = useState({});
   const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
+  const [alignStatus, setAlignStatus] = useState(null); // { step: "running"|"done"|"error", msg: string }
   const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
   const [viewRow, setViewRow] = useState(null); // riga aperta in sola lettura
   const [rtiRows, setRtiRows] = useState([]);
@@ -428,16 +429,20 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
           onClick={async () => {
             if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
             setAligning(true);
+            setAlignStatus({ step: "running", msg: "Avvio allineamento..." });
             try {
+              setAlignStatus({ step: "running", msg: "Importazione dati in corso..." });
               const result = await alignMevData({});
               const msg = result.countContratti !== undefined
-                ? `Allineamento completato: ${result.count} record MEV, ${result.countContratti} contratti`
-                : `Allineamento completato: ${result.count} record caricati`;
-              alert(msg);
+                ? `Completato: ${result.count} record MEV, ${result.countContratti} contratti`
+                : `Completato: ${result.count} record caricati`;
+              setAlignStatus({ step: "done", msg });
               onAligned?.();
               await loadMev();
+              setTimeout(() => setAlignStatus(null), 2000);
             } catch (e) {
-              alert(`Errore allineamento:\n${e.message}`);
+              setAlignStatus({ step: "error", msg: `Errore: ${e.message}` });
+              setTimeout(() => setAlignStatus(null), 4000);
             } finally {
               setAligning(false);
             }
@@ -694,6 +699,30 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
           </div>
         )}
       </div>
+
+      {/* ── Modale progress Allinea Dati ── */}
+      {alignStatus && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: "12px", padding: "28px 36px", minWidth: "320px", maxWidth: "440px", boxShadow: "0 8px 40px rgba(0,0,0,0.2)", textAlign: "center" }}>
+            {alignStatus.step === "running" && (
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ width: "40px", height: "40px", border: "4px solid #e8f0fe", borderTop: "4px solid #1a73e8", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            )}
+            {alignStatus.step === "done" && (
+              <div style={{ fontSize: "32px", marginBottom: "12px" }}>✓</div>
+            )}
+            {alignStatus.step === "error" && (
+              <div style={{ fontSize: "32px", marginBottom: "12px", color: "#ea4335" }}>✗</div>
+            )}
+            <div style={{ fontSize: "15px", fontWeight: 600, color: alignStatus.step === "error" ? "#ea4335" : alignStatus.step === "done" ? "#34a853" : "#1a73e8", marginBottom: "6px" }}>
+              {alignStatus.step === "running" ? "Allineamento in corso" : alignStatus.step === "done" ? "Allineamento completato" : "Errore"}
+            </div>
+            <div style={{ fontSize: "13px", color: "#555" }}>{alignStatus.msg}</div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modale dettaglio riga (sola lettura) ── */}
       {viewRow && (

@@ -217,6 +217,7 @@ export default function SuperAdminPage() {
               >
                 <option>Admin</option>
                 <option>Editor</option>
+                <option>Client</option>
               </select>
             </div>
             <button
