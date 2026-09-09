@@ -333,6 +333,60 @@ using (var scope = app.Services.CreateScope())
                     ""TowContratto"" TEXT NOT NULL DEFAULT ''
                 );
             ");
+            // Aggiunge tutte le colonne MevItems/Users/altri che le migration AddColumn
+            // potrebbero aver mancato se search_path era errato al primo deploy
+            db.Database.ExecuteSqlRaw($@"
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Accantonato""              NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Cm""                       TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""DocumentoOfferta""         TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ImportoFornituraScontato""  NUMERIC        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""InVita""                   TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Nel""                      TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""OffertaEuro""              NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""PmCap""                    TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""PmPoste""                  TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Po""                       TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""PowerAppsId""              TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Recupero""                 TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ResiduoFatturabile""       NUMERIC        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""SubcoNome""                TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TabellaOfferta""           TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tbd""                      TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TipoContratto""            TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow021""                   NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow022""                   NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow023""                   NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow024""                   NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow025""                   NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow026""                   NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TowTotale""                NUMERIC        NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""XOrdine""                  TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""CapImporti""               TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""SubcoImporti""             TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TowImpattoJson""           TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""IsManual""                 INTEGER        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ImportoBdo""               NUMERIC(18,2)  NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""AmbienteId""               INTEGER        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Cap""                      TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Iet""                      TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Subco""                    TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""NoteExcel""                TEXT           NULL;
+                ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""FatturatoReleaseExcel""    TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""SendEmail""                BOOLEAN        NOT NULL DEFAULT false;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""LastLogin""                TIMESTAMPTZ    NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""LastLogout""               TIMESTAMPTZ    NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""RefreshToken""             TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""RefreshTokenExpiry""       TIMESTAMPTZ    NULL;
+                ALTER TABLE ""{sch}"".""Contratti""          ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""BuoniConsegna""      ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""TowApprovati""   NUMERIC(18,2)  NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""TowImpegnati""   NUMERIC(18,2)  NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""TowResidui""     NUMERIC(18,2)  NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""Sconto""         NUMERIC        NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""IsCatalogo""     BOOLEAN        NOT NULL DEFAULT false;
+                ALTER TABLE ""{sch}"".""AppSettings""        ADD COLUMN IF NOT EXISTS ""LogoutMinutes""  INTEGER        NOT NULL DEFAULT 60;
+            ");
 #pragma warning restore EF1002
             Console.WriteLine("[PRE-PATCH] Tutte le tabelle verificate.");
         }
@@ -349,18 +403,13 @@ using (var scope = app.Services.CreateScope())
         Console.Error.WriteLine($"[MIGRATE ERROR] {ex.Message}");
     }
 
-    // Patch di sicurezza: aggiunge colonne mancanti se la migration non le ha create
-    // e converte IsCatalogo da integer a boolean se necessario (SQLite→Postgres mismatch)
+    // Patch post-migrate: solo conversioni di tipo (non ADD COLUMN — già tutte in pre-patch)
     if (isPostgres)
     {
         try
         {
 #pragma warning disable EF1002
-            db.Database.ExecuteSqlRaw($@"
-                ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""Sconto"" numeric NOT NULL DEFAULT 0;
-                ALTER TABLE ""{sch}"".""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""IsCatalogo"" boolean NOT NULL DEFAULT false;
-            ");
-            // Converte IsCatalogo da integer a boolean (DROP DEFAULT → CAST → SET DEFAULT)
+            // Converte IsCatalogo da integer a boolean se necessario (SQLite→Postgres mismatch)
             db.Database.ExecuteSqlRaw($@"
                 DO $$
                 BEGIN
@@ -377,7 +426,7 @@ using (var scope = app.Services.CreateScope())
                   END IF;
                 END$$;
             ");
-            // Converte Sconto da TEXT a numeric (DROP DEFAULT → CAST → SET DEFAULT)
+            // Converte Sconto da TEXT a numeric se necessario
             db.Database.ExecuteSqlRaw($@"
                 DO $$
                 BEGIN
@@ -395,87 +444,9 @@ using (var scope = app.Services.CreateScope())
                 END$$;
             ");
 #pragma warning restore EF1002
-            Console.WriteLine("[PATCH] Colonne Sconto/IsCatalogo verificate e corrette.");
+            Console.WriteLine("[PATCH] Conversioni tipo ConsumoTow verificate.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
-
-    // Patch colonne MevItems: aggiunge tutte le colonne introdotte da migration AddColumn
-    // che potrebbero essere mancanti se le migration EF hanno girato con search_path errato
-    try
-    {
-#pragma warning disable EF1002
-        db.Database.ExecuteSqlRaw($@"
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Accantonato""             NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Cm""                      TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""DocumentoOfferta""        TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ImportoFornituraScontato"" NUMERIC        NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""InVita""                  TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Nel""                     TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""OffertaEuro""             NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""PmCap""                   TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""PmPoste""                 TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Po""                      TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""PowerAppsId""             TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Recupero""                TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ResiduoFatturabile""      NUMERIC        NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""SubcoNome""               TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TabellaOfferta""          TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tbd""                     TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TipoContratto""           TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow021""                  NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow022""                  NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow023""                  NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow024""                  NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow025""                  NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow026""                  NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TowTotale""               NUMERIC        NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""XOrdine""                 TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""CapImporti""              TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""SubcoImporti""            TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""TowImpattoJson""          TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""IsManual""                INTEGER        NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ImportoBdo""              NUMERIC(18,2)  NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""AmbienteId""              INTEGER        NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Cap""                     TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Iet""                     TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""Subco""                   TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""NoteExcel""               TEXT           NULL;
-            ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""FatturatoReleaseExcel""   TEXT           NULL;
-        ");
-#pragma warning restore EF1002
-        Console.WriteLine("[PATCH] Colonne MevItems verificate e corrette.");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[PATCH MEVITEMS ERROR] {ex.Message}"); }
-
-    // Patch colonne altri modelli
-    try
-    {
-#pragma warning disable EF1002
-        db.Database.ExecuteSqlRaw($@"
-            ALTER TABLE ""{sch}"".""Users""  ADD COLUMN IF NOT EXISTS ""SendEmail""          BOOLEAN     NOT NULL DEFAULT false;
-            ALTER TABLE ""{sch}"".""Users""  ADD COLUMN IF NOT EXISTS ""LastLogin""          TIMESTAMPTZ NULL;
-            ALTER TABLE ""{sch}"".""Users""  ADD COLUMN IF NOT EXISTS ""LastLogout""         TIMESTAMPTZ NULL;
-            ALTER TABLE ""{sch}"".""Users""  ADD COLUMN IF NOT EXISTS ""RefreshToken""       TEXT        NULL;
-            ALTER TABLE ""{sch}"".""Users""  ADD COLUMN IF NOT EXISTS ""RefreshTokenExpiry"" TIMESTAMPTZ NULL;
-            ALTER TABLE ""{sch}"".""Contratti"" ADD COLUMN IF NOT EXISTS ""AmbienteId""      INTEGER     NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""BuoniConsegna"" ADD COLUMN IF NOT EXISTS ""AmbienteId""  INTEGER     NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""ConsumoTow""    ADD COLUMN IF NOT EXISTS ""AmbienteId""  INTEGER     NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""ConsumoTow""    ADD COLUMN IF NOT EXISTS ""TowApprovati"" NUMERIC(18,2) NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""ConsumoTow""    ADD COLUMN IF NOT EXISTS ""TowImpegnati"" NUMERIC(18,2) NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""ConsumoTow""    ADD COLUMN IF NOT EXISTS ""TowResidui""   NUMERIC(18,2) NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""AppSettings""   ADD COLUMN IF NOT EXISTS ""LogoutMinutes"" INTEGER   NOT NULL DEFAULT 60;
-            ALTER TABLE ""{sch}"".""VerbaliAvanzamento"" ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""VerbaliAvanzamento"" ADD COLUMN IF NOT EXISTS ""DatiRigheJson""  TEXT    NULL;
-            ALTER TABLE ""{sch}"".""OrdiniConsegna""     ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER NOT NULL DEFAULT 0;
-            ALTER TABLE ""{sch}"".""OrdiniConsegna""     ADD COLUMN IF NOT EXISTS ""MeseAvanzamento"" TEXT  NOT NULL DEFAULT '';
-            ALTER TABLE ""{sch}"".""OrdiniConsegna""     ADD COLUMN IF NOT EXISTS ""QtaAvanzata""     TEXT  NOT NULL DEFAULT '';
-            ALTER TABLE ""{sch}"".""OrdiniConsegna""     ADD COLUMN IF NOT EXISTS ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '';
-            ALTER TABLE ""{sch}"".""OrdiniConsegna""     ADD COLUMN IF NOT EXISTS ""Subappalto""      TEXT  NOT NULL DEFAULT '';
-        ");
-#pragma warning restore EF1002
-        Console.WriteLine("[PATCH] Colonne altri modelli verificate e corrette.");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[PATCH ALTRI ERROR] {ex.Message}"); }
 
     // Patch RtiSocietaRighe: aggiunge sequence per Id (se non già serial) e converte date in timestamptz
     try
