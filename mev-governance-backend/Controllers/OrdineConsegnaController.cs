@@ -75,6 +75,41 @@ public class OrdineConsegnaController : BaseController
     }
 
     // ============================================================
+    // PUT /api/tools/ordini/{id} — modifica un ordine di consegna
+    // ============================================================
+    [HttpPut("ordini/{id}")]
+    public IActionResult UpdateOrdine(int id, [FromBody] UpdateOrdineRequest req)
+    {
+        var ambienteId = GetAmbienteId();
+        var item = _db.OrdiniConsegna.FirstOrDefault(x => x.Id == id && x.AmbienteId == ambienteId);
+        if (item == null) return NotFound("Ordine non trovato.");
+
+        item.NumeroOrdine       = req.NumeroOrdine       ?? item.NumeroOrdine;
+        item.Data               = req.Data               ?? item.Data;
+        item.DataConsegna       = req.DataConsegna       ?? item.DataConsegna;
+        item.RifContratto       = req.RifContratto       ?? item.RifContratto;
+        item.Art                = req.Art                ?? item.Art;
+        item.Codice             = req.Codice             ?? item.Codice;
+        item.Descrizione        = req.Descrizione        ?? item.Descrizione;
+        item.TipoAtt            = req.TipoAtt            ?? item.TipoAtt;
+        item.Quantita           = req.Quantita           ?? item.Quantita;
+        item.Um                 = req.Um                 ?? item.Um;
+        item.PrezzoNetto        = req.PrezzoNetto        ?? item.PrezzoNetto;
+        item.Importo            = req.Importo            ?? item.Importo;
+        item.NumeroRda          = req.NumeroRda          ?? item.NumeroRda;
+        item.Iniziativa         = req.Iniziativa         ?? item.Iniziativa;
+        item.Ap                 = req.Ap                 ?? item.Ap;
+        item.Contratto          = req.Contratto          ?? item.Contratto;
+        item.MeseAvanzamento    = req.MeseAvanzamento    ?? item.MeseAvanzamento;
+        item.QtaAvanzata        = req.QtaAvanzata        ?? item.QtaAvanzata;
+        item.ImportoFatturabile = req.ImportoFatturabile ?? item.ImportoFatturabile;
+        item.Subappalto         = req.Subappalto         ?? item.Subappalto;
+
+        _db.SaveChanges();
+        return Ok(item);
+    }
+
+    // ============================================================
     // POST /api/tools/upload-pdf  — upload → parser Python → salva su DB
     // ============================================================
     [HttpPost("upload-pdf")]
@@ -1156,3 +1191,26 @@ public class OrdineConsegnaController : BaseController
             out result);
     }
 }
+
+public record UpdateOrdineRequest(
+    string? NumeroOrdine,
+    string? Data,
+    string? DataConsegna,
+    string? RifContratto,
+    string? Art,
+    string? Codice,
+    string? Descrizione,
+    string? TipoAtt,
+    string? Quantita,
+    string? Um,
+    string? PrezzoNetto,
+    string? Importo,
+    string? NumeroRda,
+    string? Iniziativa,
+    string? Ap,
+    string? Contratto,
+    string? MeseAvanzamento,
+    string? QtaAvanzata,
+    string? ImportoFatturabile,
+    string? Subappalto
+);

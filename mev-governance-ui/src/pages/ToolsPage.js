@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { fmtItIT, fmtEuroIt } from "../utils";
-import { tryRefreshToken } from "../services/mevService";
+import { tryRefreshToken, updateOrdineConsegna } from "../services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -260,6 +260,11 @@ export default function ToolsPage({ onUnauthorized }) {
   const [savingSubco, setSavingSubco] = useState(false);
   const [editingSubcoId, setEditingSubcoId] = useState(null); // id riga in edit inline
   const [savingInlineSubco, setSavingInlineSubco] = useState(false);
+
+  // Modale modifica ordine
+  const [editOrdine, setEditOrdine] = useState(null); // null oppure oggetto ordine in modifica
+  const [savingOrdine, setSavingOrdine] = useState(false);
+  const [saveOrdineError, setSaveOrdineError] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -1341,20 +1346,27 @@ export default function ToolsPage({ onUnauthorized }) {
 
             <tbody>
               {sortedData.map((r, idx) => (
-                <tr
-                  key={r.id}
-                  style={{
-                    background: idx % 2 === 0 ? "white" : "#f8f9ff",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "#e8f0fe")
-                  }
-                  onMouseLeave={(e) =>
-                  (e.currentTarget.style.background =
-                    idx % 2 === 0 ? "white" : "#f8f9ff")
-                  }
-                >
+                 <tr
+                   key={r.id}
+                   style={{
+                     background: idx % 2 === 0 ? "white" : "#f8f9ff",
+                     borderBottom: "1px solid #f0f0f0",
+                     cursor: "pointer",
+                   }}
+                   onMouseEnter={(e) =>
+                     (e.currentTarget.style.background = "#e8f0fe")
+                   }
+                   onMouseLeave={(e) =>
+                   (e.currentTarget.style.background =
+                     idx % 2 === 0 ? "white" : "#f8f9ff")
+                   }
+                   onClick={(e) => {
+                     // ignora click su select/input inline (subco)
+                     if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+                     setSaveOrdineError(null);
+                     setEditOrdine({ ...r });
+                   }}
+                 >
                   <td style={{ ...tdStyle, textAlign: "center" }}>{r.numeroOrdine}</td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>{r.data}</td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>{r.contratto}</td>
@@ -1803,6 +1815,106 @@ export default function ToolsPage({ onUnauthorized }) {
                   cursor: savingSubco ? "default" : "pointer",
                 }}
               >{savingSubco ? "Salvataggio..." : "Conferma associazione"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modale modifica ordine di consegna ── */}
+      {editOrdine && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditOrdine(null); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: "16px", boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+            padding: "32px 36px", minWidth: "560px", maxWidth: "700px", width: "90vw",
+            maxHeight: "90vh", overflowY: "auto",
+          }}>
+            <h3 style={{ margin: "0 0 20px", fontSize: "16px", color: "#1a73e8" }}>
+              Modifica Ordine — {editOrdine.numeroOrdine}
+            </h3>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
+              {[
+                { label: "N. Ordine",            key: "numeroOrdine" },
+                { label: "Data",                  key: "data" },
+                { label: "Data Consegna",         key: "dataConsegna" },
+                { label: "Rif. Contratto",        key: "rifContratto" },
+                { label: "Contratto",             key: "contratto" },
+                { label: "Art.",                  key: "art" },
+                { label: "Codice (TOW)",          key: "codice" },
+                { label: "Descrizione",           key: "descrizione" },
+                { label: "Tipo Attività",         key: "tipoAtt" },
+                { label: "Quantità",              key: "quantita" },
+                { label: "UM",                    key: "um" },
+                { label: "Prezzo Netto",          key: "prezzoNetto" },
+                { label: "Importo",               key: "importo" },
+                { label: "N. RdA",                key: "numeroRda" },
+                { label: "Iniziativa",            key: "iniziativa" },
+                { label: "AP",                    key: "ap" },
+                { label: "Mese Avanzamento",      key: "meseAvanzamento" },
+                { label: "Q.tà Avanzata",         key: "qtaAvanzata" },
+                { label: "Importo Fatturabile",   key: "importoFatturabile" },
+                { label: "Subappalto",            key: "subappalto" },
+              ].map(({ label, key }) => (
+                <div key={key}>
+                  <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "4px", fontWeight: 600 }}>
+                    {label}
+                  </label>
+                  <input
+                    value={editOrdine[key] ?? ""}
+                    onChange={(e) => setEditOrdine(prev => ({ ...prev, [key]: e.target.value }))}
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      border: "1px solid #d1d5db", borderRadius: "7px",
+                      padding: "7px 10px", fontSize: "13px", color: "#1e293b",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {saveOrdineError && (
+              <div style={{ marginTop: "16px", color: "#dc2626", fontSize: "13px", background: "#fef2f2", borderRadius: "8px", padding: "10px 14px" }}>
+                {saveOrdineError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px" }}>
+              <button
+                onClick={() => setEditOrdine(null)}
+                disabled={savingOrdine}
+                style={{
+                  padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0",
+                  background: "#f8fafc", color: "#64748b", fontSize: "13px", fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >Annulla</button>
+              <button
+                disabled={savingOrdine}
+                onClick={async () => {
+                  setSavingOrdine(true);
+                  setSaveOrdineError(null);
+                  try {
+                    const updated = await updateOrdineConsegna(editOrdine.id, editOrdine);
+                    setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+                    setEditOrdine(null);
+                  } catch (e) {
+                    setSaveOrdineError(e.message || "Errore nel salvataggio.");
+                  } finally {
+                    setSavingOrdine(false);
+                  }
+                }}
+                style={{
+                  padding: "9px 24px", borderRadius: "8px", border: "none",
+                  background: savingOrdine ? "#93c5fd" : "#1a73e8",
+                  color: "#fff", fontSize: "13px", fontWeight: 700,
+                  cursor: savingOrdine ? "default" : "pointer",
+                }}
+              >{savingOrdine ? "Salvataggio..." : "Salva"}</button>
             </div>
           </div>
         </div>

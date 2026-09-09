@@ -803,6 +803,17 @@ export const getOrdiniConsegna = async () => {
   return r.json();
 };
 
+export const updateOrdineConsegna = async (id, data) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/tools/ordini/${id}`, {
+    method: 'PUT',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('Errore aggiornamento ordine');
+  return r.json();
+};
+
 // ── Reset MEV + ConsumoTow ────────────────────────────────────────────────────
 export const resetMevAndConsumoTow = async () => {
   const r = await fetchWithRefresh(`${API_BASE_URL}/api/mev/reset-all`, {
