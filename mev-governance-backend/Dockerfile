@@ -1,8 +1,15 @@
 # ── Stage 1: build ────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+
+# Copia solo il .csproj prima — permette a Docker di cachare il restore NuGet
+# Il restore viene rieseguito SOLO se cambia il .csproj (nuove dipendenze)
+COPY mev-governance-backend.csproj .
+RUN dotnet restore mev-governance-backend.csproj
+
+# Ora copia il resto del codice e compila
 COPY . .
-RUN find . -name '._*' -delete && dotnet publish mev-governance-backend.csproj -c Release -o /app/publish
+RUN find . -name '._*' -delete && dotnet publish mev-governance-backend.csproj -c Release -o /app/publish --no-restore
 
 # ── Stage 2: runtime .NET puro (senza Python) ─────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
