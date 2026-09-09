@@ -10,11 +10,7 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "NoteExcel",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
+            migrationBuilder.Sql(@"ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""NoteExcel"" TEXT NULL;");
         }
 
         /// <inheritdoc />

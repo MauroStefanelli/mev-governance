@@ -10,18 +10,10 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<decimal>(
-                name: "Fatturato",
-                table: "MevItems",
-                type: "NUMERIC(18,2)",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.AddColumn<string>(
-                name: "ReleaseExcel",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Fatturato""    NUMERIC(18,2) NOT NULL DEFAULT 0;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""ReleaseExcel"" TEXT NULL;
+            ");
         }
 
         /// <inheritdoc />

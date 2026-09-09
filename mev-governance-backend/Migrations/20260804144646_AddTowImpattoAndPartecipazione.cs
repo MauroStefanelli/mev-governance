@@ -10,23 +10,11 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "CapImporti",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "SubcoImporti",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "TowImpattoJson",
-                table: "AppSettings",
-                type: "TEXT",
-                nullable: true);
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""MevItems""    ADD COLUMN IF NOT EXISTS ""CapImporti""    TEXT NULL;
+                ALTER TABLE ""MevItems""    ADD COLUMN IF NOT EXISTS ""SubcoImporti""  TEXT NULL;
+                ALTER TABLE ""AppSettings"" ADD COLUMN IF NOT EXISTS ""TowImpattoJson"" TEXT NULL;
+            ");
         }
 
         /// <inheritdoc />

@@ -10,157 +10,33 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<decimal>(
-                name: "Accantonato",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Cm",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "DocumentoOfferta",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "ImportoFornituraScontato",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.AddColumn<string>(
-                name: "InVita",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Nel",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "OffertaEuro",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "PmCap",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "PmPoste",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Po",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "PowerAppsId",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Recupero",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "ResiduoFatturabile",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.AddColumn<string>(
-                name: "SubcoNome",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "TabellaOfferta",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Tbd",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "TipoContratto",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Tow021",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Tow022",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Tow023",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Tow024",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Tow025",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Tow026",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "TowTotale",
-                table: "MevItems",
-                type: "NUMERIC",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "XOrdine",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Accantonato""             NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Cm""                      TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""DocumentoOfferta""        TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""ImportoFornituraScontato"" NUMERIC       NOT NULL DEFAULT 0;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""InVita""                  TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Nel""                     TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""OffertaEuro""             NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""PmCap""                   TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""PmPoste""                 TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Po""                      TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""PowerAppsId""             TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Recupero""                TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""ResiduoFatturabile""      NUMERIC        NOT NULL DEFAULT 0;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""SubcoNome""               TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""TabellaOfferta""          TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tbd""                     TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""TipoContratto""           TEXT           NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow021""                  NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow022""                  NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow023""                  NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow024""                  NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow025""                  NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Tow026""                  NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""TowTotale""               NUMERIC        NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""XOrdine""                 TEXT           NULL;
+            ");
         }
 
         /// <inheritdoc />

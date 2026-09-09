@@ -11,42 +11,22 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Rda",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.CreateTable(
-                name: "AppSettings",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    LastAlignAt = table.Column<DateTime>(type: "TEXT", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AppSettings", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ConsumoTow",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Voce = table.Column<string>(type: "TEXT", nullable: false),
-                    ValoreTotale = table.Column<decimal>(type: "TEXT", nullable: false),
-                    Approvato = table.Column<decimal>(type: "TEXT", nullable: false),
-                    OrdinatiRda = table.Column<decimal>(type: "TEXT", nullable: false),
-                    Impegnato = table.Column<decimal>(type: "TEXT", nullable: false),
-                    Residuo = table.Column<decimal>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ConsumoTow", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Rda"" TEXT NULL;
+                CREATE TABLE IF NOT EXISTS ""AppSettings"" (
+                    ""Id""          SERIAL PRIMARY KEY,
+                    ""LastAlignAt"" TIMESTAMPTZ NULL
+                );
+                CREATE TABLE IF NOT EXISTS ""ConsumoTow"" (
+                    ""Id""          SERIAL PRIMARY KEY,
+                    ""Voce""        TEXT NOT NULL DEFAULT '',
+                    ""ValoreTotale"" NUMERIC NOT NULL DEFAULT 0,
+                    ""Approvato""   NUMERIC NOT NULL DEFAULT 0,
+                    ""OrdinatiRda"" NUMERIC NOT NULL DEFAULT 0,
+                    ""Impegnato""   NUMERIC NOT NULL DEFAULT 0,
+                    ""Residuo""     NUMERIC NOT NULL DEFAULT 0
+                );
+            ");
         }
 
         /// <inheritdoc />

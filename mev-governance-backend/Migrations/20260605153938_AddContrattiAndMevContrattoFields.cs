@@ -10,53 +10,25 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "AtId",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Bc",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Contratto",
-                table: "MevItems",
-                type: "TEXT",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "OrdinatoBdo",
-                table: "MevItems",
-                type: "NUMERIC(18,2)",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.CreateTable(
-                name: "Contratti",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true)
-                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    RifContratto = table.Column<string>(type: "TEXT", nullable: false),
-                    TipoContratto = table.Column<string>(type: "TEXT", nullable: false),
-                    Data = table.Column<string>(type: "TEXT", nullable: true),
-                    ImpLordo = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
-                    Sconto = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
-                    ImportoNetto = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
-                    Ordinato = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
-                    DaOrdinare = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
-                    Avanzato = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false),
-                    DaAvanzare = table.Column<decimal>(type: "NUMERIC(18,2)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Contratti", x => x.Id);
-                });
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""AtId""       TEXT          NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Bc""         TEXT          NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""Contratto""  TEXT          NULL;
+                ALTER TABLE ""MevItems"" ADD COLUMN IF NOT EXISTS ""OrdinatoBdo"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+                CREATE TABLE IF NOT EXISTS ""Contratti"" (
+                    ""Id""            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    ""RifContratto""  TEXT NOT NULL DEFAULT '',
+                    ""TipoContratto"" TEXT NOT NULL DEFAULT '',
+                    ""Data""          TEXT NULL,
+                    ""ImpLordo""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+                    ""Sconto""        NUMERIC(18,2) NOT NULL DEFAULT 0,
+                    ""ImportoNetto""  NUMERIC(18,2) NOT NULL DEFAULT 0,
+                    ""Ordinato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+                    ""DaOrdinare""    NUMERIC(18,2) NOT NULL DEFAULT 0,
+                    ""Avanzato""      NUMERIC(18,2) NOT NULL DEFAULT 0,
+                    ""DaAvanzare""    NUMERIC(18,2) NOT NULL DEFAULT 0
+                );
+            ");
         }
 
         /// <inheritdoc />

@@ -10,19 +10,10 @@ namespace mevgovernancebackend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<bool>(
-                name: "IsCatalogo",
-                table: "ConsumoTow",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "Sconto",
-                table: "ConsumoTow",
-                type: "numeric",
-                nullable: false,
-                defaultValue: 0m);
+            migrationBuilder.Sql(@"
+                ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""IsCatalogo"" BOOLEAN NOT NULL DEFAULT false;
+                ALTER TABLE ""ConsumoTow"" ADD COLUMN IF NOT EXISTS ""Sconto""     NUMERIC NOT NULL DEFAULT 0;
+            ");
         }
 
         /// <inheritdoc />
