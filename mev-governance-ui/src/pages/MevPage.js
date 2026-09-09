@@ -367,6 +367,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
   const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
+  const totOda = filteredRows.reduce((s, r) => s + (Number(r.ordinatoBdo) || 0), 0);
   const hasActiveFilters = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : v !== "");
 
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
@@ -495,10 +496,11 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
         {/* Totali */}
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px" }}>
-          <div style={{
-            background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px",
-            textAlign: "right", minWidth: "160px"
-          }}>
+          <div style={{ background: "#e6f9f0", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
+            <div style={{ fontSize: "11px", color: "#12c937", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>ODA</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
+          </div>
+          <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
             <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot CAP</div>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8" }}>{formatEuro(totCap)}</div>
           </div>
