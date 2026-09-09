@@ -35,14 +35,14 @@ const fetchAuth = async (url, options = {}) => {
  * Chiama onProgress(secondi) ad ogni tentativo per aggiornare l'UI.
  * Lancia eccezione se il parser non risponde entro maxWaitMs.
  */
-const waitForParser = async (onProgress, maxWaitMs = 90000) => {
-  const interval = 18000;  // polling ogni 18s (backend impiega max 15s a rispondere)
+const waitForParser = async (onProgress, maxWaitMs = 270000) => {
+  const interval = 18000;  // polling ogni 18s (backend impiega max 30s a rispondere)
   const started = Date.now();
   let elapsed = 0;
   while (elapsed < maxWaitMs) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 17000); // timeout fetch 17s
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // timeout fetch 35s
       const res = await fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
         headers: authHeaders(),
         signal: controller.signal,
@@ -57,7 +57,7 @@ const waitForParser = async (onProgress, maxWaitMs = 90000) => {
     onProgress(Math.round(elapsed / 1000));
     await new Promise(r => setTimeout(r, interval));
   }
-  throw new Error("Il servizio di parsing PDF non risponde dopo 90 secondi. Riprovare più tardi.");
+  throw new Error("Il servizio di parsing PDF non risponde dopo 4 minuti. Riprovare più tardi.");
 };
 
 const getOrdini = async () => {
@@ -1049,7 +1049,7 @@ export default function ToolsPage({ onUnauthorized }) {
               }}
                 title="Debug testo PDF grezzo"
               >
-                {debugging ? "..." : "DBG PDF"}
+                {debugging ? "..." : "DBG ORD"}
                 <input ref={debugRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleDebug} />
               </label>
               <label style={{
