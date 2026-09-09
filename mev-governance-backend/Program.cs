@@ -239,8 +239,9 @@ using (var scope = app.Services.CreateScope())
         catch (Exception ex) { Console.Error.WriteLine($"[SCHEMA ERROR] {ex.Message}"); }
     }
 
-    // Pre-patch: crea Ambienti e UserAmbienti con schema esplicito PRIMA di Migrate()
-    // Le migration SQL-raw non prefissano lo schema e falliscono su Postgres con schema != search_path
+    // Pre-patch: crea TUTTE le tabelle con schema esplicito PRIMA di Migrate()
+    // Le migration EF (sia SQL-raw che CreateTable) usano search_path implicito;
+    // se il search_path non era corretto al momento del primo deploy le tabelle non esistono.
     if (isPostgres)
     {
         try
@@ -260,9 +261,80 @@ using (var scope = app.Services.CreateScope())
                     ""AmbienteId"" INTEGER NOT NULL,
                     ""Ruolo""      TEXT NOT NULL DEFAULT 'Editor'
                 );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserAccessLogs"" (
+                    ""Id""       SERIAL PRIMARY KEY,
+                    ""UserId""   INTEGER NOT NULL,
+                    ""Username"" TEXT NOT NULL DEFAULT '',
+                    ""FullName"" TEXT NOT NULL DEFAULT '',
+                    ""Role""     TEXT NOT NULL DEFAULT '',
+                    ""LoginAt""  TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""LogoutAt"" TIMESTAMPTZ NULL
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""OrdiniConsegna"" (
+                    ""Id""                 SERIAL PRIMARY KEY,
+                    ""NumeroOrdine""       TEXT NOT NULL DEFAULT '',
+                    ""Data""               TEXT NOT NULL DEFAULT '',
+                    ""DataConsegna""       TEXT NOT NULL DEFAULT '',
+                    ""RifContratto""       TEXT NOT NULL DEFAULT '',
+                    ""Art""                TEXT NOT NULL DEFAULT '',
+                    ""Codice""             TEXT NOT NULL DEFAULT '',
+                    ""Descrizione""        TEXT NOT NULL DEFAULT '',
+                    ""TipoAtt""            TEXT NOT NULL DEFAULT '',
+                    ""Quantita""           TEXT NOT NULL DEFAULT '',
+                    ""Um""                 TEXT NOT NULL DEFAULT '',
+                    ""PrezzoNetto""        TEXT NOT NULL DEFAULT '',
+                    ""Importo""            TEXT NOT NULL DEFAULT '',
+                    ""NumeroRda""          TEXT NOT NULL DEFAULT '',
+                    ""Iniziativa""         TEXT NOT NULL DEFAULT '',
+                    ""Ap""                 TEXT NOT NULL DEFAULT '',
+                    ""Contratto""          TEXT NOT NULL DEFAULT '',
+                    ""NomePdf""            TEXT NOT NULL DEFAULT '',
+                    ""ImportatoIl""        TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""ImportatoDA""        TEXT NOT NULL DEFAULT '',
+                    ""MeseAvanzamento""    TEXT NOT NULL DEFAULT '',
+                    ""QtaAvanzata""        TEXT NOT NULL DEFAULT '',
+                    ""ImportoFatturabile"" TEXT NOT NULL DEFAULT '',
+                    ""Subappalto""         TEXT NOT NULL DEFAULT '',
+                    ""AmbienteId""         INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""VerbaliAvanzamento"" (
+                    ""Id""              SERIAL PRIMARY KEY,
+                    ""NomePdf""         TEXT NOT NULL DEFAULT '',
+                    ""MeseAvanzamento"" TEXT NOT NULL DEFAULT '',
+                    ""RigheElaborate""  INTEGER NOT NULL DEFAULT 0,
+                    ""RigheAggiornate"" INTEGER NOT NULL DEFAULT 0,
+                    ""CaricatoIl""      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""CaricatoDa""      TEXT NOT NULL DEFAULT '',
+                    ""AmbienteId""      INTEGER NOT NULL DEFAULT 0,
+                    ""DatiRigheJson""   TEXT NULL
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""RtiSocietaRighe"" (
+                    ""Id""               SERIAL PRIMARY KEY,
+                    ""AmbienteId""       INTEGER NOT NULL DEFAULT 0,
+                    ""Contratto""        TEXT NOT NULL DEFAULT '',
+                    ""Ruolo""            TEXT NOT NULL DEFAULT '',
+                    ""Societa""          TEXT NOT NULL DEFAULT '',
+                    ""DataInizio""       TIMESTAMPTZ NULL,
+                    ""DataApprovazione"" TIMESTAMPTZ NULL,
+                    ""Percentuale""      NUMERIC NULL,
+                    ""Importo""          NUMERIC NULL,
+                    ""Consumato""        NUMERIC NULL,
+                    ""Ordine""           INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserPagePermissions"" (
+                    ""Id""     SERIAL PRIMARY KEY,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""PageId"" TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserClientContratti"" (
+                    ""Id""           SERIAL PRIMARY KEY,
+                    ""UserId""       INTEGER NOT NULL,
+                    ""AmbienteId""   INTEGER NOT NULL,
+                    ""TowContratto"" TEXT NOT NULL DEFAULT ''
+                );
             ");
 #pragma warning restore EF1002
-            Console.WriteLine("[PRE-PATCH] Tabelle Ambienti e UserAmbienti verificate.");
+            Console.WriteLine("[PRE-PATCH] Tutte le tabelle verificate.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH ERROR] {ex.Message}"); }
     }
@@ -404,28 +476,6 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine("[PATCH] Colonne altri modelli verificate e corrette.");
     }
     catch (Exception ex) { Console.Error.WriteLine($"[PATCH ALTRI ERROR] {ex.Message}"); }
-
-    // Patch permessi Client: crea tabelle UserPagePermissions e UserClientContratti se non esistono
-    try
-    {
-#pragma warning disable EF1002
-        db.Database.ExecuteSqlRaw($@"
-            CREATE TABLE IF NOT EXISTS ""{sch}"".""UserPagePermissions"" (
-                ""Id""     SERIAL PRIMARY KEY,
-                ""UserId"" INTEGER NOT NULL,
-                ""PageId"" TEXT    NOT NULL DEFAULT ''
-            );
-            CREATE TABLE IF NOT EXISTS ""{sch}"".""UserClientContratti"" (
-                ""Id""           SERIAL PRIMARY KEY,
-                ""UserId""       INTEGER NOT NULL,
-                ""AmbienteId""   INTEGER NOT NULL,
-                ""TowContratto"" TEXT    NOT NULL DEFAULT ''
-            );
-        ");
-#pragma warning restore EF1002
-        Console.WriteLine("[PATCH] Tabelle UserPagePermissions e UserClientContratti verificate.");
-    }
-    catch (Exception ex) { Console.Error.WriteLine($"[PATCH CLIENT PERM ERROR] {ex.Message}"); }
 
     // Patch RtiSocietaRighe: aggiunge sequence per Id (se non già serial) e converte date in timestamptz
     try
