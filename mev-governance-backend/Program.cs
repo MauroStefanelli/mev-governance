@@ -167,8 +167,8 @@ static string ParsePostgresUrl(string url, string schema = "public")
     // (il pooler gestisce lui le connessioni; il Transaction Pooler non supporta prepared statements)
     var noPool = host.Contains("pooler") ? ";No Reset On Close=true;Maximum Pool Size=5" : "";
 
-    // Search Path: forza lo schema corretto (dev o public) per migration e query
-    var searchPath = schema != "public" ? $";Search Path={schema},public" : "";
+    // Search Path: forza sempre lo schema corretto (dev o public) per migration e query raw senza prefisso
+    var searchPath = $";Search Path={schema},public";
 
     return $"Host={host};Port={port};Database={dbName};Username={user};Password={password};{sslMode}{noPool}{searchPath}";
 }
@@ -237,6 +237,34 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine($"[SCHEMA] Schema '{sch}' pronto.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[SCHEMA ERROR] {ex.Message}"); }
+    }
+
+    // Pre-patch: crea Ambienti e UserAmbienti con schema esplicito PRIMA di Migrate()
+    // Le migration SQL-raw non prefissano lo schema e falliscono su Postgres con schema != search_path
+    if (isPostgres)
+    {
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""Ambienti"" (
+                    ""Id""              SERIAL PRIMARY KEY,
+                    ""CodiceContratto"" TEXT NOT NULL DEFAULT '',
+                    ""Descrizione""     TEXT NOT NULL DEFAULT '',
+                    ""IsActive""        BOOLEAN NOT NULL DEFAULT true,
+                    ""CreatedAt""       TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserAmbienti"" (
+                    ""Id""         SERIAL PRIMARY KEY,
+                    ""UserId""     INTEGER NOT NULL,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""Ruolo""      TEXT NOT NULL DEFAULT 'Editor'
+                );
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] Tabelle Ambienti e UserAmbienti verificate.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH ERROR] {ex.Message}"); }
     }
 
     try
