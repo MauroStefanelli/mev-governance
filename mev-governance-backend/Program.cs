@@ -435,7 +435,7 @@ using (var scope = app.Services.CreateScope())
             SELECT '4490015980','Contratto principale',true,now()
             WHERE NOT EXISTS (SELECT 1 FROM ""{sch}"".""Ambienti"" WHERE ""CodiceContratto""='4490015980');
 
-            -- Associa MSTEFANE all'ambiente come Admin
+            -- Associa MSTEFANE all'ambiente come Admin (inserisce se non esiste)
             INSERT INTO ""{sch}"".""UserAmbienti"" (""UserId"",""AmbienteId"",""Ruolo"")
             SELECT u.""Id"", a.""Id"", 'Admin'
             FROM ""{sch}"".""Users"" u, ""{sch}"".""Ambienti"" a
@@ -444,6 +444,12 @@ using (var scope = app.Services.CreateScope())
                 SELECT 1 FROM ""{sch}"".""UserAmbienti"" ua
                 WHERE ua.""UserId""=u.""Id"" AND ua.""AmbienteId""=a.""Id""
             );
+
+            -- Associa SUPERADMIN a tutti gli ambienti attivi (come fallback — è SuperAdmin quindi vede tutto via codice)
+            -- Assicura che MSTEFANE abbia il ruolo corretto in UserAmbienti
+            UPDATE ""{sch}"".""UserAmbienti""
+            SET ""Ruolo"" = 'Admin'
+            WHERE ""UserId"" = (SELECT ""Id"" FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE' LIMIT 1);
         ", adminHash, saHash);
         Console.WriteLine("[SEED] Utenti e Ambiente pronti.");
     }
