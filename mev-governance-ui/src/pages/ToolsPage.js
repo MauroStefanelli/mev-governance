@@ -1514,7 +1514,7 @@ export default function ToolsPage({ onUnauthorized }) {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
               <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>
-                PDF caricati ({pdfGroups.length})
+                Ordini caricati (PDF) ({pdfGroups.length})
               </div>
               <button onClick={() => setShowPdfPanel(false)}
                 style={{ border: "none", background: "none", cursor: "pointer", fontSize: "20px", color: "#888" }}>×</button>

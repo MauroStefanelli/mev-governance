@@ -22,7 +22,7 @@ const parseSocietà = (val) => {
   try {
     const parsed = JSON.parse(val);
     if (Array.isArray(parsed)) return parsed;
-  } catch {}
+  } catch { }
   return val ? [val] : [];
 };
 
@@ -285,8 +285,8 @@ const btn = (variant = "default") => {
   };
   const variants = {
     primary: { ...base, background: "#1a73e8", color: "#fff", boxShadow: "0 1px 3px rgba(26,115,232,.35)" },
-    danger:  { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
-    ghost:   { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
+    danger: { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
+    ghost: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
     success: { ...base, background: "#34a853", color: "#fff", boxShadow: "0 1px 3px rgba(52,168,83,.35)" },
     default: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
   };
@@ -309,14 +309,14 @@ const ModalField = ({ label, field, type, readOnly, width, form, onChange, optio
       ? <div style={{ padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", background: "#f8f9fa", color: "#888", minHeight: "32px" }}>{form[field] ?? ""}</div>
       : options
         ? <select value={form[field] ?? ""} onChange={(e) => onChange(field, e.target.value)}
-            style={{ ...inputStyle(), height: "32px", cursor: "pointer" }}>
-            <option value="">-- seleziona --</option>
-            {options.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
+          style={{ ...inputStyle(), height: "32px", cursor: "pointer" }}>
+          <option value="">-- seleziona --</option>
+          {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
         : <input value={form[field] ?? ""} type={type || "text"}
-            step={type === "number" ? (step ?? "any") : undefined}
-            onChange={(e) => onChange(field, e.target.value)}
-            style={inputStyle()} />
+          step={type === "number" ? (step ?? "any") : undefined}
+          onChange={(e) => onChange(field, e.target.value)}
+          style={inputStyle()} />
     }
   </div>
 );
@@ -474,7 +474,7 @@ const parseImporti = (val) => {
   try {
     const p = JSON.parse(val);
     if (p && typeof p === "object" && !Array.isArray(p)) return p;
-  } catch {}
+  } catch { }
   return {};
 };
 const serializeImporti = (map) => {
@@ -506,7 +506,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
         onChange(serializeImporti(newMap));
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [societàList, autoFill]);
 
   const formatDisplay = (val) => {
@@ -542,7 +542,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
   if (!societàList || societàList.length === 0) return null;
 
   const borderColor = color + "55";
-  const labelColor  = color;
+  const labelColor = color;
   const totalImporti = societàList.reduce((s, n) => s + (parseFloat(map[n]) || 0), 0);
 
   return (
@@ -726,9 +726,9 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
           // Popola anche il dropdown Tipo Contratto con i contratti disponibili
           const contrattiGlobali = Object.keys(prezzi);
           setContrattiTow(prev => prev.length > 0 ? prev : contrattiGlobali);
-        }).catch(() => {});
+        }).catch(() => { });
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []); // eslint-disable-line
 
   // priceMap effettivo: preferisce localPriceMap (dal DB), fallback su options.priceMap
@@ -740,13 +740,13 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
 
   // Ricalcolo importo fornitura dai TOW — solo se i prezzi sono dell'ambiente corrente
   const computedImporto = effectiveIsFallback ? 0 : calcImporto(form, effectivePriceMap);
-  const hasPriceMap     = !!(effectivePriceMap[form.tipoContratto]);
+  const hasPriceMap = !!(effectivePriceMap[form.tipoContratto]);
   // In edit, se non c'è priceMap per il tipoContratto corrente, mantieni il valore originale
-  const displayImporto  = (!effectiveIsFallback && hasPriceMap && computedImporto > 0) ? computedImporto : (form.importoExcel ?? 0);
+  const displayImporto = (!effectiveIsFallback && hasPriceMap && computedImporto > 0) ? computedImporto : (form.importoExcel ?? 0);
   // Importo scontato: ricalcolato proporzionalmente se l'importo originale era > 0
-  const origImporto     = parseFloat(row?.importoExcel) || 0;
-  const origScontato    = parseFloat(row?.importoFornituraScontato) || 0;
-  const scontoRatio     = origImporto > 0 ? origScontato / origImporto : 1;
+  const origImporto = parseFloat(row?.importoExcel) || 0;
+  const origScontato = parseFloat(row?.importoFornituraScontato) || 0;
+  const scontoRatio = origImporto > 0 ? origScontato / origImporto : 1;
   const displayScontato = !effectiveIsFallback && hasPriceMap && origImporto > 0
     ? computedImporto * scontoRatio
     : (form.importoFornituraScontato ?? 0);
@@ -760,9 +760,9 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
         const autoGenPrev = [prev.goTo, prev.applicativo].filter(Boolean).join("_");
         const isAutoOrEmpty = !prev.xOrdine || prev.xOrdine === autoGenPrev;
         if (isAutoOrEmpty) {
-          const newGoTo  = field === "goTo"        ? value : prev.goTo;
-          const newAppl  = field === "applicativo"  ? value : prev.applicativo;
-          next.xOrdine   = [newGoTo, newAppl].filter(Boolean).join("_");
+          const newGoTo = field === "goTo" ? value : prev.goTo;
+          const newAppl = field === "applicativo" ? value : prev.applicativo;
+          next.xOrdine = [newGoTo, newAppl].filter(Boolean).join("_");
         }
       }
       return next;
@@ -805,10 +805,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
   // Colori sezioni
   const sectionColor = isCreate ? "#0d6e3d" : "#1a73e8"; // eslint-disable-line no-unused-vars
   // eslint-disable-next-line no-unused-vars
-  const accentBg     = isCreate ? "#f0fdf4" : "#f0f6ff";
+  const accentBg = isCreate ? "#f0fdf4" : "#f0f6ff";
   // eslint-disable-next-line no-unused-vars
   const accentBorder = isCreate ? "#a7f3d0" : "#bfdbfe";
-  const headerBg     = isCreate
+  const headerBg = isCreate
     ? "linear-gradient(135deg, #0d6e3d 0%, #15803d 100%)"
     : "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)";
 
@@ -855,28 +855,28 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
 
           {/* Sezione: Identificazione */}
           <ModalSection title="Identificazione" color={sectionColor}>
-            <ModalField label="ID *"          field="excelId"    readOnly={true}      form={form} onChange={set} width="calc(10% - 8px)" />
-            <ModalField label="GoTo"          field="goTo"        form={form} onChange={set} width="calc(12% - 8px)" />
+            <ModalField label="ID *" field="excelId" readOnly={true} form={form} onChange={set} width="calc(10% - 8px)" />
+            <ModalField label="GoTo" field="goTo" form={form} onChange={set} width="calc(12% - 8px)" />
             <ComboField label={isCreate ? "Applicativo *" : "Applicativo"} field="applicativo" options={options.applicativo || []} form={form} onChange={set} width="calc(20% - 8px)" />
-            <ModalField label="X Ordine"      field="xOrdine"    form={form} onChange={set} width="calc(18% - 8px)" />
+            <ModalField label="X Ordine" field="xOrdine" form={form} onChange={set} width="calc(18% - 8px)" />
             <ModalField label="Descrizione *" field="descrizione" form={form} onChange={set} width="calc(40% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Responsabili */}
           <ModalSection title="Responsabili" color={sectionColor}>
-            <ComboField label="PM Poste"       field="pmPoste"        options={options.pmPoste || []}        form={form} onChange={set} width="calc(30% - 8px)" />
-            <ComboField label="PM CAP"          field="pmCap"          options={options.pmCap || []}          form={form} onChange={set} width="calc(30% - 8px)" />
+            <ComboField label="PM Poste" field="pmPoste" options={options.pmPoste || []} form={form} onChange={set} width="calc(30% - 8px)" />
+            <ComboField label="PM CAP" field="pmCap" options={options.pmCap || []} form={form} onChange={set} width="calc(30% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Release */}
           <ModalSection title="Release" color={sectionColor}>
             <ComboField label="Anno Competenza" field="annoCompetenza" options={options.annoCompetenza || []} form={form} onChange={set} width="calc(20% - 8px)" />
-            <ComboField label="Release"         field="releaseExcel"   options={options.releaseExcel || []}   form={form} onChange={set} width="calc(25% - 8px)" />
+            <ComboField label="Release" field="releaseExcel" options={options.releaseExcel || []} form={form} onChange={set} width="calc(25% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Stato e Contratto */}
           <ModalSection title="Stato e Contratto" color={sectionColor}>
-            <ComboField label="Stato"          field="stato"         options={options.stato || []}         form={form} onChange={set} width="calc(20% - 8px)" />
+            <ComboField label="Stato" field="stato" options={options.stato || []} form={form} onChange={set} width="calc(20% - 8px)" />
             <ContrattoSelectField
               label="Tipo Contratto"
               field="tipoContratto"
@@ -886,11 +886,11 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
               contrattiOptions={contrattiTow.length > 0 ? contrattiTow : (options.tipoContratto || [])}
               onCrea={() => setShowCreaContratto(true)}
             />
-            <ModalField label="BC"             field="bc"            form={form} onChange={set} width="calc(15% - 8px)" />
-            <ModalField label="Contratto"      field="contratto"     form={form} onChange={set} width="calc(12% - 8px)" />
-            <ModalField label="RDA"            field="rda"           form={form} onChange={set} width="calc(12% - 8px)" />
-            <ModalField label="AT ID"          field="atId"          form={form} onChange={set} width="calc(10% - 8px)" />
-            <EuroField  label="Importo ODA"    value={form.ordinatoBdo}           width="calc(16% - 8px)" />
+            <ModalField label="BC" field="bc" form={form} onChange={set} width="calc(15% - 8px)" />
+            <ModalField label="Contratto" field="contratto" form={form} onChange={set} width="calc(12% - 8px)" />
+            <ModalField label="RDA" field="rda" form={form} onChange={set} width="calc(12% - 8px)" />
+            <ModalField label="AT ID" field="atId" form={form} onChange={set} width="calc(10% - 8px)" />
+            <EuroField label="Importo ODA" value={form.ordinatoBdo} width="calc(16% - 8px)" />
           </ModalSection>
 
           {/* Sezione: TOW Offerta — griglia tabellare allineata */}
@@ -1007,31 +1007,31 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
                               ? (totaleIntervento * perc / 100) / valUnitTow : null;
                             const scostamento = atesoQty && val ? Math.abs(val - atesoQty) / atesoQty * 100 : 0;
                             const isError = atesoQty != null && val > 0 && scostamento > 0.5;
-                      return (
-                        <td key={field} style={{ padding: "0 0 4px 0", verticalAlign: "top" }}>
-                          <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white" }}>
-                            <button type="button"
-                              onClick={() => set(field, Math.max(0, parseFloat(((parseFloat(form[field]) || 0) - 0.001).toFixed(3))))}
-                              style={{ padding: "3px 5px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "13px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
-                            <input
-                              value={form[field] ?? ""}
-                              type="number" step="0.001" min="0"
-                              onChange={e => set(field, e.target.value === "" ? null : parseFloat(e.target.value))}
-                              style={{ flex: 1, padding: "4px 4px", border: "none", fontSize: "12px", color: isError ? "#dc2626" : "#333", textAlign: "right", minWidth: 0, outline: "none", background: "transparent", fontWeight: isError ? 700 : 400 }}
-                            />
-                            <button type="button"
-                              onClick={() => set(field, parseFloat(((parseFloat(form[field]) || 0) + 0.001).toFixed(3)))}
-                              style={{ padding: "3px 5px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "13px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
-                          </div>
-                          {isError && (
-                            <div style={{ fontSize: "9px", color: "#dc2626", marginTop: "1px", textAlign: "right" }}>
-                              Att.: {atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                            return (
+                              <td key={field} style={{ padding: "0 0 4px 0", verticalAlign: "top" }}>
+                                <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${isError ? "#fca5a5" : "#dadce0"}`, borderRadius: "4px", overflow: "hidden", background: isError ? "#fff5f5" : "white" }}>
+                                  <button type="button"
+                                    onClick={() => set(field, Math.max(0, parseFloat(((parseFloat(form[field]) || 0) - 0.001).toFixed(3))))}
+                                    style={{ padding: "3px 5px", background: "#f1f3f4", border: "none", borderRight: "1px solid #dadce0", cursor: "pointer", fontSize: "13px", color: "#555", lineHeight: 1, flexShrink: 0 }}>−</button>
+                                  <input
+                                    value={form[field] ?? ""}
+                                    type="number" step="0.001" min="0"
+                                    onChange={e => set(field, e.target.value === "" ? null : parseFloat(e.target.value))}
+                                    style={{ flex: 1, padding: "4px 4px", border: "none", fontSize: "12px", color: isError ? "#dc2626" : "#333", textAlign: "right", minWidth: 0, outline: "none", background: "transparent", fontWeight: isError ? 700 : 400 }}
+                                  />
+                                  <button type="button"
+                                    onClick={() => set(field, parseFloat(((parseFloat(form[field]) || 0) + 0.001).toFixed(3)))}
+                                    style={{ padding: "3px 5px", background: "#f1f3f4", border: "none", borderLeft: "1px solid #dadce0", cursor: "pointer", fontSize: "13px", color: "#555", lineHeight: 1, flexShrink: 0 }}>+</button>
+                                </div>
+                                {isError && (
+                                  <div style={{ fontSize: "9px", color: "#dc2626", marginTop: "1px", textAlign: "right" }}>
+                                    Att.: {atesoQty?.toLocaleString("it-IT", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
                         {/* Riga importo € (visibile solo se almeno un TOW ha valoreUnitario) */}
                         {dynamicTowFields.some(({ key }) => Number(prices[key]) > 0) && (
                           <tr>
@@ -1093,9 +1093,9 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
                 {formatEuro(displayScontato)}
               </div>
             </div>
-            <EuroField label="Fatturato"        value={form.fatturato}          width="calc(20% - 8px)" />
-            <ModalField label="Recupero"        field="recupero"  form={form} onChange={set} width="calc(12% - 8px)" />
-            <EuroField label="Residuo Fatt."    value={form.residuoFatturabile} width="calc(15% - 8px)" />
+            <EuroField label="Fatturato" value={form.fatturato} width="calc(20% - 8px)" />
+            <ModalField label="Recupero" field="recupero" form={form} onChange={set} width="calc(12% - 8px)" />
+            <EuroField label="Residuo Fatt." value={form.residuoFatturabile} width="calc(15% - 8px)" />
           </ModalSection>
 
           {/* Sezione: Partecipazione — sempre visibile */}
@@ -1151,10 +1151,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
           ) : (
             <ModalSection title="Extra" color={sectionColor}>
               <ModalField label="Accantonato" field="accantonato" type="number" form={form} onChange={set} width="calc(15% - 8px)" />
-              <ModalField label="NEL"         field="nel"         form={form} onChange={set} width="calc(10% - 8px)" />
-              <ModalField label="In Vita"     field="inVita"      form={form} onChange={set} width="calc(10% - 8px)" />
-              <ModalField label="CM"          field="cm"          form={form} onChange={set} width="calc(10% - 8px)" />
-              <ModalField label="TBD"         field="tbd"         form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="NEL" field="nel" form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="In Vita" field="inVita" form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="CM" field="cm" form={form} onChange={set} width="calc(10% - 8px)" />
+              <ModalField label="TBD" field="tbd" form={form} onChange={set} width="calc(10% - 8px)" />
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "flex-end", paddingBottom: "2px" }}>
                 <button type="button" onClick={() => setShowExtra(false)}
                   style={{ fontSize: "11px", color: "#94a3b8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
@@ -1175,10 +1175,10 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
 
           {/* Sezione: PMO Poste */}
           <ModalSection title="PMO Poste" color={sectionColor}>
-             <ModalField   label="P Anno"      field="pAnno"      type="number" form={form} onChange={set} width="calc(12% - 8px)" />
-             <ComboField   label="P Release"   field="pRelease"   options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
-             <EuroEditField label="P Importo"  field="pImporto"   form={form} onChange={set} width="calc(20% - 8px)" />
-             <div style={{ width: "calc(28% - 8px)" }}>
+            <ModalField label="P Anno" field="pAnno" type="number" form={form} onChange={set} width="calc(12% - 8px)" />
+            <ComboField label="P Release" field="pRelease" options={options.releaseExcel || []} form={form} onChange={set} width="calc(20% - 8px)" />
+            <EuroEditField label="P Importo" field="pImporto" form={form} onChange={set} width="calc(20% - 8px)" />
+            <div style={{ width: "calc(28% - 8px)" }}>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>P Note</label>
               <textarea value={form.pNote ?? ""} onChange={(e) => set("pNote", e.target.value)}
                 style={{ ...inputStyle(), minHeight: "56px", resize: "vertical" }} />
@@ -1333,15 +1333,15 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       setRows(data);
       onRowsChange?.(data);
       setMevOptions({
-        applicativo:         opts.applicativo    || [],
-        pmPoste:             opts.pmPoste        || [],
-        pmCap:               opts.pmCap          || [],
-        annoCompetenza:      opts.annoCompetenza || [],
-        releaseExcel:        opts.releaseExcel   || [],
-        stato:               opts.stato          || [],
-        tipoContratto:       opts.tipoContratto  || [],
-        priceMap:            opts.priceMap       || {},
-        priceMapIsFallback:  opts.priceMapIsFallback || false,
+        applicativo: opts.applicativo || [],
+        pmPoste: opts.pmPoste || [],
+        pmCap: opts.pmCap || [],
+        annoCompetenza: opts.annoCompetenza || [],
+        releaseExcel: opts.releaseExcel || [],
+        stato: opts.stato || [],
+        tipoContratto: opts.tipoContratto || [],
+        priceMap: opts.priceMap || {},
+        priceMapIsFallback: opts.priceMapIsFallback || false,
       });
       if (impatto && Object.keys(impatto).length > 0) {
         setTowImpattoAll(impatto);
@@ -1436,9 +1436,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
   // Tot CAP: solo righe con stato "Approvato"
   const approvedRows = filteredRows.filter((r) => (r.stato || "").trim().toLowerCase() === "approvato");
-  const totCap    = approvedRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
-  const totPoste  = approvedRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
-  const totOda    = filteredRows.reduce((s, r) => s + (Number(r.ordinatoBdo) || 0), 0);
+  const totCap = approvedRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
+  const totPoste = approvedRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
+  const totOda = filteredRows.reduce((s, r) => s + (Number(r.ordinatoBdo) || 0), 0);
   const hasActive = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : !!v);
 
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
@@ -1446,41 +1446,41 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   // ── Save da modale ────────────────────────────────────────────────────────
   const handleModalSave = async (form) => {
     const updated = await updateMev(form.id, {
-      pAnno:      Number(form.pAnno),
-      pRelease:   form.pRelease ?? "",
-      pImporto:   Number(form.pImporto),
-      pNote:      form.pNote,
+      pAnno: Number(form.pAnno),
+      pRelease: form.pRelease ?? "",
+      pImporto: Number(form.pImporto),
+      pNote: form.pNote,
       importoBdo: Number(form.importoBdo ?? 0),
-      stato:      form.stato,
+      stato: form.stato,
       releaseExcel: form.releaseExcel,
-      pmPoste:    form.pmPoste,
-      pmCap:      form.pmCap,
+      pmPoste: form.pmPoste,
+      pmCap: form.pmCap,
       tipoContratto: form.tipoContratto,
-      recupero:   form.recupero,
-      capgemini:  form.capMandanti,
-      subco:      form.subco,
-      capImporti:   form.capImporti   || null,
+      recupero: form.recupero,
+      capgemini: form.capMandanti,
+      subco: form.subco,
+      capImporti: form.capImporti || null,
       subcoImporti: form.subcoImporti || null,
-      tbd:        form.tbd,
-      bc:         form.bc,
-      contratto:  form.contratto,
-      rda:        form.rda,
-      atId:       form.atId,
-      tow021:     form.tow021 != null ? Number(form.tow021) : null,
-      tow022:     form.tow022 != null ? Number(form.tow022) : null,
-      tow023:     form.tow023 != null ? Number(form.tow023) : null,
-      tow024:     form.tow024 != null ? Number(form.tow024) : null,
-      tow025:     form.tow025 != null ? Number(form.tow025) : null,
-      tow026:     form.tow026 != null ? Number(form.tow026) : null,
+      tbd: form.tbd,
+      bc: form.bc,
+      contratto: form.contratto,
+      rda: form.rda,
+      atId: form.atId,
+      tow021: form.tow021 != null ? Number(form.tow021) : null,
+      tow022: form.tow022 != null ? Number(form.tow022) : null,
+      tow023: form.tow023 != null ? Number(form.tow023) : null,
+      tow024: form.tow024 != null ? Number(form.tow024) : null,
+      tow025: form.tow025 != null ? Number(form.tow025) : null,
+      tow026: form.tow026 != null ? Number(form.tow026) : null,
       accantonato: form.accantonato != null ? Number(form.accantonato) : null,
-      nel:        form.nel,
-      inVita:     form.inVita,
-      cm:         form.cm,
-      noteExcel:  form.noteExcel,
+      nel: form.nel,
+      inVita: form.inVita,
+      cm: form.cm,
+      noteExcel: form.noteExcel,
       // Importi ricalcolati dai TOW (se presenti nel form dopo il save della modale)
-      importoExcel:               form.importoExcel             != null ? Number(form.importoExcel) : undefined,
-      importoFornituraScontato:   form.importoFornituraScontato != null ? Number(form.importoFornituraScontato) : undefined,
-      towTotale:                  form.towTotale                != null ? Number(form.towTotale) : undefined,
+      importoExcel: form.importoExcel != null ? Number(form.importoExcel) : undefined,
+      importoFornituraScontato: form.importoFornituraScontato != null ? Number(form.importoFornituraScontato) : undefined,
+      towTotale: form.towTotale != null ? Number(form.towTotale) : undefined,
     });
     setRows((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...updated } : r)));
     setSavedRows((prev) => ({ ...prev, [form.id]: true }));
@@ -1488,7 +1488,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     // Aggiorna le opzioni in memoria con i nuovi valori digitati (pmCap, releaseExcel, pRelease)
     setMevOptions(prev => ({
       ...prev,
-      pmCap:       form.pmCap       && !prev.pmCap.includes(form.pmCap)       ? [...prev.pmCap,       form.pmCap].sort()       : prev.pmCap,
+      pmCap: form.pmCap && !prev.pmCap.includes(form.pmCap) ? [...prev.pmCap, form.pmCap].sort() : prev.pmCap,
       releaseExcel: form.releaseExcel && !prev.releaseExcel.includes(form.releaseExcel) ? [...prev.releaseExcel, form.releaseExcel].sort() : prev.releaseExcel,
     }));
   };
@@ -1501,52 +1501,52 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   // ── Crea nuova riga ───────────────────────────────────────────────────────
   const handleCreateSave = async (form) => {
     const newItem = await createMev({
-      excelId:       form.excelId?.trim(),
-      applicativo:   form.applicativo,
-      descrizione:   form.descrizione,
-      goTo:          form.goTo,
-      xOrdine:       form.xOrdine,
-      pmPoste:       form.pmPoste,
-      pmCap:         form.pmCap,
+      excelId: form.excelId?.trim(),
+      applicativo: form.applicativo,
+      descrizione: form.descrizione,
+      goTo: form.goTo,
+      xOrdine: form.xOrdine,
+      pmPoste: form.pmPoste,
+      pmCap: form.pmCap,
       annoCompetenza: Number(form.annoCompetenza) || 0,
-      releaseExcel:  form.releaseExcel,
-      stato:         form.stato,
+      releaseExcel: form.releaseExcel,
+      stato: form.stato,
       tipoContratto: form.tipoContratto,
-      importoExcel:  Number(form.importoExcel) || 0,
-      recupero:      form.recupero,
-      noteExcel:     form.noteExcel,
-      bc:            form.bc,
-      contratto:     form.contratto,
-      rda:           form.rda,
-      atId:          form.atId,
-      nel:           form.nel,
-      inVita:        form.inVita,
-      cm:            form.cm,
-      subco:         form.subco,
-      tbd:           form.tbd,
-      accantonato:   form.accantonato != null ? Number(form.accantonato) : null,
-      capgemini:     form.capMandanti,
-      capImporti:    form.capImporti   || null,
-      subcoImporti:  form.subcoImporti || null,
-      tow021:        form.tow021 != null ? Number(form.tow021) : null,
-      tow022:        form.tow022 != null ? Number(form.tow022) : null,
-      tow023:        form.tow023 != null ? Number(form.tow023) : null,
-      tow024:        form.tow024 != null ? Number(form.tow024) : null,
-      tow025:        form.tow025 != null ? Number(form.tow025) : null,
-      tow026:        form.tow026 != null ? Number(form.tow026) : null,
-      pAnno:         Number(form.pAnno) || 0,
-      pRelease:      form.pRelease ?? "",
-      pImporto:      Number(form.pImporto) || 0,
-      pNote:         form.pNote,
-      importoBdo:    Number(form.importoBdo) || 0,
+      importoExcel: Number(form.importoExcel) || 0,
+      recupero: form.recupero,
+      noteExcel: form.noteExcel,
+      bc: form.bc,
+      contratto: form.contratto,
+      rda: form.rda,
+      atId: form.atId,
+      nel: form.nel,
+      inVita: form.inVita,
+      cm: form.cm,
+      subco: form.subco,
+      tbd: form.tbd,
+      accantonato: form.accantonato != null ? Number(form.accantonato) : null,
+      capgemini: form.capMandanti,
+      capImporti: form.capImporti || null,
+      subcoImporti: form.subcoImporti || null,
+      tow021: form.tow021 != null ? Number(form.tow021) : null,
+      tow022: form.tow022 != null ? Number(form.tow022) : null,
+      tow023: form.tow023 != null ? Number(form.tow023) : null,
+      tow024: form.tow024 != null ? Number(form.tow024) : null,
+      tow025: form.tow025 != null ? Number(form.tow025) : null,
+      tow026: form.tow026 != null ? Number(form.tow026) : null,
+      pAnno: Number(form.pAnno) || 0,
+      pRelease: form.pRelease ?? "",
+      pImporto: Number(form.pImporto) || 0,
+      pNote: form.pNote,
+      importoBdo: Number(form.importoBdo) || 0,
     });
     setRows((prev) => [...prev, newItem]);
     onRowsChange?.([...rows, newItem]);
     // Aggiorna le opzioni in memoria con i nuovi valori digitati
     setMevOptions(prev => ({
       ...prev,
-      pmCap:        form.pmCap        && !prev.pmCap.includes(form.pmCap)               ? [...prev.pmCap,        form.pmCap].sort()        : prev.pmCap,
-      releaseExcel: form.releaseExcel && !prev.releaseExcel.includes(form.releaseExcel)  ? [...prev.releaseExcel, form.releaseExcel].sort()  : prev.releaseExcel,
+      pmCap: form.pmCap && !prev.pmCap.includes(form.pmCap) ? [...prev.pmCap, form.pmCap].sort() : prev.pmCap,
+      releaseExcel: form.releaseExcel && !prev.releaseExcel.includes(form.releaseExcel) ? [...prev.releaseExcel, form.releaseExcel].sort() : prev.releaseExcel,
     }));
     // Reset filtri: la nuova riga deve essere visibile subito,
     // indipendentemente dai filtri attivi al momento della creazione.
@@ -1569,7 +1569,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
   const statoBadge = (stato) => {
     const map = {
-      "Approvato":       { bg: "#e6f4ea", color: "#2e7d32" },
+      "Approvato": { bg: "#e6f4ea", color: "#2e7d32" },
       "In approvazione": { bg: "#fff8e1", color: "#e65100" },
     };
     const s = map[stato] || { bg: "#f1f3f4", color: "#555" };
@@ -1587,7 +1587,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
   // ── Render principale ─────────────────────────────────────────────────────
   return (
-   <div style={{ padding: "20px 24px 40px" }}>
+    <div style={{ padding: "20px 24px 40px" }}>
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
@@ -1646,13 +1646,38 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           </>
         )}
 
-        {/* Info: da dove viene il file */}
-        <div style={{ fontSize: "11px", color: "#888", padding: "4px 8px", background: "#f8f9fa", borderRadius: "6px", border: "1px solid #e8eaed", maxWidth: "280px" }}>
-          <strong style={{ color: "#555" }}>Allinea Dati</strong> usa l'ultimo file caricato con "Carica Excel" (MEV_LAST.xlsx sul server). Le modifiche PMO vengono preservate.
-        </div>
-
-        <button style={btn("success")} onClick={() => setCreateModal(true)}>
-          + Nuovo GoTo
+        <button
+          onClick={() => setCreateModal(true)}
+          style={{
+            ...btn("success"),
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 18px",
+            borderRadius: 10,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+          }}
+        >
+          <span
+            style={{
+              width: 24,
+              height: 24,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.20)",
+              fontSize: 20,
+              fontWeight: 400,
+              lineHeight: 1,
+            }}
+          >
+            +
+          </span>
+          Nuovo GoTo
         </button>
 
         {/* KPI Totali (solo righe Approvate) — allineati a destra */}
@@ -1723,22 +1748,22 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <TH minW="80px">Recupero</TH>
               <TH minW="130px">Importo CAP</TH>
               <TH minW="60px">Note</TH>
-               <TH minW="120px">ODA (BC)</TH>
-               <TH minW="100px">RDA (AT ID)</TH>
-               <TH minW="120px">Importo ODA</TH>
-               <TH minW="120px">P Importo</TH>
-               <TH minW="140px">Mandataria/Mandante</TH>
-               <TH minW="120px">Subco</TH>
-               <TH minW="75px">TOW01</TH>
-               <TH minW="75px">TOW02</TH>
-               <TH minW="75px">TOW03</TH>
-               <TH minW="75px">TOW04</TH>
-               <TH minW="75px">TOW05</TH>
-               <TH minW="75px">TOW06</TH>
-               <TH minW="90px">Tot TOW</TH>
-               <TH minW="70px">P Anno</TH>
-               <TH minW="90px">P Release</TH>
-               <TH minW="130px">P Note</TH>
+              <TH minW="120px">ODA (BC)</TH>
+              <TH minW="100px">RDA (AT ID)</TH>
+              <TH minW="120px">Importo ODA</TH>
+              <TH minW="120px">P Importo</TH>
+              <TH minW="140px">Mandataria/Mandante</TH>
+              <TH minW="120px">Subco</TH>
+              <TH minW="75px">TOW01</TH>
+              <TH minW="75px">TOW02</TH>
+              <TH minW="75px">TOW03</TH>
+              <TH minW="75px">TOW04</TH>
+              <TH minW="75px">TOW05</TH>
+              <TH minW="75px">TOW06</TH>
+              <TH minW="90px">Tot TOW</TH>
+              <TH minW="70px">P Anno</TH>
+              <TH minW="90px">P Release</TH>
+              <TH minW="130px">P Note</TH>
             </tr>
           </thead>
 
@@ -1803,20 +1828,20 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   <td style={{ ...TD }}>
                     {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                          {resolveCapMandanti(r.capgemini, r.iet, rtiRows).map(s => (
-                            <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
-                          ))}
-                        </div>
+                        {resolveCapMandanti(r.capgemini, r.iet, rtiRows).map(s => (
+                          <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                        ))}
+                      </div>
                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
                     }
                   </td>
                   <td style={{ ...TD }}>
                     {parseSocietà(r.subco).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                          {parseSocietà(r.subco).map(s => (
-                            <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
-                          ))}
-                        </div>
+                        {parseSocietà(r.subco).map(s => (
+                          <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                        ))}
+                      </div>
                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
                     }
                   </td>
