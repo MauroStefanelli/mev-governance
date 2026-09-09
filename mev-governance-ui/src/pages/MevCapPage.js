@@ -1658,19 +1658,19 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         {/* KPI Totali (solo righe Approvate) — allineati a destra */}
         <div style={{ marginLeft: "auto", display: "flex", gap: "16px", flexWrap: "wrap" }}>
           <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
-            <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot CAP <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
+            <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Fornitura <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8" }}>{formatEuro(totCap)}</div>
+          </div>
+          <div style={{ background: "#e6f9f0", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
+            <div style={{ fontSize: "11px", color: "#12c937", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale ODA</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
           </div>
           <div style={{
             background: isScostamento(totCap, totPoste) ? "#fce8e6" : "#e6f4ea",
             borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px"
           }}>
-            <div style={{ fontSize: "11px", color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Tot Poste <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
+            <div style={{ fontSize: "11px", color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Poste <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
             <div style={{ fontSize: "16px", fontWeight: 700, color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853" }}>{formatEuro(totPoste)}</div>
-          </div>
-          <div style={{ background: "#e6f9f0", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
-            <div style={{ fontSize: "11px", color: "#12c937", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>ODA</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
           </div>
         </div>
       </div>
