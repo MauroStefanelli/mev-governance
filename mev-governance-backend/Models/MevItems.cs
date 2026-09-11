@@ -92,4 +92,10 @@ public class MevItem
     /// Queste righe NON vengono eliminate durante "Allinea Dati".
     /// </summary>
     public int IsManual { get; set; }
+
+    /// <summary>
+    /// GUID batch dell'ultimo Align che ha inserito o aggiornato questa riga.
+    /// Usato per il rollback dell'ultimo allineamento.
+    /// </summary>
+    public string? LastAlignBatchId { get; set; }
 }

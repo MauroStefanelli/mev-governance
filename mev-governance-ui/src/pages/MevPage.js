@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import {
-  getMevList, updateMev, alignMevData, exportMev, uploadExcel, getRtiSocieta
+  getMevList, updateMev, alignMevData, exportMev, uploadExcel, getRtiSocieta, rollbackLastAlign, getLastAlign
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
 
@@ -244,6 +244,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
   const [alignStatus, setAlignStatus] = useState(null); // { step: "running"|"done"|"error", msg: string }
+  const [rollingBack, setRollingBack] = useState(false);
+  const [lastAlignBatchId, setLastAlignBatchId] = useState(null);
   const [notePopover, setNotePopover] = useState(null); // { id, text, x, y }
   const [viewRow, setViewRow] = useState(null); // riga aperta in sola lettura
   const [rtiRows, setRtiRows] = useState([]);
@@ -263,9 +265,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     setRows([]);
     onRowsChange?.([]);
     try {
-      const data = await getMevList();
+      const [data, alignInfo] = await Promise.all([getMevList(), getLastAlign().catch(() => null)]);
       setRows(data);
       onRowsChange?.(data);
+      setLastAlignBatchId(alignInfo?.lastAlignBatchId ?? null);
     } catch (e) {
       if (e.message === "401") onUnauthorized?.();
     } finally {
@@ -453,6 +456,30 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
           {aligning ? "Allineamento..." : "⟳ Allinea Dati"}
         </button>
 
+        {/* Annulla ultimo Align — visibile solo se esiste un batch */}
+        {lastAlignBatchId && (
+          <button
+            style={{ ...btn("ghost"), borderColor: "#fca5a5", color: "#dc2626", background: "#fff5f5" }}
+            disabled={rollingBack || aligning}
+            onClick={async () => {
+              if (!window.confirm("Annullare l'ultimo allineamento? Le righe inserite o aggiornate nell'ultimo Align verranno eliminate.")) return;
+              setRollingBack(true);
+              try {
+                const res = await rollbackLastAlign();
+                alert(res.message);
+                setLastAlignBatchId(null);
+                await loadMev();
+              } catch (e) {
+                alert(`Errore: ${e.message}`);
+              } finally {
+                setRollingBack(false);
+              }
+            }}
+          >
+            {rollingBack ? "Annullamento..." : "↩ Annulla ultimo Align"}
+          </button>
+        )}
+
         <button style={btn("success")} onClick={async () => {
           try { await exportMev(filteredRows, filters); }
           catch (e) { alert(`Errore export: ${e.message}`); }
@@ -536,7 +563,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}>{/* Importo ODA */}</th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={mandatariaOptions} selected={filters.mandataria} onChange={(v) => handleFilterChange("mandataria", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
@@ -546,7 +572,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Mandataria/Mandante", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
+              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
               ))}
             </tr>
@@ -613,16 +639,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{formatEuro(r.ordinatoBdo)}</td>
 
                   <td style={{ ...TD }}>
-                    {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
-                      ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                          {resolveCapMandanti(r.capgemini, r.iet, rtiRows).map(s => (
-                            <span key={s} style={{ background: "#eff6ff", color: "#1a73e8", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
-                          ))}
-                        </div>
-                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
-                    }
-                  </td>
-                  <td style={{ ...TD }}>
                     {resolveSubco(r.subco, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
                           {resolveSubco(r.subco, rtiRows).map(s => (
@@ -670,10 +686,19 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                     />
                   </td>
 
-                  <td style={{ ...TD }}>
-                    <input value={r.pNote ?? ""}
+                  <td style={{ ...TD, maxWidth: "250px", verticalAlign: "top" }}>
+                    <textarea
+                      value={r.pNote ?? ""}
                       onChange={(e) => handleChange(r.id, "pNote", e.target.value)}
-                      style={inputStyle({ width: "100%", minWidth: "120px" })}
+                      rows={2}
+                      style={{
+                        ...inputStyle({ width: "100%", minWidth: "150px" }),
+                        resize: "vertical",
+                        whiteSpace: "pre-wrap",
+                        overflowY: "auto",
+                        lineHeight: "1.4",
+                        padding: "4px 6px",
+                      }}
                     />
                   </td>
 

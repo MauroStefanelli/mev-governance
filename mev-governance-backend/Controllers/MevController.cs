@@ -173,15 +173,17 @@ public class MevController : BaseController
                 return BadRequest("Nessun file Excel disponibile. Carica prima il file con 'Carica Excel'.");
 
             var ambienteId = GetAmbienteId();
-            var mevResult = ImportFromExcelFile(uploadedPath, ambienteId);
+            var batchId = Guid.NewGuid().ToString();
+            var mevResult = ImportFromExcelFile(uploadedPath, ambienteId, batchId);
 
             // Allinea anche i contratti dallo stesso file
             var contrattoResult = _contrattoCtrl.AlignInternal(ambienteId);
 
-            // Salva timestamp ultimo align
+            // Salva timestamp e batchId ultimo align
             var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
             if (settings == null) { settings = new Models.AppSettings { Id = 1 }; _db.AppSettings.Add(settings); }
             settings.LastAlignAt = DateTime.UtcNow;
+            settings.LastAlignBatchId = batchId;
             _db.SaveChanges();
 
             // Restituisce il conteggio MEV + contratti
@@ -213,7 +215,37 @@ public class MevController : BaseController
     public IActionResult GetLastAlign()
     {
         var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
-        return Ok(new { lastAlignAt = settings?.LastAlignAt });
+        return Ok(new { lastAlignAt = settings?.LastAlignAt, lastAlignBatchId = settings?.LastAlignBatchId });
+    }
+
+    // ============================================================
+    // DELETE /api/mev/last-align — rollback dell'ultimo allineamento
+    // Elimina le righe inserite nell'ultimo batch e ripristina
+    // le righe aggiornate al loro stato precedente (perdita PMO esclusa).
+    // In pratica: elimina tutte le righe con LastAlignBatchId == ultimo batch.
+    // ============================================================
+    [HttpDelete("last-align")]
+    public IActionResult RollbackLastAlign()
+    {
+        var ambienteId = GetAmbienteId();
+        var settings = _db.AppSettings.FirstOrDefault(s => s.Id == 1);
+        if (settings?.LastAlignBatchId == null)
+            return BadRequest("Nessun allineamento da annullare.");
+
+        var batchId = settings.LastAlignBatchId;
+        var righe = _db.MevItems
+            .Where(x => x.AmbienteId == ambienteId && x.LastAlignBatchId == batchId)
+            .ToList();
+
+        if (!righe.Any())
+            return BadRequest("Nessuna riga trovata per l'ultimo allineamento.");
+
+        _db.MevItems.RemoveRange(righe);
+        settings.LastAlignBatchId = null;
+        settings.LastAlignAt = null;
+        _db.SaveChanges();
+
+        return Ok(new { deleted = righe.Count, message = $"Annullate {righe.Count} righe dell'ultimo allineamento." });
     }
 
     // ============================================================
@@ -389,7 +421,7 @@ public class MevController : BaseController
     // ============================================================
     // METODO PRIVATO: import da Excel
     // ============================================================
-    private IActionResult ImportFromExcelFile(string excelPath, int ambienteId)
+    private IActionResult ImportFromExcelFile(string excelPath, int ambienteId, string? batchId = null)
     {
         try
         {
@@ -591,6 +623,7 @@ public class MevController : BaseController
                 existing.Nel                    = nel;
                 existing.InVita                 = inVita;
                 existing.Cm                     = cm;
+                if (batchId != null) existing.LastAlignBatchId = batchId;
             }
             else
             {
@@ -645,7 +678,8 @@ public class MevController : BaseController
                     PRelease                = releaseExcel,
                     PImporto                = importo,
                     ImportoBdo              = ordinatoBdo,
-                    AmbienteId              = ambienteId
+                    AmbienteId              = ambienteId,
+                    LastAlignBatchId        = batchId
                 };
                 _db.MevItems.Add(item);
             }

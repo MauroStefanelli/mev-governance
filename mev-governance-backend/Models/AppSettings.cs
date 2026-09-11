@@ -20,4 +20,9 @@ public class AppSettings
     /// Formato: { "NomeContratto": { "TOW02.1": 30.5, ... } }
     /// </summary>
     public string? TowImpattoJson { get; set; }
+
+    /// <summary>
+    /// GUID dell'ultimo batch Align eseguito. Usato per il rollback.
+    /// </summary>
+    public string? LastAlignBatchId { get; set; }
 }

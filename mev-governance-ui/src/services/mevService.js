@@ -254,6 +254,19 @@ export const getLastAlign = async () => {
   return response.json();
 };
 
+export const rollbackLastAlign = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/last-align`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Errore annullamento allineamento");
+  }
+  return response.json();
+};
+
 export const alignContratti = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/contratti/align`, {
     method: "POST",
