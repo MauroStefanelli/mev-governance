@@ -386,6 +386,8 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""Sconto""         NUMERIC        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""IsCatalogo""     BOOLEAN        NOT NULL DEFAULT false;
                 ALTER TABLE ""{sch}"".""AppSettings""        ADD COLUMN IF NOT EXISTS ""LogoutMinutes""  INTEGER        NOT NULL DEFAULT 60;
+                ALTER TABLE ""{sch}"".""AppSettings""        ADD COLUMN IF NOT EXISTS ""LastAlignBatchId"" TEXT          NULL;
+                ALTER TABLE ""{sch}"".""MevItems""           ADD COLUMN IF NOT EXISTS ""LastAlignBatchId"" TEXT          NULL;
             ");
 #pragma warning restore EF1002
             Console.WriteLine("[PRE-PATCH] Tutte le tabelle verificate.");
