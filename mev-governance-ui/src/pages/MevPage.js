@@ -253,7 +253,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [] };
+    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" };
     if (!saved) return defaults;
     const parsed = JSON.parse(saved);
     return { ...defaults, ...parsed };
@@ -281,7 +281,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], mandataria: [], subco: [], importoExcel: [] });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -365,7 +365,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
     (filters.mandataria.length === 0 || resolveCapMandanti(r.capgemini, r.iet, rtiRows).some(s => filters.mandataria.includes(s))) &&
     (filters.subco.length === 0 || resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) &&
-    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
+    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel))) &&
+    (!filters.pNote   || (r.pNote   ?? "").toLowerCase().includes(filters.pNote.toLowerCase())) &&
+    (!filters.noteCap || (r.noteCap ?? "").toLowerCase().includes(filters.noteCap.toLowerCase()))
   );
 
   const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
@@ -568,8 +570,22 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
                <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
-               <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
-               <th style={{ padding: "4px 6px" }}>{/* Note CAP */}</th>
+               <th style={{ padding: "4px 6px" }}>
+                 <input
+                   value={filters.pNote}
+                   onChange={(e) => handleFilterChange("pNote", e.target.value)}
+                   placeholder="Cerca..."
+                   style={{ width: "100%", fontSize: "12px", padding: "3px 6px", border: "1px solid #dadce0", borderRadius: "4px", boxSizing: "border-box" }}
+                 />
+               </th>
+               <th style={{ padding: "4px 6px" }}>
+                 <input
+                   value={filters.noteCap}
+                   onChange={(e) => handleFilterChange("noteCap", e.target.value)}
+                   placeholder="Cerca..."
+                   style={{ width: "100%", fontSize: "12px", padding: "3px 6px", border: "1px solid #dadce0", borderRadius: "4px", boxSizing: "border-box" }}
+                 />
+               </th>
               <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
             {/* Intestazioni */}
