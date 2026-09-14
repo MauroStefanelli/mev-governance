@@ -392,6 +392,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       const updatedItem = await updateMev(row.id, {
         pAnno: Number(row.pAnno), pRelease: row.pRelease,
         pImporto: Number(row.pImporto), pNote: row.pNote,
+        noteCap: row.noteCap,
         importoBdo: Number(row.importoBdo && row.importoBdo !== 0 ? row.importoBdo : (row.ordinatoBdo ?? 0)),
       });
       setRows((prev) =>
@@ -568,11 +569,12 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
                <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
                <th style={{ padding: "4px 6px" }}>{/* P Note */}</th>
+               <th style={{ padding: "4px 6px" }}>{/* Note CAP */}</th>
               <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
             {/* Intestazioni */}
             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Azioni"].map((h) => (
+              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h) => (
                 <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
               ))}
             </tr>
@@ -690,6 +692,22 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                     <textarea
                       value={r.pNote ?? ""}
                       onChange={(e) => handleChange(r.id, "pNote", e.target.value)}
+                      rows={2}
+                      style={{
+                        ...inputStyle({ width: "100%", minWidth: "150px" }),
+                        resize: "vertical",
+                        whiteSpace: "pre-wrap",
+                        overflowY: "auto",
+                        lineHeight: "1.4",
+                        padding: "4px 6px",
+                      }}
+                    />
+                  </td>
+
+                  <td style={{ ...TD, maxWidth: "250px", verticalAlign: "top" }}>
+                    <textarea
+                      value={r.noteCap ?? ""}
+                      onChange={(e) => handleChange(r.id, "noteCap", e.target.value)}
                       rows={2}
                       style={{
                         ...inputStyle({ width: "100%", minWidth: "150px" }),
@@ -839,6 +857,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <ViewField label="Release"     value={viewRow.releaseExcel} />
               <ViewField label="P Anno"      value={viewRow.pAnno} />
               <ViewField label="P Release"   value={viewRow.pRelease} />
+              <ViewField label="P Note"      value={viewRow.pNote} wide />
+              <ViewField label="Note CAP"    value={viewRow.noteCap} wide />
             </ViewSection>
 
             {/* Sezione Stato e Contratto */}

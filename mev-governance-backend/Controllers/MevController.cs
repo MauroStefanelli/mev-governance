@@ -77,6 +77,7 @@ public class MevController : BaseController
         item.PRelease   = request.PRelease;
         item.PImporto   = request.PImporto;
         item.PNote      = request.PNote;
+        item.NoteCap    = request.NoteCap;
         item.ImportoBdo = request.ImportoBdo;
 
         // Campi Excel editabili dalla modale
