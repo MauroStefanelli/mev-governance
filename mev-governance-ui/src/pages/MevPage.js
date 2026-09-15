@@ -194,21 +194,22 @@ const isScostamento = (excel, pianificato) =>
   excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
 
 // ── Stili condivisi ──────────────────────────────────────────────────────────
-const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle" };
+const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" };
 
 // Sticky columns: left offset cumulativi per le prime 11 colonne (ID → Importo ODA)
-const SC_LEFT = [0, 50, 130, 240, 440, 500, 600, 730, 790, 870, 950];
+const SC_LEFT  = [0, 50, 130, 240, 440, 500, 600, 730, 790, 870, 950];
 const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60, 80, 80, 120];
 const stickyTh = (i, extra = {}) => ({
   position: "sticky", left: SC_LEFT[i], zIndex: 11,
-  background: "inherit", minWidth: SC_WIDTH[i],
-  boxShadow: i === 10 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  background: "inherit",
+  borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
+  borderBottom: "inherit",
   ...extra,
 });
 const stickyTd = (i, bg, extra = {}) => ({
   ...TD, position: "sticky", left: SC_LEFT[i], zIndex: 1,
-  background: bg || "white", minWidth: SC_WIDTH[i],
-  boxShadow: i === 10 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  background: bg || "white",
+  borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
 
@@ -447,56 +448,60 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
       {/* ── Toolbar ── */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <button
-          style={btn("primary")}
-          onClick={async () => {
-            if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
-            setAligning(true);
-            setAlignStatus({ step: "running", msg: "Avvio allineamento..." });
-            try {
-              setAlignStatus({ step: "running", msg: "Importazione dati in corso..." });
-              const result = await alignMevData({});
-              const msg = result.countContratti !== undefined
-                ? `Completato: ${result.count} record MEV, ${result.countContratti} contratti`
-                : `Completato: ${result.count} record caricati`;
-              setAlignStatus({ step: "done", msg });
-              onAligned?.();
-              await loadMev();
-              setTimeout(() => setAlignStatus(null), 2000);
-            } catch (e) {
-              setAlignStatus({ step: "error", msg: `Errore: ${e.message}` });
-              setTimeout(() => setAlignStatus(null), 4000);
-            } finally {
-              setAligning(false);
-            }
-          }}
-          disabled={aligning}
-        >
-          {aligning ? "Allineamento..." : "⟳ Allinea Dati"}
-        </button>
+        {["Admin", "SuperAdmin"].includes(role) && (
+          <>
+            <button
+              style={btn("primary")}
+              onClick={async () => {
+                if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
+                setAligning(true);
+                setAlignStatus({ step: "running", msg: "Avvio allineamento..." });
+                try {
+                  setAlignStatus({ step: "running", msg: "Importazione dati in corso..." });
+                  const result = await alignMevData({});
+                  const msg = result.countContratti !== undefined
+                    ? `Completato: ${result.count} record MEV, ${result.countContratti} contratti`
+                    : `Completato: ${result.count} record caricati`;
+                  setAlignStatus({ step: "done", msg });
+                  onAligned?.();
+                  await loadMev();
+                  setTimeout(() => setAlignStatus(null), 2000);
+                } catch (e) {
+                  setAlignStatus({ step: "error", msg: `Errore: ${e.message}` });
+                  setTimeout(() => setAlignStatus(null), 4000);
+                } finally {
+                  setAligning(false);
+                }
+              }}
+              disabled={aligning}
+            >
+              {aligning ? "Allineamento..." : "⟳ Allinea Dati"}
+            </button>
 
-        {/* Annulla ultimo Align — visibile solo se esiste un batch */}
-        {lastAlignBatchId && (
-          <button
-            style={{ ...btn("ghost"), borderColor: "#fca5a5", color: "#dc2626", background: "#fff5f5" }}
-            disabled={rollingBack || aligning}
-            onClick={async () => {
-              if (!window.confirm("Annullare l'ultimo allineamento? Le righe inserite o aggiornate nell'ultimo Align verranno eliminate.")) return;
-              setRollingBack(true);
-              try {
-                const res = await rollbackLastAlign();
-                alert(res.message);
-                setLastAlignBatchId(null);
-                await loadMev();
-              } catch (e) {
-                alert(`Errore: ${e.message}`);
-              } finally {
-                setRollingBack(false);
-              }
-            }}
-          >
-            {rollingBack ? "Annullamento..." : "↩ Annulla ultimo Align"}
-          </button>
+            {/* Annulla ultimo Align — visibile solo se esiste un batch */}
+            {lastAlignBatchId && (
+              <button
+                style={{ ...btn("ghost"), borderColor: "#fca5a5", color: "#dc2626", background: "#fff5f5" }}
+                disabled={rollingBack || aligning}
+                onClick={async () => {
+                  if (!window.confirm("Annullare l'ultimo allineamento? Le righe inserite o aggiornate nell'ultimo Align verranno eliminate.")) return;
+                  setRollingBack(true);
+                  try {
+                    const res = await rollbackLastAlign();
+                    alert(res.message);
+                    setLastAlignBatchId(null);
+                    await loadMev();
+                  } catch (e) {
+                    alert(`Errore: ${e.message}`);
+                  } finally {
+                    setRollingBack(false);
+                  }
+                }}
+              >
+                {rollingBack ? "Annullamento..." : "↩ Annulla ultimo Align"}
+              </button>
+            )}
+          </>
         )}
 
         <button style={btn("success")} onClick={async () => {
@@ -567,26 +572,37 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
       {/* ── Tabella ── */}
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+        <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
+          <colgroup>
+            {/* sticky: ID GoTo Applicativo Descrizione Anno Stato ImportoCAP Note ODA RDA ImportoODA */}
+            <col style={{ width: 50 }} /><col style={{ width: 80 }} /><col style={{ width: 110 }} />
+            <col style={{ width: 200 }} /><col style={{ width: 60 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 130 }} /><col style={{ width: 60 }} /><col style={{ width: 80 }} />
+            <col style={{ width: 80 }} /><col style={{ width: 120 }} />
+            {/* non-sticky: Subco PAnno PRelease PImporto PNote NoteCAP Azioni */}
+            <col style={{ width: 90 }} /><col style={{ width: 70 }} /><col style={{ width: 90 }} />
+            <col style={{ width: 120 }} /><col style={{ width: 180 }} /><col style={{ width: 180 }} />
+            <col style={{ width: 90 }} />
+          </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Filtri */}
-             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-               <th style={{ padding: "4px 6px", ...stickyTh(0, { background: "#fff" }) }}>{/* ID */}</th>
-               <th style={{ padding: "4px 6px", ...stickyTh(1, { background: "#fff" }) }}><MultiSelect options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(2, { background: "#fff" }) }}><MultiSelect options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(3, { background: "#fff" }) }}>{/* Descrizione */}</th>
-               <th style={{ padding: "4px 6px", ...stickyTh(4, { background: "#fff" }) }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(5, { background: "#fff" }) }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(6, { background: "#fff" }) }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(7, { background: "#fff" }) }}>{/* Note */}</th>
-               <th style={{ padding: "4px 6px", ...stickyTh(8, { background: "#fff" }) }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(9, { background: "#fff" }) }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(10, { background: "#fff" }) }}>{/* Importo ODA */}</th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
-               <th style={{ padding: "4px 6px" }}>{/* P Importo */}</th>
-               <th style={{ padding: "4px 6px" }}>
+             <tr style={{ background: "#fff" }}>
+               <th style={{ padding: "4px 6px", ...stickyTh(0, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* ID */}</th>
+               <th style={{ padding: "4px 6px", ...stickyTh(1, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(2, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(3, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* Descrizione */}</th>
+               <th style={{ padding: "4px 6px", ...stickyTh(4, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(5, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(6, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(7, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* Note */}</th>
+               <th style={{ padding: "4px 6px", ...stickyTh(8, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(9, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(10, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* Importo ODA */}</th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}>{/* P Importo */}</th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}>
                  <input
                    value={filters.pNote}
                    onChange={(e) => handleFilterChange("pNote", e.target.value)}
@@ -594,7 +610,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                    style={{ width: "100%", fontSize: "12px", padding: "3px 6px", border: "1px solid #dadce0", borderRadius: "4px", boxSizing: "border-box" }}
                  />
                </th>
-               <th style={{ padding: "4px 6px" }}>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}>
                  <input
                    value={filters.noteCap}
                    onChange={(e) => handleFilterChange("noteCap", e.target.value)}
@@ -602,14 +618,15 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                    style={{ width: "100%", fontSize: "12px", padding: "3px 6px", border: "1px solid #dadce0", borderRadius: "4px", boxSizing: "border-box" }}
                  />
                </th>
-              <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
-            </tr>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}>{/* Azioni */}</th>
+             </tr>
              {/* Intestazioni */}
-             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
+             <tr style={{ background: "#f8f9fa" }}>
                {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h, i) => (
                  <th key={h} style={{
                    padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
-                   ...(i < 11 ? stickyTh(i, { background: "#f8f9fa" }) : {}),
+                   borderBottom: "2px solid #dadce0",
+                   ...(i < 11 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
                    minWidth: h === "Importo CAP" ? "130px" : undefined,
                  }}>{h}</th>
                ))}
@@ -624,7 +641,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   key={r.id}
                   style={{
                     backgroundColor: scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa",
-                    borderBottom: "1px solid #f0f0f0",
                     transition: "background-color 0.1s",
                     cursor: "pointer",
                   }}

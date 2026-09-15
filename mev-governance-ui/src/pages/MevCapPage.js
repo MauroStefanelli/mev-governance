@@ -274,21 +274,21 @@ function TowEuroInput({ importoTow, valUnitTow, onCommit }) {
 const isScostamento = (excel, pianificato) =>
   excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
 
-const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle" };
+const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" };
 
 // Sticky columns: left offset cumulativi per le prime 16 colonne (ID → Importo ODA)
-const SC_LEFT_CAP = [0, 50, 130, 240, 440, 540, 640, 700, 800, 900, 980, 1060, 1190, 1250, 1370, 1450];
+const SC_LEFT_CAP  = [0, 50, 130, 240, 440, 540, 640, 700, 800, 900, 980, 1060, 1190, 1250, 1370, 1450];
 const SC_WIDTH_CAP = [50, 80, 110, 200, 100, 100, 60, 100, 100, 80, 80, 130, 60, 120, 100, 120];
 const stickyThCap = (i, bg = "#f8f9fa", extra = {}) => ({
   position: "sticky", left: SC_LEFT_CAP[i], zIndex: 11,
-  background: bg, minWidth: SC_WIDTH_CAP[i],
-  boxShadow: i === 15 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  background: bg,
+  borderRight: i === 15 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
 const stickyTdCap = (i, bg, extra = {}) => ({
   ...TD, position: "sticky", left: SC_LEFT_CAP[i], zIndex: 1,
-  background: bg || "white", minWidth: SC_WIDTH_CAP[i],
-  boxShadow: i === 15 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  background: bg || "white",
+  borderRight: i === 15 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
 
@@ -1577,8 +1577,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   );
 
   // ── Helper colonne ────────────────────────────────────────────────────────
-  const TH = ({ children, minW, stickyStyle }) => (
-    <th style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW, ...stickyStyle }}>
+  const TH = ({ children, minW, stickyStyle, bdBottom = "2px solid #dadce0" }) => (
+    <th style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW, borderBottom: bdBottom, ...stickyStyle }}>
       {children}
     </th>
   );
@@ -1722,38 +1722,53 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       </div>
 
       {/* Tabella */}
-      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 320px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+        <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
+          <colgroup>
+            {/* sticky 0-15: ID GoTo Applicativo Descrizione PMPoste PMCAP Anno Release Stato TipoContr Recupero ImportoCAP Note ODA RDA ImportoODA */}
+            <col style={{ width: 50 }} /><col style={{ width: 80 }} /><col style={{ width: 110 }} />
+            <col style={{ width: 200 }} /><col style={{ width: 100 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 60 }} /><col style={{ width: 100 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 80 }} /><col style={{ width: 80 }} /><col style={{ width: 130 }} />
+            <col style={{ width: 60 }} /><col style={{ width: 120 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 120 }} />
+            {/* non-sticky: PImporto Mandataria Subco TOW01-06 TotTOW PAnno PRelease PNote */}
+            <col style={{ width: 120 }} /><col style={{ width: 140 }} /><col style={{ width: 120 }} />
+            <col style={{ width: 75 }} /><col style={{ width: 75 }} /><col style={{ width: 75 }} />
+            <col style={{ width: 75 }} /><col style={{ width: 75 }} /><col style={{ width: 75 }} />
+            <col style={{ width: 90 }} /><col style={{ width: 70 }} /><col style={{ width: 90 }} />
+            <col style={{ width: 130 }} />
+          </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Riga filtri */}
-             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-               <th style={{ padding: "4px 6px", ...stickyThCap(0, "#fff"), minWidth: "60px" }}></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(1, "#fff"), minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(2, "#fff"), minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(3, "#fff"), minWidth: "200px" }}></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(4, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(5, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(6, "#fff"), minWidth: "70px" }}><MultiSelect options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(7, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(8, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(9, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(10, "#fff"), minWidth: "80px" }}><MultiSelect options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(11, "#fff"), minWidth: "130px" }}></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(12, "#fff") }}></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(13, "#fff"), minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(14, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyThCap(15, "#fff") }}></th>
-              <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
-              <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
-            </tr>
-            {/* Intestazioni */}
-             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
+             <tr style={{ background: "#fff" }}>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(0, "#fff"), minWidth: "60px" }}></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(1, "#fff"), minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(2, "#fff"), minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(3, "#fff"), minWidth: "200px" }}></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(4, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(5, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(6, "#fff"), minWidth: "70px" }}><MultiSelect options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(7, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(8, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(9, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(10, "#fff"), minWidth: "80px" }}><MultiSelect options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(11, "#fff"), minWidth: "130px" }}></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(12, "#fff") }}></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(13, "#fff"), minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(14, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", ...stickyThCap(15, "#fff") }}></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th><th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}></th>
+             </tr>
+             {/* Intestazioni */}
+             <tr style={{ background: "#f8f9fa" }}>
                <TH minW="50px"  stickyStyle={stickyThCap(0)}>ID</TH>
                <TH minW="80px"  stickyStyle={stickyThCap(1)}>GoTo</TH>
                <TH minW="110px" stickyStyle={stickyThCap(2)}>Applicativo</TH>
@@ -1794,7 +1809,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               return (
                 <tr key={r.id}
                   onClick={() => setEditRow(r)}
-                  style={{ backgroundColor: bg, borderBottom: "1px solid #f0f0f0", transition: "background-color 0.1s", cursor: "pointer" }}
+                  style={{ backgroundColor: bg, transition: "background-color 0.1s", cursor: "pointer" }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = bgHover)}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bg)}>
 
