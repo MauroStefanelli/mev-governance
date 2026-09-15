@@ -282,14 +282,12 @@ const SC_WIDTH_CAP = [50, 80, 110, 200, 100, 100, 60, 100, 100, 80, 80, 130, 60,
 const stickyThCap = (i, bg = "#f8f9fa", extra = {}) => ({
   position: "sticky", left: SC_LEFT_CAP[i], zIndex: 11,
   background: bg,
-  minWidth: SC_WIDTH_CAP[i], width: SC_WIDTH_CAP[i],
   borderRight: i === 15 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
 const stickyTdCap = (i, bg, extra = {}) => ({
   ...TD, position: "sticky", left: SC_LEFT_CAP[i], zIndex: 1,
   background: bg || "white",
-  minWidth: SC_WIDTH_CAP[i], width: SC_WIDTH_CAP[i],
   borderRight: i === 15 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
@@ -1725,7 +1723,22 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
       {/* Tabella */}
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
+        <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
+          <colgroup>
+            {/* sticky 0-15: ID GoTo Applicativo Descrizione PMPoste PMCAP Anno Release Stato TipoContr Recupero ImportoCAP Note ODA RDA ImportoODA */}
+            <col style={{ width: 50 }} /><col style={{ width: 80 }} /><col style={{ width: 110 }} />
+            <col style={{ width: 200 }} /><col style={{ width: 100 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 60 }} /><col style={{ width: 100 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 80 }} /><col style={{ width: 80 }} /><col style={{ width: 130 }} />
+            <col style={{ width: 60 }} /><col style={{ width: 120 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 120 }} />
+            {/* non-sticky: PImporto Mandataria Subco TOW01-06 TotTOW PAnno PRelease PNote */}
+            <col style={{ width: 120 }} /><col style={{ width: 140 }} /><col style={{ width: 120 }} />
+            <col style={{ width: 75 }} /><col style={{ width: 75 }} /><col style={{ width: 75 }} />
+            <col style={{ width: 75 }} /><col style={{ width: 75 }} /><col style={{ width: 75 }} />
+            <col style={{ width: 90 }} /><col style={{ width: 70 }} /><col style={{ width: 90 }} />
+            <col style={{ width: 130 }} />
+          </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Riga filtri */}
              <tr style={{ background: "#fff" }}>

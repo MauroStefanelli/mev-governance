@@ -202,7 +202,6 @@ const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60, 80, 80, 120];
 const stickyTh = (i, extra = {}) => ({
   position: "sticky", left: SC_LEFT[i], zIndex: 11,
   background: "inherit",
-  minWidth: SC_WIDTH[i], width: SC_WIDTH[i],
   borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
   borderBottom: "inherit",
   ...extra,
@@ -210,7 +209,6 @@ const stickyTh = (i, extra = {}) => ({
 const stickyTd = (i, bg, extra = {}) => ({
   ...TD, position: "sticky", left: SC_LEFT[i], zIndex: 1,
   background: bg || "white",
-  minWidth: SC_WIDTH[i], width: SC_WIDTH[i],
   borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
@@ -574,7 +572,18 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
       {/* ── Tabella ── */}
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
+        <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
+          <colgroup>
+            {/* sticky: ID GoTo Applicativo Descrizione Anno Stato ImportoCAP Note ODA RDA ImportoODA */}
+            <col style={{ width: 50 }} /><col style={{ width: 80 }} /><col style={{ width: 110 }} />
+            <col style={{ width: 200 }} /><col style={{ width: 60 }} /><col style={{ width: 100 }} />
+            <col style={{ width: 130 }} /><col style={{ width: 60 }} /><col style={{ width: 80 }} />
+            <col style={{ width: 80 }} /><col style={{ width: 120 }} />
+            {/* non-sticky: Subco PAnno PRelease PImporto PNote NoteCAP Azioni */}
+            <col style={{ width: 90 }} /><col style={{ width: 70 }} /><col style={{ width: 90 }} />
+            <col style={{ width: 120 }} /><col style={{ width: 180 }} /><col style={{ width: 180 }} />
+            <col style={{ width: 90 }} />
+          </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Filtri */}
              <tr style={{ background: "#fff" }}>
