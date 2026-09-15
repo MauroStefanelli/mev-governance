@@ -447,56 +447,60 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
       {/* ── Toolbar ── */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <button
-          style={btn("primary")}
-          onClick={async () => {
-            if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
-            setAligning(true);
-            setAlignStatus({ step: "running", msg: "Avvio allineamento..." });
-            try {
-              setAlignStatus({ step: "running", msg: "Importazione dati in corso..." });
-              const result = await alignMevData({});
-              const msg = result.countContratti !== undefined
-                ? `Completato: ${result.count} record MEV, ${result.countContratti} contratti`
-                : `Completato: ${result.count} record caricati`;
-              setAlignStatus({ step: "done", msg });
-              onAligned?.();
-              await loadMev();
-              setTimeout(() => setAlignStatus(null), 2000);
-            } catch (e) {
-              setAlignStatus({ step: "error", msg: `Errore: ${e.message}` });
-              setTimeout(() => setAlignStatus(null), 4000);
-            } finally {
-              setAligning(false);
-            }
-          }}
-          disabled={aligning}
-        >
-          {aligning ? "Allineamento..." : "⟳ Allinea Dati"}
-        </button>
+        {["Admin", "SuperAdmin"].includes(role) && (
+          <>
+            <button
+              style={btn("primary")}
+              onClick={async () => {
+                if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
+                setAligning(true);
+                setAlignStatus({ step: "running", msg: "Avvio allineamento..." });
+                try {
+                  setAlignStatus({ step: "running", msg: "Importazione dati in corso..." });
+                  const result = await alignMevData({});
+                  const msg = result.countContratti !== undefined
+                    ? `Completato: ${result.count} record MEV, ${result.countContratti} contratti`
+                    : `Completato: ${result.count} record caricati`;
+                  setAlignStatus({ step: "done", msg });
+                  onAligned?.();
+                  await loadMev();
+                  setTimeout(() => setAlignStatus(null), 2000);
+                } catch (e) {
+                  setAlignStatus({ step: "error", msg: `Errore: ${e.message}` });
+                  setTimeout(() => setAlignStatus(null), 4000);
+                } finally {
+                  setAligning(false);
+                }
+              }}
+              disabled={aligning}
+            >
+              {aligning ? "Allineamento..." : "⟳ Allinea Dati"}
+            </button>
 
-        {/* Annulla ultimo Align — visibile solo se esiste un batch */}
-        {lastAlignBatchId && (
-          <button
-            style={{ ...btn("ghost"), borderColor: "#fca5a5", color: "#dc2626", background: "#fff5f5" }}
-            disabled={rollingBack || aligning}
-            onClick={async () => {
-              if (!window.confirm("Annullare l'ultimo allineamento? Le righe inserite o aggiornate nell'ultimo Align verranno eliminate.")) return;
-              setRollingBack(true);
-              try {
-                const res = await rollbackLastAlign();
-                alert(res.message);
-                setLastAlignBatchId(null);
-                await loadMev();
-              } catch (e) {
-                alert(`Errore: ${e.message}`);
-              } finally {
-                setRollingBack(false);
-              }
-            }}
-          >
-            {rollingBack ? "Annullamento..." : "↩ Annulla ultimo Align"}
-          </button>
+            {/* Annulla ultimo Align — visibile solo se esiste un batch */}
+            {lastAlignBatchId && (
+              <button
+                style={{ ...btn("ghost"), borderColor: "#fca5a5", color: "#dc2626", background: "#fff5f5" }}
+                disabled={rollingBack || aligning}
+                onClick={async () => {
+                  if (!window.confirm("Annullare l'ultimo allineamento? Le righe inserite o aggiornate nell'ultimo Align verranno eliminate.")) return;
+                  setRollingBack(true);
+                  try {
+                    const res = await rollbackLastAlign();
+                    alert(res.message);
+                    setLastAlignBatchId(null);
+                    await loadMev();
+                  } catch (e) {
+                    alert(`Errore: ${e.message}`);
+                  } finally {
+                    setRollingBack(false);
+                  }
+                }}
+              >
+                {rollingBack ? "Annullamento..." : "↩ Annulla ultimo Align"}
+              </button>
+            )}
+          </>
         )}
 
         <button style={btn("success")} onClick={async () => {
