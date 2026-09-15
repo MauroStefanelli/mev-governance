@@ -196,6 +196,22 @@ const isScostamento = (excel, pianificato) =>
 // ── Stili condivisi ──────────────────────────────────────────────────────────
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle" };
 
+// Sticky columns: left offset cumulativi per le prime 11 colonne (ID → Importo ODA)
+const SC_LEFT = [0, 50, 130, 240, 440, 500, 600, 730, 790, 870, 950];
+const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60, 80, 80, 120];
+const stickyTh = (i, extra = {}) => ({
+  position: "sticky", left: SC_LEFT[i], zIndex: 11,
+  background: "inherit", minWidth: SC_WIDTH[i],
+  boxShadow: i === 10 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  ...extra,
+});
+const stickyTd = (i, bg, extra = {}) => ({
+  ...TD, position: "sticky", left: SC_LEFT[i], zIndex: 1,
+  background: bg || "white", minWidth: SC_WIDTH[i],
+  boxShadow: i === 10 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  ...extra,
+});
+
 const btn = (variant = "default") => {
   const base = {
     display: "inline-flex", alignItems: "center", gap: "6px",
@@ -281,7 +297,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" });
+    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -553,19 +569,19 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            {/* Filtri */}
-            <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-              <th style={{ padding: "4px 6px" }}>{/* ID */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Descrizione */}</th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px" }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
-              <th style={{ padding: "4px 6px" }}>{/* Note */}</th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}>{/* Importo ODA */}</th>
+             {/* Filtri */}
+             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
+               <th style={{ padding: "4px 6px", ...stickyTh(0, { background: "#fff" }) }}>{/* ID */}</th>
+               <th style={{ padding: "4px 6px", ...stickyTh(1, { background: "#fff" }) }}><MultiSelect options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(2, { background: "#fff" }) }}><MultiSelect options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(3, { background: "#fff" }) }}>{/* Descrizione */}</th>
+               <th style={{ padding: "4px 6px", ...stickyTh(4, { background: "#fff" }) }}><MultiSelect options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(5, { background: "#fff" }) }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(6, { background: "#fff" }) }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(7, { background: "#fff" }) }}>{/* Note */}</th>
+               <th style={{ padding: "4px 6px", ...stickyTh(8, { background: "#fff" }) }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(9, { background: "#fff" }) }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyTh(10, { background: "#fff" }) }}>{/* Importo ODA */}</th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
@@ -588,11 +604,15 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                </th>
               <th style={{ padding: "4px 6px" }}>{/* Azioni */}</th>
             </tr>
-            {/* Intestazioni */}
-            <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h) => (
-                <th key={h} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap", minWidth: h === "Importo CAP" ? "130px" : undefined }}>{h}</th>
-              ))}
+             {/* Intestazioni */}
+             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
+               {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h, i) => (
+                 <th key={h} style={{
+                   padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
+                   ...(i < 11 ? stickyTh(i, { background: "#f8f9fa" }) : {}),
+                   minWidth: h === "Importo CAP" ? "130px" : undefined,
+                 }}>{h}</th>
+               ))}
             </tr>
           </thead>
 
@@ -615,46 +635,45 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = scost ? "#ffe8e8" : "#f0f4ff"}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa"}
-                >
-                  <td style={{ ...TD }}>{r.excelId}</td>
-                  <td style={{ ...TD }}>{r.goTo}</td>
-                  <td style={{ ...TD }}>{r.applicativo}</td>
-                  <td style={{ ...TD, maxWidth: "300px" }}>{r.descrizione}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{r.annoCompetenza}</td>
-                  <td style={{ ...TD }}>
-                    <span style={{
-                      display: "inline-block", padding: "2px 8px", borderRadius: "12px",
-                      fontSize: "13px",
-                      background: r.stato === "Approvato" ? "#e6f4ea" : r.stato === "In approvazione" ? "#fff8e1" : "#f1f3f4",
-                      color: r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
-                    }}>{r.stato || "(vuoto)"}</span>
-                  </td>
-                  <td style={{ ...TD, textAlign: "right", minWidth: "130px", whiteSpace: "nowrap" }}>{formatEuro(r.importoExcel)}</td>
-
-                  <td style={{ ...TD, textAlign: "center" }}>
-                    {r.noteExcel ? (
-                      <button
-                        data-note-btn="1"
-                        onClick={(e) => {
-                          if (notePopover && notePopover.id === r.id) { setNotePopover(null); return; }
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setNotePopover({ id: r.id, text: r.noteExcel, x: rect.left, y: rect.bottom + window.scrollY + 6 });
-                        }}
-                        style={{
-                          padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 600,
-                          cursor: "pointer", border: "1px solid #1a73e8",
-                          background: notePopover?.id === r.id ? "#1a73e8" : "#e8f0fe",
-                          color: notePopover?.id === r.id ? "#fff" : "#1a73e8",
-                        }}
-                      >
-                        Note
-                      </button>
-                    ) : null}
-                  </td>
-
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.bc ?? ""}</td>
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{formatEuro(r.ordinatoBdo)}</td>
+                 >
+                   {/* ── Colonne fisse (sticky) ── */}
+                   <td style={stickyTd(0, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa")}>{r.excelId}</td>
+                   <td style={stickyTd(1, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa")}>{r.goTo}</td>
+                   <td style={stickyTd(2, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa")}>{r.applicativo}</td>
+                   <td style={stickyTd(3, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { maxWidth: "200px" })}>{r.descrizione}</td>
+                   <td style={stickyTd(4, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { textAlign: "center" })}>{r.annoCompetenza}</td>
+                   <td style={stickyTd(5, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa")}>
+                     <span style={{
+                       display: "inline-block", padding: "2px 8px", borderRadius: "12px",
+                       fontSize: "13px",
+                       background: r.stato === "Approvato" ? "#e6f4ea" : r.stato === "In approvazione" ? "#fff8e1" : "#f1f3f4",
+                       color: r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#e65100" : "#555",
+                     }}>{r.stato || "(vuoto)"}</span>
+                   </td>
+                   <td style={stickyTd(6, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { textAlign: "right", whiteSpace: "nowrap" })}>{formatEuro(r.importoExcel)}</td>
+                   <td style={stickyTd(7, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { textAlign: "center" })}>
+                     {r.noteExcel ? (
+                       <button
+                         data-note-btn="1"
+                         onClick={(e) => {
+                           if (notePopover && notePopover.id === r.id) { setNotePopover(null); return; }
+                           const rect = e.currentTarget.getBoundingClientRect();
+                           setNotePopover({ id: r.id, text: r.noteExcel, x: rect.left, y: rect.bottom + window.scrollY + 6 });
+                         }}
+                         style={{
+                           padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 600,
+                           cursor: "pointer", border: "1px solid #1a73e8",
+                           background: notePopover?.id === r.id ? "#1a73e8" : "#e8f0fe",
+                           color: notePopover?.id === r.id ? "#fff" : "#1a73e8",
+                         }}
+                       >
+                         Note
+                       </button>
+                     ) : null}
+                   </td>
+                   <td style={stickyTd(8, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { color: "#12c937", fontWeight: "bold", fontSize: "13px" })}>{r.bc ?? ""}</td>
+                   <td style={stickyTd(9, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { color: "#12c937", fontWeight: "bold", fontSize: "13px" })}>{r.atId ?? ""}</td>
+                   <td style={stickyTd(10, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" })}>{formatEuro(r.ordinatoBdo)}</td>
 
                   <td style={{ ...TD }}>
                     {resolveSubco(r.subco, rtiRows).length > 0

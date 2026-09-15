@@ -276,6 +276,22 @@ const isScostamento = (excel, pianificato) =>
 
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle" };
 
+// Sticky columns: left offset cumulativi per le prime 16 colonne (ID → Importo ODA)
+const SC_LEFT_CAP = [0, 50, 130, 240, 440, 540, 640, 700, 800, 900, 980, 1060, 1190, 1250, 1370, 1450];
+const SC_WIDTH_CAP = [50, 80, 110, 200, 100, 100, 60, 100, 100, 80, 80, 130, 60, 120, 100, 120];
+const stickyThCap = (i, bg = "#f8f9fa", extra = {}) => ({
+  position: "sticky", left: SC_LEFT_CAP[i], zIndex: 11,
+  background: bg, minWidth: SC_WIDTH_CAP[i],
+  boxShadow: i === 15 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  ...extra,
+});
+const stickyTdCap = (i, bg, extra = {}) => ({
+  ...TD, position: "sticky", left: SC_LEFT_CAP[i], zIndex: 1,
+  background: bg || "white", minWidth: SC_WIDTH_CAP[i],
+  boxShadow: i === 15 ? "2px 0 4px rgba(0,0,0,0.08)" : undefined,
+  ...extra,
+});
+
 const btn = (variant = "default") => {
   const base = {
     display: "inline-flex", alignItems: "center", gap: "6px",
@@ -1561,8 +1577,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   );
 
   // ── Helper colonne ────────────────────────────────────────────────────────
-  const TH = ({ children, minW }) => (
-    <th style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW }}>
+  const TH = ({ children, minW, stickyStyle }) => (
+    <th style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW, ...stickyStyle }}>
       {children}
     </th>
   );
@@ -1709,21 +1725,24 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 320px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            {/* Riga filtri */}
-            <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
-              <th style={{ padding: "4px 6px", minWidth: "60px" }}></th>
-              <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "200px" }}></th>
-              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
-              <th style={{ padding: "4px 6px", minWidth: "130px" }}></th>
-              <th style={{ padding: "4px 6px" }}></th>
+             {/* Riga filtri */}
+             <tr style={{ background: "#fff", borderBottom: "1px solid #dadce0" }}>
+               <th style={{ padding: "4px 6px", ...stickyThCap(0, "#fff"), minWidth: "60px" }}></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(1, "#fff"), minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(2, "#fff"), minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(3, "#fff"), minWidth: "200px" }}></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(4, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(5, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(6, "#fff"), minWidth: "70px" }}><MultiSelect options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(7, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(8, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(9, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(10, "#fff"), minWidth: "80px" }}><MultiSelect options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(11, "#fff"), minWidth: "130px" }}></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(12, "#fff") }}></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(13, "#fff"), minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(14, "#fff"), minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", ...stickyThCap(15, "#fff") }}></th>
               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
@@ -1734,23 +1753,23 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
               <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
             </tr>
             {/* Intestazioni */}
-            <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
-              <TH minW="50px">ID</TH>
-              <TH minW="80px">GoTo</TH>
-              <TH minW="110px">Applicativo</TH>
-              <TH minW="200px">Descrizione</TH>
-              <TH minW="100px">PM Poste</TH>
-              <TH minW="100px">PM CAP</TH>
-              <TH minW="60px">Anno</TH>
-              <TH minW="100px">Release</TH>
-              <TH minW="100px">Stato</TH>
-              <TH minW="80px">Tipo Contr.</TH>
-              <TH minW="80px">Recupero</TH>
-              <TH minW="130px">Importo CAP</TH>
-              <TH minW="60px">Note</TH>
-              <TH minW="120px">ODA (BC)</TH>
-              <TH minW="100px">RDA (AT ID)</TH>
-              <TH minW="120px">Importo ODA</TH>
+             <tr style={{ background: "#f8f9fa", borderBottom: "2px solid #dadce0" }}>
+               <TH minW="50px"  stickyStyle={stickyThCap(0)}>ID</TH>
+               <TH minW="80px"  stickyStyle={stickyThCap(1)}>GoTo</TH>
+               <TH minW="110px" stickyStyle={stickyThCap(2)}>Applicativo</TH>
+               <TH minW="200px" stickyStyle={stickyThCap(3)}>Descrizione</TH>
+               <TH minW="100px" stickyStyle={stickyThCap(4)}>PM Poste</TH>
+               <TH minW="100px" stickyStyle={stickyThCap(5)}>PM CAP</TH>
+               <TH minW="60px"  stickyStyle={stickyThCap(6)}>Anno</TH>
+               <TH minW="100px" stickyStyle={stickyThCap(7)}>Release</TH>
+               <TH minW="100px" stickyStyle={stickyThCap(8)}>Stato</TH>
+               <TH minW="80px"  stickyStyle={stickyThCap(9)}>Tipo Contr.</TH>
+               <TH minW="80px"  stickyStyle={stickyThCap(10)}>Recupero</TH>
+               <TH minW="130px" stickyStyle={stickyThCap(11)}>Importo CAP</TH>
+               <TH minW="60px"  stickyStyle={stickyThCap(12)}>Note</TH>
+               <TH minW="120px" stickyStyle={stickyThCap(13)}>ODA (BC)</TH>
+               <TH minW="100px" stickyStyle={stickyThCap(14)}>RDA (AT ID)</TH>
+               <TH minW="120px" stickyStyle={stickyThCap(15)}>Importo ODA</TH>
               <TH minW="120px">P Importo</TH>
               <TH minW="140px">Mandataria/Mandante</TH>
               <TH minW="120px">Subco</TH>
@@ -1779,17 +1798,18 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = bgHover)}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bg)}>
 
-                  <td style={{ ...TD, fontSize: "12px", color: "#999" }}>{r.excelId}</td>
-                  <td style={{ ...TD }}>{r.goTo}</td>
-                  <td style={{ ...TD }}>{r.applicativo}</td>
-                  <td style={{ ...TD, maxWidth: "280px" }}>{r.descrizione}</td>
-                  <td style={{ ...TD }}>{r.pmPoste ?? ""}</td>
-                  <td style={{ ...TD }}>{r.pmCap ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "center" }}>{r.annoCompetenza}</td>
-                  <td style={{ ...TD }}>{r.releaseExcel ?? ""}</td>
-                  <td style={{ ...TD }}>{statoBadge(r.stato)}</td>
-                  <td style={{ ...TD, fontSize: "12px" }}>{r.tipoContratto ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "center", fontSize: "12px" }}>
+                  {/* ── Colonne fisse (sticky) ── */}
+                  <td style={stickyTdCap(0, bg, { fontSize: "12px", color: "#999" })}>{r.excelId}</td>
+                  <td style={stickyTdCap(1, bg)}>{r.goTo}</td>
+                  <td style={stickyTdCap(2, bg)}>{r.applicativo}</td>
+                  <td style={stickyTdCap(3, bg, { maxWidth: "200px" })}>{r.descrizione}</td>
+                  <td style={stickyTdCap(4, bg)}>{r.pmPoste ?? ""}</td>
+                  <td style={stickyTdCap(5, bg)}>{r.pmCap ?? ""}</td>
+                  <td style={stickyTdCap(6, bg, { textAlign: "center" })}>{r.annoCompetenza}</td>
+                  <td style={stickyTdCap(7, bg)}>{r.releaseExcel ?? ""}</td>
+                  <td style={stickyTdCap(8, bg)}>{statoBadge(r.stato)}</td>
+                  <td style={stickyTdCap(9, bg, { fontSize: "12px" })}>{r.tipoContratto ?? ""}</td>
+                  <td style={stickyTdCap(10, bg, { textAlign: "center", fontSize: "12px" })}>
                     {r.recupero ? (
                       <span style={{
                         display: "inline-block", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600,
@@ -1798,10 +1818,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                       }}>{r.recupero}</span>
                     ) : ""}
                   </td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoExcel)}</td>
+                  <td style={stickyTdCap(11, bg, { textAlign: "right", whiteSpace: "nowrap" })}>{formatEuro(r.importoExcel)}</td>
 
                   {/* Note */}
-                  <td style={{ ...TD, textAlign: "center" }}>
+                  <td style={stickyTdCap(12, bg, { textAlign: "center" })}>
                     {r.noteExcel ? (
                       <button data-note-btn="1"
                         onClick={(e) => {
@@ -1821,9 +1841,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                     ) : null}
                   </td>
 
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{formatEuro(r.ordinatoBdo)}</td>
+                  <td style={stickyTdCap(13, bg, { color: "#12c937", fontWeight: "bold", fontSize: "12px" })}>{r.bc ?? ""}</td>
+                  <td style={stickyTdCap(14, bg, { color: "#12c937", fontWeight: "bold", fontSize: "12px" })}>{r.atId ?? ""}</td>
+                  <td style={stickyTdCap(15, bg, { textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "12px" })}>{formatEuro(r.ordinatoBdo)}</td>
                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.importoBdo)}</td>
                   <td style={{ ...TD }}>
                     {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
