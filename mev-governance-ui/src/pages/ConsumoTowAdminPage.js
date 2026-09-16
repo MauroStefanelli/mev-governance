@@ -1636,131 +1636,107 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
                           })}
                         </tr>
 
-                        {/* ── Dettaglio TOW (espanso) — colonne identiche, nessun offset ── */}
+                        {/* ── Dettaglio TOW (espanso) — stesse colonne della tabella principale ── */}
                         {expanded && (
-                          <tr>
-                             <td colSpan={5 + visibleFields.length + (hasImpatto ? 1 : 0)} style={{ padding: 0, borderBottom: "1px solid #f1f5f9" }}>
-                              <div style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-                                 <table style={{ width: "max-content", minWidth: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: "fixed" }}>
-                                   <colgroup>
-                                     <col style={{ width: "32px" }} />
-                                     <col style={{ width: "180px" }} />
-                                     <col style={{ width: "100px" }} />
-                                     <col style={{ width: "65px" }} />
-                                     <col style={{ width: `${CW.cat}px` }} />
-                                     {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
-                                       <col key={f.key} style={{ width: "125px" }} />
-                                     ))}
-                                     {hasImpatto && <col style={{ width: "90px" }} />}
-                                     {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
-                                       <col key={f.key} style={{ width: f.group === "euro" ? "125px" : "85px" }} />
-                                     ))}
-                                   </colgroup>
-                                  <tbody>
-                                    {cRows.map((row, idx) => (
-                                      <tr key={row.id}
-                                        style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc", transition: "background 0.1s" }}
-                                        onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                                        onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}
-                                      >
-                                        {/* cella freccia vuota per allineamento */}
-                                        <td />
-                                        {/* Contratto — vuoto nelle righe espanse */}
-                                        <td />
-                                        {/* Nome TOW — allineato all'intestazione */}
-                                        <td style={{ ...TD("left"), fontWeight: 700 }}>
-                                          <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
-                                        </td>
-                                        {/* QTA */}
-                                        <td style={{ ...TD("right"), color: "#64748b" }}>
-                                          {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
-                                        </td>
-                                        {/* CAT. — checkbox isCatalogo */}
-                                        <td style={{ ...TD("center"), padding: "6px 4px" }}>
-                                          <input
-                                            type="checkbox"
-                                            checked={!!(row.isCatalogo)}
-                                            onChange={e => handleCatChange(row, e.target.checked)}
-                                            style={{ width: "15px", height: "15px", cursor: "pointer", accentColor: "#10b981" }}
-                                          />
-                                        </td>
-                                        {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
-                                          <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
-                                            {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
-                                          </td>
-                                        ))}
-                                        {hasImpatto && (
-                                          <td style={{ ...TD("right"), padding: "6px 8px" }}>
-                                            <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                step="0.1"
-                                                value={getImpatto(c, row.tow) !== undefined ? getImpatto(c, row.tow) : ""}
-                                                onChange={e => handleImpattoChange(c, row.tow, e.target.value)}
-                                                placeholder="0"
-                                                style={{
-                                                  width: "60px", padding: "3px 20px 3px 6px",
-                                                  border: "1px solid #ddd8fe", borderRadius: "6px",
-                                                  fontSize: "12px", textAlign: "right", outline: "none",
-                                                  background: getImpatto(c, row.tow) ? "#f5f3ff" : "#fff",
-                                                  color: "#7c3aed", fontWeight: getImpatto(c, row.tow) ? 700 : 400,
-                                                }}
-                                              />
-                                              <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
-                                            </div>
-                                          </td>
-                                        )}
-                                         {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
-                                           <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
-                                             {row.isCatalogo && (f.key === "towApprovati" || f.key === "towResidui")
-                                               ? "—"
-                                               : f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
-                                           </td>
-                                         ))}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                  {/* Riga totale interna */}
-                                     <tfoot>
-                                      <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1" }}>
-                                        <td />
-                                        <td />
-                                        <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
-                                        <td />{/* QTA */}
-                                        <td />{/* CAT. */}
-                                       {visibleFields.filter(f => f.key === "valoreUnitario").map(f => {
-                                         if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                                         const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                                         return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
-                                       })}
-                                        {hasImpatto && (
-                                          <td style={{ ...TD("right"), fontWeight: 700, color: "#7c3aed", fontSize: "12px" }}>
-                                            {(() => {
-                                              const tot = cRows.reduce((s, r) => s + (Number(getImpatto(c, r.tow)) || 0), 0);
-                                              return tot > 0 ? (
-                                                <span style={{ background: tot === 100 ? "#f0fdf4" : tot > 100 ? "#fef2f2" : "#f5f3ff", color: tot === 100 ? "#16a34a" : tot > 100 ? "#dc2626" : "#7c3aed", border: `1px solid ${tot === 100 ? "#bbf7d0" : tot > 100 ? "#fecaca" : "#ddd8fe"}`, borderRadius: "5px", padding: "1px 6px", fontSize: "11px" }}>
-                                                  {tot.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
-                                                </span>
-                                              ) : "—";
-                                            })()}
-                                          </td>
-                                        )}
-                                       {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => {
-                                         if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
-                                         // Per towApprovati e towResidui escludere le righe catalogo dal totale
-                                         const rows = (f.key === "towApprovati" || f.key === "towResidui")
-                                           ? cRows.filter(r => !r.isCatalogo)
-                                           : cRows;
-                                         const tot = rows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
-                                         return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
-                                       })}                                    </tr>
-                                   </tfoot>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
+                          <>
+                            {cRows.map((row, idx) => (
+                              <tr key={row.id}
+                                style={{ background: idx % 2 === 0 ? "#f8fafc" : "#f1f5f9", transition: "background 0.1s", borderBottom: "1px solid #e9eef5" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#f8fafc" : "#f1f5f9"}
+                              >
+                                {/* freccia vuota */}
+                                <td />
+                                {/* Contratto vuoto */}
+                                <td />
+                                {/* Nome TOW */}
+                                <td style={{ ...TD("left"), fontWeight: 700 }}>
+                                  <span style={{ display: "inline-block", background: "#e2e8f0", borderRadius: "5px", padding: "2px 7px", fontSize: "12px", fontWeight: 700, color: "#334155" }}>{row.tow}</span>
+                                </td>
+                                {/* QTA */}
+                                <td style={{ ...TD("right"), color: "#64748b" }}>
+                                  {row.valoreUnitario > 0 ? formatQta(Math.round(row.valoreTotale / row.valoreUnitario)) : "—"}
+                                </td>
+                                {/* CAT. */}
+                                <td style={{ ...TD("center"), padding: "6px 4px" }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!(row.isCatalogo)}
+                                    onChange={e => handleCatChange(row, e.target.checked)}
+                                    style={{ width: "15px", height: "15px", cursor: "pointer", accentColor: "#10b981" }}
+                                  />
+                                </td>
+                                {visibleFields.filter(f => f.key === "valoreUnitario").map(f => (
+                                  <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                    {f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                  </td>
+                                ))}
+                                {hasImpatto && (
+                                  <td style={{ ...TD("right"), padding: "6px 8px" }}>
+                                    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        value={getImpatto(c, row.tow) !== undefined ? getImpatto(c, row.tow) : ""}
+                                        onChange={e => handleImpattoChange(c, row.tow, e.target.value)}
+                                        placeholder="0"
+                                        style={{
+                                          width: "60px", padding: "3px 20px 3px 6px",
+                                          border: "1px solid #ddd8fe", borderRadius: "6px",
+                                          fontSize: "12px", textAlign: "right", outline: "none",
+                                          background: getImpatto(c, row.tow) ? "#f5f3ff" : "#fff",
+                                          color: "#7c3aed", fontWeight: getImpatto(c, row.tow) ? 700 : 400,
+                                        }}
+                                      />
+                                      <span style={{ position: "absolute", right: "6px", fontSize: "11px", color: "#8b5cf6", pointerEvents: "none" }}>%</span>
+                                    </div>
+                                  </td>
+                                )}
+                                {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => (
+                                  <td key={f.key} style={{ ...TD("right"), color: f.color, fontWeight: TOTALE_KEYS.has(f.key) ? 600 : 400 }}>
+                                    {row.isCatalogo && (f.key === "towApprovati" || f.key === "towResidui")
+                                      ? "—"
+                                      : f.group === "euro" ? formatEuro(row[f.key]) : formatQta(row[f.key])}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                            {/* Riga totale parziale del contratto */}
+                            <tr style={{ background: "#e2e8f0", borderTop: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1" }}>
+                              <td />
+                              <td />
+                              <td style={{ ...TD("left"), fontWeight: 700, fontSize: "11px", textTransform: "uppercase", color: "#1e293b" }}>Totale</td>
+                              <td />{/* QTA */}
+                              <td />{/* CAT. */}
+                              {visibleFields.filter(f => f.key === "valoreUnitario").map(f => {
+                                if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                const tot = cRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                              })}
+                              {hasImpatto && (
+                                <td style={{ ...TD("right"), fontWeight: 700, color: "#7c3aed", fontSize: "12px" }}>
+                                  {(() => {
+                                    const tot = cRows.reduce((s, r) => s + (Number(getImpatto(c, r.tow)) || 0), 0);
+                                    return tot > 0 ? (
+                                      <span style={{ background: tot === 100 ? "#f0fdf4" : tot > 100 ? "#fef2f2" : "#f5f3ff", color: tot === 100 ? "#16a34a" : tot > 100 ? "#dc2626" : "#7c3aed", border: `1px solid ${tot === 100 ? "#bbf7d0" : tot > 100 ? "#fecaca" : "#ddd8fe"}`, borderRadius: "5px", padding: "1px 6px", fontSize: "11px" }}>
+                                        {tot.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%
+                                      </span>
+                                    ) : "—";
+                                  })()}
+                                </td>
+                              )}
+                              {visibleFields.filter(f => f.key !== "valoreUnitario").map(f => {
+                                if (!TOTALE_KEYS.has(f.key)) return <td key={f.key} style={TD("right")} />;
+                                const filteredRows = (f.key === "towApprovati" || f.key === "towResidui")
+                                  ? cRows.filter(r => !r.isCatalogo)
+                                  : cRows;
+                                const tot = filteredRows.reduce((s, r) => s + (Number(r[f.key]) || 0), 0);
+                                return <td key={f.key} style={{ ...TD("right"), fontWeight: 800, color: f.color, fontSize: "13px" }}>{f.group === "euro" ? formatEuro(tot) : formatQta(tot)}</td>;
+                              })}
+                            </tr>
+                          </>
                         )}
                       </React.Fragment>
                     );
