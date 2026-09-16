@@ -650,11 +650,11 @@ function App() {
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
                   {[
+                    { id: "superadmin", label: "Gestione Contratti" },
+                    { id: "consumotow", label: "Monitoraggio Contratti" },
                     { id: "tools",      label: "Caricamento Ordini" },
                     { id: "admin",      label: "Utenti" },
-                    { id: "consumotow", label: "TOW Contratti" },
                     { id: "dbconfig",   label: "Configurazione" },
-                    { id: "superadmin", label: "Gestione Contratti" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
