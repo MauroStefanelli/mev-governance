@@ -432,6 +432,63 @@ export const setUserRoles = async (id, roles) => {
 };
 
 // ── Configuratore Offerta ──────────────────────────────────────────────────
+// Contratti e lotti (entity_type 'contract' / 'contract_lot' su PC_DataRecords)
+export const getConfiguratoreContracts = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore recupero contratti configuratore");
+  return response.json();
+};
+
+export const getConfiguratoreContract = async (contractId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore recupero contratto configuratore");
+  return response.json();
+};
+
+export const upsertConfiguratoreContract = async (payload) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const updateConfiguratoreLot = async (contractId, lotId, payload) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}/lots/${encodeURIComponent(lotId)}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const deleteConfiguratoreContract = async (contractId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore eliminazione contratto configuratore");
+  return response.json();
+};
+
 export const getConfiguratoreRecords = async (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records${qs ? `?${qs}` : ""}`, {
