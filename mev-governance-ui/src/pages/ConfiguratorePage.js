@@ -6,15 +6,12 @@ import {
   upsertConfiguratoreRecord,
   deleteConfiguratoreRecord,
   analyzeInitiativeWithAi,
-  analyzeDevelopmentWithAi,
 } from "../services/mevService";
 import JSZip from "jszip";
 import {
   euro,
   esc,
   appNorm,
-  parseMoney,
-  extractPdfPages,
   ensurePdfLoader,
   parseCatalogPdf,
   parseTowPriceFile,
@@ -34,7 +31,9 @@ import {
   ignoredSourcePath,
   evaluationSystems,
   evaluationApplicationCodes,
-  downloadBlob,
+  applicationsFor,
+  saveApplications,
+  applicationIdentity,
 } from "../configuratore/configuratoreCore";
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
@@ -60,7 +59,7 @@ function ConfiguratorePage({ onUnauthorized }) {
   const [contingency, setContingency] = useState(0);
   const [tow, setTow] = useState({});
   const [towPercentages, setTowPercentages] = useState({});
-  const [priceMode, setPriceMode] = useState("historical");
+  const [priceMode] = useState("historical");
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
@@ -76,6 +75,11 @@ function ConfiguratorePage({ onUnauthorized }) {
   const [implementationTests, setImplementationTests] = useState("");
   const [devBusy, setDevBusy] = useState(false);
 
+  // ── Applicativi ──
+  const [applicationSearch, setApplicationSearch] = useState("");
+  const [applicationDraft, setApplicationDraft] = useState(null);
+  const [applications, setApplications] = useState([]);
+
   const toastTimer = useRef(null);
   const toast = (m) => {
     setToastMsg(m);
@@ -90,6 +94,13 @@ function ConfiguratorePage({ onUnauthorized }) {
   );
 
   useEffect(() => { ensurePdfLoader().catch(() => {}); }, []);
+
+  useEffect(() => {
+    const current = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
+    setApplications(current);
+    setApplicationDraft(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedContractId, lot]);
 
   useEffect(() => {
     let alive = true;
@@ -355,7 +366,6 @@ function ConfiguratorePage({ onUnauthorized }) {
 
   // ── Step 2: gap analysis (port da analyzeImportedGaps) ──
   const runGapAnalysis = async (interventions, already = items) => {
-    const existingItems = already.length ? already : items;
     const suggestions = [];
     for (const intervention of interventions) {
       const history = await loadInitiativeHistory();
@@ -369,7 +379,7 @@ function ConfiguratorePage({ onUnauthorized }) {
       });
       const detailText = (intervention.mappings || []).flatMap((m) => [m.name, m.componentApplication, m.technology, m.unitName, m.detailDescription, m.ambit]).join(" ");
       const profileCatalogIds = [];
-      const apps = applicationContextFor(intervention.sistema, null);
+      const apps = applicationContextFor(intervention.sistema, DEFAULT_APPLICATIONS[lot]);
       apps.forEach((a) => {
         const techs = [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])];
         catalog.forEach((c) => {
@@ -412,7 +422,7 @@ function ConfiguratorePage({ onUnauthorized }) {
 
   // ── Step 2: analyze (port da analyze r.328) ──
   const analyze = async () => {
-    const source = [initiative.title, initiative.system, initiative.description, applicationsText(applicationContextFor(initiative.system, null))].join(" ").toLowerCase();
+    const source = [initiative.title, initiative.system, initiative.description, applicationsText(applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]))].join(" ").toLowerCase();
     if (source.replace(/\s/g, "").length < 20) {
       toast("Inserisci una descrizione più dettagliata");
       return;
@@ -467,7 +477,7 @@ function ConfiguratorePage({ onUnauthorized }) {
       rationale: s.reason,
       additionalInfo: s.additionalInfo || "",
     })),
-    applicationContext: applicationContextFor(initiative.system, null).map((a) => ({
+    applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]).map((a) => ({
       code: a.code,
       name: a.name,
       technologies: [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])],
@@ -606,6 +616,47 @@ function ConfiguratorePage({ onUnauthorized }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // ── Applicativi (port da addApplicationV39/saveApplication/delete r.159-160) ──
+  const addApplicationV39 = () => {
+    const name = window.prompt("Nome dell'applicativo (es. NPSO)");
+    if (!name) return;
+    const existing = applications.find((a) => appNorm(a.name) === appNorm(name));
+    if (existing) {
+      setApplicationDraft({ ...existing });
+      toast("Applicativo già esistente: puoi completare codice AP e repository");
+      return;
+    }
+    const app = { id: "application-" + Date.now(), code: "", name: name.trim(), codeUrl: "", codeLoadedAt: null, systemAliases: [name.trim()], ambiti: [], components: [], operatingSystems: [], databases: [], languages: [], extraTechnologies: [], notes: "" };
+    const next = [...applications, app];
+    setApplications(next);
+    saveApplications(selectedContractId, lot, next);
+    setApplicationDraft(app);
+    toast("Applicativo creato: associa ora codice AP e repository");
+  };
+
+  const saveApplicationDraft = () => {
+    if (!applicationDraft) return;
+    if (!applicationDraft.name) { toast("Inserisci il nome dell'applicativo"); return; }
+    const idx = applications.findIndex((a) => applicationIdentity(a) === applicationIdentity(applicationDraft));
+    const next = [...applications];
+    if (idx >= 0) next[idx] = applicationDraft; else next.push(applicationDraft);
+    setApplications(next);
+    saveApplications(selectedContractId, lot, next);
+    setApplicationDraft(null);
+    toast(`Applicativo ${applicationDraft.name} salvato${applicationDraft.code ? " con " + applicationDraft.code : ""}`);
+  };
+
+  const deleteApplication = (a) => {
+    if (!window.confirm(`Eliminare l'applicativo ${a.name}?`)) return;
+    const next = applications.filter((x) => applicationIdentity(x) !== applicationIdentity(a));
+    setApplications(next);
+    saveApplications(selectedContractId, lot, next);
+    setApplicationDraft(null);
+    toast("Applicativo eliminato");
+  };
+
+  const safeAppUrl = (url) => { try { const u = new URL(url, window.location.origin); return (u.protocol === "http:" || u.protocol === "https:") ? u.href : ""; } catch { return ""; } };
+
   // ── Sviluppo: repository + ZIP richiesta codice (port da generateCodeChangeRequest r.244) ──
   const selectImplementationRepository = () => {
     const input = document.createElement("input");
@@ -649,7 +700,7 @@ function ConfiguratorePage({ onUnauthorized }) {
     setDevBusy(true);
     try {
       const systems = evaluationSystems({ initiative, systems: [initiative.system], importedInterventions });
-      const applicationCodes = evaluationApplicationCodes({ applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot] || null) });
+      const applicationCodes = evaluationApplicationCodes({ applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]) });
       const allPaths = [...implementationFiles].map((f) => f.webkitRelativePath || f.name);
       const sourcePaths = [...implementationFiles]
         .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
@@ -735,7 +786,6 @@ function ConfiguratorePage({ onUnauthorized }) {
     const sep = ";";
     const header = ["ID Catalogo", "Tipo", "Complessità", "Quantità", "Prezzo unitario", "Importo", "Intervento", "Razionale"].join(sep);
     const rows = items.map((it) => {
-      const c = catalog.find((x) => x.id === it.id);
       const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
       return [it.id, it.type, it.complexity, it.qty, unit, unit * it.qty, it.interventionId || "", (it.reason || "").replace(/\n/g, " ")].join(sep);
     });
@@ -1173,6 +1223,64 @@ function ConfiguratorePage({ onUnauthorized }) {
           </div>
         </div>
       )}
+
+      {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
+      <div style={{ ...styles.card, marginTop: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <h3 style={{ margin: 0 }}>Applicativi e tecnologie · Lotto {lot}</h3>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
+            <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
+          </div>
+        </div>
+        {applications.length === 0 ? (
+          <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {applications
+              .filter((a) => !appNorm(applicationSearch) || appNorm([a.name, a.code, (a.systemAliases || []).join(" "), (a.ambiti || []).join(" ")].join(" ")).includes(appNorm(applicationSearch)))
+              .map((a, i) => {
+                const tag = (props, arr) =>
+                  (arr || []).length
+                    ? `${props}: ${[...arr].join(" · ")}`
+                    : "";
+                const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
+                return (
+                  <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
+                      {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
+                      {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
+                      <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
+                      <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {applicationDraft && (
+          <div style={{ border: "1px solid #d7dce1", borderRadius: 8, padding: 12, marginTop: 12, background: "#fbfbfc" }}>
+            <h4 style={{ margin: "0 0 8px" }}>Modifica applicativo</h4>
+            <div style={styles.grid2}>
+              <label style={styles.label}>Nome applicativo<input style={styles.input} value={applicationDraft.name || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, name: e.target.value })} /></label>
+              <label style={styles.label}>Codice AP<input style={styles.input} value={applicationDraft.code || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, code: e.target.value.toUpperCase() })} placeholder="AP-00226" /></label>
+            </div>
+            <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+            <label style={styles.label}>Link al codice o repository<input style={styles.input} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} /></label>
+            <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+            <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
+              <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* SVILUPPO INIZIATIVA */}
       <div style={{ ...styles.card, marginTop: 28 }}>

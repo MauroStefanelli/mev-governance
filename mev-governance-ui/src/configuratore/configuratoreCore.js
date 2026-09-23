@@ -620,3 +620,31 @@ export function implementationDocument({ record, proposals, branch, approvalNote
   lines.push("## Compilazione e test", "", tests || "Non indicati");
   return lines.join("\n");
 }
+
+// ============================================================
+// APPLICATIVI — store localStorage per contratto/lotto (r.100-103)
+// ============================================================
+
+const APPLICATIONS_KEY = "configuratore_applications_v1";
+
+export const applicationsStore = () => {
+  try { return JSON.parse(localStorage.getItem(APPLICATIONS_KEY)) || {}; } catch { return {}; }
+};
+
+export function saveApplications(contractId, lot, apps) {
+  const store = applicationsStore();
+  store[contractId] = { ...(store[contractId] || {}), [lot]: apps };
+  localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(store));
+}
+
+export function applicationsFor(contractId, lot, builtin) {
+  const store = applicationsStore();
+  const saved = store[contractId]?.[lot];
+  if (saved) return saved;
+  if (builtin) return JSON.parse(JSON.stringify(DEFAULT_APPLICATIONS?.[lot] || []));
+  return [];
+}
+
+export function applicationIdentity(app) {
+  return appNorm(`${app.code || ""}|${app.name || ""}`);
+}
