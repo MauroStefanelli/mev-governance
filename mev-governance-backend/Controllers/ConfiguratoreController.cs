@@ -41,12 +41,15 @@ public class ConfiguratoreController : ControllerBase
 
     private (string Schema, string ConStr) GetDbTarget()
     {
-        var rawSchema = (_config["DB_SCHEMA"] ?? "public").Trim().ToLower();
-        var sch = System.Text.RegularExpressions.Regex.IsMatch(rawSchema, @"^[a-zA-Z0-9_]+$")
-            ? rawSchema : "public";
+        var rawSchema = (_config["DB_SCHEMA"] ?? "").Trim().ToLower();
+        var sch = rawSchema.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(rawSchema, @"^[a-zA-Z0-9_]+$")
+            ? rawSchema : "dev";
+        // Se DB_CONNECTION_STRING manca, prova le variabili che Render/Supabase espongono.
         var cs = _config["DB_CONNECTION_STRING"] ?? "";
         if (string.IsNullOrWhiteSpace(cs))
-            throw new InvalidOperationException("DB_CONNECTION_STRING non configurato");
+            cs = _config["DATABASE_DIRECT_URL"] ?? _config["DATABASE_URL"] ?? "";
+        // La connessione recovery NON deve far esplodere il 500: se manca, deleghiamo
+        // la connessione a GetAllRecordsInternal che proverà anche gli schemi alternativi.
         return (sch, cs);
     }
 
