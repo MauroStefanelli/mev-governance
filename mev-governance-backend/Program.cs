@@ -219,6 +219,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
+builder.Services.AddHttpClient("ConfiguratoreAi", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(95);
+});
 
 var app = builder.Build();
 
