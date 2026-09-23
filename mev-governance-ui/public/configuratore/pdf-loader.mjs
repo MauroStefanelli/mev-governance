@@ -1,6 +1,6 @@
 import * as pdfjsLib from './pdf.min.mjs';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/configuratore/pdf.worker.min.mjs';
 
 window.extractPdfPages = async file => {
   const data = new Uint8Array(await file.arrayBuffer());
