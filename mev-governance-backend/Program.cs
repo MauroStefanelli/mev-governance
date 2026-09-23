@@ -90,10 +90,13 @@ var dbSchema = (Environment.GetEnvironmentVariable("DB_SCHEMA") ?? "public").Tri
 // Rende lo schema disponibile come IConfiguration per il DbContext
 builder.Configuration["DB_SCHEMA"] = dbSchema;
 var isPostgres = false;
+// Connection string attiva (formato Npgsql) esposta ai controller per query raw
+string? activeConnStr = null;
 
 if (DbConfigConnectionString != null && DbConfigIsPostgres)
 {
     isPostgres = true;
+    activeConnStr = DbConfigConnectionString;
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(DbConfigConnectionString,
             npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema)));
@@ -111,6 +114,7 @@ else if (!string.IsNullOrEmpty(databaseUrl))
         connStr = ParsePostgresUrl(databaseUrl, dbSchema);
     else
         connStr = databaseUrl;
+    activeConnStr = connStr;
 
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(connStr,
@@ -124,10 +128,7 @@ else
 }
 
 // Espone la connection string attiva via IConfiguration (usata dai controller per query raw)
-builder.Configuration["DB_CONNECTION_STRING"] = isPostgres
-    ? (DbConfigConnectionString ?? (Environment.GetEnvironmentVariable("DATABASE_DIRECT_URL")
-         ?? Environment.GetEnvironmentVariable("DATABASE_URL") ?? ""))
-    : null;
+builder.Configuration["DB_CONNECTION_STRING"] = activeConnStr;
 
 
 // Parsing manuale della URL postgresql:// senza usare System.Uri
