@@ -228,10 +228,18 @@ public class AuthController : ControllerBase
             })
             .ToList();
 
-        var extraRoles = _db.UserRoles
-            .Where(ur => users.Select(u => u.Id).Contains(ur.UserId))
-            .Select(ur => new { ur.UserId, ur.Role })
-            .ToList();
+        var extraRoles = new List<KeyValuePair<int, string>>();
+        try
+        {
+            extraRoles = _db.UserRoles
+                .Where(ur => users.Select(u => u.Id).Contains(ur.UserId))
+                .Select(ur => new KeyValuePair<int, string>(ur.UserId, ur.Role))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[USER-ROLES] GetUsers warning: {ex.Message}");
+        }
 
         var result = users.Select(u => new
         {
@@ -240,7 +248,7 @@ public class AuthController : ControllerBase
             u.FullName,
             u.Email,
             u.Role,
-            roles = extraRoles.Where(x => x.UserId == u.Id).Select(x => x.Role).ToList(),
+            roles = extraRoles.Where(x => x.Key == u.Id).Select(x => x.Value).ToList(),
             u.IsActive,
             u.SendEmail,
             u.LastLogin,
@@ -334,11 +342,19 @@ public class AuthController : ControllerBase
             .Distinct()
             .ToList();
 
-        var existing = _db.UserRoles.Where(ur => ur.UserId == id).ToList();
-        _db.UserRoles.RemoveRange(existing);
-        foreach (var r in clean)
-            _db.UserRoles.Add(new UserRole { UserId = id, Role = r });
-        _db.SaveChanges();
+        try
+        {
+            var existing = _db.UserRoles.Where(ur => ur.UserId == id).ToList();
+            _db.UserRoles.RemoveRange(existing);
+            foreach (var r in clean)
+                _db.UserRoles.Add(new UserRole { UserId = id, Role = r });
+            _db.SaveChanges();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SET-USER-ROLES] Warning: {ex.Message}");
+            return StatusCode(500, new { message = "Tabella UserRoles non disponibile nel DB corrente. Il ruolo aggiuntivo non è stato salvato." });
+        }
 
         return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
     }
@@ -471,11 +487,21 @@ public class AuthController : ControllerBase
     // ============================================================
     private List<string> GetUserRoles(int userId)
     {
-        return _db.UserRoles
-            .Where(ur => ur.UserId == userId && !string.IsNullOrEmpty(ur.Role))
-            .Select(ur => ur.Role)
-            .Distinct()
-            .ToList();
+        // Best-effort: se la tabella UserRoles non esiste ancora (primo deploy)
+        // o il DB non la supporta, il login NON deve fallire → lista vuota.
+        try
+        {
+            return _db.UserRoles
+                .Where(ur => ur.UserId == userId && !string.IsNullOrEmpty(ur.Role))
+                .Select(ur => ur.Role)
+                .Distinct()
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[USER-ROLES] Warning: {ex.Message}");
+            return new List<string>();
+        }
     }
 
     // ============================================================
