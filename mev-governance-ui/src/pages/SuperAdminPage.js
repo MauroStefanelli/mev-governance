@@ -356,6 +356,7 @@ export default function SuperAdminPage() {
         </div>
 
         {/* Lista contratti configuratore */}
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#333", margin: "18px 0 10px" }}>Seleziona o configura un contratto</div>
         {archLoading && archContracts.length === 0
           ? <div style={{ color: "#888", fontSize: 13 }}>Caricamento contratti...</div>
           : archContracts.length === 0
