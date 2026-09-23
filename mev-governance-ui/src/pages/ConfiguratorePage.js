@@ -8,6 +8,7 @@ import {
   analyzeInitiativeWithAi,
   analyzeDevelopmentWithAi,
 } from "../services/mevService";
+import JSZip from "jszip";
 import {
   euro,
   esc,
@@ -27,6 +28,13 @@ import {
   suggestionRules,
   APP_DATA,
   DEFAULT_APPLICATIONS,
+  codeChangePrompt,
+  implementationDocument,
+  sourceFileAllowed,
+  ignoredSourcePath,
+  evaluationSystems,
+  evaluationApplicationCodes,
+  downloadBlob,
 } from "../configuratore/configuratoreCore";
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
@@ -59,6 +67,14 @@ function ConfiguratorePage({ onUnauthorized }) {
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
   const [mappedLoading, setMappedLoading] = useState(false);
+
+  // ── Sviluppo ──
+  const [implementationFiles, setImplementationFiles] = useState([]);
+  const [codeChangeTool, setCodeChangeTool] = useState("vscode");
+  const [implementationBranch, setImplementationBranch] = useState("");
+  const [implementationApprovalNotes, setImplementationApprovalNotes] = useState("");
+  const [implementationTests, setImplementationTests] = useState("");
+  const [devBusy, setDevBusy] = useState(false);
 
   const toastTimer = useRef(null);
   const toast = (m) => {
@@ -590,6 +606,109 @@ function ConfiguratorePage({ onUnauthorized }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // ── Sviluppo: repository + ZIP richiesta codice (port da generateCodeChangeRequest r.244) ──
+  const selectImplementationRepository = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+    input.onchange = () => {
+      if (!input.files.length) return;
+      setImplementationFiles([...input.files]);
+      toast("Repository collegato: " + input.files.length + " file selezionati");
+    };
+    input.click();
+  };
+
+  const approvedInterventionsFor = () =>
+    [...suggestions.filter((s) => s.selected && s.approved !== false), ...items.filter((it) => it.selected || it.imported)].map((x, i) => ({
+      key: x.key || "s" + i,
+      id: x.id,
+      name: catalog.find((c) => c.id === x.id)?.nome || x.name || x.id,
+      type: x.type,
+      complexity: x.complexity,
+      quantity: x.qty,
+      reason: x.reason || "",
+      additionalInfo: x.additionalInfo || "",
+      interventionId: x.interventionId || "",
+    }));
+
+  const generateCodeChangeRequest = async () => {
+    const r = activeContract;
+    const payload = {};
+    const selected = approvedInterventionsFor();
+    if (!r || !selected.length) {
+      toast("Approva prima almeno un intervento");
+      return;
+    }
+    if (!implementationFiles.length) {
+      toast("Seleziona prima il repository di questa iniziativa");
+      return;
+    }
+    setDevBusy(true);
+    try {
+      const systems = evaluationSystems({ initiative, systems: [initiative.system], importedInterventions });
+      const applicationCodes = evaluationApplicationCodes({ applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot] || null) });
+      const allPaths = [...implementationFiles].map((f) => f.webkitRelativePath || f.name);
+      const sourcePaths = [...implementationFiles]
+        .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
+        .map((f) => f.webkitRelativePath || f.name);
+      const folderName = (allPaths[0] || "").split("/")[0] || "repository";
+      const request = {
+        formatVersion: 3,
+        generatedAt: new Date().toISOString(),
+        source: "Configuratore MEV v1",
+        targetTool: codeChangeTool,
+        contractId: selectedContractId,
+        contractName: r.name || selectedContractId,
+        lot: String(lot),
+        initiative,
+        systems,
+        applicationCodes,
+        requirements: initiative.requirements || "",
+        description: initiative.description || "",
+        approvalNotes: implementationApprovalNotes,
+        branch: implementationBranch,
+        approvedInterventions: selected,
+        repository: { folderName, totalFiles: allPaths.length, sourceFiles: sourcePaths.length, filePaths: allPaths, sourceFilePaths: sourcePaths },
+      };
+      const zip = new JSZip();
+      zip.file("README_MODIFICA_CODICE.md", codeChangePrompt(request));
+      zip.file("richiesta_modifica_codice.json", JSON.stringify(request, null, 2));
+      zip.file("piano_sviluppo.md", implementationDocument({ record: { payload, lot_id: lot, contract_id: selectedContractId, title: initiative.title }, proposals: selected, branch: implementationBranch, approvalNotes: implementationApprovalNotes, tests: implementationTests }));
+      zip.file("elenco_file_repository.txt", allPaths.join("\n"));
+      zip.file("VERIFICA_SELEZIONE.txt", [
+        `Codice iniziativa: ${initiative.code || ""}`,
+        `Titolo: ${initiative.title || ""}`,
+        `Sistema/applicazione: ${systems.join(", ")}`,
+        `Applicativi AP: ${applicationCodes.join(", ")}`,
+        `Repository selezionato: ${folderName}`,
+        `Interventi approvati: ${selected.length}`,
+      ].join("\n"));
+      const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+      const code = String(initiative.code || "iniziativa").replace(/[^a-z0-9_-]+/gi, "_");
+      downloadBlob(`Richiesta_Modifica_Codice_${code}.zip`, blob);
+      toast("Richiesta di modifica codice generata");
+    } catch (error) {
+      toast("Generazione non riuscita: " + error.message);
+    } finally {
+      setDevBusy(false);
+    }
+  };
+
+  const exportImplementation = () => {
+    const code = initiative.code || "iniziativa";
+    const doc = implementationDocument({
+      record: { payload: {}, lot_id: lot, contract_id: selectedContractId, title: initiative.title },
+      proposals: approvedInterventionsFor(),
+      branch: implementationBranch,
+      approvalNotes: implementationApprovalNotes,
+      tests: implementationTests,
+    });
+    downloadBlob(`piano_sviluppo_${code}.md`, new Blob([doc], { type: "text/markdown;charset=utf-8" }));
+  };
+
   // ── Export ──
   const exportSnapshotJson = () => {
     const data = {
@@ -1054,6 +1173,51 @@ function ConfiguratorePage({ onUnauthorized }) {
           </div>
         </div>
       )}
+
+      {/* SVILUPPO INIZIATIVA */}
+      <div style={{ ...styles.card, marginTop: 28 }}>
+        <h3 style={{ margin: 0 }}>Sviluppo iniziativa · richiesta di modifica codice</h3>
+        <p style={styles.hint}>Autorizza gli interventi nello step Offerta/Revisione, collega il repository e genera il pacchetto di richiesta codice (ZIP) per lo strumento di sviluppo scelto.</p>
+        <div style={{ ...styles.grid2, marginTop: 10 }}>
+          <label style={styles.label}>
+            Strumento previsto
+            <select style={styles.input} value={codeChangeTool} onChange={(e) => setCodeChangeTool(e.target.value)}>
+              <option value="vscode">Visual Studio Code</option>
+              <option value="codex">Codex</option>
+              <option value="other">Altro</option>
+            </select>
+          </label>
+          <label style={styles.label}>
+            Branch suggerito
+            <input style={styles.input} value={implementationBranch} onChange={(e) => setImplementationBranch(e.target.value)} placeholder="feature/<codice>" />
+          </label>
+          <label style={styles.label}>
+            Repository (cartella sorgente)
+            <button style={btnStyles.secondary} onClick={selectImplementationRepository}>
+              {implementationFiles.length ? `${implementationFiles.length} file selezionati` : "Scegli cartella…"}
+            </button>
+          </label>
+        </div>
+        <label style={styles.label}>
+          Note di approvazione
+          <textarea style={styles.textarea} rows={2} value={implementationApprovalNotes} onChange={(e) => setImplementationApprovalNotes(e.target.value)} placeholder="Criteri di autorizzazione, vincoli, razionale…" />
+        </label>
+        <label style={styles.label}>
+          Compilazione e test
+          <textarea style={styles.textarea} rows={2} value={implementationTests} onChange={(e) => setImplementationTests(e.target.value)} placeholder="Comandi di build/test da eseguire (es. npm run build, dotnet test)…" />
+        </label>
+        {implementationFiles.length > 0 && (
+          <p style={styles.hint}>
+            {implementationFiles.filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name)).length} file sorgente presi in considerazione · quelli ignorati (node_modules, dist, build, vendor, bin/obj, minificati, lock) non vengono elencati.
+          </p>
+        )}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+          <button style={btnStyles.primary} onClick={generateCodeChangeRequest} disabled={devBusy}>
+            {devBusy ? "Genero il pacchetto…" : "Genera ZIP richiesta modifica codice"}
+          </button>
+          <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
+        </div>
+      </div>
 
       {/* ARCHIVIO INIZIATIVE */}
       <div style={{ ...styles.card, marginTop: 28 }}>

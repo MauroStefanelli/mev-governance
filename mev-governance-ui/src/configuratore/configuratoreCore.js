@@ -510,3 +510,113 @@ export function applicationContextFor(system, lotApplications, lot) {
   const matched = apps.filter((a) => words.some((w) => appNorm(a.name).includes(appNorm(w))));
   return matched.length ? matched : [];
 }
+
+// ============================================================
+// SVILUPPO INIZIATIVA — ZIP richiesta codice (port r.114, r.244)
+// ============================================================
+
+export const sourceFileAllowed = (name) => {
+  const ext = new RegExp(/\.(?:java|kt|scala|groovy|cs|py|js|ts|jsx|tsx|go|rs|rb|php|c|cpp|h|hpp|sql|xml|json|yml|yaml|properties|conf|ini|sh|bat|ps1|vue|svelte|html|css|scss|less|tf|tfvars|proto|graphql|md|txt|gradle|mvn|pom)$/i);
+  return /^(Dockerfile|Jenkinsfile|Makefile|Procfile)$/i.test(name) || ext.test(name);
+};
+
+export const ignoredSourcePath = (path) =>
+  /(^|\/)(node_modules|\.git|\.svn|\.hg|dist|build|target|vendor|\.gradle|\.idea|\.vscode|coverage|__pycache__|\.next|\.nuxt|out|bin|obj)(\/|$)/.test(path) ||
+  /\.(?:min\.|\.map$|\.lock$)/.test(path);
+
+export const evaluationSystems = (payload) => {
+  const p = payload || {};
+  const set = new Set();
+  [p.initiative?.system, p.initiative?.systems].flat().filter(Boolean).forEach((s) => set.add(String(s).trim()).size);
+  (p.systems || []).forEach((s) => set.add(s));
+  (p.importedInterventions || []).forEach((x) => { if (x.sistema) set.add(String(x.sistema).trim()); });
+  return [...set].filter(Boolean);
+};
+
+export const evaluationApplicationCodes = (payload) => {
+  const p = payload || {};
+  const set = new Set();
+  (p.applicationCodes || []).forEach((c) => set.add(String(c).trim()));
+  (p.applicationContext || []).forEach((a) => { if (a.code) set.add(String(a.code).trim()); });
+  return [...set].filter(Boolean);
+};
+
+export function codeChangePrompt(request) {
+  const i = request.initiative;
+  const approved = request.approvedInterventions;
+  const toolLabel = { vscode: "Visual Studio Code", codex: "Codex", other: "lo strumento di sviluppo scelto" }[request.targetTool] || "Visual Studio Code";
+  const start =
+    request.targetTool === "vscode"
+      ? "Apri in Visual Studio Code la cartella principale del repository. Crea o seleziona il branch indicato, quindi usa questo documento come checklist di implementazione. Se utilizzi un'estensione AI, fornisci anche il JSON e il piano allegati."
+      : request.targetTool === "codex"
+        ? "Apri il repository sorgente nello stesso workspace di Codex e allega questo pacchetto alla richiesta."
+        : "Apri la cartella principale del repository nello strumento scelto e usa questo documento come checklist di implementazione.";
+  return `# Richiesta di modifica codice – ${i.code || ""} ${i.title || ""}
+
+**Strumento previsto:** ${toolLabel}
+
+${start}
+
+## Obiettivo
+Analizza il repository reale e realizza esclusivamente gli interventi approvati descritti nei file allegati. Verifica che siano necessari e sufficienti rispetto alla richiesta funzionale, senza introdurre funzionalità non autorizzate.
+
+## Regole obbligatorie
+1. Prima di modificare, ispeziona architettura, convenzioni, test e stato Git del repository.
+2. Non sovrascrivere modifiche preesistenti e non lavorare direttamente sul branch principale.
+3. Confronta ogni intervento con i file candidati e individua anche dipendenze tecniche non evidenti.
+4. Se manca un'informazione che cambia materialmente la soluzione, fermati e chiedi conferma.
+5. Applica soltanto gli interventi approvati (${approved.length}).
+6. Esegui test e compilazione disponibili; non dichiarare superato ciò che non hai eseguito.
+7. Al termine registra: file modificati, spiegazione puntuale, test eseguiti, esiti, rischi e attività residue.
+
+## Dati principali
+- Contratto: ${request.contractName}
+- Lotto: ${request.lot}
+- Sistema/applicazione: ${(request.systems || []).join(", ") || "non indicato"}
+- Applicativi AP: ${(request.applicationCodes || []).join(", ") || "non indicati"}
+- Branch suggerito: ${request.branch || "da creare"}
+- Cartella selezionata: ${request.repository?.folderName || "non indicata"}
+
+Consulta richiesta_modifica_codice.json per tutti i dati strutturati e piano_sviluppo.md per il dettaglio leggibile.`;
+}
+
+export function implementationDocument({ record, proposals, branch, approvalNotes, tests }) {
+  const p = record?.payload || {};
+  const i = p.initiative || {};
+  const selected = proposals;
+  const lines = [
+    `# Piano di sviluppo – ${i.code || ""} ${i.title || record?.title || ""}`,
+    "",
+    `- Contratto: ${p.contractName || record?.contract_id || ""}`,
+    `- Lotto: ${record?.lot_id || p.lot || ""}`,
+    `- Sistema: ${evaluationSystems(p).join(", ")}`,
+    `- Branch: ${branch || "da definire"}`,
+    "",
+    "## Approvazione",
+    `- Data: ${new Date().toLocaleString("it-IT")}`,
+    `- Note: ${approvalNotes || "nessuna"}`,
+    "",
+  ];
+  selected.forEach((x, n) => {
+    lines.push(
+      `## ${n + 1}. ID ${x.catalogId || x.id} – ${x.name}`,
+      "",
+      `**Motivazione:** ${x.reason || ""}`,
+      "",
+      `**Informazioni aggiuntive e razionale condiviso:** ${x.sharedRationale || x.additionalInfo || "non indicati"}`,
+      "",
+      `**Interventi necessari:** ${(x.areas || []).join("; ") || (x.activity || "")}`,
+      "",
+      `**File candidati:** ${(x.files || []).join("; ") || "da individuare"}`,
+      "",
+      `**Stato:** ${x.executionStatus || "Da avviare"}`,
+      "",
+      `**File modificati:** ${x.actualFiles || "non indicati"}`,
+      "",
+      `**Attività effettuate:** ${x.workDone || "non indicate"}`,
+      ""
+    );
+  });
+  lines.push("## Compilazione e test", "", tests || "Non indicati");
+  return lines.join("\n");
+}
