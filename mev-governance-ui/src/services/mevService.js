@@ -416,6 +416,56 @@ export const updateUserRole = async (id, role) => {
   return response.json();
 };
 
+// Imposta i ruoli aggiuntivi (extra) di un utente; il ruolo primario resta user.Role
+export const setUserRoles = async (id, roles) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/roles`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ roles })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+// ── Configuratore Offerta ──────────────────────────────────────────────────
+export const getConfiguratoreRecords = async (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records${qs ? `?${qs}` : ""}`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore recupero records configuratore");
+  return response.json();
+};
+
+export const upsertConfiguratoreRecord = async (payload) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const deleteConfiguratoreRecord = async (id) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records/${id}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore eliminazione record configuratore");
+  return response.json();
+};
+
 export const getUserAccessLogSafe = async (username) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/editor-logins`, {
     headers: authHeaders()

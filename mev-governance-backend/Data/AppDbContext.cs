@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<RtiSocietaRiga> RtiSocietaRighe => Set<RtiSocietaRiga>();
     public DbSet<UserClientContratto> UserClientContratti => Set<UserClientContratto>();
     public DbSet<UserPagePermission> UserPagePermissions => Set<UserPagePermission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

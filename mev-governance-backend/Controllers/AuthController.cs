@@ -52,7 +52,8 @@ public class AuthController : ControllerBase
         var ambienti = GetAmbientiForUser(user);
         var defaultAmbienteId = ambienti.FirstOrDefault()?.Id ?? 0;
 
-        var token = GenerateToken(user, defaultAmbienteId);
+        var roles = GetUserRoles(user.Id);
+        var token = GenerateToken(user, defaultAmbienteId, roles);
 
         var refreshToken = GenerateRefreshToken();
         user.RefreshToken = refreshToken;
@@ -67,6 +68,7 @@ public class AuthController : ControllerBase
             username = user.Username,
             fullName = user.FullName,
             role = user.Role,
+            roles,
             ambienti,
             ambienteId = defaultAmbienteId
         });
@@ -102,7 +104,7 @@ public class AuthController : ControllerBase
         if (!ambienti.Any(a => a.Id == request.AmbienteId))
             return Forbid();
 
-        var newToken = GenerateToken(user, request.AmbienteId);
+        var newToken = GenerateToken(user, request.AmbienteId, GetUserRoles(user.Id));
         return Ok(new { token = newToken, ambienteId = request.AmbienteId });
     }
 
@@ -155,7 +157,7 @@ public class AuthController : ControllerBase
             catch { /* ignora token malformato */ }
         }
 
-        var newJwt = GenerateToken(user, currentAmbienteId);
+        var newJwt = GenerateToken(user, currentAmbienteId, GetUserRoles(user.Id));
         var newRefresh = GenerateRefreshToken();
 
         user.RefreshToken = newRefresh;
@@ -226,7 +228,26 @@ public class AuthController : ControllerBase
             })
             .ToList();
 
-        return Ok(users);
+        var extraRoles = _db.UserRoles
+            .Where(ur => users.Select(u => u.Id).Contains(ur.UserId))
+            .Select(ur => new { ur.UserId, ur.Role })
+            .ToList();
+
+        var result = users.Select(u => new
+        {
+            u.Id,
+            u.Username,
+            u.FullName,
+            u.Email,
+            u.Role,
+            roles = extraRoles.Where(x => x.UserId == u.Id).Select(x => x.Role).ToList(),
+            u.IsActive,
+            u.SendEmail,
+            u.LastLogin,
+            u.LastLogout
+        }).ToList();
+
+        return Ok(result);
     }
 
     // ============================================================
@@ -260,9 +281,9 @@ public class AuthController : ControllerBase
         if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
         if (!validRoles.Contains(request.Role))
-            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client");
+            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client, Developer");
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null)
@@ -271,7 +292,55 @@ public class AuthController : ControllerBase
         user.Role = request.Role;
         _db.SaveChanges();
 
-        return Ok(new { id = user.Id, username = user.Username, role = user.Role });
+        return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
+    }
+
+    // ============================================================
+    // GET /api/auth/users/{id}/roles — elenco ruoli aggiuntivi utente
+    // ============================================================
+    [HttpGet("users/{id}/roles")]
+    [Authorize]
+    public IActionResult GetUserRolesEndpoint(int id)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null)
+            return NotFound("Utente non trovato");
+
+        return Ok(new { userId = user.Id, role = user.Role, roles = GetUserRoles(user.Id) });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/roles — imposta ruoli aggiuntivi utente
+    // Body: { "roles": ["Developer", ...] } (il ruolo primario resta in user.Role)
+    // ============================================================
+    [HttpPut("users/{id}/roles")]
+    [Authorize]
+    public IActionResult SetUserRolesEndpoint(int id, [FromBody] SetRolesRequest request)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null)
+            return NotFound("Utente non trovato");
+
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
+        var clean = (request.Roles ?? new List<string>())
+            .Where(r => !string.IsNullOrWhiteSpace(r) && r != user.Role)
+            .Where(r => validRoles.Contains(r))
+            .Distinct()
+            .ToList();
+
+        var existing = _db.UserRoles.Where(ur => ur.UserId == id).ToList();
+        _db.UserRoles.RemoveRange(existing);
+        foreach (var r in clean)
+            _db.UserRoles.Add(new UserRole { UserId = id, Role = r });
+        _db.SaveChanges();
+
+        return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
     }
 
     [HttpPost("users")]
@@ -361,14 +430,14 @@ public class AuthController : ControllerBase
     // ============================================================
     // GENERATE JWT
     // ============================================================
-    private string GenerateToken(AppUser user, int ambienteId = 0)
+    private string GenerateToken(AppUser user, int ambienteId = 0, List<string>? extraRoles = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var expires = DateTime.UtcNow.AddMinutes(60);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
@@ -376,6 +445,13 @@ public class AuthController : ControllerBase
             new Claim("fullName", user.FullName),
             new Claim("ambienteId", ambienteId.ToString())
         };
+
+        // Ruoli multipli: emette un claim Role aggiuntivo per ogni ruolo extra
+        if (extraRoles != null)
+        {
+            foreach (var r in extraRoles.Where(r => !string.IsNullOrEmpty(r) && r != user.Role))
+                claims.Add(new Claim(ClaimTypes.Role, r));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
@@ -386,6 +462,20 @@ public class AuthController : ControllerBase
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    // ============================================================
+    // RUOLI MULTIPLI
+    // Restituisce i ruoli aggiuntivi dell'utente (escluso il primario user.Role)
+    // La tabella UserRoles permette di associare più ruoli a un utente.
+    // ============================================================
+    private List<string> GetUserRoles(int userId)
+    {
+        return _db.UserRoles
+            .Where(ur => ur.UserId == userId && !string.IsNullOrEmpty(ur.Role))
+            .Select(ur => ur.Role)
+            .Distinct()
+            .ToList();
     }
 
     // ============================================================
@@ -455,5 +545,6 @@ public record CreateUserRequest(
 public record LoginRequest(string Username, string Password);
 public record RefreshRequest(string RefreshToken, string? CurrentToken = null);
 public record UpdateRoleRequest(string Role);
+public record SetRolesRequest(List<string> Roles);
 public record SwitchAmbienteRequest(int AmbienteId);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);

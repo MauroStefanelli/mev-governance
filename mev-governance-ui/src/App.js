@@ -10,6 +10,7 @@ import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
+import ConfiguratorePage from "./pages/ConfiguratorePage";
 import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
@@ -21,6 +22,9 @@ function App() {
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole]         = useState("");
+  const [roles, setRoles]       = useState(() => {
+    try { return JSON.parse(localStorage.getItem("roles") || "[]"); } catch { return []; }
+  });
   // true finché non abbiamo verificato se la sessione salvata è ancora valida
   const [bootstrapping, setBootstrapping] = useState(true);
   const [page, setPage]             = useState("mev");
@@ -88,8 +92,17 @@ function App() {
         setToken(jwt);
         setUsername(p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || localStorage.getItem("XUSER") || "");
         setFullName(p?.fullName || localStorage.getItem("fullName") || "");
-        const restoredRole = p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || localStorage.getItem("role") || "";
+        const roleClaim = p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+        // I claim role multipli arrivano come array, singolo come stringa
+        const restoredRole = Array.isArray(roleClaim) ? (roleClaim[0] || "") : (roleClaim || localStorage.getItem("role") || "");
         setRole(restoredRole);
+        const restoredRoles = Array.isArray(roleClaim)
+          ? roleClaim
+          : (roleClaim ? [roleClaim] : (() => {
+              const saved = localStorage.getItem("roles");
+              try { return saved ? JSON.parse(saved) : []; } catch { return []; }
+            })());
+        setRoles([...new Set(restoredRoles)]);
         try { setAmbienti(JSON.parse(localStorage.getItem("ambienti") || "[]")); } catch {}
         setAmbienteId(parseInt(localStorage.getItem("ambienteId") || "0", 10));
         // Per Client: carica pagine permesse
@@ -116,14 +129,14 @@ function App() {
             restoreSession(data.token);
           } else {
             // Refresh fallito: pulisce tutto → mostra login
-            ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+            ["jwt","refreshToken","XUSER","fullName","role","roles","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
           }
         } catch {
-          ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+          ["jwt","refreshToken","XUSER","fullName","role","roles","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
         }
       } else {
         // Nessuna sessione valida: pulisce eventuali residui
-        ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+        ["jwt","refreshToken","XUSER","fullName","role","roles","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
       }
 
       setBootstrapping(false);
@@ -135,8 +148,8 @@ function App() {
   // ── Logout automatico se il refresh token è scaduto ─────────────────────────
   useEffect(() => {
     const handleAuthExpired = () => {
-      ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
-      setToken(""); setUsername(""); setFullName(""); setRole("");
+      ["jwt", "refreshToken", "XUSER", "fullName", "role", "roles", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
+      setToken(""); setUsername(""); setFullName(""); setRole(""); setRoles([]);
       setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
       setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
       showToast("Sessione scaduta. Effettua di nuovo il login.", "warn", 8000);
@@ -200,10 +213,15 @@ function App() {
     localStorage.setItem("fullName",    data.fullName);
     localStorage.setItem("role",        data.role);
 
+    const extraRoles = Array.isArray(data.roles) ? data.roles : [data.role];
+    const allRoles = [...new Set([data.role, ...extraRoles].filter(Boolean))];
+    localStorage.setItem("roles", JSON.stringify(allRoles));
+
     setToken(data.token);
     setUsername(data.username);
     setFullName(data.fullName);
     setRole(data.role);
+    setRoles(allRoles);
 
     const ambientiList = data.ambienti || [];
     const activeId = data.ambienteId || 0;
@@ -249,8 +267,8 @@ function App() {
       } catch { /* ignora errori di rete */ }
     }
     // Pulisce TUTTO il localStorage relativo alla sessione, compreso refreshToken
-    ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
-    setToken(""); setUsername(""); setFullName(""); setRole("");
+    ["jwt", "refreshToken", "XUSER", "fullName", "role", "roles", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
+    setToken(""); setUsername(""); setFullName(""); setRole(""); setRoles([]);
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
     setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
   };
@@ -337,6 +355,12 @@ function App() {
   // Helper: descrizione dell'ambiente attivo
   const ambienteAttivo = ambienti.find(a => a.id === ambienteId);
   const descrizioneAttiva = ambienteAttivo?.descrizione || "";
+
+  // Helper: verifica se l'utente ha (almeno) uno dei ruoli indicati
+  const hasRole = useCallback((...wanted) => {
+    const myRoles = roles.length > 0 ? roles : (role ? [role] : []);
+    return wanted.some(r => myRoles.includes(r));
+  }, [roles, role]);
 
   /*const navItems = [
     { id: "mev",               label: "MEV" },
@@ -566,13 +590,13 @@ function App() {
             </button>
           ))}
 
-          {role === "Admin" && (
+          {hasRole("Admin") && !hasRole("SuperAdmin") && (
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setShowAdminMenu(!showAdminMenu)}
                 style={{
                   background:
-                    ["tools", "admin", "dbconfig", "consumotow"].includes(page)
+                    ["tools", "admin", "dbconfig", "consumotow", "configuratore"].includes(page)
                       ? "rgba(255,255,255,0.22)"
                       : "transparent",
                   color: "white",
@@ -599,6 +623,7 @@ function App() {
                     { id: "admin",      label: "Utenti" },
                     { id: "consumotow", label: "Contratti" },
                     { id: "dbconfig",   label: "App Config" },
+                    ...(hasRole("Developer") ? [{ id: "configuratore", label: "Configuratore Offerta" }] : []),
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -624,12 +649,12 @@ function App() {
             </div>
           )}
 
-          {role === "SuperAdmin" && (
+          {hasRole("SuperAdmin") && (
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setShowAdminMenu(!showAdminMenu)}
                 style={{
-                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin"].includes(page)
+                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin", "configuratore"].includes(page)
                     ? "rgba(255,255,255,0.22)" : "transparent",
                   color: "white",
                   border: "1px solid transparent",
@@ -650,11 +675,64 @@ function App() {
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
                   {[
-                    { id: "superadmin", label: "Gestione Contratti" },
-                    { id: "consumotow", label: "Monitoraggio Contratti" },
-                    { id: "tools",      label: "Caricamento Ordini" },
-                    { id: "admin",      label: "Utenti" },
-                    { id: "dbconfig",   label: "Configurazione" },
+                    { id: "superadmin",   label: "Gestione Contratti" },
+                    { id: "consumotow",   label: "Gestione Contratti" },
+                    { id: "configuratore",label: "Configuratore Offerta" },
+                    { id: "tools",        label: "Caricamento Ordini" },
+                    { id: "admin",        label: "Utenti" },
+                    { id: "dbconfig",     label: "Configurazione" },
+                  ].map(({ id, label }) => (
+                    <div
+                      key={id}
+                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
+                      style={{
+                        padding: "8px 16px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: page === id ? 600 : 400,
+                        color: "white",
+                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Menu Configuratore per Developer puro (senza Admin/SuperAdmin) */}
+          {hasRole("Developer") && !hasRole("Admin") && !hasRole("SuperAdmin") && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowAdminMenu(!showAdminMenu)}
+                style={{
+                  background: ["configuratore"].includes(page) ? "rgba(255,255,255,0.22)" : "transparent",
+                  color: "white",
+                  border: "1px solid transparent",
+                  cursor: "pointer",
+                  padding: "6px 16px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              >
+                Developer {showAdminMenu ? "▲" : "▼"}
+              </button>
+              {showAdminMenu && (
+                <div style={{
+                  position: "absolute", top: "38px", right: 0,
+                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+                  borderRadius: "8px", minWidth: "180px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}>
+                  {[
+                    { id: "configuratore", label: "Configuratore Offerta" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -816,11 +894,12 @@ function App() {
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
-        {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
-        {page === "tools"             && (["Admin","SuperAdmin"].includes(role) || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
-        {page === "consumotow"        && (["Admin","SuperAdmin"].includes(role) || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "superadmin"        && (role === "SuperAdmin" || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
+        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage />}
+        {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
+        {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
+        {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
+        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}
