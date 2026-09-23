@@ -523,6 +523,39 @@ export const deleteConfiguratoreRecord = async (id) => {
   return response.json();
 };
 
+// ── Configuratore Offerta — AI (secondo parere e sviluppo) ───────────────────
+export const analyzeInitiativeWithAi = async (context) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/analyze`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(context)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let detail = text;
+    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
+    throw new Error(detail);
+  }
+  return response.json();
+};
+
+export const analyzeDevelopmentWithAi = async (context) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/development`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(context)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let detail = text;
+    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
+    throw new Error(detail);
+  }
+  return response.json();
+};
+
 export const getUserAccessLogSafe = async (username) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/editor-logins`, {
     headers: authHeaders()

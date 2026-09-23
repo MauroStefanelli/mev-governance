@@ -1,33 +1,1246 @@
-import { useState, useEffect } from "react";
-import { getConfiguratoreRecords } from "../services/mevService";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+  getConfiguratoreContracts,
+  upsertConfiguratoreContract,
+  getConfiguratoreRecords,
+  upsertConfiguratoreRecord,
+  deleteConfiguratoreRecord,
+  analyzeInitiativeWithAi,
+  analyzeDevelopmentWithAi,
+} from "../services/mevService";
+import {
+  euro,
+  esc,
+  appNorm,
+  parseMoney,
+  extractPdfPages,
+  ensurePdfLoader,
+  parseCatalogPdf,
+  parseTowPriceFile,
+  parseInitiativeWorkbook,
+  applicationContextFor,
+  scoreIntervention,
+  reasonFor,
+  validComplexities,
+  defaultPrice,
+  calc,
+  suggestionRules,
+  APP_DATA,
+  DEFAULT_APPLICATIONS,
+} from "../configuratore/configuratoreCore";
+
+const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
 function ConfiguratorePage({ onUnauthorized }) {
-  const [records, setRecords] = useState(null);
+  const [contracts, setContracts] = useState([]);
+  const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
+  const [lot, setLot] = useState("1");
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [toastMsg, setToastMsg] = useState("");
+
+  const [showContractForm, setShowContractForm] = useState(false);
+  const [contractForm, setContractForm] = useState({ name: "", rulesFile: "", lots: [{ id: "1", name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] });
+
+  const [initiative, setInitiative] = useState({ code: "", title: "", system: "", release: "", requirements: "", description: "" });
+  const [importedInterventions, setImportedInterventions] = useState([]);
+  const [items, setItems] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [discount, setDiscount] = useState(0);
+  const [contingency, setContingency] = useState(0);
+  const [tow, setTow] = useState({});
+  const [towPercentages, setTowPercentages] = useState({});
+  const [priceMode, setPriceMode] = useState("historical");
+  const [aiProposals, setAiProposals] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [archiveRecords, setArchiveRecords] = useState([]);
+  const [economyNotes, setEconomyNotes] = useState("");
+  const [sourceWorkbookName, setSourceWorkbookName] = useState("");
+  const [mappedLoading, setMappedLoading] = useState(false);
+
+  const toastTimer = useRef(null);
+  const toast = (m) => {
+    setToastMsg(m);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(""), 2600);
+  };
+
+  // ── Contratti ──
+  const activeContract = useMemo(
+    () => contracts.find((c) => c.contractId === selectedContractId) || contractToApp(contracts.find((c) => c.contractId === selectedContractId)) || null,
+    [contracts, selectedContractId]
+  );
+
+  useEffect(() => { ensurePdfLoader().catch(() => {}); }, []);
 
   useEffect(() => {
-    getConfiguratoreRecords()
-      .then(setRecords)
+    let alive = true;
+    setLoading(true);
+    Promise.all([getConfiguratoreContracts(), getConfiguratoreRecords({ entity_type: "initiative_evaluation" })])
+      .then(([c, r]) => {
+        if (!alive) return;
+        setContracts(c);
+        setArchiveRecords(r.records || []);
+      })
       .catch((err) => {
-        if (err && (err.status === 401 || err.status === 403)) onUnauthorized();
-        else setError("Impossibile caricare i dati del Configuratore");
-      });
+        if (err && (err.status === 401 || err.status === 403)) return onUnauthorized();
+        setError("Impossibile caricare i dati del Configuratore Offerta");
+      })
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
   }, []); // eslint-disable-line
 
+  const builtinContract = useMemo(() => {
+    const catalogo = (APP_DATA.cataloghi || {})["1"] || [];
+    const b = {
+      contractId: "poste-tet-2025",
+      name: "Poste TeT (built-in)",
+      rulesFile: "",
+      builtin: true,
+      lots: [
+        {
+          lotId: "1",
+          name: "Lotto 1 – Postali",
+          catalog: catalogo,
+          towPrices: (APP_DATA.tow_prices || {})["1"] || {},
+          tow5Share: 65,
+          active: true,
+          codiceContratto: "",
+        },
+        {
+          lotId: "2",
+          name: "Lotto 2 – TOW",
+          catalog: (APP_DATA.cataloghi || {})["2"] || catalogo,
+          towPrices: (APP_DATA.tow_prices || {})["2"] || {},
+          tow5Share: 65,
+          active: true,
+          codiceContratto: "",
+        },
+      ],
+    };
+    return b;
+  }, []);
+
+  function contractToApp(c) {
+    if (!c) return null;
+    return {
+      contractId: c.contractId,
+      name: c.name,
+      rulesFile: c.rulesFile,
+      builtin: !!c.builtin,
+      lots: (c.lots || []).map((l) => ({
+        lotId: String(l.lotId),
+        name: l.name || `Lotto ${l.lotId}`,
+        catalog: l.catalog || [],
+        towPrices: l.towPrices || {},
+        tow5Share: l.tow5Share ?? 65,
+        active: l.active !== false,
+        codiceContratto: l.codiceContratto || "",
+      })),
+    };
+  }
+
+  const allContracts = useMemo(() => {
+    const list = contracts.map(contractToApp);
+    return [builtinContract, ...list.filter((c) => c.contractId !== "poste-tet-2025")];
+  }, [contracts, builtinContract]);
+
+  const activeLot = useMemo(() => {
+    const c = activeContract || builtinContract;
+    if (!c) return null;
+    const lots = (c.lots || []).filter((l) => l.active !== false && l.lotId === lot);
+    return lots[0] || (c.lots || []).filter((l) => l.active !== false)[0] || c.lots?.[0] || null;
+  }, [activeContract, builtinContract, lot]);
+
+  const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
+  const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
+  const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
+
+  // ── Persist contratti ──
+  const persistContract = async (contract) => {
+    const lots = Object.fromEntries(
+      (contract.lots || []).map((l) => [
+        String(l.lotId),
+        {
+          name: l.name,
+          catalogFile: l.catalogFile || "",
+          priceFile: l.priceFile || "",
+          tow5Share: l.tow5Share,
+          active: l.active !== false,
+          codiceContratto: l.codiceContratto || "",
+        },
+      ])
+    );
+    await upsertConfiguratoreContract({
+      contract_id: contract.contractId,
+      name: contract.name,
+      rules_file: contract.rulesFile || "",
+      builtin: !!contract.builtin,
+      lot_states: lots,
+    });
+  };
+
+  const handleSelectContract = async (id) => {
+    setSelectedContractId(id);
+    setLot((allContracts.find((c) => c.contractId === id)?.lots || [])[0]?.lotId || "1");
+    setStep(1);
+    resetInitiative();
+  };
+
+  // ── Form contratto ──
+  const updateContractLotField = (idx, patch) => {
+    setContractForm((f) => ({
+      ...f,
+      lots: f.lots.map((l, i) => (i === idx ? { ...l, ...patch } : l)),
+    }));
+  };
+
+  const saveContract = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const lots = {};
+      for (const box of contractForm.lots) {
+        if (!box.catalogFile || !box.priceFile) throw new Error(`File mancanti per il Lotto ${box.id}`);
+        const catalogData = await parseCatalogPdf(box.catalogFile, box.id);
+        const towPriceData = await parseTowPriceFile(box.priceFile, box.id);
+        lots[String(box.id)] = {
+          lotId: String(box.id),
+          name: box.name || `Lotto ${box.id}`,
+          catalogFile: box.catalogFile.name,
+          priceFile: box.priceFile.name,
+          catalog: catalogData,
+          towPrices: towPriceData,
+          tow5Share: Number(box.tow5Share) || 0,
+          active: true,
+          codiceContratto: "",
+        };
+      }
+      const contract = {
+        contractId: "contract-" + Date.now(),
+        name: contractForm.name.trim(),
+        rulesFile: contractForm.rulesFile?.name || "",
+        builtin: false,
+        lots: Object.values(lots),
+      };
+      await persistContract(contract);
+      const refreshed = await getConfiguratoreContracts();
+      setContracts(refreshed);
+      setShowContractForm(false);
+      setContractForm({ name: "", rulesFile: "", lots: [{ id: "1", name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] });
+      toast("Contratto importato e salvato nel database");
+    } catch (err) {
+      toast("Configurazione non riuscita: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Sincronizzazioni DB del posto di lavoro ──
+  const loadInitiativeHistory = useCallback(async () => {
+    try {
+      const data = await getConfiguratoreRecords({
+        entity_type: "initiative_evaluation",
+        contract_id: selectedContractId,
+        lot_id: lot,
+      });
+      return data.records || [];
+    } catch {
+      return [];
+    }
+  }, [selectedContractId, lot]);
+
+  const persistInitiativeEvaluation = async (showMessage = true) => {
+    if (!initiative.code && !initiative.title) {
+      if (showMessage) toast("Inserisci almeno codice o titolo dell'iniziativa");
+      return false;
+    }
+    const systems = [...new Set([initiative.system, ...importedInterventions.map((x) => x.sistema)].filter(Boolean))];
+    const keyPart = appNorm(initiative.code || initiative.title).replace(/ /g, "-");
+    const body = {
+      record_key: `${selectedContractId}|${lot}|initiative|${keyPart}`,
+      entity_type: "initiative_evaluation",
+      contract_id: selectedContractId,
+      lot_id: String(lot),
+      title: `${initiative.code ? initiative.code + " · " : ""}${initiative.title}`,
+      payload: {
+        version: 6,
+        contractId: selectedContractId,
+        contractName: activeContract?.name || "",
+        lot,
+        priceMode,
+        sourceWorkbookName,
+        initiative,
+        importedInterventions,
+        items,
+        tow,
+        discount,
+        contingency,
+        economicNotes: economyNotes,
+        savedAt: new Date().toISOString(),
+        systems,
+      },
+    };
+    try {
+      await upsertConfiguratoreRecord(body);
+      if (showMessage) toast("Valutazione salvata e resa disponibile alle stime future");
+      return true;
+    } catch (error) {
+      toast("Salvataggio non riuscito: " + error.message);
+      return false;
+    }
+  };
+
+  // ── Reset / iniziativa ──
+  const resetInitiative = () => {
+    setInitiative({ code: "", title: "", system: "", release: "", requirements: "", description: "" });
+    setImportedInterventions([]);
+    setItems([]);
+    setSuggestions([]);
+    setTow({});
+    setDiscount(0);
+    setContingency(0);
+    setAiProposals(null);
+    setEconomyNotes("");
+    setSourceWorkbookName("");
+  };
+
+  // ── Step 1: import Excel ──
+  const handleImportExcel = async (file) => {
+    if (!file) return;
+    setMappedLoading(true);
+    try {
+      const parsed = await parseInitiativeWorkbook(file, catalog);
+      if (parsed.lot && allContracts.find((c) => c.contractId === selectedContractId)?.lots?.some((l) => l.active !== false && String(l.lotId) === parsed.lot)) {
+        setLot(parsed.lot);
+      }
+      setImportedInterventions(parsed.interventions);
+      setItems(parsed.items);
+      setSuggestions([]);
+      setSourceWorkbookName(parsed.fileName);
+      setInitiative((i) => ({
+        ...i,
+        code: parsed.code || i.code,
+        title: parsed.title || i.title,
+        system: parsed.systems || i.system,
+        requirements: parsed.requirements || i.requirements,
+        description: parsed.description || i.description,
+      }));
+      toast(`${parsed.interventions.length} interventi e ${parsed.items.length} dettagli importati; verifico possibili integrazioni`);
+      await runGapAnalysis(parsed.interventions, parsed.items);
+    } catch (err) {
+      toast("Importazione non riuscita: " + err.message);
+    } finally {
+      setMappedLoading(false);
+    }
+  };
+
+  // ── Step 2: gap analysis (port da analyzeImportedGaps) ──
+  const runGapAnalysis = async (interventions, already = items) => {
+    const existingItems = already.length ? already : items;
+    const suggestions = [];
+    for (const intervention of interventions) {
+      const history = await loadInitiativeHistory();
+      const historicalCounts = new Map();
+      history.forEach((rec) => {
+        const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
+        const sys = payload.initiative?.system || rec.payload?.system || "";
+        if (appNorm(sys) && appNorm(intervention.sistema) && appNorm(intervention.sistema).includes(appNorm(sys))) {
+          (payload.items || []).forEach((x) => historicalCounts.set(x.id, (historicalCounts.get(x.id) || 0) + 1));
+        }
+      });
+      const detailText = (intervention.mappings || []).flatMap((m) => [m.name, m.componentApplication, m.technology, m.unitName, m.detailDescription, m.ambit]).join(" ");
+      const profileCatalogIds = [];
+      const apps = applicationContextFor(intervention.sistema, null);
+      apps.forEach((a) => {
+        const techs = [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])];
+        catalog.forEach((c) => {
+          if (techs.some((t) => appNorm(t) && (appNorm(c.nome) + appNorm(c.descrizione)).includes(appNorm(t)))) profileCatalogIds.push(c.id);
+        });
+      });
+      const appText = applicationsText(apps);
+      const { scores } = scoreIntervention({ intervention, detailText, catalog, applicationContextText: appText, historicalCounts, profileCatalogIds });
+      [...scores]
+        .map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score }))
+        .filter((x) => x.c && !new Set((intervention.mappings || []).map((m) => m.catalogId)).has(x.c.id) && x.score >= 2)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .forEach(({ c, score }) => {
+          const source = [intervention.titolo, intervention.descrizione, intervention.attivita, detailText, appText].join(" ").toLowerCase();
+          suggestions.push({
+            id: c.id,
+            selected: false,
+            type: source.match(/modific|adegua|evoluz|rientro/) ? "MODIFICA" : "REALIZZAZIONE",
+            complexity: "Medio",
+            qty: 1,
+            score,
+            reason: `Possibile voce aggiuntiva per ${intervention.id}: ${reasonFor(c, source)}`,
+            interventionId: intervention.id,
+            interventionTitle: intervention.titolo,
+          });
+        });
+    }
+    setSuggestions(suggestions);
+  };
+
+  const safeParse = (s) => {
+    try { return JSON.parse(s); } catch { return {}; }
+  };
+
+  const applicationsText = (apps) =>
+    apps
+      .map((a) => `${a.name || ""} ${[...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])].join(" ")} ${a.notes || ""}`)
+      .join(" ");
+
+  // ── Step 2: analyze (port da analyze r.328) ──
+  const analyze = async () => {
+    const source = [initiative.title, initiative.system, initiative.description, applicationsText(applicationContextFor(initiative.system, null))].join(" ").toLowerCase();
+    if (source.replace(/\s/g, "").length < 20) {
+      toast("Inserisci una descrizione più dettagliata");
+      return;
+    }
+    const scores = new Map();
+    suggestionRules.forEach((r) => {
+      const hits = r.words.filter((w) => source.includes(w));
+      if (hits.length) r.ids.forEach((id) => scores.set(id, (scores.get(id) || 0) + hits.length * 2));
+    });
+    catalog.forEach((c) => {
+      const hay = (c.nome + " " + c.ambito + " " + c.descrizione).toLowerCase();
+      const tokens = [...new Set(source.match(/[a-zà-ù0-9]{5,}/g) || [])];
+      const hits = tokens.filter((t) => hay.includes(t)).length;
+      if (hits) scores.set(c.id, (scores.get(c.id) || 0) + Math.min(hits, 5));
+    });
+    let ranked = [...scores].map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score })).filter((x) => x.c).sort((a, b) => b.score - a.score).slice(0, 10);
+    if (!ranked.length) ranked = catalog.slice(0, 6).map((c) => ({ c, score: 1 }));
+    setSuggestions(
+      ranked.map(({ c, score }, i) => ({
+        id: c.id,
+        selected: i < Math.min(4, ranked.length),
+        type: source.match(/modific|adegua|evoluz|rientro/) ? "MODIFICA" : "REALIZZAZIONE",
+        complexity: "Medio",
+        qty: 1,
+        score,
+        reason: reasonFor(c, source),
+      }))
+    );
+    setStep(2);
+  };
+
+  // ── AI: secondo parere (port da aiAnalysisContext + analyzeWithAi) ──
+  const buildAiContext = () => ({
+    contract: { id: selectedContractId, name: activeContract?.name || "" },
+    lot,
+    initiative,
+    catalog: catalog.map((c) => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "", prices: c.prezzi || c.price || {} })),
+    excelInterventions: importedInterventions.map((x) => ({
+      id: x.interventionId || x.id,
+      title: x.titolo || x.title || "",
+      description: x.descrizione || x.description || "",
+      activity: x.attivita || x.activity || "",
+      quantity: x.qty || x.quantity || 1,
+      catalogId: x.catalogId || x.idCatalogo || null,
+    })),
+    currentSuggestions: suggestions.map((s) => ({
+      catalogId: s.id,
+      selected: s.selected,
+      type: s.type,
+      complexity: s.complexity,
+      quantity: s.qty,
+      rationale: s.reason,
+      additionalInfo: s.additionalInfo || "",
+    })),
+    applicationContext: applicationContextFor(initiative.system, null).map((a) => ({
+      code: a.code,
+      name: a.name,
+      technologies: [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])],
+      notes: a.notes || "",
+    })),
+    priorEvaluations: [],
+  });
+
+  const analyzeWithAi = async () => {
+    setAiBusy(true);
+    setError("");
+    try {
+      const data = await analyzeInitiativeWithAi(buildAiContext());
+      const proposals = (data.analysis?.proposals || [])
+        .filter((p) => catalog.some((c) => String(c.id) === String(p.catalogId)))
+        .map((p, i) => ({ ...p, apply: p.action !== "exclude", _index: i }));
+      setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
+    } catch (err) {
+      setError("Analisi AI non riuscita: " + (err.message || err));
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const applyAiProposals = () => {
+    const next = [...suggestions];
+    aiProposals.proposals
+      .filter((p) => p.apply)
+      .forEach((p) => {
+        const catalogItem = catalog.find((x) => String(x.id) === String(p.catalogId));
+        if (!catalogItem) return;
+        let s = next.find((x) => String(x.id) === String(p.catalogId));
+        if (!s) {
+          s = { id: catalogItem.id, selected: true, type: "MODIFICA", complexity: "Medio", qty: 1, score: 0, reason: "" };
+          next.push(s);
+        }
+        s.selected = true;
+        s.type = p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA";
+        s.complexity = p.complexity || "Medio";
+        s.qty = Math.max(0.01, Number(p.quantity) || 1);
+        s.reason = p.rationale || s.reason;
+        s.additionalInfo = [s.additionalInfo, p.additionalInfo, "Validato tramite secondo parere AI"].filter(Boolean).join(" · ");
+      });
+    setSuggestions(next);
+    setAiProposals(null);
+    toast("Proposte AI applicate; resta possibile modificarle manualmente");
+  };
+
+  // ── Step 3: compose (port da compose r.379) ──
+  const compose = () => {
+    const imported = items.filter((x) => x.imported);
+    const added = suggestions.filter((s) => s.selected).map((s, i) => ({ ...s, key: Date.now() + i, unit: null, imported: false }));
+    setItems([...imported, ...added]);
+    setStep(3);
+  };
+
+  const addManualItem = (c) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: c.id,
+        type: "REALIZZAZIONE",
+        complexity: validComplexities(c, "REALIZZAZIONE")[0] || "Medio",
+        qty: 1,
+        score: 0,
+        reason: "Voce aggiunta manualmente dal catalogo.",
+        key: Date.now(),
+        unit: null,
+        imported: false,
+      },
+    ]);
+  };
+
+  const updateItem = (key, patch) => setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  const removeItem = (key) => setItems((prev) => prev.filter((it) => it.key !== key));
+
+  // ── Calcolo ──
+  const calculation = useMemo(
+    () =>
+      calc({
+        items: items.map((it) => ({
+          ...it,
+          unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
+        })),
+        lot,
+        contractId: selectedContractId,
+        tow5Share,
+        towPercentages,
+        tow,
+        discount,
+        contingency,
+        catalog,
+        priceMode,
+        builtin: !!activeContract?.builtin,
+      }),
+    [items, lot, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
+  );
+
+  const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
+  const tow5Total = useMemo(() => importedInterventions.reduce((n, x) => n + (Number(x.tow5) || 0), 0), [importedInterventions]);
+
+  // ── Archivio ──
+  const loadArchive = useCallback(() => {
+    getConfiguratoreRecords({ entity_type: "initiative_evaluation" })
+      .then((d) => setArchiveRecords(d.records || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { loadArchive(); }, [loadArchive]);
+
+  const deleteArchiveRecord = async (id) => {
+    if (!window.confirm("Eliminare definitivamente questa iniziativa memorizzata?")) return;
+    try {
+      await deleteConfiguratoreRecord(id);
+      loadArchive();
+      toast("Iniziativa eliminata");
+    } catch (error) {
+      toast("Eliminazione non riuscita: " + error.message);
+    }
+  };
+
+  const reworkInitiative = (record) => {
+    const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
+    setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
+    setLot(String(record.lot_id || payload.lot || lot));
+    if (payload.initiative) setInitiative(payload.initiative);
+    if (payload.importedInterventions) setImportedInterventions(payload.importedInterventions);
+    if (payload.items) setItems(payload.items);
+    if (payload.tow) setTow(payload.tow);
+    if (payload.towPercentages) setTowPercentages(payload.towPercentages);
+    if (payload.discount != null) setDiscount(payload.discount);
+    if (payload.contingency != null) setContingency(payload.contingency);
+    if (payload.economicNotes) setEconomyNotes(payload.economicNotes);
+    if (payload.sourceWorkbookName) setSourceWorkbookName(payload.sourceWorkbookName);
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ── Export ──
+  const exportSnapshotJson = () => {
+    const data = {
+      version: 6,
+      contractId: selectedContractId,
+      contractName: activeContract?.name || "",
+      lot,
+      priceMode,
+      sourceWorkbookName,
+      initiative,
+      importedInterventions,
+      items: items.map((it) => ({ ...it, unit: defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }) })),
+      tow,
+      discount,
+      contingency,
+      economicNotes: economyNotes,
+      calculation,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    downloadBlob(`offerta_${appNorm(initiative.code || "iniziativa")}.json`, blob);
+  };
+
+  const exportCsv = () => {
+    const sep = ";";
+    const header = ["ID Catalogo", "Tipo", "Complessità", "Quantità", "Prezzo unitario", "Importo", "Intervento", "Razionale"].join(sep);
+    const rows = items.map((it) => {
+      const c = catalog.find((x) => x.id === it.id);
+      const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+      return [it.id, it.type, it.complexity, it.qty, unit, unit * it.qty, it.interventionId || "", (it.reason || "").replace(/\n/g, " ")].join(sep);
+    });
+    downloadBlob(`offerta_${appNorm(initiative.code || "iniziativa")}.csv`, new Blob(["\uFEFF" + [header, ...rows].join("\n")], { type: "text/csv;charset=utf-8" }));
+  };
+
+  const downloadBlob = (name, blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  };
+
+  const go = (n) => {
+    setStep(n);
+    if (n === 4) persistInitiativeEvaluation(false);
+  };
+
+  // ── Render ──
+  if (loading) return <div style={{ padding: 40 }}>Caricamento configuratore…</div>;
+
+  const c = activeContract || builtinContract;
+  const lots = c ? (c.lots || []).filter((l) => l.active !== false) : [];
+
   return (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ margin: "0 0 6px", fontSize: "18px" }}>Configuratore Offerta</h2>
-      <p style={{ margin: "0 0 16px", color: "#666", fontSize: "13px" }}>
-        L'integrazione del Configuratore Offerta sarà completata qui (Fase 2).
-      </p>
-      {error && <p style={{ color: "#b00020", fontSize: "13px" }}>{error}</p>}
-      {records !== null && (
-        <p style={{ fontSize: "13px", color: "#333" }}>
-          Record salvati in PC_DataRecords: <b>{records.length}</b>
+    <div style={{ padding: 24, fontFamily: "inherit" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20 }}>Configuratore Offerta TOW</h2>
+          <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
+            {c?.name} · Lotto {lot} · {catalog.length} voci di catalogo
+          </p>
+        </div>
+        <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
+          {showContractForm ? "Chiudi form contratto" : "+ Nuovo contratto"}
+        </button>
+      </div>
+
+      {/* Selezione contratto / lotto */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "12px 0 16px" }}>
+        <select value={selectedContractId} onChange={(e) => handleSelectContract(e.target.value)} style={styles.input}>
+          {allContracts.map((cc) => (
+            <option key={cc.contractId} value={cc.contractId}>{cc.name}</option>
+          ))}
+        </select>
+        {lots.map((l) => (
+          <button
+            key={l.lotId}
+            onClick={() => { setLot(l.lotId); setStep(1); }}
+            style={lot === l.lotId ? styles.lotBtnActive : styles.lotBtn}
+          >
+            {l.name || `Lotto ${l.lotId}`}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <p style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
+          {error}
+          <button style={{ marginLeft: 8, border: "none", background: "none", cursor: "pointer" }} onClick={() => setError("")}>✕</button>
         </p>
+      )}
+
+      {/* Form contratto */}
+      {showContractForm && (
+        <form onSubmit={saveContract} style={{ ...styles.card, marginBottom: 20 }}>
+          <h3 style={{ margin: "0 0 12px" }}>Importa nuovo contratto</h3>
+          <label style={styles.label}>
+            Nome contratto
+            <input style={styles.input} value={contractForm.name} onChange={(e) => setContractForm((f) => ({ ...f, name: e.target.value }))} required />
+          </label>
+          <label style={styles.label}>
+            File regole (facoltativo)
+            <input style={styles.input} type="file" accept=".pdf,.doc,.docx" onChange={(e) => setContractForm((f) => ({ ...f, rulesFile: e.target.files[0] }))} />
+          </label>
+          {contractForm.lots.map((l, idx) => (
+            <div key={idx} style={{ ...styles.card, background: "#fafafa", marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <strong>Lotto {l.id}</strong>
+                <input style={{ ...styles.input, width: 180 }} placeholder="Nome lotto" value={l.name} onChange={(e) => updateContractLotField(idx, { name: e.target.value })} />
+                <label style={styles.label}>
+                  % TOW .5
+                  <input style={{ ...styles.input, width: 80 }} type="number" value={l.tow5Share} onChange={(e) => updateContractLotField(idx, { tow5Share: Number(e.target.value) })} />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <label style={styles.label}>
+                  Catalogo PDF (obbligatorio)
+                  <input style={styles.input} type="file" accept=".pdf" onChange={(e) => updateContractLotField(idx, { catalogFile: e.target.files[0] })} />
+                </label>
+                <label style={styles.label}>
+                  Listino TOW (PDF o XLSX, obbligatorio)
+                  <input style={styles.input} type="file" accept=".pdf,.xlsx" onChange={(e) => updateContractLotField(idx, { priceFile: e.target.files[0] })} />
+                </label>
+              </div>
+              <button type="button" style={{ marginTop: 8, ...btnStyles.danger }} onClick={() => setContractForm((f) => ({ ...f, lots: f.lots.filter((_, i) => i !== idx) }))} disabled={contractForm.lots.length <= 1}>
+                Rimuovi lotto
+              </button>
+            </div>
+          ))}
+          <button type="button" style={{ margin: "10px 10px 0 0", ...btnStyles.secondary }} onClick={() => setContractForm((f) => ({ ...f, lots: [...f.lots, { id: String(f.lots.length + 1), name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] }))}>
+            + Aggiungi lotto
+          </button>
+          <button type="submit" style={{ marginTop: 10, ...btnStyles.primary }} disabled={saving}>
+            {saving ? "Elaborazione documenti…" : "Importa e salva contratto"}
+          </button>
+        </form>
+      )}
+
+      {/* Stepper */}
+      <div style={{ display: "flex", gap: 4, margin: "8px 0 20px", flexWrap: "wrap" }}>
+        {STEPS.map((s, i) => (
+          <button key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
+            {i + 1}. {s}
+          </button>
+        ))}
+      </div>
+
+      {/* STEP 1: INIZIATIVA */}
+      {step === 1 && (
+        <div>
+          <input type="file" accept=".xlsx" style={styles.inputFile} onChange={(e) => handleImportExcel(e.target.files[0])} disabled={mappedLoading} />
+          <p style={styles.hint}>Carica il workbook dell'iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).</p>
+          <div style={{ ...styles.card, marginTop: 12 }}>
+            <h3 style={{ margin: "0 0 12px" }}>Dati iniziativa</h3>
+            <div style={styles.grid2}>
+              <label style={styles.label}>Codice
+                <input style={styles.input} value={initiative.code} onChange={(e) => setInitiative((i) => ({ ...i, code: e.target.value }))} />
+              </label>
+              <label style={styles.label}>Titolo
+                <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
+              </label>
+              <label style={styles.label}>Sistema / applicazione
+                <input style={styles.input} value={initiative.system} onChange={(e) => setInitiative((i) => ({ ...i, system: e.target.value }))} />
+              </label>
+              <label style={styles.label}>Release
+                <input style={styles.input} value={initiative.release} onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+              </label>
+              <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
+                <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
+              </label>
+              <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Descrizione
+                <textarea style={styles.textarea} value={initiative.description} onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))} rows={5} />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              <button style={btnStyles.primary} onClick={analyze}>Analizza e suggerisci</button>
+              <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
+            </div>
+          </div>
+
+          {importedInterventions.length > 0 && (
+            <div style={styles.card}>
+              <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
+              <details>
+                <summary style={{ cursor: "pointer", margin: "8px 0" }}>Mostra dettaglio importato</summary>
+                <ol style={{ fontSize: 13 }}>
+                  {importedInterventions.map((x) => (
+                    <li key={x.id} style={{ marginBottom: 8 }}>
+                      <strong>{esc(x.id)}</strong> — {esc(x.titolo || x.descrizione || x.attivita || "Senza descrizione")}
+                      {x.mappings.length > 0 && (
+                        <div style={{ marginLeft: 12, fontSize: 12, color: "#444" }}>
+                          {x.mappings.map((m, i) => (
+                            <div key={i}>
+                              <strong>{esc(m.name)}</strong> · {esc(m.type)} · {esc(m.complexity)} · q.tà {m.qty} · {euro.format(m.total)}
+                              {m.detailDescription ? <div>{esc(m.detailDescription)}</div> : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* STEP 2: INTERVENTI / SUGGERIMENTI */}
+      {step === 2 && (
+        <div>
+          <div style={{ ...styles.card, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
+              <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}>
+                {aiBusy ? "Analisi AI…" : "Secondo parere AI"}
+              </button>
+            </div>
+            {aiProposals && (
+              <div style={{ ...styles.card, marginTop: 10, background: "#f0f7ff" }}>
+                <div>
+                  <small>Secondo parere AI · {aiProposals.model || "AI"}</small>
+                  <p style={{ margin: "6px 0" }}>{esc(aiProposals.analysis?.summary || "Analisi completata.")}</p>
+                </div>
+                <div>
+                  {aiProposals.proposals.map((p, i) => {
+                    const cc = catalog.find((x) => String(x.id) === String(p.catalogId));
+                    return (
+                      <label key={i} style={{ display: "block", margin: "6px 0", fontSize: 13 }}>
+                        <input type="checkbox" checked={p.apply} onChange={(e) => setAiProposals((prev) => ({ ...prev, proposals: prev.proposals.map((q, j) => (j === i ? { ...q, apply: e.target.checked } : q)) }))} />
+                        {" "}ID {esc(p.catalogId)} · {esc(cc?.nome || "Voce catalogo")} — {esc(p.rationale || "")}
+                        <div style={{ fontSize: 12, color: "#555" }}>
+                          {esc(p.type || "MODIFICA")} · {esc(p.complexity || "Medio")} · Q.tà {esc(p.quantity || 1)} · Confidenza {Math.round((Number(p.confidence) || 0) * 100)}%
+                        </div>
+                      </label>
+                    );
+                  })}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button style={btnStyles.primary} onClick={applyAiProposals} disabled={!aiProposals.proposals.length}>Applica proposte selezionate</button>
+                    <button style={btnStyles.secondary} onClick={() => setAiProposals(null)}>Chiudi</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ ...styles.card }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <h3 style={{ margin: 0 }}>Possibili integrazioni</h3>
+              <button style={btnStyles.primary} onClick={compose} disabled={!suggestions.some((s) => s.selected)}>
+                Vai all'offerta ({suggestions.filter((s) => s.selected).length} selezionate)
+              </button>
+            </div>
+            {suggestions.map((s, i) => {
+              const cc = catalog.find((x) => x.id === s.id);
+              if (!cc) return null;
+              const vals = validComplexities(cc, s.type);
+              return (
+                <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd" }}>
+                  <div>
+                    {s.interventionId ? <small>{esc(s.interventionId)}</small> : null}
+                    <div style={{ color: "#666", fontSize: 12 }}>ID {cc.id} · {esc(cc.ambito)}</div>
+                    <strong>{esc(cc.nome)}</strong>
+                    <p style={{ margin: "6px 0", fontSize: 13 }}>{esc(s.reason)}</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select style={styles.input} value={s.type} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, type: e.target.value } : q)))}>
+                      <option>REALIZZAZIONE</option>
+                      <option>MODIFICA</option>
+                    </select>
+                    <select style={styles.input} value={s.complexity} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, complexity: e.target.value } : q)))}>
+                      {vals.map((v) => <option key={v}>{v}</option>)}
+                    </select>
+                    <input style={{ ...styles.input, width: 70 }} type="number" min="0.01" value={s.qty} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))} />
+                    <label style={{ ...styles.checkRow }}>
+                      <input type="checkbox" checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, selected: e.target.checked } : q)))} />
+                      Aggiungi all'offerta
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Catalogo manuale */}
+          <div style={styles.card}>
+            <h3 style={{ margin: "0 0 10px" }}>Aggiungi manualmente dal catalogo</h3>
+            <div style={{ display: "grid", gap: 8, maxHeight: 340, overflow: "auto" }}>
+              {catalog.map((cc) => (
+                <div key={cc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee", padding: "6px 0", gap: 8 }}>
+                  <div style={{ fontSize: 13 }}>
+                    <small style={{ color: "#666" }}>ID {cc.id} · {esc(cc.ambito)}</small>
+                    <div><strong>{esc(cc.nome)}</strong></div>
+                    <div style={{ color: "#666" }}>{esc((cc.descrizione || "").slice(0, 160))}</div>
+                  </div>
+                  <button style={btnStyles.secondary} onClick={() => addManualItem(cc)}>Aggiungi</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: OFFERTA */}
+      {step === 3 && (
+        <div>
+          <div style={{ ...styles.card }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <h3 style={{ margin: 0 }}>Offerta economica — Lotto {lot}</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={btnStyles.secondary} onClick={() => setStep(2)}>← Interventi</button>
+                <button style={btnStyles.primary} onClick={() => go(4)}>Revisione →</button>
+              </div>
+            </div>
+            <div style={{ ...styles.grid2, marginTop: 10 }}>
+              <label style={styles.label}>Sconto (%) <input style={styles.input} type="number" step="0.01" value={discount} onChange={(e) => setDiscount(Number(e.target.value) || 0)} /></label>
+              <label style={styles.label}>Contingenza (%) <input style={styles.input} type="number" step="0.01" value={contingency} onChange={(e) => setContingency(Number(e.target.value) || 0)} /></label>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <strong>Base allocazione TOW .5: </strong>{euro.format(calculation.allocationBase)} ({tow5Share}%)
+            </div>
+          </div>
+
+          {/* TOW automatici */}
+          <div style={styles.card}>
+            <h3 style={{ margin: "0 0 10px" }}>TOW automatici (Lotto {lot})</h3>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))" }}>
+              {["1", "3", "4"].map((n) => {
+                const k = `TOW0${lot}.${n}`;
+                const amount = calculation.autoTow[k] || 0;
+                const unit = towPricesMap[k] || 0;
+                const qty = unit ? amount / unit : null;
+                return (
+                  <div key={n} style={styles.card}>
+                    <strong>{k} · {Math.round(calculation.autoTow[k] / calculation.allocationBase * 10000) / 100 || 0}%</strong>
+                    <div style={{ color: "#666", fontSize: 12 }}>{unit ? `${euro.format(unit)} / unità` : "calcolo sul valore TOW .5"}</div>
+                    <div style={{ fontWeight: 600 }}>{euro.format(amount)}</div>
+                    <div style={{ color: "#666", fontSize: 12 }}>{qty === null ? "Quantità n.d." : `Quantità equivalente: ${qty.toLocaleString("it-IT", { maximumFractionDigits: 3 })}`}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* TOW manuali 2 e 6 */}
+          <div style={styles.card}>
+            <h3 style={{ margin: "0 0 10px" }}>TOW manuali</h3>
+            {["2", "6"].map((n) => {
+              const k = `TOW0${lot}.${n}`;
+              return (
+                <div key={n} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <strong style={{ width: 90 }}>{k}</strong>
+                  <input style={{ ...styles.input, width: 120 }} type="number" min="0" step=".001" value={tow[k] || 0} placeholder="Quantità"
+                    onChange={(e) => setTow((t) => ({ ...t, [k]: Number(e.target.value) || 0 }))} />
+                  <input style={{ ...styles.input, width: 140 }} type="number" min="0" step=".01" value={towPricesMap[k] || tow[k + "_price"] || 0} placeholder="Prezzo unitario"
+                    onChange={(e) => setTow((t) => ({ ...t, [k + "_price"]: Number(e.target.value) || 0 }))} />
+                  <span>{euro.format((tow[k] || 0) * (towPricesMap[k] || tow[k + "_price"] || 0))}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Riga offerta */}
+          <div style={styles.card}>
+            <h3 style={{ margin: "0 0 10px" }}>Voci di catalogo</h3>
+            <table style={styles.table}>
+              <thead>
+                <tr style={styles.thead}>
+                  <th>ID Catalogo / componente</th><th>Tipo</th><th>Complessità</th><th>Q.tà</th><th>Prezzo unitario</th><th>Totale</th><th>Note</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it) => {
+                  const cc = catalog.find((x) => x.id === it.id);
+                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  return (
+                    <tr key={it.key}>
+                      <td>
+                        <strong>ID {it.id}</strong>
+                        <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
+                      </td>
+                      <td>
+                        <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
+                          <option>REALIZZAZIONE</option>
+                          <option>MODIFICA</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
+                          {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
+                        </select>
+                      </td>
+                      <td><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
+                      <td><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
+                      <td><strong>{euro.format(unit * it.qty)}</strong></td>
+                      <td><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
+                      <td><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, gap: 8, flexWrap: "wrap" }}>
+              <strong>Totale catalogo: {euro.format(calculation.cat)}</strong>
+              <strong>Altri TOW: {euro.format(calculation.oth)}</strong>
+              <strong style={{ fontSize: 16 }}>Totale offerta: {euro.format(calculation.total)}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: REVISIONE */}
+      {step === 4 && (
+        <div>
+          <div style={styles.card}>
+            <h3 style={{ margin: "0 0 12px" }}>Revisione offerta</h3>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))" }}>
+              <div style={styles.card}><span style={{ color: "#666" }}>Lotto</span><div><strong>{lot}</strong></div></div>
+              <div style={styles.card}><span style={{ color: "#666" }}>Voci catalogo</span><div><strong>{items.length}</strong></div></div>
+              <div style={styles.card}><span style={{ color: "#666" }}>Sconto</span><div><strong>{discount}%</strong></div></div>
+              <div style={styles.card}><span style={{ color: "#666" }}>Contingenza</span><div><strong>{contingency}%</strong></div></div>
+              <div style={styles.card}><span style={{ color: "#666" }}>Totale offerta</span><div><strong style={{ fontSize: 17 }}>{euro.format(calculation.total)}</strong></div></div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={styles.label}>Note economiche
+                <textarea style={styles.textarea} rows={3} value={economyNotes} onChange={(e) => setEconomyNotes(e.target.value)} />
+              </label>
+            </div>
+          </div>
+
+          <div style={styles.card}>
+            <h3 style={{ margin: "0 0 10px" }}>Dettaglio righe</h3>
+            <table style={styles.table}>
+              <thead>
+                <tr style={styles.thead}><th>ID</th><th>Voce</th><th>Tipo · Complessità · Q.tà</th><th>Razionale</th><th>Importo</th></tr>
+              </thead>
+              <tbody>
+                {items.map((it) => {
+                  const cc = catalog.find((x) => x.id === it.id);
+                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  return (
+                    <tr key={it.key}>
+                      <td>{it.id}</td>
+                      <td>{esc(cc?.nome || "Voce manuale")}</td>
+                      <td>{it.type} · {it.complexity} · {it.qty}</td>
+                      <td>{esc(it.reason || it.additionalInfo || "—")}</td>
+                      <td>{euro.format(unit * it.qty)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button style={btnStyles.primary} onClick={() => persistInitiativeEvaluation()}>Salva valutazione</button>
+            <button style={btnStyles.secondary} onClick={() => setStep(3)}>← Offerta</button>
+            <button style={btnStyles.secondary} onClick={exportSnapshotJson}>Esporta JSON</button>
+            <button style={btnStyles.secondary} onClick={exportCsv}>Esporta CSV</button>
+            <button style={btnStyles.secondary} onClick={() => window.print()}>Stampa</button>
+          </div>
+        </div>
+      )}
+
+      {/* ARCHIVIO INIZIATIVE */}
+      <div style={{ ...styles.card, marginTop: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0 }}>Archivio iniziative calcolate</h3>
+          <button style={btnStyles.secondary} onClick={loadArchive}>Aggiorna</button>
+        </div>
+        {archiveRecords.length === 0 ? (
+          <p style={{ color: "#666", fontSize: 13 }}>Nessuna iniziativa memorizzata.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8, maxHeight: 360, overflow: "auto", marginTop: 10 }}>
+            {archiveRecords.map((rec) => {
+              const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
+              const ini = payload.initiative || {};
+              return (
+                <div key={rec.id} style={styles.suggestion}>
+                  <div>
+                    <strong>{esc(ini.code || "Senza codice")} · {esc(ini.title || rec.title)}</strong>
+                    <div style={{ color: "#666", fontSize: 12 }}>
+                      {esc(rec.contract_id || payload.contractId || "")} / Lotto {esc(rec.lot_id || payload.lot || "—")} · {esc((payload.systems || []).join(", "))}
+                      {payload.items ? ` · ${payload.items.length} voci` : ""}
+                      {payload.savedAt ? ` · ${new Date(payload.savedAt).toLocaleDateString("it-IT")}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button style={btnStyles.secondary} onClick={() => reworkInitiative(rec)}>Riapri</button>
+                    <button style={btnStyles.danger} onClick={() => deleteArchiveRecord(rec.id)}>Elimina</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {toastMsg && (
+        <div style={styles.toast}>
+          {toastMsg}
+        </div>
       )}
     </div>
   );
 }
+
+const styles = {
+  card: {
+    background: "#fff",
+    border: "1px solid #e3e6e9",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  input: {
+    padding: "7px 10px",
+    borderRadius: 6,
+    border: "1px solid #cbd2d9",
+    fontSize: 13,
+    marginTop: 4,
+  },
+  inputFile: {
+    marginBottom: 6,
+  },
+  textarea: {
+    width: "100%",
+    padding: 7,
+    borderRadius: 6,
+    border: "1px solid #cbd2d9",
+    fontSize: 13,
+    marginTop: 4,
+    fontFamily: "inherit",
+  },
+  label: {
+    display: "flex",
+    flexDirection: "column",
+    fontSize: 12,
+    color: "#444",
+    gap: 2,
+  },
+  grid2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: 12,
+  },
+  hint: { color: "#667", fontSize: 12, marginTop: 4 },
+  checkRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 },
+  suggestion: {
+    border: "1px solid #e0e4e8",
+    borderRadius: 8,
+    padding: 12,
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    background: "#fcfcfd",
+  },
+  step: {
+    padding: "7px 14px",
+    borderRadius: 6,
+    border: "1px solid #cbd2d9",
+    background: "#fff",
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  stepActive: {
+    padding: "7px 14px",
+    borderRadius: 6,
+    border: "1px solid #1a73e8",
+    background: "#e8f0fe",
+    color: "#174ea6",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  lotBtn: {
+    padding: "6px 12px",
+    borderRadius: 6,
+    border: "1px solid #cbd2d9",
+    background: "#fff",
+    fontSize: 13,
+    cursor: "pointer",
+    opacity: 0.75,
+  },
+  lotBtnActive: {
+    padding: "6px 12px",
+    borderRadius: 6,
+    border: "1px solid #1a73e8",
+    background: "#e8f0fe",
+    color: "#174ea6",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: 13,
+  },
+  thead: {
+    background: "#f5f6f8",
+    textAlign: "left",
+    fontSize: 12,
+  },
+  toast: {
+    position: "fixed",
+    bottom: 24,
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#174ea6",
+    color: "#fff",
+    padding: "10px 18px",
+    borderRadius: 8,
+    fontSize: 13,
+    boxShadow: "0 4px 16px rgba(0,0,0,.2)",
+    zIndex: 1000,
+  },
+};
+
+const btnStyles = {
+  primary: {
+    padding: "8px 16px",
+    borderRadius: 6,
+    border: "none",
+    background: "#1a73e8",
+    color: "#fff",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  secondary: {
+    padding: "8px 16px",
+    borderRadius: 6,
+    border: "1px solid #cbd2d9",
+    background: "#fff",
+    color: "#1f2a37",
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  danger: {
+    padding: "8px 12px",
+    borderRadius: 6,
+    border: "1px solid #d9a3a3",
+    background: "#fdecec",
+    color: "#b00020",
+    fontSize: 13,
+    cursor: "pointer",
+  },
+};
 
 export default ConfiguratorePage;
