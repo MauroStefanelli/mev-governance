@@ -497,6 +497,8 @@ export default function SuperAdminPage() {
                 <option>Admin</option>
                 <option>Editor</option>
                 <option>Client</option>
+                <option>Developer</option>
+                <option>SuperAdmin</option>
               </select>
             </div>
             <button
@@ -547,6 +549,8 @@ export default function SuperAdminPage() {
                               <option>Admin</option>
                               <option>Editor</option>
                               <option>Client</option>
+                              <option>Developer</option>
+                              <option>SuperAdmin</option>
                             </select>
                           ) : (
                             <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: ruoloColor.bg, color: ruoloColor.fg }}>

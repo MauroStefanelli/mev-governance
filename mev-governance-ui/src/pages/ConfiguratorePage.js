@@ -1013,35 +1013,60 @@ function ConfiguratorePage({ onUnauthorized }) {
                 Vai all'offerta ({suggestions.filter((s) => s.selected).length} selezionate)
               </button>
             </div>
-            {suggestions.map((s, i) => {
-              const cc = catalog.find((x) => x.id === s.id);
-              if (!cc) return null;
-              const vals = validComplexities(cc, s.type);
-              return (
-                <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd" }}>
-                  <div>
-                    {s.interventionId ? <small>{esc(s.interventionId)}</small> : null}
-                    <div style={{ color: "#666", fontSize: 12 }}>ID {cc.id} · {esc(cc.ambito)}</div>
-                    <strong>{esc(cc.nome)}</strong>
-                    <p style={{ margin: "6px 0", fontSize: 13 }}>{esc(s.reason)}</p>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <select style={styles.input} value={s.type} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, type: e.target.value } : q)))}>
-                      <option>REALIZZAZIONE</option>
-                      <option>MODIFICA</option>
-                    </select>
-                    <select style={styles.input} value={s.complexity} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, complexity: e.target.value } : q)))}>
-                      {vals.map((v) => <option key={v}>{v}</option>)}
-                    </select>
-                    <input style={{ ...styles.input, width: 70 }} type="number" min="0.01" value={s.qty} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))} />
-                    <label style={{ ...styles.checkRow }}>
-                      <input type="checkbox" checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === i ? { ...q, selected: e.target.checked } : q)))} />
-                      Aggiungi all'offerta
-                    </label>
-                  </div>
+{(() => {
+  const groups = new Map();
+  suggestions.forEach((s, gi) => {
+    const k = s.interventionId || "__NOX__";
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push({ ...s, __gi: gi });
+  });
+  return [...groups.entries()].map(([gid, items]) => {
+    const inter = importedInterventions.find((x) => String(x.id) === String(gid));
+    return (
+      <details key={gid} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
+        <summary style={{ cursor: "pointer", padding: "10px 14px", fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "#f8f9fa" }}>
+          <span>
+            <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {gid}</span>
+            {items.length > 1 ? <span style={{ marginLeft: 8, fontSize: 11, color: "#777", fontWeight: 400 }}>({items.length} voci)</span> : null}
+          </span>
+          {inter?.titolo || inter?.descrizione ? (
+            <span style={{ fontWeight: 400, fontSize: 12, color: "#444", textAlign: "right", maxWidth: "55%" }}>
+              {inter.titolo ? <span style={{ color: "#222", fontWeight: 600 }}>{esc(inter.titolo)}</span> : null}
+              {inter?.descrizione ? <span style={{ display: "block", color: "#666" }}>{esc(inter.descrizione)}</span> : null}
+            </span>
+          ) : null}
+        </summary>
+        <div style={{ padding: "10px 14px", display: "grid", gap: 8 }}>
+          {items.map((s, i) => {
+            const cc = catalog.find((x) => x.id === s.id);
+            if (!cc) return null;
+            const vals = validComplexities(s, cc);
+            return (
+              <label key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd" }}>
+                <div style={{ color: "#666", fontSize: 11 }}>ID {cc.id} · {esc(cc.ambito)}</div>
+                <strong>{esc(cc.nome)}</strong>
+                <p style={{ margin: "6px 0", fontSize: 13 }}>{esc(s.reason)}</p>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <select style={styles.input} value={s.type} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, type: e.target.value } : q)))}>
+                    <option>REALIZZAZIONE</option>
+                    <option>MODIFICA</option>
+                  </select>
+                  <select style={styles.input} value={s.complexity} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
+                    {vals.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                  <input style={{ ...styles.input, width: 64 }} type="number" min="0.01" value={s.qty} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))} />
+                  <input type="checkbox" checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
                 </div>
-              );
-            })}
+              </label>
+            );
+          })}
+        </div>
+      </details>
+    );
+  });
+})()}
           </div>
 
           {/* Catalogo manuale */}

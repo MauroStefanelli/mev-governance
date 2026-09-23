@@ -286,6 +286,8 @@ function AdminPage() {
               <option value="Editor">Editor</option>
               <option value="Admin">Admin</option>
               <option value="Client">Client</option>
+              <option value="Developer">Developer</option>
+              <option value="SuperAdmin">SuperAdmin</option>
             </select>
           </div>
           <button type="submit" style={{ padding: "6px 16px", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
