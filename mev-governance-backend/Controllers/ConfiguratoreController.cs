@@ -445,6 +445,80 @@ public class ConfiguratoreController : ControllerBase
     }
 
     // ============================================================
+    // POST /api/configuratore/contracts/seed-builtin
+    // Inserisce/aggiorna il contratto builtin poste-tet-2025 con
+    // catalogo e prezzi TOW reali letti dal bundle dell'app standalone.
+    // Idempotente: usa ON CONFLICT DO UPDATE.
+    // ============================================================
+    [HttpPost("contracts/seed-builtin")]
+    public async Task<IActionResult> SeedBuiltin([FromBody] SeedBuiltinRequest req)
+    {
+        if (!CanAccess()) return Forbid();
+
+        const string contractId = "poste-tet-2025";
+        var (sch, cs) = GetDbTarget();
+
+        try
+        {
+            // 1. Upsert contratto
+            var contractPayload = new Dictionary<string, object?>
+            {
+                ["name"]      = "Poste Italiane \u2013 Tracciatura e Logistica Integrata",
+                ["rulesFile"] = "02_Gara_TeT_Capitolato Tecnico_Tracciatura e Logistica_All.1.1.pdf",
+                ["builtin"]   = true,
+                ["createdAt"] = "2025-01-01T00:00:00Z",
+            };
+            var sqlC = $@"INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"",""entity_type"",""contract_id"",""lot_id"",""title"",""payload"")
+                VALUES (@rk,'contract',@cid,'',@title,@pl::jsonb)
+                ON CONFLICT (""record_key"") DO UPDATE SET ""title""=EXCLUDED.""title"",""payload""=EXCLUDED.""payload"",""updated_at""=now()";
+            await ExecuteAsync(cs, sqlC, new List<NpgsqlParameter>
+            {
+                new("rk",    $"{contractId}|contract"),
+                new("cid",   contractId),
+                new("title", "Poste Italiane \u2013 Tracciatura e Logistica Integrata"),
+                new("pl",    JsonSerializer.Serialize(contractPayload)),
+            });
+
+            // 2. Lotti — i dati catalog/towPrices vengono dal body
+            var lots = req.Lots ?? new List<BuiltinLotData>();
+            foreach (var lot in lots)
+            {
+                if (string.IsNullOrEmpty(lot.LotId)) continue;
+                var lotPayload = new Dictionary<string, object?>
+                {
+                    ["name"]           = lot.Name,
+                    ["catalogFile"]    = lot.CatalogFile ?? "",
+                    ["priceFile"]      = lot.PriceFile ?? "",
+                    ["tow5Share"]      = lot.Tow5Share ?? 65,
+                    ["active"]         = true,
+                    ["deleted"]        = false,
+                    ["builtin"]        = true,
+                    ["codiceContratto"]= lot.CodiceContratto ?? "",
+                    ["catalog"]        = lot.Catalog ?? new List<object?>(),
+                    ["towPrices"]      = lot.TowPrices ?? new Dictionary<string, object?>(),
+                };
+                var sqlL = $@"INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"",""entity_type"",""contract_id"",""lot_id"",""title"",""payload"")
+                    VALUES (@rk,'contract_lot',@cid,@lid,@title,@pl::jsonb)
+                    ON CONFLICT (""record_key"") DO UPDATE SET ""title""=EXCLUDED.""title"",""payload""=EXCLUDED.""payload"",""updated_at""=now()";
+                await ExecuteAsync(cs, sqlL, new List<NpgsqlParameter>
+                {
+                    new("rk",    $"{contractId}|{lot.LotId}|contract-lot"),
+                    new("cid",   contractId),
+                    new("lid",   lot.LotId),
+                    new("title", lot.Name ?? $"Lotto {lot.LotId}"),
+                    new("pl",    JsonSerializer.Serialize(lotPayload)),
+                });
+            }
+
+            return Ok(new { message = "Seed builtin completato", contractId, lots = lots.Count });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Errore seed builtin", error = ex.Message });
+        }
+    }
+
+    // ============================================================
     // GET /api/configuratore/records?entity_type=&contract_id=&lot_id=&q=
     // ============================================================
     [HttpGet("records")]
@@ -737,8 +811,7 @@ public record ContractLotRequest(
     string? CodiceContratto
 );
 
-public record LotPatchRequest(
-    string? Name,
+public record LotPatchRequest(    string? Name,
     string? CatalogFile,
     string? PriceFile,
     int? Tow5Share,
@@ -752,4 +825,18 @@ public record ImportLotMeta
     public string? LotId      { get; init; }
     public string? Name       { get; init; }
     public int?    Tow5Share  { get; init; }
+}
+
+public record SeedBuiltinRequest(List<BuiltinLotData>? Lots);
+
+public class BuiltinLotData
+{
+    public string?  LotId           { get; set; }
+    public string?  Name            { get; set; }
+    public string?  CatalogFile     { get; set; }
+    public string?  PriceFile       { get; set; }
+    public int?     Tow5Share       { get; set; }
+    public string?  CodiceContratto { get; set; }
+    public List<object?>?               Catalog   { get; set; }
+    public Dictionary<string, object?>? TowPrices { get; set; }
 }
