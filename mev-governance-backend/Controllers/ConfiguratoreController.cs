@@ -159,7 +159,7 @@ public class ConfiguratoreController : ControllerBase
                         new("cid", req.ContractId),
                         new("lid", lot.LotId),
                         new("title", lot.Name ?? $"Lotto {lot.LotId}"),
-                        new("pl", JsonSerializer.Serialize(lotPayload)),
+                    new("pl",    JsonSerializer.Serialize(lotPayload)),
                     });
                 }
             }
@@ -484,19 +484,26 @@ public class ConfiguratoreController : ControllerBase
             foreach (var lot in lots)
             {
                 if (string.IsNullOrEmpty(lot.LotId)) continue;
-                var lotPayload = new Dictionary<string, object?>
-                {
-                    ["name"]           = lot.Name,
-                    ["catalogFile"]    = lot.CatalogFile ?? "",
-                    ["priceFile"]      = lot.PriceFile ?? "",
-                    ["tow5Share"]      = lot.Tow5Share ?? 65,
-                    ["active"]         = true,
-                    ["deleted"]        = false,
-                    ["builtin"]        = true,
-                    ["codiceContratto"]= lot.CodiceContratto ?? "",
-                    ["catalog"]        = lot.Catalog ?? new List<object?>(),
-                    ["towPrices"]      = lot.TowPrices ?? new Dictionary<string, object?>(),
-                };
+
+                // Usa GetRawText() per preservare catalog e towPrices esattamente come arrivano
+                var catalogRaw  = lot.Catalog.HasValue  && lot.Catalog.Value.ValueKind  != System.Text.Json.JsonValueKind.Null
+                    ? lot.Catalog.Value.GetRawText()  : "[]";
+                var towRaw      = lot.TowPrices.HasValue && lot.TowPrices.Value.ValueKind != System.Text.Json.JsonValueKind.Null
+                    ? lot.TowPrices.Value.GetRawText() : "{}";
+
+                // Costruiamo il payload JSON manualmente per includere i raw values
+                var lotPayloadJson = $@"{{
+                    ""name"":""{lot.Name?.Replace("\"","\\\"")}"",
+                    ""catalogFile"":""{(lot.CatalogFile ?? "").Replace("\"","\\\"")}"",
+                    ""priceFile"":""{(lot.PriceFile ?? "").Replace("\"","\\\"")}"",
+                    ""tow5Share"":{lot.Tow5Share ?? 65},
+                    ""active"":true,
+                    ""deleted"":false,
+                    ""builtin"":true,
+                    ""codiceContratto"":""{(lot.CodiceContratto ?? "").Replace("\"","\\\"")}"",
+                    ""catalog"":{catalogRaw},
+                    ""towPrices"":{towRaw}
+                }}";
                 var sqlL = $@"INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"",""entity_type"",""contract_id"",""lot_id"",""title"",""payload"")
                     VALUES (@rk,'contract_lot',@cid,@lid,@title,@pl::jsonb)
                     ON CONFLICT (""record_key"") DO UPDATE SET ""title""=EXCLUDED.""title"",""payload""=EXCLUDED.""payload"",""updated_at""=now()";
@@ -506,7 +513,7 @@ public class ConfiguratoreController : ControllerBase
                     new("cid",   contractId),
                     new("lid",   lot.LotId),
                     new("title", lot.Name ?? $"Lotto {lot.LotId}"),
-                    new("pl",    JsonSerializer.Serialize(lotPayload)),
+                    new("pl",    lotPayloadJson),
                 });
             }
 
@@ -837,6 +844,7 @@ public class BuiltinLotData
     public string?  PriceFile       { get; set; }
     public int?     Tow5Share       { get; set; }
     public string?  CodiceContratto { get; set; }
-    public List<object?>?               Catalog   { get; set; }
-    public Dictionary<string, object?>? TowPrices { get; set; }
+    // Arrivano come JsonElement dal body JSON
+    public System.Text.Json.JsonElement? Catalog   { get; set; }
+    public System.Text.Json.JsonElement? TowPrices { get; set; }
 }
