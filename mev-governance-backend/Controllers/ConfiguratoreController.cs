@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using System.Text.Json.Serialization;
 using System.Data;
 using System.Text.Json;
 using MevGovernanceBackend.Data;
@@ -793,12 +794,12 @@ public class ConfiguratoreController : ControllerBase
 }
 
 public record PcRecordRequest(
-    string RecordKey,
-    string EntityType,
-    string? ContractId,
-    string? LotId,
-    string? Title,
-    Dictionary<string, object?>? Payload
+    [property: JsonPropertyName("record_key")]   string RecordKey,
+    [property: JsonPropertyName("entity_type")]  string EntityType,
+    [property: JsonPropertyName("contract_id")]  string? ContractId,
+    [property: JsonPropertyName("lot_id")]       string? LotId,
+    [property: JsonPropertyName("title")]        string? Title,
+    [property: JsonPropertyName("payload")]      Dictionary<string, object?>? Payload
 );
 
 public record ContractRequest(

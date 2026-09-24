@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { getConsumoTow } from "../services/mevService";
+import { useEffect, useState, useCallback } from "react";
+import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
@@ -1046,6 +1046,174 @@ function ConsumoTowSection({ towRows }) {
 }
 
 
+// ── Tabella Release per Contratto ─────────────────────────────────────────────
+const RELEASE_DATE_FIELDS = [
+  { key: "devStart",    label: "Sviluppo inizio" },
+  { key: "devEnd",      label: "Sviluppo fine" },
+  { key: "cfStart",     label: "Coll. Funz. inizio" },
+  { key: "cfEnd",       label: "Coll. Funz. fine" },
+  { key: "e2eStart",    label: "Coll. E2E inizio" },
+  { key: "e2eEnd",      label: "Coll. E2E fine" },
+  { key: "uatStart",    label: "UAT inizio" },
+  { key: "uatEnd",      label: "UAT fine" },
+  { key: "certStart",   label: "Cert. inizio" },
+  { key: "certEnd",     label: "Cert. fine" },
+  { key: "passInProd",  label: "Pass in prod" },
+  { key: "dispClient",  label: "Disp. al cliente" },
+];
+
+const EMPTY_RELEASE = () => ({
+  name: "", devStart: "", devEnd: "", cfStart: "", cfEnd: "",
+  e2eStart: "", e2eEnd: "", uatStart: "", uatEnd: "",
+  certStart: "", certEnd: "", passInProd: "", dispClient: "",
+});
+
+function formatDate(d) {
+  if (!d) return "–";
+  try { return new Date(d).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" }); }
+  catch { return d; }
+}
+
+function ReleaseScheduleSection({ contractId }) {
+  const [records, setRecords]   = useState([]);
+  const [editing, setEditing]   = useState(null); // null | { id, ...release } | "new"
+  const [draft,   setDraft]     = useState(EMPTY_RELEASE());
+  const [saving,  setSaving]    = useState(false);
+  const [msg,     setMsg]       = useState("");
+
+  const load = useCallback(() => {
+    if (!contractId) return;
+    getReleaseSchedules(contractId).then(d => setRecords(d.records || [])).catch(() => {});
+  }, [contractId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openNew = () => {
+    setDraft(EMPTY_RELEASE());
+    setEditing("new");
+    setMsg("");
+  };
+
+  const openEdit = (rec) => {
+    const p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : rec.payload || {};
+    setDraft({ name: rec.title || "", ...p });
+    setEditing(rec);
+    setMsg("");
+  };
+
+  const cancel = () => { setEditing(null); setMsg(""); };
+
+  const save = async () => {
+    if (!draft.name.trim()) { setMsg("Inserire il nome della release."); return; }
+    setSaving(true);
+    try {
+      await upsertReleaseSchedule(contractId, { ...draft, name: draft.name.trim() });
+      setMsg("Salvato.");
+      setEditing(null);
+      load();
+    } catch (e) { setMsg("Errore: " + e.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (rec) => {
+    if (!window.confirm(`Eliminare la release "${rec.title}"?`)) return;
+    try { await deleteConfiguratoreRecord(rec.id); load(); }
+    catch (e) { setMsg("Errore eliminazione: " + e.message); }
+  };
+
+  const cardStyle = {
+    background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
+    padding: "20px 24px", marginTop: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+  };
+  const inputStyle = {
+    border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 8px",
+    fontSize: 12, width: "100%", boxSizing: "border-box",
+  };
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b" }}>Pianificazione Release</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release del contratto</div>
+        </div>
+        <button onClick={openNew} style={{ padding: "7px 16px", background: "#102a47", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          + Nuova release
+        </button>
+      </div>
+
+      {/* Form inserimento/modifica */}
+      {editing && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", marginBottom: 12 }}>
+            {editing === "new" ? "Nuova release" : `Modifica: ${editing.title}`}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>Nome release</label>
+            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12…"
+              value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px 12px" }}>
+            {RELEASE_DATE_FIELDS.map(f => (
+              <label key={f.key} style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
+                {f.label}
+                <input type="date" style={{ ...inputStyle, marginTop: 3 }}
+                  value={draft[f.key] || ""}
+                  onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))} />
+              </label>
+            ))}
+          </div>
+          {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginTop: 8, fontWeight: 600 }}>{msg}</div>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+            <button onClick={cancel} style={{ padding: "7px 16px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Annulla</button>
+            <button onClick={save} disabled={saving} style={{ padding: "7px 16px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              {saving ? "Salvataggio…" : "Salva"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabella release */}
+      {records.length === 0 && !editing ? (
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata. Aggiungi la prima con "+ Nuova release".</p>
+      ) : records.length > 0 ? (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#102a47", color: "#fff" }}>
+                <th style={{ padding: "8px 12px", textAlign: "left", whiteSpace: "nowrap", borderRadius: "6px 0 0 0" }}>Release</th>
+                {RELEASE_DATE_FIELDS.map(f => (
+                  <th key={f.key} style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{f.label}</th>
+                ))}
+                <th style={{ padding: "8px 10px", textAlign: "center", borderRadius: "0 6px 0 0" }}>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((rec, ri) => {
+                const p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : rec.payload || {};
+                return (
+                  <tr key={rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap" }}>{rec.title}</td>
+                    {RELEASE_DATE_FIELDS.map(f => (
+                      <td key={f.key} style={{ padding: "8px 10px", textAlign: "center", color: p[f.key] ? "#334155" : "#cbd5e1" }}>
+                        {formatDate(p[f.key])}
+                      </td>
+                    ))}
+                    <td style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                      <button onClick={() => openEdit(rec)} style={{ marginRight: 6, padding: "4px 10px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 5, cursor: "pointer", fontWeight: 600 }}>Modifica</button>
+                      <button onClick={() => del(rec)} style={{ padding: "4px 10px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 5, cursor: "pointer", fontWeight: 600 }}>Elimina</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Pagina ────────────────────────────────────────────────────────────────────
 function ContrattiPage({ onUnauthorized, ambienteId }) {
   const [towRows, setTowRows] = useState([]);
@@ -1075,6 +1243,10 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
   return (
     <div style={{ padding: "24px 28px", background: "#f8fafc", minHeight: "100vh" }}>
       <ConsumoTowSection towRows={towRows} />
+      {/* Tabella Release — usa il contratto più frequente nei towRows come contractId */}
+      <ReleaseScheduleSection
+        contractId={towRows.length > 0 ? (towRows[0]?.towContratto || "default") : "default"}
+      />
     </div>
   );
 }

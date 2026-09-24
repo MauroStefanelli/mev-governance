@@ -604,10 +604,19 @@ export const getConfiguratoreRecords = async (params = {}) => {
 };
 
 export const upsertConfiguratoreRecord = async (payload) => {
+  // Normalizza le chiavi in snake_case per il backend C# (che usa [JsonPropertyName])
+  const body = {
+    record_key:  payload.record_key  ?? payload.recordKey,
+    entity_type: payload.entity_type ?? payload.entityType,
+    contract_id: payload.contract_id ?? payload.contractId ?? null,
+    lot_id:      payload.lot_id      ?? payload.lotId      ?? null,
+    title:       payload.title       ?? null,
+    payload:     payload.payload     ?? null,
+  };
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify(payload)
+    body: JSON.stringify(body)
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) {
@@ -625,6 +634,27 @@ export const deleteConfiguratoreRecord = async (id) => {
   if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) throw new Error("Errore eliminazione record configuratore");
   return response.json();
+};
+
+// ── Release schedule per contratto ──────────────────────────────────────────
+export const getReleaseSchedules = async (contractId) => {
+  const params = new URLSearchParams({ entity_type: "release_schedule", contract_id: contractId });
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records?${params}`, {
+    headers: authHeaders()
+  });
+  if (!response.ok) return { records: [] };
+  return response.json();
+};
+
+export const upsertReleaseSchedule = async (contractId, release) => {
+  return upsertConfiguratoreRecord({
+    record_key:  `${contractId}|release|${(release.name || "").replace(/\s+/g, "-").toLowerCase() || Date.now()}`,
+    entity_type: "release_schedule",
+    contract_id: contractId,
+    lot_id:      null,
+    title:       release.name || "Release senza nome",
+    payload:     release,
+  });
 };
 
 // ── Configuratore Offerta — AI (secondo parere e sviluppo) ───────────────────

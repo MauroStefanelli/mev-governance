@@ -6,6 +6,7 @@ import {
   upsertConfiguratoreRecord,
   deleteConfiguratoreRecord,
   analyzeInitiativeWithAi,
+  getReleaseSchedules,
 } from "../services/mevService";
 import JSZip from "jszip";
 import {
@@ -63,6 +64,7 @@ function ConfiguratorePage({ onUnauthorized }) {
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
+  const [releaseList, setReleaseList] = useState([]); // release del contratto selezionato
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
   const [mappedLoading, setMappedLoading] = useState(false);
@@ -308,8 +310,10 @@ function ConfiguratorePage({ onUnauthorized }) {
     }
     const systems = [...new Set([initiative.system, ...importedInterventions.map((x) => x.sistema)].filter(Boolean))];
     const keyPart = appNorm(initiative.code || initiative.title).replace(/ /g, "-");
+    // Se il record è stato aperto per modifica usa la sua chiave, altrimenti genera nuova
+    const recordKey = editingRecordKey || `${selectedContractId}|${lot}|initiative|${keyPart}`;
     const body = {
-      record_key: `${selectedContractId}|${lot}|initiative|${keyPart}`,
+      record_key: recordKey,
       entity_type: "initiative_evaluation",
       contract_id: selectedContractId,
       lot_id: String(lot),
@@ -334,7 +338,10 @@ function ConfiguratorePage({ onUnauthorized }) {
     };
     try {
       await upsertConfiguratoreRecord(body);
-      if (showMessage) toast("Valutazione salvata e resa disponibile alle stime future");
+      const isUpdate = !!editingRecordKey;
+      if (showMessage) toast(isUpdate ? "Valutazione aggiornata con successo" : "Valutazione salvata e resa disponibile alle stime future");
+      setEditingRecordKey(null); // reset dopo salvataggio
+      loadArchive();
       return true;
     } catch (error) {
       toast("Salvataggio non riuscito: " + error.message);
@@ -664,6 +671,14 @@ function ConfiguratorePage({ onUnauthorized }) {
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
 
+  // Carica le release del contratto selezionato per il campo Release in Step 1
+  useEffect(() => {
+    if (!selectedContractId) return;
+    getReleaseSchedules(selectedContractId)
+      .then(d => setReleaseList((d.records || []).map(r => r.title || "")))
+      .catch(() => setReleaseList([]));
+  }, [selectedContractId]);
+
   const deleteArchiveRecord = async (id) => {
     if (!window.confirm("Eliminare definitivamente questa iniziativa memorizzata?")) return;
     try {
@@ -674,6 +689,8 @@ function ConfiguratorePage({ onUnauthorized }) {
       toast("Eliminazione non riuscita: " + error.message);
     }
   };
+
+  const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
   const reworkInitiative = (record) => {
     const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
@@ -688,7 +705,10 @@ function ConfiguratorePage({ onUnauthorized }) {
     if (payload.contingency != null) setContingency(payload.contingency);
     if (payload.economicNotes) setEconomyNotes(payload.economicNotes);
     if (payload.sourceWorkbookName) setSourceWorkbookName(payload.sourceWorkbookName);
+    // Memorizza la chiave del record esistente per sovrascrivere al salvataggio
+    setEditingRecordKey(record.record_key || null);
     setStep(1);
+    toast(`Valutazione "${record.title}" riaperta — modifica e premi "Salva valutazione" per aggiornarla`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1017,7 +1037,23 @@ function ConfiguratorePage({ onUnauthorized }) {
                 <input style={styles.input} value={initiative.system} onChange={(e) => setInitiative((i) => ({ ...i, system: e.target.value }))} />
               </label>
               <label style={styles.label}>Release
-                <input style={styles.input} value={initiative.release} onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                {releaseList.length > 0 ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <select style={{ ...styles.input, flex: 1 }}
+                      value={releaseList.includes(initiative.release) ? initiative.release : ""}
+                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
+                      <option value="">— seleziona —</option>
+                      {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <input style={{ ...styles.input, flex: 1 }} placeholder="o digita libero"
+                      value={releaseList.includes(initiative.release) ? "" : initiative.release}
+                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                  </div>
+                ) : (
+                  <input style={styles.input} value={initiative.release}
+                    placeholder="es. R2025-04"
+                    onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                )}
               </label>
               <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
                 <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
@@ -1280,53 +1316,62 @@ function ConfiguratorePage({ onUnauthorized }) {
 })()}
           </div>
 
-          {/* Catalogo manuale */}
-          <div style={styles.card}>
-            <h3 style={{ margin: "0 0 4px" }}>Aggiungi manualmente dal catalogo</h3>
-            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#667482" }}>
-              Le voci aggiunte qui compaiono nelle "Possibili integrazioni" come selezionate.
-            </p>
-            <div style={{ display: "grid", gap: 0, maxHeight: 420, overflow: "auto", border: "1px solid #dde1e6", borderRadius: 8 }}>
-              {catalog.map((cc, ci) => {
-                const alreadyAdded = suggestions.some(s => s.id === cc.id);
-                return (
-                  <details key={cc.id} style={{ borderBottom: ci < catalog.length - 1 ? "1px solid #eef2f5" : "none" }}>
-                    <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "8px 12px", cursor: "pointer", gap: 8, listStyle: "none",
-                      background: alreadyAdded ? "#f0f7ff" : "#fff" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <small style={{ color: "#667482" }}>ID {cc.id} · {esc(cc.ambito)}</small>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{esc(cc.nome)}</div>
-                        <div style={{ color: "#555", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {esc((cc.descrizione || "").slice(0, 100))}{cc.descrizione?.length > 100 ? "…" : ""}
-                        </div>
-                      </div>
-                      <button style={{ ...btnStyles.secondary, whiteSpace: "nowrap", fontSize: 12, padding: "5px 10px",
-                        background: alreadyAdded ? "#e8f0fe" : "#fff", color: alreadyAdded ? "#1a73e8" : "#334456",
-                        border: alreadyAdded ? "1px solid #4285f4" : "1px solid #d8e0e8" }}
-                        onClick={(e) => { e.preventDefault(); addManualItem(cc); }}>
-                        {alreadyAdded ? "Già aggiunta" : "Aggiungi"}
-                      </button>
-                    </summary>
-                    <div style={{ padding: "8px 14px 12px", background: "#f8f9fa", fontSize: 12, borderTop: "1px solid #eef2f5" }}>
-                      <div style={{ color: "#444", lineHeight: 1.6, marginBottom: 8 }}>{esc(cc.descrizione || "Nessuna descrizione disponibile.")}</div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {["REALIZZAZIONE", "MODIFICA"].map(tipo => {
-                          const p = cc.prezzi?.[tipo] || {};
-                          return Object.keys(p).length > 0 ? (
-                            <div key={tipo} style={{ fontSize: 11, background: "#fff", border: "1px solid #dde1e6", borderRadius: 6, padding: "4px 8px" }}>
-                              <strong style={{ color: "#102a47" }}>{tipo}:</strong>{" "}
-                              {["Semplice","Medio","Complesso"].map(c => p[c] != null ? `${c} ${euro.format(p[c])}` : null).filter(Boolean).join(" · ")}
-                            </div>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
-                  </details>
-                );
-              })}
-            </div>
-          </div>
+           {/* Catalogo manuale — sezione collassabile */}
+           <details style={styles.card}>
+             <summary style={{ cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center", userSelect: "none" }}>
+               <div>
+                 <h3 style={{ margin: 0, fontSize: 15 }}>Aggiungi manualmente dal catalogo</h3>
+                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#667482" }}>
+                   {catalog.length} voci disponibili · Le voci aggiunte compaiono nelle "Possibili integrazioni" come selezionate.
+                 </p>
+               </div>
+               <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 600, whiteSpace: "nowrap", marginLeft: 12 }}>
+                 {suggestions.filter(s => s.interventionId === "__MANUALE__").length > 0
+                   ? `${suggestions.filter(s => s.interventionId === "__MANUALE__").length} aggiunte`
+                   : "Espandi"}
+               </span>
+             </summary>
+             <div style={{ marginTop: 10, display: "grid", gap: 0, maxHeight: 420, overflow: "auto", border: "1px solid #dde1e6", borderRadius: 8 }}>
+               {catalog.map((cc, ci) => {
+                 const alreadyAdded = suggestions.some(s => s.id === cc.id);
+                 return (
+                   <details key={cc.id} style={{ borderBottom: ci < catalog.length - 1 ? "1px solid #eef2f5" : "none" }}>
+                     <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                       padding: "8px 12px", cursor: "pointer", gap: 8, listStyle: "none",
+                       background: alreadyAdded ? "#f0f7ff" : "#fff" }}>
+                       <div style={{ flex: 1, minWidth: 0 }}>
+                         <small style={{ color: "#667482" }}>ID {cc.id} · {esc(cc.ambito)}</small>
+                         <div style={{ fontWeight: 600, fontSize: 13 }}>{esc(cc.nome)}</div>
+                         <div style={{ color: "#555", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                           {esc((cc.descrizione || "").slice(0, 100))}{cc.descrizione?.length > 100 ? "…" : ""}
+                         </div>
+                       </div>
+                       <button style={{ ...btnStyles.secondary, whiteSpace: "nowrap", fontSize: 12, padding: "5px 10px",
+                         background: alreadyAdded ? "#e8f0fe" : "#fff", color: alreadyAdded ? "#1a73e8" : "#334456",
+                         border: alreadyAdded ? "1px solid #4285f4" : "1px solid #d8e0e8" }}
+                         onClick={(e) => { e.preventDefault(); addManualItem(cc); }}>
+                         {alreadyAdded ? "Già aggiunta" : "Aggiungi"}
+                       </button>
+                     </summary>
+                     <div style={{ padding: "8px 14px 12px", background: "#f8f9fa", fontSize: 12, borderTop: "1px solid #eef2f5" }}>
+                       <div style={{ color: "#444", lineHeight: 1.6, marginBottom: 8 }}>{esc(cc.descrizione || "Nessuna descrizione disponibile.")}</div>
+                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                         {["REALIZZAZIONE", "MODIFICA"].map(tipo => {
+                           const p = cc.prezzi?.[tipo] || {};
+                           return Object.keys(p).length > 0 ? (
+                             <div key={tipo} style={{ fontSize: 11, background: "#fff", border: "1px solid #dde1e6", borderRadius: 6, padding: "4px 8px" }}>
+                               <strong style={{ color: "#102a47" }}>{tipo}:</strong>{" "}
+                               {["Semplice","Medio","Complesso"].map(c => p[c] != null ? `${c} ${euro.format(p[c])}` : null).filter(Boolean).join(" · ")}
+                             </div>
+                           ) : null;
+                         })}
+                       </div>
+                     </div>
+                   </details>
+                 );
+               })}
+             </div>
+           </details>
         </div>
       )}
 
@@ -1458,6 +1503,13 @@ function ConfiguratorePage({ onUnauthorized }) {
       {/* STEP 4: REVISIONE */}
       {step === 4 && (
         <div>
+          {/* Banner modifica record esistente */}
+          {editingRecordKey && (
+            <div style={{ background: "#fff8e1", border: "1px solid #f6c90e", borderRadius: 8, padding: "10px 16px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+              <span><strong>Modalità modifica:</strong> stai aggiornando una valutazione esistente. "Salva valutazione" sovrascriverà il record originale.</span>
+              <button onClick={() => setEditingRecordKey(null)} style={{ background: "none", border: "none", color: "#92600a", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Salva come nuovo</button>
+            </div>
+          )}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 12px" }}>Revisione offerta</h3>
             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))" }}>
