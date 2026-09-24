@@ -165,6 +165,7 @@ function ConfiguratorePage({ onUnauthorized }) {
         tow5Share: l.tow5Share ?? 65,
         active: l.active !== false,
         codiceContratto: l.codiceContratto || "",
+        towImpact: l.towImpact || {},
       })),
     };
   }
@@ -184,6 +185,27 @@ function ConfiguratorePage({ onUnauthorized }) {
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
   const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
+
+  // Pre-popola towPercentages dal towImpact del lotto quando cambia il contratto/lotto attivo.
+  // Non sovrascrive se l'utente ha già modificato manualmente (solo al cambio di activeLot).
+  useEffect(() => {
+    if (!activeLot?.towImpact) return;
+    const imp = activeLot.towImpact;
+    if (Object.keys(imp).length === 0) return;
+    setTowPercentages(prev => {
+      const existing = prev?.[selectedContractId]?.[lot] || {};
+      // Applica solo se l'utente non ha già impostato valori non-zero
+      const hasUserValues = Object.values(existing).some(v => Number(v) > 0);
+      if (hasUserValues) return prev;
+      return {
+        ...prev,
+        [selectedContractId]: {
+          ...(prev?.[selectedContractId] || {}),
+          [lot]: { 1: Number(imp['1']) || 0, 3: Number(imp['3']) || 0, 4: Number(imp['4']) || 0 },
+        },
+      };
+    });
+  }, [activeLot]); // eslint-disable-line
 
   // ── Persist contratti ──
   const persistContract = async (contract) => {
@@ -455,42 +477,72 @@ function ConfiguratorePage({ onUnauthorized }) {
   };
 
   // ── AI: secondo parere (port da aiAnalysisContext + analyzeWithAi) ──
-  const buildAiContext = () => ({
-    contract: { id: selectedContractId, name: activeContract?.name || "" },
-    lot,
-    initiative,
-    catalog: catalog.map((c) => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "", prices: c.prezzi || c.price || {} })),
-    excelInterventions: importedInterventions.map((x) => ({
-      id: x.interventionId || x.id,
-      title: x.titolo || x.title || "",
-      description: x.descrizione || x.description || "",
-      activity: x.attivita || x.activity || "",
-      quantity: x.qty || x.quantity || 1,
-      catalogId: x.catalogId || x.idCatalogo || null,
-    })),
-    currentSuggestions: suggestions.map((s) => ({
-      catalogId: s.id,
-      selected: s.selected,
-      type: s.type,
-      complexity: s.complexity,
-      quantity: s.qty,
-      rationale: s.reason,
-      additionalInfo: s.additionalInfo || "",
-    })),
-    applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]).map((a) => ({
-      code: a.code,
-      name: a.name,
-      technologies: [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])],
-      notes: a.notes || "",
-    })),
-    priorEvaluations: [],
-  });
+
+  // Legge i file sorgente (max 40KB totali) per includerli nel contesto AI
+  const readSourceSnippets = async () => {
+    if (!implementationFiles.length) return [];
+    const CODE_EXTS = /\.(js|jsx|ts|tsx|java|py|cs|go|rb|php|vue|html|css|xml|json|yaml|yml|md|sql)$/i;
+    const relevant = [...implementationFiles].filter(f => CODE_EXTS.test(f.name)).slice(0, 30);
+    const MAX_TOTAL = 40000; // ~40KB
+    let total = 0;
+    const snippets = [];
+    for (const f of relevant) {
+      if (total >= MAX_TOTAL) break;
+      try {
+        const text = await f.text();
+        const slice = text.slice(0, Math.min(3000, MAX_TOTAL - total));
+        snippets.push({ file: f.webkitRelativePath || f.name, content: slice, truncated: text.length > slice.length });
+        total += slice.length;
+      } catch { /* skip unreadable */ }
+    }
+    return snippets;
+  };
+
+  const buildAiContext = async () => {
+    const sourceSnippets = await readSourceSnippets();
+    return {
+      contract: { id: selectedContractId, name: activeContract?.name || "" },
+      lot,
+      initiative,
+      catalog: catalog.map((c) => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "", prices: c.prezzi || c.price || {} })),
+      excelInterventions: importedInterventions.map((x) => ({
+        id: x.interventionId || x.id,
+        title: x.titolo || x.title || "",
+        description: x.descrizione || x.description || "",
+        activity: x.attivita || x.activity || "",
+        quantity: x.qty || x.quantity || 1,
+        catalogId: x.catalogId || x.idCatalogo || null,
+        notes: x.notes || "",
+      })),
+      currentSuggestions: suggestions.map((s) => ({
+        catalogId: s.id,
+        selected: s.selected,
+        type: s.type,
+        complexity: s.complexity,
+        quantity: s.qty,
+        rationale: s.reason,
+        additionalInfo: s.additionalInfo || "",
+        notes: s.notes || "",
+      })),
+      applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]).map((a) => ({
+        code: a.code,
+        name: a.name,
+        technologies: [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])],
+        notes: a.notes || "",
+        codeUrl: a.codeUrl || "",
+      })),
+      // Snippets del codice sorgente per verifica tecnica
+      sourceCode: sourceSnippets,
+      priorEvaluations: [],
+    };
+  };
 
   const analyzeWithAi = async () => {
     setAiBusy(true);
     setError("");
     try {
-      const data = await analyzeInitiativeWithAi(buildAiContext());
+      const ctx = await buildAiContext();
+      const data = await analyzeInitiativeWithAi(ctx);
       const proposals = (data.analysis?.proposals || [])
         .filter((p) => catalog.some((c) => String(c.id) === String(p.catalogId)))
         .map((p, i) => ({ ...p, apply: p.action !== "exclude", _index: i }));
@@ -1024,42 +1076,52 @@ function ConfiguratorePage({ onUnauthorized }) {
     const inter = importedInterventions.find((x) => String(x.id) === String(gid));
     return (
       <details key={gid} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
-        <summary style={{ cursor: "pointer", padding: "10px 14px", fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "#f8f9fa" }}>
-          <span>
+        <summary style={{ cursor: "pointer", padding: "10px 14px", fontWeight: 700, fontSize: 13, background: "#f8f9fa", borderRadius: "8px 8px 0 0", listStyle: "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <span style={{ flex: "0 0 auto", marginTop: 1 }}>▶</span>
+          <span style={{ flex: 1 }}>
             <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {gid}</span>
-            {items.length > 1 ? <span style={{ marginLeft: 8, fontSize: 11, color: "#777", fontWeight: 400 }}>({items.length} voci)</span> : null}
+            <span style={{ marginLeft: 8, fontSize: 11, color: "#777", fontWeight: 400 }}>({items.length} voc{items.length === 1 ? "e" : "i"})</span>
+            {inter?.titolo ? <span style={{ display: "block", color: "#222", fontWeight: 600, marginTop: 2 }}>{esc(inter.titolo)}</span> : null}
+            {inter?.descrizione ? <span style={{ display: "block", color: "#555", fontWeight: 400, fontSize: 12, marginTop: 1 }}>{esc(inter.descrizione)}</span> : null}
           </span>
-          {inter?.titolo || inter?.descrizione ? (
-            <span style={{ fontWeight: 400, fontSize: 12, color: "#444", textAlign: "right", maxWidth: "55%" }}>
-              {inter.titolo ? <span style={{ color: "#222", fontWeight: 600 }}>{esc(inter.titolo)}</span> : null}
-              {inter?.descrizione ? <span style={{ display: "block", color: "#666" }}>{esc(inter.descrizione)}</span> : null}
-            </span>
-          ) : null}
+          <span style={{ fontSize: 11, color: items.some((x) => x.selected) ? "#1a73e8" : "#999", fontWeight: 700, flex: "0 0 auto" }}>
+            {items.filter((x) => x.selected).length}/{items.length} selezionate
+          </span>
         </summary>
-        <div style={{ padding: "10px 14px", display: "grid", gap: 8 }}>
+        <div style={{ padding: "10px 14px", display: "grid", gap: 10 }}>
           {items.map((s, i) => {
             const cc = catalog.find((x) => x.id === s.id);
             if (!cc) return null;
             const vals = validComplexities(s, cc);
             return (
-              <label key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd" }}>
-                <div style={{ color: "#666", fontSize: 11 }}>ID {cc.id} · {esc(cc.ambito)}</div>
-                <strong>{esc(cc.nome)}</strong>
-                <p style={{ margin: "6px 0", fontSize: 13 }}>{esc(s.reason)}</p>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <select style={styles.input} value={s.type} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, type: e.target.value } : q)))}>
-                    <option>REALIZZAZIONE</option>
-                    <option>MODIFICA</option>
-                  </select>
-                  <select style={styles.input} value={s.complexity} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
-                    {vals.map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                  <input style={{ ...styles.input, width: 64 }} type="number" min="0.01" value={s.qty} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))} />
-                  <input type="checkbox" checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
-                </div>
-              </label>
+              <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd", display: "grid", gap: 6 }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+                  <input type="checkbox" style={{ marginTop: 3, flex: "0 0 auto" }} checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "#666", fontSize: 11 }}>ID {cc.id} · {esc(cc.ambito)}</div>
+                    <strong>{esc(cc.nome)}</strong>
+                    <p style={{ margin: "4px 0 6px", fontSize: 13, color: "#444" }}>{esc(s.reason)}</p>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <select style={{ ...styles.input, width: "auto" }} value={s.type} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, type: e.target.value } : q)))}>
+                        <option>REALIZZAZIONE</option>
+                        <option>MODIFICA</option>
+                      </select>
+                      <select style={{ ...styles.input, width: "auto" }} value={s.complexity} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
+                        {vals.map((v) => (<option key={v} value={v}>{v}</option>))}
+                      </select>
+                      <input style={{ ...styles.input, width: 64 }} type="number" min="0.01" value={s.qty} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))} />
+                    </div>
+                  </div>
+                </label>
+                {/* Campo note per condivisione tra interventi/iniziative */}
+                <textarea
+                  rows={2}
+                  placeholder="Note (visibili in condivisione con altri interventi/iniziative)…"
+                  value={s.notes || ""}
+                  onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, notes: e.target.value } : q)))}
+                  style={{ ...styles.textarea, fontSize: 12, marginTop: 0, borderColor: s.notes ? "#1a73e8" : "#dde1e6" }}
+                />
+              </div>
             );
           })}
         </div>
@@ -1111,16 +1173,33 @@ function ConfiguratorePage({ onUnauthorized }) {
           {/* TOW automatici */}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>TOW automatici (Lotto {lot})</h3>
-            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))" }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
               {["1", "3", "4"].map((n) => {
                 const k = `TOW0${lot}.${n}`;
                 const amount = calculation.autoTow[k] || 0;
                 const unit = towPricesMap[k] || 0;
                 const qty = unit ? amount / unit : null;
+                const pctCurrent = towPercentages?.[selectedContractId]?.[lot]?.[n] ?? 0;
                 return (
                   <div key={n} style={styles.card}>
-                    <strong>{k} · {Math.round(calculation.autoTow[k] / calculation.allocationBase * 10000) / 100 || 0}%</strong>
+                    <strong>{k}</strong>
                     <div style={{ color: "#666", fontSize: 12 }}>{unit ? `${euro.format(unit)} / unità` : "calcolo sul valore TOW .5"}</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, margin: "6px 0" }}>
+                      <span style={{ fontSize: 12, color: "#444" }}>% impatto:</span>
+                      <input
+                        type="number" min={0} max={100} step={0.01}
+                        value={pctCurrent}
+                        onChange={(e) => setTowPercentages((prev) => ({
+                          ...prev,
+                          [selectedContractId]: {
+                            ...(prev?.[selectedContractId] || {}),
+                            [lot]: { ...(prev?.[selectedContractId]?.[lot] || { 1: 0, 3: 0, 4: 0 }), [n]: Number(e.target.value) || 0 },
+                          },
+                        }))}
+                        style={{ width: 70, border: "1px solid #bdc9d4", borderRadius: 5, padding: "4px 6px", fontSize: 13, textAlign: "right" }}
+                      />
+                      <span style={{ fontSize: 12, color: "#444" }}>%</span>
+                    </label>
                     <div style={{ fontWeight: 600 }}>{euro.format(amount)}</div>
                     <div style={{ color: "#666", fontSize: 12 }}>{qty === null ? "Quantità n.d." : `Quantità equivalente: ${qty.toLocaleString("it-IT", { maximumFractionDigits: 3 })}`}</div>
                   </div>
@@ -1296,7 +1375,27 @@ function ConfiguratorePage({ onUnauthorized }) {
               <label style={styles.label}>Codice AP<input style={styles.input} value={applicationDraft.code || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, code: e.target.value.toUpperCase() })} placeholder="AP-00226" /></label>
             </div>
             <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
-            <label style={styles.label}>Link al codice o repository<input style={styles.input} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} /></label>
+            <label style={styles.label}>Link al codice o repository
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}>
+                <input style={{ ...styles.input, marginTop: 0, flex: 1 }} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} placeholder="https://github.com/..." />
+                <button type="button" style={{ ...btnStyles.secondary, whiteSpace: "nowrap", padding: "8px 12px" }}
+                  onClick={() => {
+                    const inp = document.createElement("input");
+                    inp.type = "file"; inp.multiple = true;
+                    inp.setAttribute("webkitdirectory", ""); inp.setAttribute("directory", "");
+                    inp.onchange = () => {
+                      if (!inp.files.length) return;
+                      const rel = inp.files[0].webkitRelativePath || "";
+                      const folder = rel.split("/")[0] || "cartella";
+                      setApplicationDraft((d) => ({ ...d, codeUrl: folder + " (" + inp.files.length + " file)" }));
+                      toast("Cartella collegata: " + folder + " — " + inp.files.length + " file");
+                    };
+                    inp.click();
+                  }}>
+                  Seleziona cartella
+                </button>
+              </div>
+            </label>
             <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
             <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>

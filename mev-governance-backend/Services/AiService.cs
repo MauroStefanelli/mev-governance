@@ -339,6 +339,9 @@ public class AiService
     private const string AnalyzeInstructions =
         "Sei un responsabile tecnico di stima software. Analizza l'iniziativa usando esclusivamente gli ID del catalogo fornito. " +
         "Confronta requisiti, interventi Excel, contesto applicativo, stime storiche e suggerimenti correnti. " +
+        "Se nel contesto è presente il campo 'sourceCode' con snippet di codice sorgente, usali per verificare " +
+        "la coerenza tecnica delle proposte: verifica se le dipendenze tecnologiche, i pattern architetturali e " +
+        "la complessità del codice confermano o contraddicono le stime proposte; segnala eventuali discrepanze nei warnings. " +
         "Proponi interventi necessari e sufficienti, senza inventare voci. " +
         "Usa action add/update/confirm/exclude. Quantità positiva per gli interventi inclusi. " +
         "Spiega ogni razionale in italiano e segnala in warnings le informazioni mancanti. La decisione finale spetta all'utente.";

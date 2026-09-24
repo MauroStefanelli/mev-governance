@@ -84,21 +84,54 @@ function SummaryTable({ headers, rows }) {
 }
 
 // ── Modale dati lotto (Catalogo / Quadro TOW) ────────────────────────────────
-function LotDataModal({ modal, onClose }) {
+function LotDataModal({ modal, onClose, onSaveTowImpact }) {
+  const [impact, setImpact] = React.useState({});
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(() => {
+    if (modal?.type === 'tow') {
+      // Inizializza % impatto dal DB (towImpact già salvato) o da 0
+      const init = {};
+      (modal.data || []).forEach(row => {
+        const towKey = row[0]; // es. "TOW01.1"
+        const suffix = towKey?.split('.')[1]; // "1","2",...
+        if (suffix && ['1','3','4'].includes(suffix))
+          init[suffix] = modal.towImpact?.[suffix] ?? '';
+      });
+      setImpact(init);
+      setSaved(false);
+    }
+  }, [modal]);
+
   if (!modal) return null;
+
   const overlay = {
     position: 'fixed', inset: 0, background: 'rgba(16,42,71,.45)', zIndex: 1200,
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
   };
   const box = {
     background: '#fff', borderRadius: 12, boxShadow: '0 8px 40px rgba(16,42,71,.22)',
-    maxWidth: 820, width: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+    maxWidth: 860, width: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
   };
   const head = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '18px 22px', borderBottom: '1px solid #d8e0e8',
   };
   const body = { overflowY: 'auto', padding: 22, flex: 1 };
+
+  const hasImpactRows = modal.type === 'tow' && (modal.data || []).some(row => ['1','3','4'].includes(row[0]?.split?.('.')?.[1]));
+  const impactDirty = Object.values(impact).some(v => v !== '' && v !== null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSaveTowImpact(modal.contractId, modal.lotId, impact);
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -152,10 +185,59 @@ function LotDataModal({ modal, onClose }) {
             </div>
           )}
           {modal.type === 'tow' && (
-            <SummaryTable
-              headers={['TOW', 'Ambito', 'Quantità contrattuale', 'Peso']}
-              rows={modal.data || []}
-            />
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      {['TOW', 'Ambito', 'Quantità contrattuale', 'Peso %', '% Impatto (Configuratore)'].map(h => (
+                        <th key={h} style={{ background: '#102a47', color: '#fff', padding: '9px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(modal.data || []).map((row, i) => {
+                      const towKey = row[0]; // "TOW01.1"
+                      const suffix = towKey?.split?.('.')?.[1];
+                      const autoTow = ['1','3','4'].includes(suffix);
+                      return (
+                        <tr key={i} style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{row[0]}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', color: '#334456' }}>{row[1]}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5' }}>{row[2]}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', textAlign: 'right', fontWeight: 600 }}>{row[3]}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', textAlign: 'center' }}>
+                            {autoTow ? (
+                              <input
+                                type="number" min={0} max={100} step={0.01}
+                                value={impact[suffix] ?? ''}
+                                onChange={e => setImpact(p => ({ ...p, [suffix]: e.target.value === '' ? '' : Number(e.target.value) }))}
+                                placeholder="0"
+                                style={{ width: 70, border: '1px solid #bdc9d4', borderRadius: 5, padding: '4px 6px', fontSize: 12, textAlign: 'right' }}
+                              />
+                            ) : (
+                              <span style={{ color: '#9aa7b3', fontSize: 11 }}>–</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {hasImpactRows && (
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    style={{ background: '#1c4e80', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 13, opacity: saving ? 0.7 : 1 }}>
+                    {saving ? 'Salvataggio…' : 'Salva % impatto'}
+                  </button>
+                  {saved && <span style={{ color: '#006b57', fontWeight: 700, fontSize: 13 }}>Salvato — il Configuratore userà questi valori come default</span>}
+                  <span style={{ color: '#667482', fontSize: 12 }}>I valori si applicano ai TOW automatici (TOWxx.1, TOWxx.3, TOWxx.4) nel Configuratore Offerta.</span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -383,7 +465,22 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const [lotUpload, setLotUpload]     = useState({});
 
   // Modale visualizzazione catalogo / quadro TOW
-  const [modal, setModal] = useState(null); // { type:'catalog'|'tow', title, data }
+  const [modal, setModal] = useState(null); // { type:'catalog'|'tow', title, data, contractId, lotId, towImpact }
+
+  // Salva % impatto TOW nel payload del lotto
+  const handleSaveTowImpact = async (contractId, lotId, impact) => {
+    // Filtra valori vuoti
+    const clean = {};
+    Object.entries(impact).forEach(([k, v]) => { if (v !== '' && v !== null) clean[k] = Number(v); });
+    await updateConfiguratoreLot(contractId, lotId, { towImpact: clean });
+    // Aggiorna lo stato locale
+    setContracts(prev => prev.map(c => {
+      if (c.contractId !== contractId) return c;
+      return { ...c, lots: (c.lots || []).map(l => l.lotId === lotId ? { ...l, towImpact: clean } : l) };
+    }));
+    // Aggiorna anche il modal con i nuovi valori
+    setModal(m => m ? { ...m, towImpact: clean } : m);
+  };
 
   const loadContracts = async () => {
     setLoading(true);
@@ -732,10 +829,21 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                   const lotSum  = summary?.lots?.[l.lotId];
                                   const hasTowSummary = lotSum && Array.isArray(lotSum.tow) && lotSum.tow.length > 0;
 
-                                  if (towKeys.length > 0) {
+                                   if (towKeys.length > 0) {
                                     return (
                                       <button
-                                        onClick={() => setModal({ type: 'tow', title: `Lotto ${l.lotId} – Prezzi TOW`, data: towKeys.map(k => [k, '', euro.format(l.towPrices[k]), '']) })}
+                                        onClick={() => setModal({
+                                          type: 'tow',
+                                          title: `Lotto ${l.lotId} – Prezzi TOW`,
+                                          contractId: c.contractId,
+                                          lotId: l.lotId,
+                                          towImpact: l.towImpact || {},
+                                          // [TOW, Ambito, Qta contrattuale, Peso, (usato per impatto)]
+                                          data: towKeys.map(k => {
+                                            const summaryRow = (lotSum?.tow || []).find(r => r[0] === k);
+                                            return [k, summaryRow?.[1] || '', euro.format(l.towPrices[k]), summaryRow?.[3] || ''];
+                                          }),
+                                        })}
                                         style={{ fontSize: 11, color: '#006b57', background: '#fff', padding: '2px 8px', borderRadius: 4, border: '1px solid #a8d9cc', cursor: 'pointer', fontWeight: 700 }}>
                                         {towKeys.length} prezzi TOW
                                       </button>
@@ -743,7 +851,14 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                   } else if (hasTowSummary) {
                                     return (
                                       <button
-                                        onClick={() => setModal({ type: 'tow', title: `Lotto ${l.lotId} – Quadro TOW`, data: lotSum.tow })}
+                                        onClick={() => setModal({
+                                          type: 'tow',
+                                          title: `Lotto ${l.lotId} – Quadro TOW`,
+                                          contractId: c.contractId,
+                                          lotId: l.lotId,
+                                          towImpact: l.towImpact || {},
+                                          data: lotSum.tow,
+                                        })}
                                         style={{ fontSize: 11, color: '#1c4e80', background: '#fff', padding: '2px 8px', borderRadius: 4, border: '1px solid #b3c9e0', cursor: 'pointer', fontWeight: 700 }}>
                                         Quadro TOW
                                       </button>
@@ -915,7 +1030,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
           )
       }
     </div>
-    <LotDataModal modal={modal} onClose={() => setModal(null)} />
+    <LotDataModal modal={modal} onClose={() => setModal(null)} onSaveTowImpact={handleSaveTowImpact} />
     </>
   );
 }
