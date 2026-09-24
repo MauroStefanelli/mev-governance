@@ -263,7 +263,7 @@ public class ConfiguratoreController : ControllerBase
     {
 
         var (sch, cs) = GetDbTarget();
-        var sql = $@"SELECT ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at"" FROM ""{sch}"".""PC_DataRecords"" WHERE 1 = 1";
+        var sql = $@"SELECT id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at"" FROM ""{sch}"".""PC_DataRecords"" WHERE 1 = 1";
         var ps = new List<NpgsqlParameter>();
 
         if (!string.IsNullOrWhiteSpace(entity_type))
@@ -325,7 +325,7 @@ public class ConfiguratoreController : ControllerBase
                 ""title""       = EXCLUDED.""title"",
                 ""payload""     = EXCLUDED.""payload"",
                 ""updated_at""  = now()
-            RETURNING ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at""";
+            RETURNING id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at""";
 
         try
         {
@@ -357,7 +357,7 @@ public class ConfiguratoreController : ControllerBase
             return BadRequest("Id non valido");
 
         var (sch, cs) = GetDbTarget();
-        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE ""Id"" = @id::uuid";
+        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid";
 
         try
         {
@@ -420,7 +420,7 @@ public class ConfiguratoreController : ControllerBase
     private async Task<List<Dictionary<string, object?>>> GetAllContractsInternal()
     {
         var (sch, cs) = GetDbTarget();
-        var sql = $@"SELECT ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at""
+        var sql = $@"SELECT id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at""
             FROM ""{sch}"".""PC_DataRecords""
             WHERE ""entity_type"" IN ('contract', 'contract_lot')
             ORDER BY ""contract_id"", ""lot_id""";
