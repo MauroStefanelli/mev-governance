@@ -704,8 +704,10 @@ public class ConfiguratoreController : ControllerBase
             var cid = (r.GetValueOrDefault("contract_id") as string) ?? "";
             var lotId = (r.GetValueOrDefault("lot_id") as string) ?? "";
             var entityType = (r.GetValueOrDefault("entity_type") as string) ?? "";
-            var payload = r.GetValueOrDefault("payload") as Dictionary<string, object?> ??
-                          new Dictionary<string, object?>();
+            var payloadRaw = r.GetValueOrDefault("payload");
+            var payload = payloadRaw is System.Text.Json.JsonElement je2
+                ? JsonElementToDict(je2)
+                : (payloadRaw as Dictionary<string, object?> ?? new Dictionary<string, object?>());
 
             if (entityType == "contract" && string.IsNullOrEmpty(lotId))
             {
