@@ -587,20 +587,44 @@ function ConfiguratorePage({ onUnauthorized }) {
   };
 
   const addManualItem = (c) => {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: c.id,
-        type: "REALIZZAZIONE",
-        complexity: validComplexities(c, "REALIZZAZIONE")[0] || "Medio",
-        qty: 1,
-        score: 0,
-        reason: "Voce aggiunta manualmente dal catalogo.",
-        key: Date.now(),
-        unit: null,
-        imported: false,
-      },
-    ]);
+    // In Step 2 aggiunge alle suggestions (selezionata); in Step 3 aggiunge direttamente agli items
+    if (step === 2) {
+      setSuggestions((prev) => {
+        const existing = prev.find((s) => s.id === c.id);
+        if (existing) {
+          // Già presente: assicura che sia selezionata
+          return prev.map((s) => s.id === c.id ? { ...s, selected: true } : s);
+        }
+        return [
+          ...prev,
+          {
+            id: c.id,
+            selected: true,
+            type: "REALIZZAZIONE",
+            complexity: validComplexities(c, "REALIZZAZIONE")[0] || "Medio",
+            qty: 1,
+            score: 1,
+            reason: "Voce aggiunta manualmente dal catalogo.",
+            interventionId: "__MANUALE__",
+          },
+        ];
+      });
+    } else {
+      setItems((prev) => [
+        ...prev,
+        {
+          id: c.id,
+          type: "REALIZZAZIONE",
+          complexity: validComplexities(c, "REALIZZAZIONE")[0] || "Medio",
+          qty: 1,
+          score: 0,
+          reason: "Voce aggiunta manualmente dal catalogo.",
+          key: Date.now(),
+          unit: null,
+          imported: false,
+        },
+      ]);
+    }
   };
 
   const updateItem = (key, patch) => setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
@@ -996,24 +1020,79 @@ function ConfiguratorePage({ onUnauthorized }) {
             <div style={styles.card}>
               <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
               <details>
-                <summary style={{ cursor: "pointer", margin: "8px 0" }}>Mostra dettaglio importato</summary>
-                <ol style={{ fontSize: 13 }}>
-                  {importedInterventions.map((x) => (
-                    <li key={x.id} style={{ marginBottom: 8 }}>
-                      <strong>{esc(x.id)}</strong> — {esc(x.titolo || x.descrizione || x.attivita || "Senza descrizione")}
-                      {x.mappings.length > 0 && (
-                        <div style={{ marginLeft: 12, fontSize: 12, color: "#444" }}>
-                          {x.mappings.map((m, i) => (
-                            <div key={i}>
-                              <strong>{esc(m.name)}</strong> · {esc(m.type)} · {esc(m.complexity)} · q.tà {m.qty} · {euro.format(m.total)}
-                              {m.detailDescription ? <div>{esc(m.detailDescription)}</div> : null}
-                            </div>
-                          ))}
-                        </div>
+                <summary style={{ cursor: "pointer", margin: "8px 0", fontWeight: 600 }}>Mostra dettaglio importato</summary>
+                <div style={{ overflowX: "auto", marginTop: 8 }}>
+                  {importedInterventions.map((x, xi) => (
+                    <div key={x.id} style={{ marginBottom: 16, border: "1px solid #dde1e6", borderRadius: 8, overflow: "hidden" }}>
+                      <div style={{ background: "#f8f9fa", padding: "8px 12px", fontWeight: 700, fontSize: 13, borderBottom: "1px solid #dde1e6" }}>
+                        <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {x.id}</span>
+                        {x.titolo ? <span style={{ marginLeft: 8, color: "#222" }}>{esc(x.titolo)}</span> : null}
+                        {x.descrizione ? <span style={{ marginLeft: 8, color: "#666", fontWeight: 400, fontSize: 12 }}>{esc(x.descrizione)}</span> : null}
+                      </div>
+                      {x.mappings.length > 0 ? (
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: "#102a47", color: "#fff" }}>
+                              <th style={{ padding: "7px 10px", textAlign: "left" }}>Componente</th>
+                              <th style={{ padding: "7px 10px", textAlign: "left" }}>Tipo</th>
+                              <th style={{ padding: "7px 10px", textAlign: "left" }}>Complessità</th>
+                              <th style={{ padding: "7px 10px", textAlign: "right" }}>Q.tà</th>
+                              <th style={{ padding: "7px 10px", textAlign: "right" }}>Prezzo unitario (€)</th>
+                              <th style={{ padding: "7px 10px", textAlign: "right" }}>Totale (€)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {x.mappings.map((m, mi) => {
+                              const cc = catalog.find(c => c.id === m.catalogId || c.nome === m.name);
+                              const validC = cc ? validComplexities(cc, m.type) : ["Semplice", "Medio", "Complesso"];
+                              const unitPrice = m.unit ?? (m.qty ? (m.total || 0) / m.qty : 0);
+                              const updMapping = (patch) => setImportedInterventions(prev => prev.map((iv, ivi) =>
+                                ivi !== xi ? iv : { ...iv, mappings: iv.mappings.map((mm, mmi) => mmi !== mi ? mm : { ...mm, ...patch }) }
+                              ));
+                              const qty = m.qty ?? 1;
+                              const unit = m.unit ?? unitPrice;
+                              return (
+                                <tr key={mi} style={{ background: mi % 2 ? "#f7f9fb" : "#fff", borderBottom: "1px solid #eef2f5" }}>
+                                  <td style={{ padding: "6px 10px" }}>
+                                    <div style={{ fontWeight: 600 }}>{esc(m.name)}</div>
+                                    {m.detailDescription ? <div style={{ color: "#667482", fontSize: 11 }}>{esc(m.detailDescription)}</div> : null}
+                                  </td>
+                                  <td style={{ padding: "6px 10px" }}>
+                                    <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.type || "REALIZZAZIONE"}
+                                      onChange={e => updMapping({ type: e.target.value, unit: null })}>
+                                      <option>REALIZZAZIONE</option><option>MODIFICA</option>
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "6px 10px" }}>
+                                    <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.complexity || "Medio"}
+                                      onChange={e => updMapping({ complexity: e.target.value, unit: null })}>
+                                      {validC.map(v => <option key={v}>{v}</option>)}
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "6px 10px", textAlign: "right" }}>
+                                    <input type="number" min={0} step={0.01} value={qty}
+                                      onChange={e => updMapping({ qty: Number(e.target.value) || 0, total: (Number(e.target.value) || 0) * unit })}
+                                      style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
+                                  </td>
+                                  <td style={{ padding: "6px 10px", textAlign: "right" }}>
+                                    <input type="number" min={0} step={0.01} value={unit}
+                                      onChange={e => updMapping({ unit: Number(e.target.value) || 0, total: qty * (Number(e.target.value) || 0) })}
+                                      style={{ ...styles.input, width: 90, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
+                                  </td>
+                                  <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700 }}>
+                                    {euro.format(qty * unit)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <div style={{ padding: "8px 12px", color: "#667482", fontSize: 12 }}>Nessuna valorizzazione di catalogo.</div>
                       )}
-                    </li>
+                    </div>
                   ))}
-                </ol>
+                </div>
               </details>
             </div>
           )}
@@ -1093,34 +1172,76 @@ function ConfiguratorePage({ onUnauthorized }) {
             const cc = catalog.find((x) => x.id === s.id);
             if (!cc) return null;
             const vals = validComplexities(s, cc);
+            const prezzi = cc.prezzi?.[s.type] || {};
+            const unitPrice = defaultPrice(s, { catalog, priceMode, builtin: !!activeContract?.builtin });
+            const importoProposto = unitPrice * (s.qty || 1);
             return (
-              <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd", display: "grid", gap: 6 }}>
+              <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd", display: "grid", gap: 8, background: s.selected ? "#f0f7ff" : "#fff" }}>
+                {/* Riga intestazione con checkbox */}
                 <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
                   <input type="checkbox" style={{ marginTop: 3, flex: "0 0 auto" }} checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
                   <div style={{ flex: 1 }}>
                     <div style={{ color: "#666", fontSize: 11 }}>ID {cc.id} · {esc(cc.ambito)}</div>
-                    <strong>{esc(cc.nome)}</strong>
-                    <p style={{ margin: "4px 0 6px", fontSize: 13, color: "#444" }}>{esc(s.reason)}</p>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <select style={{ ...styles.input, width: "auto" }} value={s.type} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, type: e.target.value } : q)))}>
-                        <option>REALIZZAZIONE</option>
-                        <option>MODIFICA</option>
-                      </select>
-                      <select style={{ ...styles.input, width: "auto" }} value={s.complexity} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
-                        {vals.map((v) => (<option key={v} value={v}>{v}</option>))}
-                      </select>
-                      <input style={{ ...styles.input, width: 64 }} type="number" min="0.01" value={s.qty} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))} />
-                    </div>
+                    <strong style={{ fontSize: 14 }}>{esc(cc.nome)}</strong>
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#555", lineHeight: 1.4 }}>{esc(s.reason)}</p>
                   </div>
                 </label>
-                {/* Campo note per condivisione tra interventi/iniziative */}
-                <textarea
-                  rows={2}
-                  placeholder="Note (visibili in condivisione con altri interventi/iniziative)…"
+
+                {/* Tabella prezzi S/M/C */}
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: "#102a47", color: "#fff" }}>
+                        <th style={{ padding: "5px 8px", textAlign: "left" }}>Tipo</th>
+                        <th style={{ padding: "5px 8px", textAlign: "left" }}>Complessità</th>
+                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Pz. Semplice</th>
+                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Pz. Medio</th>
+                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Pz. Complesso</th>
+                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Q.tà</th>
+                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Importo proposto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ background: "#f9fbfd" }}>
+                        <td style={{ padding: "5px 8px" }}>
+                          <select style={{ ...styles.input, fontSize: 11, padding: "3px 5px", minWidth: 110 }} value={s.type}
+                            onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, type: e.target.value } : q)))}>
+                            <option>REALIZZAZIONE</option><option>MODIFICA</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: "5px 8px" }}>
+                          <select style={{ ...styles.input, fontSize: 11, padding: "3px 5px" }} value={s.complexity}
+                            onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
+                            {vals.map((v) => (<option key={v} value={v}>{v}</option>))}
+                          </select>
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Semplice" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Semplice" ? 700 : 400 }}>
+                          {cc.prezzi?.[s.type]?.Semplice != null ? euro.format(cc.prezzi[s.type].Semplice) : "–"}
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Medio" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Medio" ? 700 : 400 }}>
+                          {cc.prezzi?.[s.type]?.Medio != null ? euro.format(cc.prezzi[s.type].Medio) : "–"}
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Complesso" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Complesso" ? 700 : 400 }}>
+                          {cc.prezzi?.[s.type]?.Complesso != null ? euro.format(cc.prezzi[s.type].Complesso) : "–"}
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
+                          <input type="number" min="0.01" step={0.01} value={s.qty}
+                            onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))}
+                            style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 5px", textAlign: "right" }} />
+                        </td>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, color: "#102a47" }}>
+                          {euro.format(importoProposto)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Campo note */}
+                <textarea rows={2} placeholder="Note (condivisibili con altri interventi/iniziative)…"
                   value={s.notes || ""}
                   onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, notes: e.target.value } : q)))}
-                  style={{ ...styles.textarea, fontSize: 12, marginTop: 0, borderColor: s.notes ? "#1a73e8" : "#dde1e6" }}
-                />
+                  style={{ ...styles.textarea, fontSize: 12, marginTop: 0, borderColor: s.notes ? "#1a73e8" : "#dde1e6" }} />
               </div>
             );
           })}
@@ -1133,18 +1254,49 @@ function ConfiguratorePage({ onUnauthorized }) {
 
           {/* Catalogo manuale */}
           <div style={styles.card}>
-            <h3 style={{ margin: "0 0 10px" }}>Aggiungi manualmente dal catalogo</h3>
-            <div style={{ display: "grid", gap: 8, maxHeight: 340, overflow: "auto" }}>
-              {catalog.map((cc) => (
-                <div key={cc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee", padding: "6px 0", gap: 8 }}>
-                  <div style={{ fontSize: 13 }}>
-                    <small style={{ color: "#666" }}>ID {cc.id} · {esc(cc.ambito)}</small>
-                    <div><strong>{esc(cc.nome)}</strong></div>
-                    <div style={{ color: "#666" }}>{esc((cc.descrizione || "").slice(0, 160))}</div>
-                  </div>
-                  <button style={btnStyles.secondary} onClick={() => addManualItem(cc)}>Aggiungi</button>
-                </div>
-              ))}
+            <h3 style={{ margin: "0 0 4px" }}>Aggiungi manualmente dal catalogo</h3>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#667482" }}>
+              Le voci aggiunte qui compaiono nelle "Possibili integrazioni" come selezionate.
+            </p>
+            <div style={{ display: "grid", gap: 0, maxHeight: 420, overflow: "auto", border: "1px solid #dde1e6", borderRadius: 8 }}>
+              {catalog.map((cc, ci) => {
+                const alreadyAdded = suggestions.some(s => s.id === cc.id);
+                return (
+                  <details key={cc.id} style={{ borderBottom: ci < catalog.length - 1 ? "1px solid #eef2f5" : "none" }}>
+                    <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "8px 12px", cursor: "pointer", gap: 8, listStyle: "none",
+                      background: alreadyAdded ? "#f0f7ff" : "#fff" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <small style={{ color: "#667482" }}>ID {cc.id} · {esc(cc.ambito)}</small>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{esc(cc.nome)}</div>
+                        <div style={{ color: "#555", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {esc((cc.descrizione || "").slice(0, 100))}{cc.descrizione?.length > 100 ? "…" : ""}
+                        </div>
+                      </div>
+                      <button style={{ ...btnStyles.secondary, whiteSpace: "nowrap", fontSize: 12, padding: "5px 10px",
+                        background: alreadyAdded ? "#e8f0fe" : "#fff", color: alreadyAdded ? "#1a73e8" : "#334456",
+                        border: alreadyAdded ? "1px solid #4285f4" : "1px solid #d8e0e8" }}
+                        onClick={(e) => { e.preventDefault(); addManualItem(cc); }}>
+                        {alreadyAdded ? "Già aggiunta" : "Aggiungi"}
+                      </button>
+                    </summary>
+                    <div style={{ padding: "8px 14px 12px", background: "#f8f9fa", fontSize: 12, borderTop: "1px solid #eef2f5" }}>
+                      <div style={{ color: "#444", lineHeight: 1.6, marginBottom: 8 }}>{esc(cc.descrizione || "Nessuna descrizione disponibile.")}</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {["REALIZZAZIONE", "MODIFICA"].map(tipo => {
+                          const p = cc.prezzi?.[tipo] || {};
+                          return Object.keys(p).length > 0 ? (
+                            <div key={tipo} style={{ fontSize: 11, background: "#fff", border: "1px solid #dde1e6", borderRadius: 6, padding: "4px 8px" }}>
+                              <strong style={{ color: "#102a47" }}>{tipo}:</strong>{" "}
+                              {["Semplice","Medio","Complesso"].map(c => p[c] != null ? `${c} ${euro.format(p[c])}` : null).filter(Boolean).join(" · ")}
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  </details>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -11,7 +11,7 @@ import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -32,11 +32,15 @@ function App() {
   const [filteredRows, setFilteredRows] = useState([]);
   const [lastAlign, setLastAlign]   = useState(null);
   const [showPwdModal, setShowPwdModal] = useState(false);
+  const [pwdModalTab, setPwdModalTab]   = useState("password"); // "password" | "aikey"
   const [pwdOld, setPwdOld]         = useState("");
   const [pwdNew, setPwdNew]         = useState("");
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
+  const [aiKeyVal, setAiKeyVal]     = useState("");
+  const [aiKeyHas, setAiKeyHas]     = useState(false);
+  const [aiKeyMsg, setAiKeyMsg]     = useState("");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
 
@@ -813,8 +817,13 @@ function App() {
             <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "11px" }}>{role}</div>
           </div>
           <button
-            onClick={() => { setShowPwdModal(true); setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError(""); }}
-            title="Cambia password"
+            onClick={async () => {
+              setShowPwdModal(true); setPwdModalTab("password");
+              setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError("");
+              setAiKeyVal(""); setAiKeyMsg("");
+              try { const p = await getMyProfile(); setAiKeyHas(!!p?.hasAiKey); } catch {}
+            }}
+            title="Profilo: cambio password / API Key AI"
             style={{
               background: "rgba(255,255,255,0.12)", color: "white",
               border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
@@ -832,7 +841,7 @@ function App() {
         </div>
       </header>
 
-      {/* ── Modale cambio password ── */}
+      {/* ── Modale profilo: cambio password + API Key AI ── */}
       {showPwdModal && (
         <div style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
@@ -840,50 +849,104 @@ function App() {
         }}>
           <div style={{
             background: "white", borderRadius: "12px", padding: "28px 32px",
-            width: "360px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            width: "400px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
           }}>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8", marginBottom: "20px" }}>
-              Cambia Password
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#102a47", marginBottom: "16px" }}>
+              Profilo utente
             </div>
-            {[
-              { label: "Password attuale", val: pwdOld, set: setPwdOld },
-              { label: "Nuova password",   val: pwdNew, set: setPwdNew },
-              { label: "Conferma nuova",   val: pwdNew2, set: setPwdNew2 },
-            ].map(({ label, val, set }) => (
-              <div key={label} style={{ marginBottom: "14px" }}>
-                <div style={{ fontSize: "12px", color: "#555", marginBottom: "4px" }}>{label}</div>
-                <input
-                  type="password" value={val}
-                  onChange={e => set(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleChangePassword()}
-                  style={{
-                    width: "100%", padding: "8px 10px", border: "1px solid #dadce0",
-                    borderRadius: "6px", fontSize: "13px", boxSizing: "border-box",
-                  }}
-                />
-              </div>
-            ))}
-            {pwdError && (
-              <div style={{ fontSize: "12px", color: "#ea4335", marginBottom: "12px" }}>{pwdError}</div>
+            {/* Tab selector */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#eef2f5", borderRadius: 8, padding: 4 }}>
+              {[["password", "Cambia password"], ["aikey", "API Key AI"]].map(([tab, label]) => (
+                <button key={tab} onClick={() => { setPwdModalTab(tab); setPwdError(""); setAiKeyMsg(""); }}
+                  style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13,
+                    background: pwdModalTab === tab ? "#102a47" : "transparent",
+                    color: pwdModalTab === tab ? "#fff" : "#667482" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {pwdModalTab === "password" && (
+              <>
+                {[
+                  { label: "Password attuale", val: pwdOld, set: setPwdOld },
+                  { label: "Nuova password",   val: pwdNew, set: setPwdNew },
+                  { label: "Conferma nuova",   val: pwdNew2, set: setPwdNew2 },
+                ].map(({ label, val, set }) => (
+                  <div key={label} style={{ marginBottom: "14px" }}>
+                    <div style={{ fontSize: "12px", color: "#555", marginBottom: "4px" }}>{label}</div>
+                    <input
+                      type="password" value={val}
+                      onChange={e => set(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleChangePassword()}
+                      style={{
+                        width: "100%", padding: "8px 10px", border: "1px solid #dadce0",
+                        borderRadius: "6px", fontSize: "13px", boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                ))}
+                {pwdError && (
+                  <div style={{ fontSize: "12px", color: "#ea4335", marginBottom: "12px" }}>{pwdError}</div>
+                )}
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                  <button onClick={() => setShowPwdModal(false)}
+                    style={{ padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
+                      background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}>
+                    Annulla</button>
+                  <button onClick={handleChangePassword} disabled={pwdSaving}
+                    style={{ padding: "8px 18px", borderRadius: "6px", border: "none",
+                      background: "#1a73e8", color: "white", cursor: "pointer",
+                      fontSize: "13px", fontWeight: 600, opacity: pwdSaving ? 0.7 : 1 }}>
+                    {pwdSaving ? "Salvataggio..." : "Salva password"}</button>
+                </div>
+              </>
             )}
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setShowPwdModal(false)}
-                style={{
-                  padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
-                  background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px",
-                }}
-              >Annulla</button>
-              <button
-                onClick={handleChangePassword}
-                disabled={pwdSaving}
-                style={{
-                  padding: "8px 18px", borderRadius: "6px", border: "none",
-                  background: "#1a73e8", color: "white", cursor: "pointer",
-                  fontSize: "13px", fontWeight: 600, opacity: pwdSaving ? 0.7 : 1,
-                }}
-              >{pwdSaving ? "Salvataggio..." : "Salva"}</button>
-            </div>
+
+            {pwdModalTab === "aikey" && (
+              <>
+                <div style={{ fontSize: 13, color: "#334456", marginBottom: 12, lineHeight: 1.5 }}>
+                  Inserisci la tua chiave API OpenAI personale. Verrà usata al posto della chiave di sistema quando usi il Configuratore AI.
+                  {aiKeyHas && <span style={{ display: "block", marginTop: 6, color: "#006b57", fontWeight: 600 }}>Una chiave è già memorizzata. Inserire una nuova per sostituirla.</span>}
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: "12px", color: "#555", marginBottom: "4px" }}>API Key (sk-...)</div>
+                  <input
+                    type="text" value={aiKeyVal}
+                    onChange={e => setAiKeyVal(e.target.value)}
+                    placeholder={aiKeyHas ? "••••••••••••••••••••••••••••••••" : "sk-..."}
+                    style={{ width: "100%", padding: "8px 10px", border: "1px solid #dadce0",
+                      borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", fontFamily: "monospace" }}
+                  />
+                </div>
+                {aiKeyMsg && (
+                  <div style={{ fontSize: "12px", color: aiKeyMsg.startsWith("Errore") ? "#ea4335" : "#006b57", marginBottom: 12, fontWeight: 600 }}>{aiKeyMsg}</div>
+                )}
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  {aiKeyHas && (
+                    <button onClick={async () => {
+                      try { await saveMyAiKey(""); setAiKeyHas(false); setAiKeyVal(""); setAiKeyMsg("Chiave rimossa."); }
+                      catch (e) { setAiKeyMsg("Errore: " + e.message); }
+                    }} style={{ padding: "8px 14px", borderRadius: "6px", border: "1px solid #f5c6c2",
+                      background: "#fff", color: "#c5221f", cursor: "pointer", fontSize: "13px" }}>
+                      Rimuovi chiave</button>
+                  )}
+                  <button onClick={() => setShowPwdModal(false)}
+                    style={{ padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
+                      background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}>
+                    Annulla</button>
+                  <button onClick={async () => {
+                    if (!aiKeyVal.trim()) { setAiKeyMsg("Inserire una chiave valida."); return; }
+                    try {
+                      await saveMyAiKey(aiKeyVal.trim());
+                      setAiKeyHas(true); setAiKeyVal(""); setAiKeyMsg("Chiave salvata con successo.");
+                    } catch (e) { setAiKeyMsg("Errore: " + e.message); }
+                  }} style={{ padding: "8px 18px", borderRadius: "6px", border: "none",
+                    background: "#1a73e8", color: "white", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>
+                    Salva chiave</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

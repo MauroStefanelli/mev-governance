@@ -26,4 +26,7 @@ public class AppUser
 
     public string? RefreshToken { get; set; }
     public DateTime? RefreshTokenExpiry { get; set; }
+
+    // Chiave API personale per il servizio AI (es. OpenAI)
+    public string? AiApiKey { get; set; }
 }

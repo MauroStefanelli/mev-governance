@@ -37,11 +37,12 @@ public class AiService
         return string.IsNullOrWhiteSpace(v) ? fallback : v;
     }
 
-    private AiSettings Settings()
+    private AiSettings Settings(string? userApiKey = null)
     {
         var endpoint = Env("AI_ENDPOINT", "https://api.openai.com/v1/responses");
         var model = Env("AI_MODEL", "");
-        var apiKey = Env("AI_API_KEY", "");
+        // Usa la chiave dell'utente se presente, altrimenti quella dell'ambiente
+        var apiKey = !string.IsNullOrWhiteSpace(userApiKey) ? userApiKey : Env("AI_API_KEY", "");
         var apiStyle = Env("AI_API_STYLE", "responses");
         var authMode = Env("AI_AUTH_MODE", "bearer");
         var provider = Env("AI_PROVIDER", "openai");
@@ -357,9 +358,9 @@ public class AiService
     // POST /api/configuratore/ai/analyze
     // Valuta un'iniziativa e propone interventi dal catalogo.
     // ============================================================
-    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalyzeAsync(JsonElement context)
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalyzeAsync(JsonElement context, string? userApiKey = null)
     {
-        var s = Settings();
+        var s = Settings(userApiKey);
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "developer", ["content"] = AnalyzeInstructions },
@@ -385,9 +386,9 @@ public class AiService
     // POST /api/configuratore/ai/development
     // Verifica un piano di sviluppo stimato (raccomandazioni).
     // ============================================================
-    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> DevelopmentAsync(JsonElement context)
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> DevelopmentAsync(JsonElement context, string? userApiKey = null)
     {
-        var s = Settings();
+        var s = Settings(userApiKey);
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "developer", ["content"] = DevelopmentInstructions },

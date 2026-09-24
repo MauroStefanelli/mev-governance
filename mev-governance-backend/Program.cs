@@ -405,6 +405,7 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""LastLogout""               TIMESTAMPTZ    NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""RefreshToken""             TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""RefreshTokenExpiry""       TIMESTAMPTZ    NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiApiKey""                 TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Contratti""          ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""BuoniConsegna""      ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;

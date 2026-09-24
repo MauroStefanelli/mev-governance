@@ -389,6 +389,84 @@ public class AuthController : ControllerBase
             user.Username
         });
     }
+
+    // ============================================================
+    // PUT /api/auth/me/password — cambio password self-service
+    // ============================================================
+    [HttpPut("me/password")]
+    [Authorize]
+    public async Task<IActionResult> ChangeMyPassword([FromBody] ChangeMyPasswordRequest req)
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+
+        if (!BCrypt.Net.BCrypt.Verify(req.OldPassword, user.PasswordHash))
+            return BadRequest(new { message = "Password attuale non corretta" });
+
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 6)
+            return BadRequest(new { message = "La nuova password deve avere almeno 6 caratteri" });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Password aggiornata" });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/password — reset password (Admin)
+    // ============================================================
+    [HttpPut("users/{id}/password")]
+    [Authorize]
+    public async Task<IActionResult> ResetUserPassword(int id, [FromBody] ResetPasswordRequest req)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 4)
+            return BadRequest(new { message = "Password troppo corta (min 4 caratteri)" });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Password aggiornata", id });
+    }
+
+    // ============================================================
+    // PUT /api/auth/me/aikey — salva/aggiorna API key AI personale
+    // ============================================================
+    [HttpPut("me/aikey")]
+    [Authorize]
+    public async Task<IActionResult> SaveMyAiKey([FromBody] SaveAiKeyRequest req)
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+
+        user.AiApiKey = string.IsNullOrWhiteSpace(req.ApiKey) ? null : req.ApiKey.Trim();
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "API key aggiornata", hasKey = user.AiApiKey != null });
+    }
+
+    // ============================================================
+    // GET /api/auth/me — profilo self (include hasAiKey)
+    // ============================================================
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetMe()
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+        return Ok(new { user.Id, user.Username, user.FullName, user.Email, user.Role, hasAiKey = !string.IsNullOrEmpty(user.AiApiKey) });
+    }
+
     // ============================================================
     // EDITOR LOGINS
     // ============================================================
@@ -573,4 +651,7 @@ public record RefreshRequest(string RefreshToken, string? CurrentToken = null);
 public record UpdateRoleRequest(string Role);
 public record SetRolesRequest(List<string> Roles);
 public record SwitchAmbienteRequest(int AmbienteId);
+public record ChangeMyPasswordRequest(string OldPassword, string NewPassword);
+public record ResetPasswordRequest(string NewPassword);
+public record SaveAiKeyRequest(string? ApiKey);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);

@@ -290,8 +290,33 @@ export const changeMyPassword = async (oldPassword, newPassword) => {
   if (response.status === 401) throw new Error("401");
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text);
+    let msg = text;
+    try { msg = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(msg);
   }
+  return response.json();
+};
+
+export const saveMyAiKey = async (apiKey) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/aikey`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ apiKey })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = text;
+    try { msg = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(msg);
+  }
+  return response.json();
+};
+
+export const getMyProfile = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) return null;
   return response.json();
 };
 

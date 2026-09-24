@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using MevGovernanceBackend.Services;
+using MevGovernanceBackend.Data;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -11,15 +12,26 @@ namespace MevGovernanceBackend.Controllers;
 public class ConfiguratoreAiController : ControllerBase
 {
     private readonly AiService _ai;
+    private readonly AppDbContext _db;
 
-    public ConfiguratoreAiController(AiService ai)
+    public ConfiguratoreAiController(AiService ai, AppDbContext db)
     {
         _ai = ai;
+        _db = db;
     }
 
     private bool CanAccess()
     {
         return User.IsInRole("SuperAdmin") || User.IsInRole("Developer");
+    }
+
+    // Legge la API key personale dell'utente corrente (se presente)
+    private string? GetUserAiKey()
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return null;
+        var user = _db.Users.Find(userId);
+        return string.IsNullOrWhiteSpace(user?.AiApiKey) ? null : user.AiApiKey;
     }
 
     // ============================================================
@@ -36,7 +48,7 @@ public class ConfiguratoreAiController : ControllerBase
 
         try
         {
-            var (analysis, provider, model, usage) = await _ai.AnalyzeAsync(context);
+            var (analysis, provider, model, usage) = await _ai.AnalyzeAsync(context, GetUserAiKey());
             return Ok(new { analysis, provider, model, usage });
         }
         catch (Exception ex)
@@ -57,7 +69,7 @@ public class ConfiguratoreAiController : ControllerBase
 
         try
         {
-            var (analysis, provider, model, usage) = await _ai.DevelopmentAsync(context);
+            var (analysis, provider, model, usage) = await _ai.DevelopmentAsync(context, GetUserAiKey());
             return Ok(new { analysis, provider, model, usage });
         }
         catch (Exception ex)
