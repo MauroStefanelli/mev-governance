@@ -83,6 +83,86 @@ function SummaryTable({ headers, rows }) {
   );
 }
 
+// ── Modale dati lotto (Catalogo / Quadro TOW) ────────────────────────────────
+function LotDataModal({ modal, onClose }) {
+  if (!modal) return null;
+  const overlay = {
+    position: 'fixed', inset: 0, background: 'rgba(16,42,71,.45)', zIndex: 1200,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+  };
+  const box = {
+    background: '#fff', borderRadius: 12, boxShadow: '0 8px 40px rgba(16,42,71,.22)',
+    maxWidth: 820, width: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+  };
+  const head = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '18px 22px', borderBottom: '1px solid #d8e0e8',
+  };
+  const body = { overflowY: 'auto', padding: 22, flex: 1 };
+
+  return (
+    <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={box}>
+        <div style={head}>
+          <div>
+            <p style={{ margin: 0, color: '#008b72', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.1em' }}>
+              {modal.type === 'catalog' ? 'Voci di catalogo' : 'Quadro TOW'}
+            </p>
+            <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#102a47' }}>{modal.title}</h2>
+          </div>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#667482', lineHeight: 1, padding: 4 }}>×</button>
+        </div>
+        <div style={body}>
+          {modal.type === 'catalog' && (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    {['ID', 'Ambito', 'Nome componente', 'Semplice (€)', 'Medio (€)', 'Complesso (€)'].map(h => (
+                      <th key={h} style={{ background: '#102a47', color: '#fff', padding: '9px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(modal.data || []).map((v, i) => {
+                    const pr = v.prezzi || {};
+                    const real = pr.REALIZZAZIONE || {};
+                    return (
+                      <tr key={i} style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
+                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{v.id}</td>
+                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', color: '#334456' }}>{v.ambito}</td>
+                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5' }}>{v.nome}</td>
+                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
+                          {real.Semplice != null ? euro.format(real.Semplice) : '–'}
+                        </td>
+                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
+                          {real.Medio != null ? euro.format(real.Medio) : '–'}
+                        </td>
+                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
+                          {real.Complesso != null ? euro.format(real.Complesso) : '–'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {(!modal.data || modal.data.length === 0) && (
+                <p style={{ color: '#667482', padding: 16 }}>Nessuna voce disponibile.</p>
+              )}
+            </div>
+          )}
+          {modal.type === 'tow' && (
+            <SummaryTable
+              headers={['TOW', 'Ambito', 'Quantità contrattuale', 'Peso']}
+              rows={modal.data || []}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Pagina Sintesi Contratto ───────────────────────────────────────────────
 function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
   const summary = CONTRACT_SUMMARIES[contract.contractId];
@@ -302,6 +382,9 @@ export default function ContractArchivePage({ ambienti = [] }) {
   // { "contractId|lotId": { catalogFile?, priceFile?, tow5Share?, uploading } }
   const [lotUpload, setLotUpload]     = useState({});
 
+  // Modale visualizzazione catalogo / quadro TOW
+  const [modal, setModal] = useState(null); // { type:'catalog'|'tow', title, data }
+
   const loadContracts = async () => {
     setLoading(true);
     try {
@@ -500,6 +583,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const lotCount = Math.max(1, Math.min(6, ncLots));
 
   return (
+    <>
     <div style={S.page}>
       {/* Header */}
       <div style={S.sectionHead}>
@@ -640,19 +724,64 @@ export default function ContractArchivePage({ ambienti = [] }) {
                               <strong style={{ display: 'block', fontSize: 13, color: '#102a47' }}>Lotto {l.lotId}</strong>
                               <span style={{ display: 'block', color: '#667482', fontSize: 12 }}>{l.name}</span>
                               {/* Badge riepilogo file analizzati */}
-                              <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                {l.priceFile
-                                  ? <span style={{ fontSize: 11, color: l.towPrices && Object.keys(l.towPrices).length > 0 ? '#006b57' : '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>
-                                      {l.towPrices && Object.keys(l.towPrices).length > 0 ? Object.keys(l.towPrices).length + ' prezzi TOW' : 'Listino: ' + l.priceFile}
-                                    </span>
-                                  : <span style={{ fontSize: 11, color: '#c5221f', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #f5c6c2' }}>Listino TOW mancante</span>
-                                }
-                                {l.catalogFile
-                                  ? <span style={{ fontSize: 11, color: Array.isArray(l.catalog) && l.catalog.length > 0 ? '#006b57' : '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>
-                                      {Array.isArray(l.catalog) && l.catalog.length > 0 ? l.catalog.length + ' voci catalogo' : 'Catalogo: ' + l.catalogFile}
-                                    </span>
-                                  : <span style={{ fontSize: 11, color: '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>Catalogo non caricato</span>
-                                }
+                              <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {(() => {
+                                  // ── Badge TOW ──
+                                  const towKeys = l.towPrices ? Object.keys(l.towPrices) : [];
+                                  const summary = CONTRACT_SUMMARIES[c.contractId];
+                                  const lotSum  = summary?.lots?.[l.lotId];
+                                  const hasTowSummary = lotSum && Array.isArray(lotSum.tow) && lotSum.tow.length > 0;
+
+                                  if (towKeys.length > 0) {
+                                    return (
+                                      <button
+                                        onClick={() => setModal({ type: 'tow', title: `Lotto ${l.lotId} – Prezzi TOW`, data: towKeys.map(k => [k, '', euro.format(l.towPrices[k]), '']) })}
+                                        style={{ fontSize: 11, color: '#006b57', background: '#fff', padding: '2px 8px', borderRadius: 4, border: '1px solid #a8d9cc', cursor: 'pointer', fontWeight: 700 }}>
+                                        {towKeys.length} prezzi TOW
+                                      </button>
+                                    );
+                                  } else if (hasTowSummary) {
+                                    return (
+                                      <button
+                                        onClick={() => setModal({ type: 'tow', title: `Lotto ${l.lotId} – Quadro TOW`, data: lotSum.tow })}
+                                        style={{ fontSize: 11, color: '#1c4e80', background: '#fff', padding: '2px 8px', borderRadius: 4, border: '1px solid #b3c9e0', cursor: 'pointer', fontWeight: 700 }}>
+                                        Quadro TOW
+                                      </button>
+                                    );
+                                  } else {
+                                    return (
+                                      <span style={{ fontSize: 11, color: '#c5221f', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #f5c6c2' }}>
+                                        Listino TOW mancante
+                                      </span>
+                                    );
+                                  }
+                                })()}
+
+                                {(() => {
+                                  // ── Badge Catalogo ──
+                                  const cat = Array.isArray(l.catalog) ? l.catalog : [];
+                                  if (cat.length > 0) {
+                                    return (
+                                      <button
+                                        onClick={() => setModal({ type: 'catalog', title: `Lotto ${l.lotId} – ${l.name || ''} – Catalogo`, data: cat })}
+                                        style={{ fontSize: 11, color: '#006b57', background: '#fff', padding: '2px 8px', borderRadius: 4, border: '1px solid #a8d9cc', cursor: 'pointer', fontWeight: 700 }}>
+                                        {cat.length} voci catalogo
+                                      </button>
+                                    );
+                                  } else if (l.catalogFile) {
+                                    return (
+                                      <span style={{ fontSize: 11, color: '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>
+                                        Catalogo: {l.catalogFile}
+                                      </span>
+                                    );
+                                  } else {
+                                    return (
+                                      <span style={{ fontSize: 11, color: '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>
+                                        Catalogo non caricato
+                                      </span>
+                                    );
+                                  }
+                                })()}
                               </div>
                             </div>
                             <span style={{ ...S.lotStatus, color: isActive ? '#006b57' : '#667482' }}>
@@ -786,5 +915,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
           )
       }
     </div>
+    <LotDataModal modal={modal} onClose={() => setModal(null)} />
+    </>
   );
 }
