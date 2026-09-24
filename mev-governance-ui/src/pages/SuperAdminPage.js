@@ -70,7 +70,7 @@ export default function SuperAdminPage() {
           codes[key] = l.codiceContratto || "";
           if (l.codiceContratto) {
             const env = ambienti.find(a => a.codiceContratto === l.codiceContratto);
-            envSel[key] = env ? env.id : "";
+            envSel[key] = env ? String(env.id) : "";
           }
         });
       });
@@ -108,7 +108,7 @@ export default function SuperAdminPage() {
   const handleSaveLotCode = async (contractId, lotId) => {
     const key = `${contractId}|${lotId}`;
     const codice = (lotCodes[key] || "").trim();
-    const env = ambienti.find(a => a.id === lotEnvSel[key]);
+    const env = ambienti.find(a => a.id === parseInt(lotEnvSel[key], 10));
     const finalCode = env ? env.codiceContratto : codice;
     setSavingLot(prev => ({ ...prev, [key]: true }));
     try {
@@ -205,90 +205,6 @@ export default function SuperAdminPage() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1a73e8", marginBottom: 20 }}>Gestione Contratti</h2>
-
-      {/* Crea nuovo contratto */}
-      <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Crea nuovo Contratto</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Codice Contratto *</div>
-            <input
-              value={newCodice}
-              onChange={e => setNewCodice(e.target.value)}
-              placeholder="es. 4490015981"
-              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 180 }}
-            />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Descrizione</div>
-            <input
-              value={newDesc}
-              onChange={e => setNewDesc(e.target.value)}
-              placeholder="es. Nuovo Progetto"
-              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 240 }}
-            />
-          </div>
-          <button
-            onClick={handleCreateAmbiente}
-            disabled={creating || !newCodice.trim()}
-            style={{
-              padding: "7px 20px", background: "#1a73e8", color: "white",
-              border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-              cursor: creating ? "wait" : "pointer", opacity: creating ? 0.7 : 1,
-            }}
-          >
-            {creating ? "Creazione..." : "Crea"}
-          </button>
-        </div>
-      </div>
-
-      {/* Lista contratti */}
-      <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Contratti Esistenti</div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={th}>ID</th>
-              <th style={th}>Codice Contratto</th>
-              <th style={th}>Descrizione</th>
-              <th style={th}>Stato</th>
-              <th style={th}>Creato il</th>
-              <th style={th}>Utenti</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ambienti.map(a => (
-              <tr key={a.id}>
-                <td style={td}>{a.id}</td>
-                <td style={{ ...td, fontWeight: 600 }}>{a.codiceContratto}</td>
-                <td style={td}>{a.descrizione}</td>
-                <td style={td}>
-                  <span style={{
-                    padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-                    background: a.isActive ? "#e6f4ea" : "#fce8e6",
-                    color: a.isActive ? "#137333" : "#c5221f",
-                  }}>
-                    {a.isActive ? "Attivo" : "Disattivato"}
-                  </span>
-                </td>
-                <td style={td}>{new Date(a.createdAt).toLocaleDateString("it-IT")}</td>
-                <td style={td}>
-                  <button
-                    onClick={() => loadUtenti(a)}
-                    style={{
-                      padding: "4px 12px", background: "#e8f0fe", color: "#1a73e8",
-                      border: "1px solid #c5d8fb", borderRadius: 6, fontSize: 12,
-                      cursor: "pointer", fontWeight: 600,
-                    }}
-                  >
-                    Gestisci
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
       {/* ── Archivio configurazioni (Configuratore Offerta) ── */}
       <div style={card}>
@@ -461,6 +377,90 @@ export default function SuperAdminPage() {
                 </tbody>
               </table>
             )}
+      </div>
+
+      {/* Crea nuovo contratto MEV */}
+      <div style={card}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Crea nuovo Contratto MEV</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Codice Contratto *</div>
+            <input
+              value={newCodice}
+              onChange={e => setNewCodice(e.target.value)}
+              placeholder="es. 4490015981"
+              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 180 }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Descrizione</div>
+            <input
+              value={newDesc}
+              onChange={e => setNewDesc(e.target.value)}
+              placeholder="es. Nuovo Progetto"
+              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 240 }}
+            />
+          </div>
+          <button
+            onClick={handleCreateAmbiente}
+            disabled={creating || !newCodice.trim()}
+            style={{
+              padding: "7px 20px", background: "#1a73e8", color: "white",
+              border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
+              cursor: creating ? "wait" : "pointer", opacity: creating ? 0.7 : 1,
+            }}
+          >
+            {creating ? "Creazione..." : "Crea"}
+          </button>
+        </div>
+      </div>
+
+      {/* Lista contratti MEV */}
+      <div style={card}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Contratti MEV Esistenti</div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>ID</th>
+              <th style={th}>Codice Contratto</th>
+              <th style={th}>Descrizione</th>
+              <th style={th}>Stato</th>
+              <th style={th}>Creato il</th>
+              <th style={th}>Utenti</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ambienti.map(a => (
+              <tr key={a.id}>
+                <td style={td}>{a.id}</td>
+                <td style={{ ...td, fontWeight: 600 }}>{a.codiceContratto}</td>
+                <td style={td}>{a.descrizione}</td>
+                <td style={td}>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
+                    background: a.isActive ? "#e6f4ea" : "#fce8e6",
+                    color: a.isActive ? "#137333" : "#c5221f",
+                  }}>
+                    {a.isActive ? "Attivo" : "Disattivato"}
+                  </span>
+                </td>
+                <td style={td}>{new Date(a.createdAt).toLocaleDateString("it-IT")}</td>
+                <td style={td}>
+                  <button
+                    onClick={() => loadUtenti(a)}
+                    style={{
+                      padding: "4px 12px", background: "#e8f0fe", color: "#1a73e8",
+                      border: "1px solid #c5d8fb", borderRadius: 6, fontSize: 12,
+                      cursor: "pointer", fontWeight: 600,
+                    }}
+                  >
+                    Gestisci
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Gestione utenti di un ambiente */}
