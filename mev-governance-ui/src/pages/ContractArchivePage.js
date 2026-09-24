@@ -326,6 +326,14 @@ export default function ContractArchivePage({ ambienti = [] }) {
 
   useEffect(() => { loadContracts(); }, []); // eslint-disable-line
 
+  // ── Helpers: aggiornamento ottimistico locale (come l'app standalone) ─────
+  const updateLotLocal = (contractId, lotId, patch) => {
+    setContracts(prev => prev.map(c => {
+      if (c.contractId !== contractId) return c;
+      return { ...c, lots: (c.lots || []).map(l => l.lotId === lotId ? { ...l, ...patch } : l) };
+    }));
+  };
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleToggleLot = async (contractId, lotId, currentActive) => {
     const key = contractId + '|' + lotId;
@@ -335,11 +343,14 @@ export default function ContractArchivePage({ ambienti = [] }) {
       setMsg({ type: 'error', text: 'Deve rimanere almeno un Lotto attivo.' });
       return;
     }
+    // Aggiornamento ottimistico immediato
+    updateLotLocal(contractId, lotId, { active: !currentActive });
     setToggling(prev => ({ ...prev, [key]: true }));
     try {
       await updateConfiguratoreLot(contractId, lotId, { active: !currentActive });
-      await loadContracts();
     } catch (e) {
+      // Rollback in caso di errore
+      updateLotLocal(contractId, lotId, { active: currentActive });
       setMsg({ type: 'error', text: 'Errore: ' + (e.message || '') });
     } finally {
       setToggling(prev => ({ ...prev, [key]: false }));
@@ -354,10 +365,13 @@ export default function ContractArchivePage({ ambienti = [] }) {
       return;
     }
     if (!window.confirm('Eliminare il Lotto ' + lotId + ' dal contratto?')) return;
+    // Aggiornamento ottimistico immediato
+    updateLotLocal(contractId, lotId, { deleted: true, active: false });
     try {
       await updateConfiguratoreLot(contractId, lotId, { deleted: true, active: false });
-      await loadContracts();
     } catch (e) {
+      // Rollback
+      updateLotLocal(contractId, lotId, { deleted: false, active: true });
       setMsg({ type: 'error', text: 'Errore eliminazione lotto: ' + (e.message || '') });
     }
   };
@@ -366,8 +380,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
     if (!window.confirm('Eliminare questa configurazione contrattuale?')) return;
     try {
       await deleteConfiguratoreContract(contractId);
+      setContracts(prev => prev.filter(c => c.contractId !== contractId));
       setMsg({ type: 'ok', text: 'Contratto eliminato.' });
-      await loadContracts();
     } catch (e) {
       setMsg({ type: 'error', text: 'Errore eliminazione: ' + (e.message || '') });
     }

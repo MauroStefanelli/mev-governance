@@ -387,6 +387,7 @@ public class ConfiguratoreController : ControllerBase
             if (req.PriceFile != null) payload["priceFile"] = req.PriceFile;
             if (req.Tow5Share != null) payload["tow5Share"] = req.Tow5Share;
             if (req.Active != null) payload["active"] = req.Active;
+            if (req.Deleted != null) payload["deleted"] = req.Deleted;
             if (req.CodiceContratto != null) payload["codiceContratto"] = req.CodiceContratto;
 
             var sql = $@"
@@ -650,8 +651,12 @@ public class ConfiguratoreController : ControllerBase
                     ["priceFile"] = payload.GetValueOrDefault("priceFile") ?? "",
                     ["tow5Share"] = payload.GetValueOrDefault("tow5Share") ?? 65,
                     ["active"] = payload.GetValueOrDefault("active") ?? true,
+                    ["deleted"] = payload.GetValueOrDefault("deleted") ?? false,
                     ["codiceContratto"] = payload.GetValueOrDefault("codiceContratto") ?? "",
                     ["recordId"] = r.GetValueOrDefault("Id"),
+                    // Includi catalog e towPrices dal payload (popolati dall'import PDF/Excel)
+                    ["catalog"] = payload.GetValueOrDefault("catalog") ?? new List<object?>(),
+                    ["towPrices"] = payload.GetValueOrDefault("towPrices") ?? new Dictionary<string, object?>(),
                 };
                 if (byContract.TryGetValue(cid, out var contract))
                     (contract["lots"] as List<Dictionary<string, object?>>)?.Add(lot);
@@ -738,6 +743,7 @@ public record LotPatchRequest(
     string? PriceFile,
     int? Tow5Share,
     bool? Active,
+    bool? Deleted,
     string? CodiceContratto
 );
 
