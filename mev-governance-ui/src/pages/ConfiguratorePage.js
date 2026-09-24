@@ -35,6 +35,7 @@ import {
   applicationsFor,
   saveApplications,
   applicationIdentity,
+  buildTechnicalProfile,
 } from "../configuratore/configuratoreCore";
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
@@ -71,6 +72,8 @@ function ConfiguratorePage({ onUnauthorized }) {
 
   // ── Sviluppo ──
   const [implementationFiles, setImplementationFiles] = useState([]);
+  const [techProfile, setTechProfile] = useState(null);
+  const [techProfileBusy, setTechProfileBusy] = useState(false);
   const [codeChangeTool, setCodeChangeTool] = useState("vscode");
   const [implementationBranch, setImplementationBranch] = useState("");
   const [implementationApprovalNotes, setImplementationApprovalNotes] = useState("");
@@ -753,6 +756,38 @@ function ConfiguratorePage({ onUnauthorized }) {
 
   const safeAppUrl = (url) => { try { const u = new URL(url, window.location.origin); return (u.protocol === "http:" || u.protocol === "https:") ? u.href : ""; } catch { return ""; } };
 
+  // ── Analisi codice sorgente (scheda tecnica) ─────────────────────────────────
+  const selectSourceFolder = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+    input.onchange = async () => {
+      if (!input.files.length) return;
+      const name = initiative.system || initiative.title || "Applicativo";
+      const applicationCode = initiative.code || "AP-000";
+      setTechProfileBusy(true);
+      setTechProfile(null);
+      try {
+        const profile = await buildTechnicalProfile(
+          [...input.files],
+          { name, applicationCode, repositoryUrl: "", systemAliases: [name] },
+          catalog
+        );
+        setTechProfile(profile);
+        // Riusa gli stessi file per lo step sviluppo
+        setImplementationFiles([...input.files]);
+        toast(`Analisi completata: ${profile.readFiles} file elaborati su ${profile.totalFiles} totali`);
+      } catch (err) {
+        toast("Analisi non riuscita: " + err.message);
+      } finally {
+        setTechProfileBusy(false);
+      }
+    };
+    input.click();
+  };
+
   // ── Sviluppo: repository + ZIP richiesta codice (port da generateCodeChangeRequest r.244) ──
   const selectImplementationRepository = () => {
     const input = document.createElement("input");
@@ -1136,6 +1171,107 @@ function ConfiguratorePage({ onUnauthorized }) {
               <button style={btnStyles.primary} onClick={analyze}>Analizza e suggerisci</button>
               <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
             </div>
+          </div>
+
+          {/* ── Codice sorgente: selettore + scheda tecnica ── */}
+          <div style={styles.card}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Codice sorgente</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Carica la cartella del repository per generare la scheda tecnica dell'applicativo</div>
+              </div>
+              <button
+                style={{ ...btnStyles.secondary, marginLeft: "auto" }}
+                disabled={techProfileBusy}
+                onClick={selectSourceFolder}>
+                {techProfileBusy ? "Analisi in corso…" : techProfile ? `↻ Rianalizza (${techProfile.totalFiles} file)` : "Seleziona cartella sorgente…"}
+              </button>
+            </div>
+
+            {techProfile && (() => {
+              const TagList = ({ items }) => items?.length ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 6px", marginTop: 4 }}>
+                  {items.map((t) => (
+                    <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600 }}>{t}</span>
+                  ))}
+                </div>
+              ) : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>;
+
+              const Section = ({ title, items }) => items?.length ? (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: "#475569", marginBottom: 2 }}>{title}</div>
+                  <TagList items={items} />
+                </div>
+              ) : null;
+
+              return (
+                <div style={{ marginTop: 16 }}>
+                  {/* Header scheda */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Scheda tecnica memorizzata</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#102a47" }}>{techProfile.name} · {techProfile.applicationCode}</div>
+                      <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{techProfile.summary}</div>
+                    </div>
+                    <span style={{ background: "#dcfce7", color: "#16a34a", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>Disponibile per le stime</span>
+                  </div>
+
+                  {/* Metriche */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 14 }}>
+                    {[
+                      ["File nella cartella",  techProfile.totalFiles],
+                      ["Sorgenti analizzati",  techProfile.readFiles],
+                      ["File di test",         techProfile.testFiles],
+                      ["Configurazioni",       techProfile.configFiles],
+                    ].map(([label, val]) => (
+                      <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "8px 10px", textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: "#102a47" }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Sezioni tecniche */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px 16px", marginBottom: 12 }}>
+                    <Section title="Linguaggi"              items={techProfile.technologies} />
+                    <Section title="Framework e piattaforme" items={techProfile.frameworks} />
+                    <Section title="Dati e persistenza"     items={techProfile.databases} />
+                    <Section title="Integrazioni"           items={techProfile.integrations} />
+                    <Section title="Interfacce e processi"  items={techProfile.interfaces} />
+                    <Section title="Sicurezza"              items={techProfile.security} />
+                    <Section title="Test"                   items={techProfile.testing} />
+                    <Section title="Infrastruttura e build" items={techProfile.infrastructure} />
+                    <Section title="Componenti o moduli"    items={techProfile.components} />
+                  </div>
+
+                  {/* Segnali catalogo */}
+                  {techProfile.catalogSignals?.length > 0 && (
+                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "10px 12px", marginBottom: 10 }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: "#92400e", marginBottom: 6 }}>
+                        Indizi utili per il Catalogo del Lotto {lot}
+                      </div>
+                      <div style={{ fontSize: 11, lineHeight: 1.7, color: "#78350f" }}>
+                        {techProfile.catalogSignals.map((x) => (
+                          <span key={x.id} style={{ display: "block" }}>
+                            <strong>ID {x.id} · {x.name}</strong>{x.reason ? ` (${x.reason})` : ""}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rischi */}
+                  {techProfile.risks?.length > 0 && (
+                    <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "10px 12px" }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#881337" }}>
+                        {techProfile.risks.map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {importedInterventions.length > 0 && (

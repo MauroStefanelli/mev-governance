@@ -648,3 +648,190 @@ export function applicationsFor(contractId, lot, builtin) {
 export function applicationIdentity(app) {
   return appNorm(`${app.code || ""}|${app.name || ""}`);
 }
+
+// ── Analisi tecnica codice sorgente (port da app standalone v50) ──────────────
+
+function detectedLabels(text, definitions) {
+  return definitions.filter(([, rx]) => rx.test(text)).map(([label]) => label);
+}
+
+export function profileSummary(p) {
+  const core = [...(p.technologies || []), ...(p.frameworks || [])].slice(0, 7).join(", ") || "tecnologie non riconosciute";
+  const traits = [
+    p.interfaces?.length && `${p.interfaces.length} tipologie di interfaccia`,
+    p.integrations?.length && `${p.integrations.length} integrazioni`,
+    p.databases?.length && `${p.databases.length} tecnologie dati`,
+    p.testing?.length && "test automatici rilevati",
+  ].filter(Boolean).join("; ");
+  return `${p.name} (${p.applicationCode}) è un applicativo basato principalmente su ${core}.${traits ? " Sono stati rilevati " + traits + "." : ""}`;
+}
+
+export async function buildTechnicalProfile(files, meta, catalog = []) {
+  const patterns = {
+    technologies: [
+      ["Java",       /\b(?:public class|package [\w.]+|import java\.)/i],
+      ["JavaScript", /\b(?:const|let|function|require\(|module\.exports)\b/i],
+      ["TypeScript", /\b(?:interface\s+\w+|type\s+\w+\s*=|:\s*(?:string|number|boolean)\b)/i],
+      ["Python",     /\b(?:def\s+\w+\(|import\s+\w+|from\s+\w+\s+import)\b/i],
+      ["C#",         /\b(?:namespace\s+\w+|using System|public\s+(?:class|interface))\b/i],
+      ["PHP",        /<\?php|\bnamespace\s+[A-Z]/i],
+      ["Go",         /\bpackage\s+main\b|\bfunc\s+\w+\(/i],
+      ["Kotlin",     /\bfun\s+\w+\(|\bdata class\b/i],
+      ["ABAP",       /\bREPORT\s+\w+|\bDATA:\s|\bSELECT\s+.*\s+INTO\b/i],
+      ["SQL",        /\b(?:select|insert|update|delete|create table)\b[\s\S]{0,100}\b(?:from|into|set|values|table)\b/i],
+    ],
+    frameworks: [
+      ["Spring / Spring Boot", /springframework|spring-boot|@RestController|@Service\b/i],
+      ["React",                /from ['"]react['"]|React\.|useState\(/i],
+      ["Angular",              /@angular\/|@Component\s*\(/i],
+      ["Vue",                  /from ['"]vue['"]|<template>|createApp\(/i],
+      ["Node.js / Express",    /express\(|from ['"]express['"]|require\(['"]express/i],
+      ["Django",               /django\.|from django/i],
+      ["Flask",                /from flask|Flask\(__name__/i],
+      [".NET",                 /Microsoft\.AspNetCore|\.csproj\b|EntityFramework/i],
+      ["SAP",                  /sap\.ui|SAP EM|BAPI_|IDOC/i],
+    ],
+    databases: [
+      ["Oracle",          /oracle|ojdbc|pl\/sql/i],
+      ["PostgreSQL",      /postgres|psycopg/i],
+      ["MySQL / MariaDB", /mysql|mariadb/i],
+      ["SQL Server",      /sqlserver|mssql|Microsoft\.Data\.SqlClient/i],
+      ["MongoDB",         /mongodb|mongoose/i],
+      ["Redis",           /redis/i],
+      ["Elasticsearch",   /elasticsearch|opensearch/i],
+      ["JPA / Hibernate", /hibernate|javax\.persistence|jakarta\.persistence/i],
+    ],
+    integrations: [
+      ["Kafka",        /kafka/i],
+      ["RabbitMQ",     /rabbitmq|amqp/i],
+      ["IBM MQ / JMS", /ibm.?mq|javax\.jms|jakarta\.jms/i],
+      ["REST HTTP",    /https?:\/\/|RestTemplate|WebClient|axios\.|fetch\(/i],
+      ["SOAP / WSDL",  /\bsoap\b|\bwsdl\b/i],
+      ["SFTP / FTP",   /\bsftp\b|\bftp\b/i],
+      ["SAP RFC / IDoc", /\bidoc\b|\bbapi\b|sapjco/i],
+      ["File / CSV",   /\.csv\b|FileReader|BufferedReader/i],
+    ],
+    interfaces: [
+      ["API REST",         /@(?:Get|Post|Put|Delete|Patch)Mapping|app\.(?:get|post|put|delete)\(|router\.(?:get|post)|openapi|swagger/i],
+      ["GraphQL",          /graphql|gql`/i],
+      ["Web UI",           /<html|<template>|ReactDOM|@Component\s*\(/i],
+      ["Batch / Scheduler", /@Scheduled|\bcron\b|crontab|Tasklet|JobBuilder/i],
+      ["Command line",     /process\.argv|argparse|picocli|CommandLineRunner/i],
+    ],
+    security: [
+      ["OAuth2 / OIDC",  /oauth2|openid|oidc/i],
+      ["JWT",            /\bjwt\b|jsonwebtoken/i],
+      ["LDAP",           /\bldap\b/i],
+      ["SAML",           /\bsaml\b/i],
+      ["Cifratura / TLS", /encrypt|decrypt|keystore|truststore|\btls\b/i],
+    ],
+    testing: [
+      ["JUnit",          /junit|@Test\b/i],
+      ["Jest",           /\bjest\b|describe\s*\(|it\s*\(/i],
+      ["Pytest",         /pytest|def test_/i],
+      ["Selenium",       /selenium|WebDriver/i],
+      ["Cypress",        /cypress|cy\./i],
+      ["Testcontainers", /testcontainers/i],
+    ],
+    infrastructure: [
+      ["Docker",              /dockerfile|docker-compose|FROM\s+[\w./:-]+/i],
+      ["Kubernetes / OpenShift", /apiVersion:\s*(?:apps\/|v1)|kind:\s*(?:Deployment|Service|Route)/i],
+      ["Jenkins",             /jenkinsfile|pipeline\s*\{/i],
+      ["GitLab CI",           /\.gitlab-ci|stages:\s*\n/i],
+      ["Maven",               /pom\.xml|<artifactId>/i],
+      ["Gradle",              /build\.gradle|plugins\s*\{/i],
+      ["npm",                 /package\.json|"dependencies"\s*:/i],
+    ],
+  };
+
+  const candidates = [...files].filter(
+    (f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name)
+  );
+  if (!candidates.length) throw new Error("La cartella non contiene file sorgente compatibili");
+
+  const extCounts = {}, topFolders = new Map(), fileNames = [];
+  const detected = {
+    technologies: new Set(), frameworks: new Set(), databases: new Set(),
+    integrations: new Set(), interfaces: new Set(), security: new Set(),
+    testing: new Set(), infrastructure: new Set(),
+  };
+
+  let totalBytes = 0, readFiles = 0, failedFiles = 0, testFiles = 0, configFiles = 0;
+
+  for (const file of candidates) {
+    const path = file.webkitRelativePath || file.name;
+    const parts = path.split("/");
+    if (parts.length > 2) topFolders.set(parts[1], (topFolders.get(parts[1]) || 0) + 1);
+    fileNames.push(path);
+    const ext = (file.name.match(/\.([^.]+)$/)?.[1] || file.name).toLowerCase();
+    extCounts[ext] = (extCounts[ext] || 0) + 1;
+    if (/(?:test|spec|__tests__)/i.test(path)) testFiles++;
+    if (/\.(?:ya?ml|json|xml|properties|conf|cfg|env|toml|ini)$/i.test(file.name) || /Dockerfile|Jenkinsfile/i.test(file.name)) configFiles++;
+    try {
+      const body = await file.text();
+      readFiles++;
+      totalBytes += file.size || body.length;
+      for (const [group, defs] of Object.entries(patterns))
+        detectedLabels(`${path}\n${body}`, defs).forEach((x) => detected[group].add(x));
+    } catch { failedFiles++; }
+  }
+
+  const components = [...topFolders]
+    .filter(([n]) => !/^(?:src|main|test|tests|app|lib|config|resources)$/i.test(n))
+    .sort((a, b) => b[1] - a[1]).slice(0, 12).map(([n]) => n);
+
+  const technologies   = [...detected.technologies];
+  const frameworks     = [...detected.frameworks];
+  const databases      = [...detected.databases];
+  const integrations   = [...detected.integrations];
+  const interfaces     = [...detected.interfaces];
+  const security       = [...detected.security];
+  const testing        = [...detected.testing];
+  const infrastructure = [...detected.infrastructure];
+
+  // Segnali catalogo
+  const signalText = [meta.name, ...technologies, ...frameworks, ...databases, ...integrations, ...interfaces, ...components, fileNames.slice(0, 200).join(" ")].join(" ").toLowerCase();
+  const tokens = [...new Set(signalText.match(/[a-zà-ù0-9]{4,}/g) || [])];
+  const catalogSignals = catalog.map((c) => {
+    const hay = `${c.nome} ${c.ambito} ${c.descrizione || ""}`.toLowerCase();
+    const hits = tokens.filter((t) => hay.includes(t));
+    return { id: c.id, name: c.nome, ambito: c.ambito, score: hits.length, reason: hits.slice(0, 5).join(", ") };
+  }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
+
+  // Rischi
+  const risks = [];
+  if (!testing.length && testFiles === 0) risks.push("Non sono stati riconosciuti test automatici");
+  if (integrations.length >= 4) risks.push("Numerose integrazioni esterne: verificare impatti e collaudi end-to-end");
+  if (databases.length >= 2) risks.push("Persistenza distribuita su più tecnologie dati");
+  if (!security.length && interfaces.length) risks.push("Interfacce rilevate senza meccanismi di sicurezza riconoscibili nel codice");
+  if (failedFiles) risks.push(`${failedFiles} file non leggibili durante l'analisi`);
+
+  const profile = {
+    id: `analysis-${Date.now()}`,
+    name: meta.name || "",
+    applicationCode: (meta.applicationCode || "").toUpperCase(),
+    folderName: (files[0]?.webkitRelativePath || files[0]?.name || "").split("/")[0],
+    analyzedAt: new Date().toISOString(),
+    totalFiles: files.length,
+    sourceFiles: candidates.length,
+    readFiles,
+    failedFiles,
+    totalBytes,
+    extensionCounts: extCounts,
+    technologies,
+    frameworks,
+    databases,
+    integrations,
+    interfaces,
+    security,
+    testing,
+    infrastructure,
+    components,
+    testFiles,
+    configFiles,
+    catalogSignals,
+    risks,
+  };
+  profile.summary = profileSummary(profile);
+  return profile;
+}

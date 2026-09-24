@@ -584,7 +584,12 @@ public class ConfiguratoreController : ControllerBase
             return BadRequest($"entity_type non valido. Valori accettati: {string.Join(", ", ValidEntities)}");
 
         var (sch, cs) = GetDbTarget();
-        var payload = req.Payload ?? new Dictionary<string, object?>();
+        // Serializza il payload preservando la struttura JSON originale
+        string payloadJson;
+        if (req.Payload.HasValue && req.Payload.Value.ValueKind != JsonValueKind.Null && req.Payload.Value.ValueKind != JsonValueKind.Undefined)
+            payloadJson = req.Payload.Value.GetRawText();
+        else
+            payloadJson = "{}";
 
         var sql = $@"
             INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload"")
@@ -607,7 +612,7 @@ public class ConfiguratoreController : ControllerBase
                 new("cid", req.ContractId ?? ""),
                 new("lid", req.LotId ?? ""),
                 new("title", req.Title ?? ""),
-                new("pl", JsonSerializer.Serialize(payload)),
+                new("pl", payloadJson),
             }, sch);
             return Ok(list.Count > 0 ? list[0] : new { message = "salvato" });
         }
@@ -799,7 +804,7 @@ public record PcRecordRequest(
     [property: JsonPropertyName("contract_id")]  string? ContractId,
     [property: JsonPropertyName("lot_id")]       string? LotId,
     [property: JsonPropertyName("title")]        string? Title,
-    [property: JsonPropertyName("payload")]      Dictionary<string, object?>? Payload
+    [property: JsonPropertyName("payload")]      JsonElement? Payload
 );
 
 public record ContractRequest(
