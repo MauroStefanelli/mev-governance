@@ -604,6 +604,39 @@ public class EmergencyController : ControllerBase
 
     public EmergencyController(AppDbContext db) { _db = db; }
 
+    /// <summary>
+    /// Esegue ALTER TABLE DDL di emergenza per aggiungere colonne mancanti senza usare EF.
+    /// Utile quando il modello EF è stato aggiornato ma il DB non ha ancora le nuove colonne.
+    /// </summary>
+    [HttpPost("emergency-ddl")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EmergencyDdl([FromBody] EmergencyResetRequest req)
+    {
+        if (req.Key != EmergencyKey)
+            return Unauthorized(new { message = "Chiave non valida" });
+
+        var schema = (Environment.GetEnvironmentVariable("DB_SCHEMA") ?? "public").Trim().ToLower();
+        var sch = System.Text.RegularExpressions.Regex.IsMatch(schema, @"^[a-zA-Z0-9_]+$") ? schema : "public";
+
+        var conn = _db.Database.GetDbConnection();
+        await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"ALTER TABLE \"{sch}\".\"Users\" ADD COLUMN IF NOT EXISTS \"AiApiKey\" TEXT NULL;";
+            await cmd.ExecuteNonQueryAsync();
+            return Ok(new { message = $"ALTER TABLE eseguita su schema '{sch}'.Users.AiApiKey — OK" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
+    }
+
     [HttpPost("emergency-reset")]
     [AllowAnonymous]
     public async Task<IActionResult> EmergencyReset([FromBody] EmergencyResetRequest req)
