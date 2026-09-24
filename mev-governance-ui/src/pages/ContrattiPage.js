@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord } from "../services/mevService";
+import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord, getConfiguratoreContracts } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
@@ -1074,33 +1074,41 @@ function formatDate(d) {
   catch { return d; }
 }
 
-function ReleaseScheduleSection({ contractId }) {
-  const [records, setRecords]   = useState([]);
-  const [editing, setEditing]   = useState(null); // null | { id, ...release } | "new"
-  const [draft,   setDraft]     = useState(EMPTY_RELEASE());
-  const [saving,  setSaving]    = useState(false);
-  const [msg,     setMsg]       = useState("");
+function ReleaseScheduleSection() {
+  // Carica i contratti del Configuratore per il selector
+  const [contracts,    setContracts]    = useState([]);
+  const [contractId,   setContractId]   = useState("");
+  const [records,      setRecords]      = useState([]);
+  const [editing,      setEditing]      = useState(null);
+  const [draft,        setDraft]        = useState(EMPTY_RELEASE());
+  const [saving,       setSaving]       = useState(false);
+  const [msg,          setMsg]          = useState("");
+
+  // Carica la lista contratti del Configuratore
+  useEffect(() => {
+    getConfiguratoreContracts()
+      .then(d => {
+        const list = d?.contracts || d || [];
+        setContracts(list);
+        if (list.length > 0 && !contractId) setContractId(list[0].contractId || list[0].contract_id || "");
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line
 
   const load = useCallback(() => {
     if (!contractId) return;
-    getReleaseSchedules(contractId).then(d => setRecords(d.records || [])).catch(() => {});
+    getReleaseSchedules(contractId).then(d => setRecords(d.records || [])).catch(() => setRecords([]));
   }, [contractId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const openNew = () => {
-    setDraft(EMPTY_RELEASE());
-    setEditing("new");
-    setMsg("");
-  };
-
+  const openNew = () => { setDraft(EMPTY_RELEASE()); setEditing("new"); setMsg(""); };
   const openEdit = (rec) => {
     const p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : rec.payload || {};
     setDraft({ name: rec.title || "", ...p });
     setEditing(rec);
     setMsg("");
   };
-
   const cancel = () => { setEditing(null); setMsg(""); };
 
   const save = async () => {
@@ -1118,7 +1126,7 @@ function ReleaseScheduleSection({ contractId }) {
   const del = async (rec) => {
     if (!window.confirm(`Eliminare la release "${rec.title}"?`)) return;
     try { await deleteConfiguratoreRecord(rec.id); load(); }
-    catch (e) { setMsg("Errore eliminazione: " + e.message); }
+    catch (e) { setMsg("Errore: " + e.message); }
   };
 
   const cardStyle = {
@@ -1132,14 +1140,34 @@ function ReleaseScheduleSection({ contractId }) {
 
   return (
     <div style={cardStyle}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      {/* Header + selector contratto */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b" }}>Pianificazione Release</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release del contratto</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Pianificazione Release</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release — legate al contratto selezionato</div>
         </div>
-        <button onClick={openNew} style={{ padding: "7px 16px", background: "#102a47", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          + Nuova release
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {/* Selector contratto */}
+          <select
+            value={contractId}
+            onChange={e => setContractId(e.target.value)}
+            style={{ padding: "7px 12px", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, minWidth: 180, background: "#f8fafc" }}>
+            {contracts.length === 0
+              ? <option value="">— nessun contratto —</option>
+              : contracts.map(c => (
+                  <option key={c.contractId || c.contract_id} value={c.contractId || c.contract_id}>
+                    {c.name || c.contractId}
+                  </option>
+                ))
+            }
+          </select>
+          <button
+            onClick={openNew}
+            disabled={!contractId}
+            style={{ padding: "7px 16px", background: contractId ? "#102a47" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: contractId ? "pointer" : "not-allowed" }}>
+            + Nuova release
+          </button>
+        </div>
       </div>
 
       {/* Form inserimento/modifica */}
@@ -1150,7 +1178,7 @@ function ReleaseScheduleSection({ contractId }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>Nome release</label>
-            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12…"
+            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12, Fase 1…"
               value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px 12px" }}>
@@ -1174,18 +1202,20 @@ function ReleaseScheduleSection({ contractId }) {
       )}
 
       {/* Tabella release */}
-      {records.length === 0 && !editing ? (
-        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata. Aggiungi la prima con "+ Nuova release".</p>
+      {!contractId ? (
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto per visualizzare le release pianificate.</p>
+      ) : records.length === 0 && !editing ? (
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata per questo contratto. Aggiungi la prima con "+ Nuova release".</p>
       ) : records.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ background: "#102a47", color: "#fff" }}>
-                <th style={{ padding: "8px 12px", textAlign: "left", whiteSpace: "nowrap", borderRadius: "6px 0 0 0" }}>Release</th>
+                <th style={{ padding: "8px 12px", textAlign: "left", whiteSpace: "nowrap" }}>Release</th>
                 {RELEASE_DATE_FIELDS.map(f => (
                   <th key={f.key} style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{f.label}</th>
                 ))}
-                <th style={{ padding: "8px 10px", textAlign: "center", borderRadius: "0 6px 0 0" }}>Azioni</th>
+                <th style={{ padding: "8px 10px", textAlign: "center" }}>Azioni</th>
               </tr>
             </thead>
             <tbody>
@@ -1243,10 +1273,7 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
   return (
     <div style={{ padding: "24px 28px", background: "#f8fafc", minHeight: "100vh" }}>
       <ConsumoTowSection towRows={towRows} />
-      {/* Tabella Release — usa il contratto più frequente nei towRows come contractId */}
-      <ReleaseScheduleSection
-        contractId={towRows.length > 0 ? (towRows[0]?.towContratto || "default") : "default"}
-      />
+      <ReleaseScheduleSection />
     </div>
   );
 }

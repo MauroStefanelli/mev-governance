@@ -994,6 +994,76 @@ function ConfiguratorePage({ onUnauthorized }) {
         </form>
       )}
 
+      {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
+      <div style={{ ...styles.card, marginBottom: 16, padding: "14px 18px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: archiveRecords.length > 0 ? 10 : 0 }}>
+          <div>
+            <strong style={{ fontSize: 14, color: "#102a47" }}>Valutazioni salvate</strong>
+            <span style={{ marginLeft: 8, fontSize: 12, color: "#667482" }}>
+              {archiveRecords.length === 0 ? "Nessuna iniziativa salvata" : `${archiveRecords.length} iniziativ${archiveRecords.length === 1 ? "a" : "e"}`}
+            </span>
+            {editingRecordKey && (
+              <span style={{ marginLeft: 10, fontSize: 11, background: "#fff8e1", color: "#92600a", border: "1px solid #f6c90e", borderRadius: 4, padding: "2px 8px", fontWeight: 700 }}>
+                In modifica
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={btnStyles.secondary} onClick={loadArchive}>↻ Aggiorna</button>
+            <button
+              style={{ ...btnStyles.primary, background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
+              onClick={() => {
+                if (initiative.code || initiative.title || items.length > 0) {
+                  if (!window.confirm("Avviare una nuova iniziativa? I dati non salvati andranno persi.")) return;
+                }
+                resetInitiative();
+                setEditingRecordKey(null);
+                setStep(1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}>
+              + Nuova Iniziativa
+            </button>
+          </div>
+        </div>
+        {archiveRecords.length > 0 && (
+          <div style={{ display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+            {archiveRecords.map((rec) => {
+              const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
+              const ini = payload.initiative || {};
+              const isCurrentlyEditing = editingRecordKey && editingRecordKey === rec.record_key;
+              return (
+                <div key={rec.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "8px 12px", borderRadius: 7, gap: 10,
+                  background: isCurrentlyEditing ? "#fff8e1" : "#f8f9fa",
+                  border: isCurrentlyEditing ? "1.5px solid #f6c90e" : "1px solid #e8ecf0",
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {isCurrentlyEditing && <span style={{ color: "#92600a", marginRight: 6 }}>✏</span>}
+                      {esc(ini.code || "—")} · {esc(ini.title || rec.title || "Senza titolo")}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#667482", marginTop: 1 }}>
+                      {esc(rec.contract_id || payload.contractId || "")}
+                      {rec.lot_id ? ` · Lotto ${esc(rec.lot_id)}` : ""}
+                      {ini.release ? ` · ${esc(ini.release)}` : ""}
+                      {payload.items ? ` · ${payload.items.length} voci` : ""}
+                      {payload.savedAt ? ` · ${new Date(payload.savedAt).toLocaleDateString("it-IT")}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button style={{ ...btnStyles.secondary, fontSize: 12, padding: "5px 12px" }} onClick={() => reworkInitiative(rec)}>
+                      {isCurrentlyEditing ? "Già aperta" : "Apri"}
+                    </button>
+                    <button style={{ ...btnStyles.danger, fontSize: 12, padding: "5px 10px" }} onClick={() => deleteArchiveRecord(rec.id)}>✕</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Stepper */}
       <div style={{ display: "flex", gap: 4, margin: "8px 0 20px", flexWrap: "wrap" }}>
         {STEPS.map((s, i) => (
@@ -1681,40 +1751,6 @@ function ConfiguratorePage({ onUnauthorized }) {
           </button>
           <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
         </div>
-      </div>
-
-      {/* ARCHIVIO INIZIATIVE */}
-      <div style={{ ...styles.card, marginTop: 28 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0 }}>Archivio iniziative calcolate</h3>
-          <button style={btnStyles.secondary} onClick={loadArchive}>Aggiorna</button>
-        </div>
-        {archiveRecords.length === 0 ? (
-          <p style={{ color: "#666", fontSize: 13 }}>Nessuna iniziativa memorizzata.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 8, maxHeight: 360, overflow: "auto", marginTop: 10 }}>
-            {archiveRecords.map((rec) => {
-              const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
-              const ini = payload.initiative || {};
-              return (
-                <div key={rec.id} style={styles.suggestion}>
-                  <div>
-                    <strong>{esc(ini.code || "Senza codice")} · {esc(ini.title || rec.title)}</strong>
-                    <div style={{ color: "#666", fontSize: 12 }}>
-                      {esc(rec.contract_id || payload.contractId || "")} / Lotto {esc(rec.lot_id || payload.lot || "—")} · {esc((payload.systems || []).join(", "))}
-                      {payload.items ? ` · ${payload.items.length} voci` : ""}
-                      {payload.savedAt ? ` · ${new Date(payload.savedAt).toLocaleDateString("it-IT")}` : ""}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button style={btnStyles.secondary} onClick={() => reworkInitiative(rec)}>Riapri</button>
-                    <button style={btnStyles.danger} onClick={() => deleteArchiveRecord(rec.id)}>Elimina</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {toastMsg && (
