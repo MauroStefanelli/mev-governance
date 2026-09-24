@@ -638,7 +638,7 @@ export const deleteConfiguratoreRecord = async (id) => {
 
 // ── Release schedule per contratto ──────────────────────────────────────────
 export const getReleaseSchedules = async (contractId) => {
-  const params = new URLSearchParams({ entity_type: "release_schedule", contract_id: contractId });
+  const params = new URLSearchParams({ entity_type: "release_calendar", contract_id: contractId });
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records?${params}`, {
     headers: authHeaders()
   });
@@ -649,7 +649,7 @@ export const getReleaseSchedules = async (contractId) => {
 export const upsertReleaseSchedule = async (contractId, release) => {
   return upsertConfiguratoreRecord({
     record_key:  `${contractId}|release|${(release.name || "").replace(/\s+/g, "-").toLowerCase() || Date.now()}`,
-    entity_type: "release_schedule",
+    entity_type: "release_calendar",
     contract_id: contractId,
     lot_id:      null,
     title:       release.name || "Release senza nome",

@@ -1047,17 +1047,30 @@ function ConsumoTowSection({ towRows }) {
 
 
 // ── Tabella Release per Contratto ─────────────────────────────────────────────
+// Colonne raggruppate: ogni fase ha inizio+fine. In tabella vengono mostrate
+// come due sub-colonne sotto un'intestazione di gruppo per ridurre la larghezza.
+const RELEASE_GROUPS = [
+  { group: "Sviluppo",         start: "devStart",   end: "devEnd"   },
+  { group: "Coll. Funz.",      start: "cfStart",    end: "cfEnd"    },
+  { group: "Coll. E2E",        start: "e2eStart",   end: "e2eEnd"   },
+  { group: "UAT",              start: "uatStart",   end: "uatEnd"   },
+  { group: "Certificazione",   start: "certStart",  end: "certEnd"  },
+  { group: "Pass in prod",     start: "passInProd", end: null       },
+  { group: "Disp. cliente",    start: "dispClient", end: null       },
+];
+
+// Lista piatta per il form
 const RELEASE_DATE_FIELDS = [
   { key: "devStart",    label: "Sviluppo inizio" },
   { key: "devEnd",      label: "Sviluppo fine" },
-  { key: "cfStart",     label: "Coll. Funz. inizio" },
-  { key: "cfEnd",       label: "Coll. Funz. fine" },
+  { key: "cfStart",     label: "Coll. Funzionale inizio" },
+  { key: "cfEnd",       label: "Coll. Funzionale fine" },
   { key: "e2eStart",    label: "Coll. E2E inizio" },
   { key: "e2eEnd",      label: "Coll. E2E fine" },
   { key: "uatStart",    label: "UAT inizio" },
   { key: "uatEnd",      label: "UAT fine" },
-  { key: "certStart",   label: "Cert. inizio" },
-  { key: "certEnd",     label: "Cert. fine" },
+  { key: "certStart",   label: "Certificazione inizio" },
+  { key: "certEnd",     label: "Certificazione fine" },
   { key: "passInProd",  label: "Pass in prod" },
   { key: "dispClient",  label: "Disp. al cliente" },
 ];
@@ -1201,21 +1214,41 @@ function ReleaseScheduleSection() {
         </div>
       )}
 
-      {/* Tabella release */}
+      {/* Tabella release — intestazioni a doppio livello, font compatto */}
       {!contractId ? (
         <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto per visualizzare le release pianificate.</p>
       ) : records.length === 0 && !editing ? (
         <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata per questo contratto. Aggiungi la prima con "+ Nuova release".</p>
       ) : records.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "auto" }}>
             <thead>
+              {/* Riga 1: gruppi */}
               <tr style={{ background: "#102a47", color: "#fff" }}>
-                <th style={{ padding: "8px 12px", textAlign: "left", whiteSpace: "nowrap" }}>Release</th>
-                {RELEASE_DATE_FIELDS.map(f => (
-                  <th key={f.key} style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>{f.label}</th>
+                <th rowSpan={2} style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap", verticalAlign: "middle", minWidth: 100, borderRight: "1px solid #1e3a5f" }}>
+                  Nome Release
+                </th>
+                {RELEASE_GROUPS.map(g => (
+                  <th key={g.group}
+                    colSpan={g.end ? 2 : 1}
+                    style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap", fontSize: 10, fontWeight: 700, borderRight: "1px solid #1e3a5f", borderBottom: "1px solid #1e3a5f", letterSpacing: "0.2px" }}>
+                    {g.group}
+                  </th>
                 ))}
-                <th style={{ padding: "8px 10px", textAlign: "center" }}>Azioni</th>
+                <th rowSpan={2} style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap", minWidth: 110 }}>
+                  Azioni
+                </th>
+              </tr>
+              {/* Riga 2: Inizio / Fine */}
+              <tr style={{ background: "#1a3a5c", color: "#c8d9ee" }}>
+                {RELEASE_GROUPS.map(g => g.end ? (
+                  [
+                    <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Inizio</th>,
+                    <th key={g.end}   style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Fine</th>,
+                  ]
+                ) : (
+                  <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Data</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -1223,15 +1256,24 @@ function ReleaseScheduleSection() {
                 const p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : rec.payload || {};
                 return (
                   <tr key={rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "8px 12px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap" }}>{rec.title}</td>
-                    {RELEASE_DATE_FIELDS.map(f => (
-                      <td key={f.key} style={{ padding: "8px 10px", textAlign: "center", color: p[f.key] ? "#334155" : "#cbd5e1" }}>
-                        {formatDate(p[f.key])}
+                    <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>{rec.title}</td>
+                    {RELEASE_GROUPS.map(g => g.end ? (
+                      [
+                        <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap" }}>
+                          {formatDate(p[g.start])}
+                        </td>,
+                        <td key={g.end} style={{ padding: "5px 6px", textAlign: "center", color: p[g.end] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
+                          {formatDate(p[g.end])}
+                        </td>,
+                      ]
+                    ) : (
+                      <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
+                        {formatDate(p[g.start])}
                       </td>
                     ))}
-                    <td style={{ padding: "8px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
-                      <button onClick={() => openEdit(rec)} style={{ marginRight: 6, padding: "4px 10px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 5, cursor: "pointer", fontWeight: 600 }}>Modifica</button>
-                      <button onClick={() => del(rec)} style={{ padding: "4px 10px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 5, cursor: "pointer", fontWeight: 600 }}>Elimina</button>
+                    <td style={{ padding: "5px 8px", textAlign: "center", whiteSpace: "nowrap" }}>
+                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 8px", fontSize: 10, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Modifica</button>
+                      <button onClick={() => del(rec)} style={{ padding: "3px 8px", fontSize: 10, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Elimina</button>
                     </td>
                   </tr>
                 );
