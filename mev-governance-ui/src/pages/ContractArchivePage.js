@@ -4,6 +4,7 @@ import {
   updateConfiguratoreLot,
   deleteConfiguratoreContract,
   importConfiguratoreContract,
+  uploadConfiguratoreContractLot,
 } from '../services/mevService';
 import { CONTRACT_SUMMARIES } from '../configuratore/contractSummaries';
 
@@ -297,6 +298,10 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const [lotEnvSel, setLotEnvSel]     = useState({});
   const [savingLot, setSavingLot]     = useState({});
 
+  // Stato per aggiornamento file su lotto esistente
+  // { "contractId|lotId": { catalogFile?, priceFile?, tow5Share?, uploading } }
+  const [lotUpload, setLotUpload]     = useState({});
+
   const loadContracts = async () => {
     setLoading(true);
     try {
@@ -403,8 +408,39 @@ export default function ContractArchivePage({ ambienti = [] }) {
     }
   };
 
-  const handleShowSummary = (contract) => {
-    const visibleLots = (contract.lots || []).filter(l => !l.deleted);
+  const handleUploadLotFiles = async (contract, lot) => {
+    const key = contract.contractId + '|' + lot.lotId;
+    const up = lotUpload[key] || {};
+    if (!up.priceFile) {
+      setMsg({ type: 'error', text: 'Lotto ' + lot.lotId + ': il Listino TOW è obbligatorio.' });
+      return;
+    }
+    setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], uploading: true } }));
+    setMsg({ type: '', text: '' });
+    try {
+      const result = await uploadConfiguratoreContractLot({
+        contractId: contract.contractId,
+        contractName: contract.name,
+        lotId: lot.lotId,
+        lotName: lot.name,
+        tow5Share: up.tow5Share ?? lot.tow5Share ?? 65,
+        catalogFile: up.catalogFile || null,
+        priceFile: up.priceFile,
+      });
+      const warn = result.warnings?.length ? ' Avvisi: ' + result.warnings.join('; ') : '';
+      setMsg({ type: warn ? 'error' : 'ok', text: result.message + warn });
+      // Reset file selezionati per questo lotto
+      setLotUpload(prev => { const n = { ...prev }; delete n[key]; return n; });
+      // Ricarica contratti per aggiornare badge voci/prezzi
+      await loadContracts();
+    } catch (e) {
+      setMsg({ type: 'error', text: 'Errore upload lotto: ' + (e.message || '') });
+    } finally {
+      setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], uploading: false } }));
+    }
+  };
+
+  const handleShowSummary = (contract) => {    const visibleLots = (contract.lots || []).filter(l => !l.deleted);
     if (!visibleLots.length) return;
     setSumCon(contract);
     setSumLot(visibleLots[0].lotId);
@@ -603,6 +639,21 @@ export default function ContractArchivePage({ ambienti = [] }) {
                             <div>
                               <strong style={{ display: 'block', fontSize: 13, color: '#102a47' }}>Lotto {l.lotId}</strong>
                               <span style={{ display: 'block', color: '#667482', fontSize: 12 }}>{l.name}</span>
+                              {/* Badge riepilogo file analizzati */}
+                              <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {l.priceFile
+                                  ? <span style={{ fontSize: 11, color: l.towPrices && Object.keys(l.towPrices).length > 0 ? '#006b57' : '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>
+                                      {l.towPrices && Object.keys(l.towPrices).length > 0 ? Object.keys(l.towPrices).length + ' prezzi TOW' : 'Listino: ' + l.priceFile}
+                                    </span>
+                                  : <span style={{ fontSize: 11, color: '#c5221f', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #f5c6c2' }}>Listino TOW mancante</span>
+                                }
+                                {l.catalogFile
+                                  ? <span style={{ fontSize: 11, color: Array.isArray(l.catalog) && l.catalog.length > 0 ? '#006b57' : '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>
+                                      {Array.isArray(l.catalog) && l.catalog.length > 0 ? l.catalog.length + ' voci catalogo' : 'Catalogo: ' + l.catalogFile}
+                                    </span>
+                                  : <span style={{ fontSize: 11, color: '#9aa7b3', background: '#fff', padding: '1px 6px', borderRadius: 4, border: '1px solid #d8e0e8' }}>Catalogo non caricato</span>
+                                }
+                              </div>
                             </div>
                             <span style={{ ...S.lotStatus, color: isActive ? '#006b57' : '#667482' }}>
                               {isActive ? 'Attivo' : 'Disattivato'}
@@ -622,6 +673,49 @@ export default function ContractArchivePage({ ambienti = [] }) {
                         );
                       })}
                     </div>
+
+                    {/* Aggiornamento file per lotto (collassabile) */}
+                    {!c.builtin && visible.map(l => {
+                      const key = c.contractId + '|' + l.lotId;
+                      const up = lotUpload[key] || {};
+                      return (
+                        <details key={'up-' + l.lotId} style={{ borderTop: '1px solid #eef2f5', paddingTop: 6 }}>
+                          <summary style={{ fontSize: 12, color: '#334456', cursor: 'pointer', fontWeight: 700, userSelect: 'none', padding: '4px 2px' }}>
+                            Aggiorna file Lotto {l.lotId} — {l.name}
+                          </summary>
+                          <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: 8, alignItems: 'end', paddingBottom: 6 }}>
+                            <label style={{ ...S.labelStyle, fontSize: 12 }}>
+                              Listino TOW (obbligatorio) <span style={{ color: '#c5221f' }}>*</span>
+                              <input type="file"
+                                accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], priceFile: e.target.files[0] || null } }))}
+                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4, borderColor: up.priceFile ? '#bdc9d4' : '#e8a09a' }} />
+                              {up.priceFile && <span style={{ fontSize: 10, color: '#008b72' }}>{up.priceFile.name}</span>}
+                            </label>
+                            <label style={{ ...S.labelStyle, fontSize: 12 }}>
+                              Catalogo PDF (opzionale)
+                              <input type="file" accept=".pdf,application/pdf"
+                                onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], catalogFile: e.target.files[0] || null } }))}
+                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4 }} />
+                              {up.catalogFile && <span style={{ fontSize: 10, color: '#008b72' }}>{up.catalogFile.name}</span>}
+                            </label>
+                            <label style={{ ...S.labelStyle, fontSize: 12 }}>
+                              TOW .5 %
+                              <input type="number" min={0} max={100} step={0.01}
+                                value={up.tow5Share ?? l.tow5Share ?? 65}
+                                onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], tow5Share: parseFloat(e.target.value) || 65 } }))}
+                                style={{ ...S.inputStyle, fontSize: 12, padding: '6px 8px', marginTop: 4, width: 80 }} />
+                            </label>
+                            <button
+                              onClick={() => handleUploadLotFiles(c, l)}
+                              disabled={up.uploading || !up.priceFile}
+                              style={{ ...S.btnGhost, ...S.btnCompact, background: '#1c4e80', color: '#fff', border: 'none', opacity: (!up.priceFile || up.uploading) ? 0.6 : 1, alignSelf: 'end' }}>
+                              {up.uploading ? 'Analisi...' : 'Analizza e salva'}
+                            </button>
+                          </div>
+                        </details>
+                      );
+                    })}
 
                     {/* Azioni */}
                     <div style={S.cardActions}>
