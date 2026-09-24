@@ -37,14 +37,14 @@ public class AiService
         return string.IsNullOrWhiteSpace(v) ? fallback : v;
     }
 
-    private AiSettings Settings(string? userApiKey = null)
+    private AiSettings Settings(string? userApiKey = null, string? userEndpoint = null,
+                                string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
-        var endpoint = Env("AI_ENDPOINT", "https://api.openai.com/v1/responses");
-        var model = Env("AI_MODEL", "");
-        // Usa la chiave dell'utente se presente, altrimenti quella dell'ambiente
-        var apiKey = !string.IsNullOrWhiteSpace(userApiKey) ? userApiKey : Env("AI_API_KEY", "");
-        var apiStyle = Env("AI_API_STYLE", "responses");
-        var authMode = Env("AI_AUTH_MODE", "bearer");
+        var endpoint = !string.IsNullOrWhiteSpace(userEndpoint) ? userEndpoint : Env("AI_ENDPOINT", "https://api.openai.com/v1/chat/completions");
+        var model    = !string.IsNullOrWhiteSpace(userModel)    ? userModel    : Env("AI_MODEL", "gpt-4o");
+        var apiKey   = !string.IsNullOrWhiteSpace(userApiKey)   ? userApiKey   : Env("AI_API_KEY", "");
+        var apiStyle = !string.IsNullOrWhiteSpace(userStyle)    ? userStyle    : Env("AI_API_STYLE", "chat");
+        var authMode = !string.IsNullOrWhiteSpace(userAuthMode) ? userAuthMode : Env("AI_AUTH_MODE", "bearer");
         var provider = Env("AI_PROVIDER", "openai");
         return new AiSettings(endpoint, model, apiKey, apiStyle, authMode, provider);
     }
@@ -358,9 +358,12 @@ public class AiService
     // POST /api/configuratore/ai/analyze
     // Valuta un'iniziativa e propone interventi dal catalogo.
     // ============================================================
-    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalyzeAsync(JsonElement context, string? userApiKey = null)
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalyzeAsync(
+        JsonElement context,
+        string? userApiKey = null, string? userEndpoint = null,
+        string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
-        var s = Settings(userApiKey);
+        var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "developer", ["content"] = AnalyzeInstructions },
@@ -386,9 +389,12 @@ public class AiService
     // POST /api/configuratore/ai/development
     // Verifica un piano di sviluppo stimato (raccomandazioni).
     // ============================================================
-    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> DevelopmentAsync(JsonElement context, string? userApiKey = null)
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> DevelopmentAsync(
+        JsonElement context,
+        string? userApiKey = null, string? userEndpoint = null,
+        string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
-        var s = Settings(userApiKey);
+        var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "developer", ["content"] = DevelopmentInstructions },

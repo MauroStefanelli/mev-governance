@@ -27,6 +27,10 @@ public class AppUser
     public string? RefreshToken { get; set; }
     public DateTime? RefreshTokenExpiry { get; set; }
 
-    // Chiave API personale per il servizio AI (es. OpenAI)
-    public string? AiApiKey { get; set; }
+    // Configurazione AI personale
+    public string? AiApiKey   { get; set; }   // chiave API (es. sk-...)
+    public string? AiEndpoint { get; set; }   // es. https://api.openai.com/v1/chat/completions
+    public string? AiModel    { get; set; }   // es. gpt-4o, gpt-5.5
+    public string? AiStyle    { get; set; }   // "responses" | "chat"
+    public string? AiAuthMode { get; set; }   // "bearer" | "api-key"
 }

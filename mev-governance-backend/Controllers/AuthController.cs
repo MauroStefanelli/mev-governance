@@ -436,7 +436,7 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
-    // PUT /api/auth/me/aikey — salva/aggiorna API key AI personale
+    // PUT /api/auth/me/aikey — manteniamo per retrocompatibilità
     // ============================================================
     [HttpPut("me/aikey")]
     [Authorize]
@@ -444,17 +444,44 @@ public class AuthController : ControllerBase
     {
         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
-
         var user = await _db.Users.FindAsync(userId);
         if (user == null) return NotFound();
-
         user.AiApiKey = string.IsNullOrWhiteSpace(req.ApiKey) ? null : req.ApiKey.Trim();
         await _db.SaveChangesAsync();
         return Ok(new { message = "API key aggiornata", hasKey = user.AiApiKey != null });
     }
 
     // ============================================================
-    // GET /api/auth/me — profilo self (include hasAiKey)
+    // PUT /api/auth/me/aisettings — salva configurazione AI completa
+    // ============================================================
+    [HttpPut("me/aisettings")]
+    [Authorize]
+    public async Task<IActionResult> SaveMyAiSettings([FromBody] SaveAiSettingsRequest req)
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+
+        if (req.ApiKey  != null) user.AiApiKey   = string.IsNullOrWhiteSpace(req.ApiKey)   ? null : req.ApiKey.Trim();
+        if (req.Endpoint != null) user.AiEndpoint = string.IsNullOrWhiteSpace(req.Endpoint) ? null : req.Endpoint.Trim();
+        if (req.Model    != null) user.AiModel    = string.IsNullOrWhiteSpace(req.Model)    ? null : req.Model.Trim();
+        if (req.Style    != null) user.AiStyle    = string.IsNullOrWhiteSpace(req.Style)    ? null : req.Style.Trim();
+        if (req.AuthMode != null) user.AiAuthMode = string.IsNullOrWhiteSpace(req.AuthMode) ? null : req.AuthMode.Trim();
+
+        await _db.SaveChangesAsync();
+        return Ok(new {
+            message   = "Configurazione AI aggiornata",
+            hasKey    = user.AiApiKey   != null,
+            endpoint  = user.AiEndpoint,
+            model     = user.AiModel,
+            style     = user.AiStyle,
+            authMode  = user.AiAuthMode
+        });
+    }
+
+    // ============================================================
+    // GET /api/auth/me — profilo self (include configurazione AI)
     // ============================================================
     [HttpGet("me")]
     [Authorize]
@@ -464,7 +491,14 @@ public class AuthController : ControllerBase
         if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
         var user = await _db.Users.FindAsync(userId);
         if (user == null) return NotFound();
-        return Ok(new { user.Id, user.Username, user.FullName, user.Email, user.Role, hasAiKey = !string.IsNullOrEmpty(user.AiApiKey) });
+        return Ok(new {
+            user.Id, user.Username, user.FullName, user.Email, user.Role,
+            hasAiKey  = !string.IsNullOrEmpty(user.AiApiKey),
+            aiEndpoint = user.AiEndpoint,
+            aiModel    = user.AiModel,
+            aiStyle    = user.AiStyle,
+            aiAuthMode = user.AiAuthMode
+        });
     }
 
     // ============================================================
@@ -623,7 +657,13 @@ public class EmergencyController : ControllerBase
         try
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"ALTER TABLE \"{sch}\".\"Users\" ADD COLUMN IF NOT EXISTS \"AiApiKey\" TEXT NULL;";
+            cmd.CommandText = $@"
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiApiKey""   TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiEndpoint"" TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiModel""    TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiStyle""    TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiAuthMode"" TEXT NULL;
+            ";
             await cmd.ExecuteNonQueryAsync();
             return Ok(new { message = $"ALTER TABLE eseguita su schema '{sch}'.Users.AiApiKey — OK" });
         }
@@ -687,4 +727,5 @@ public record SwitchAmbienteRequest(int AmbienteId);
 public record ChangeMyPasswordRequest(string OldPassword, string NewPassword);
 public record ResetPasswordRequest(string NewPassword);
 public record SaveAiKeyRequest(string? ApiKey);
+public record SaveAiSettingsRequest(string? ApiKey, string? Endpoint, string? Model, string? Style, string? AuthMode);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);

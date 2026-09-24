@@ -312,6 +312,21 @@ export const saveMyAiKey = async (apiKey) => {
   return response.json();
 };
 
+export const saveMyAiSettings = async ({ apiKey, endpoint, model, style, authMode }) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/aisettings`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ apiKey: apiKey ?? null, endpoint: endpoint ?? null, model: model ?? null, style: style ?? null, authMode: authMode ?? null })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = text;
+    try { msg = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(msg);
+  }
+  return response.json();
+};
+
 export const getMyProfile = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me`, {
     headers: authHeaders(),

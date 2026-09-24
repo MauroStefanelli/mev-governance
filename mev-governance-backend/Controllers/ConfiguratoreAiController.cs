@@ -25,13 +25,20 @@ public class ConfiguratoreAiController : ControllerBase
         return User.IsInRole("SuperAdmin") || User.IsInRole("Developer");
     }
 
-    // Legge la API key personale dell'utente corrente (se presente)
-    private string? GetUserAiKey()
+    // Legge le impostazioni AI personali dell'utente corrente
+    private (string? key, string? endpoint, string? model, string? style, string? authMode) GetUserAiSettings()
     {
         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(idClaim, out var userId)) return null;
+        if (!int.TryParse(idClaim, out var userId)) return (null, null, null, null, null);
         var user = _db.Users.Find(userId);
-        return string.IsNullOrWhiteSpace(user?.AiApiKey) ? null : user.AiApiKey;
+        if (user == null) return (null, null, null, null, null);
+        return (
+            string.IsNullOrWhiteSpace(user.AiApiKey)   ? null : user.AiApiKey,
+            string.IsNullOrWhiteSpace(user.AiEndpoint) ? null : user.AiEndpoint,
+            string.IsNullOrWhiteSpace(user.AiModel)    ? null : user.AiModel,
+            string.IsNullOrWhiteSpace(user.AiStyle)    ? null : user.AiStyle,
+            string.IsNullOrWhiteSpace(user.AiAuthMode) ? null : user.AiAuthMode
+        );
     }
 
     // ============================================================
@@ -48,7 +55,8 @@ public class ConfiguratoreAiController : ControllerBase
 
         try
         {
-            var (analysis, provider, model, usage) = await _ai.AnalyzeAsync(context, GetUserAiKey());
+            var (key, ep, mdl, sty, auth) = GetUserAiSettings();
+            var (analysis, provider, model, usage) = await _ai.AnalyzeAsync(context, key, ep, mdl, sty, auth);
             return Ok(new { analysis, provider, model, usage });
         }
         catch (Exception ex)
@@ -69,7 +77,8 @@ public class ConfiguratoreAiController : ControllerBase
 
         try
         {
-            var (analysis, provider, model, usage) = await _ai.DevelopmentAsync(context, GetUserAiKey());
+            var (key, ep, mdl, sty, auth) = GetUserAiSettings();
+            var (analysis, provider, model, usage) = await _ai.DevelopmentAsync(context, key, ep, mdl, sty, auth);
             return Ok(new { analysis, provider, model, usage });
         }
         catch (Exception ex)

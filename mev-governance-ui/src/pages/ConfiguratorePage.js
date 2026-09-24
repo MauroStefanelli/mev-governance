@@ -986,8 +986,24 @@ function ConfiguratorePage({ onUnauthorized }) {
       {/* STEP 1: INIZIATIVA */}
       {step === 1 && (
         <div>
-          <input type="file" accept=".xlsx" style={styles.inputFile} onChange={(e) => handleImportExcel(e.target.files[0])} disabled={mappedLoading} />
-          <p style={styles.hint}>Carica il workbook dell'iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).</p>
+          {/* Bottone import Excel visibile */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: mappedLoading ? "not-allowed" : "pointer",
+              background: mappedLoading ? "#c8d6e5" : "linear-gradient(135deg, #102a47 0%, #1a73e8 100%)",
+              color: "#fff", padding: "12px 24px", borderRadius: 8, fontSize: 15, fontWeight: 700,
+              boxShadow: "0 2px 8px rgba(16,42,71,0.18)", border: "none",
+              opacity: mappedLoading ? 0.7 : 1, transition: "opacity 0.2s" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              {mappedLoading ? "Elaborazione in corso…" : "Importa Tabella di Offerta"}
+              <input type="file" accept=".xlsx" style={{ display: "none" }} disabled={mappedLoading}
+                onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0]); e.target.value = ""; }} />
+            </label>
+            <p style={{ ...styles.hint, marginTop: 8, marginBottom: 0 }}>
+              Carica il workbook dell'iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).
+            </p>
+          </div>
           <div style={{ ...styles.card, marginTop: 12 }}>
             <h3 style={{ margin: "0 0 12px" }}>Dati iniziativa</h3>
             <div style={styles.grid2}>
@@ -1171,8 +1187,8 @@ function ConfiguratorePage({ onUnauthorized }) {
           {items.map((s, i) => {
             const cc = catalog.find((x) => x.id === s.id);
             if (!cc) return null;
-            const vals = validComplexities(s, cc);
-            const prezzi = cc.prezzi?.[s.type] || {};
+            // CORRETTO: validComplexities(catalogEntry, typeString)
+            const vals = validComplexities(cc, s.type);
             const unitPrice = defaultPrice(s, { catalog, priceMode, builtin: !!activeContract?.builtin });
             const importoProposto = unitPrice * (s.qty || 1);
             return (
@@ -1181,9 +1197,18 @@ function ConfiguratorePage({ onUnauthorized }) {
                 <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
                   <input type="checkbox" style={{ marginTop: 3, flex: "0 0 auto" }} checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: "#666", fontSize: 11 }}>ID {cc.id} · {esc(cc.ambito)}</div>
-                    <strong style={{ fontSize: 14 }}>{esc(cc.nome)}</strong>
-                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#555", lineHeight: 1.4 }}>{esc(s.reason)}</p>
+                    <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>ID {cc.id} · {esc(cc.ambito)}</div>
+                    <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
+                    {cc.descrizione && (
+                      <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "5px 8px" }}>
+                        <span style={{ fontWeight: 600, color: "#102a47" }}>Voce catalogo: </span>{esc(cc.descrizione)}
+                      </p>
+                    )}
+                    {s.reason && (
+                      <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "5px 8px", borderLeft: "3px solid #1a73e8" }}>
+                        <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{esc(s.reason)}
+                      </p>
+                    )}
                   </div>
                 </label>
 
@@ -1212,7 +1237,10 @@ function ConfiguratorePage({ onUnauthorized }) {
                         <td style={{ padding: "5px 8px" }}>
                           <select style={{ ...styles.input, fontSize: 11, padding: "3px 5px" }} value={s.complexity}
                             onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
-                            {vals.map((v) => (<option key={v} value={v}>{v}</option>))}
+                            {vals.length > 0
+                              ? vals.map((v) => (<option key={v} value={v}>{v}</option>))
+                              : <option value={s.complexity}>{s.complexity}</option>
+                            }
                           </select>
                         </td>
                         <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Semplice" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Semplice" ? 700 : 400 }}>
@@ -1225,8 +1253,8 @@ function ConfiguratorePage({ onUnauthorized }) {
                           {cc.prezzi?.[s.type]?.Complesso != null ? euro.format(cc.prezzi[s.type].Complesso) : "–"}
                         </td>
                         <td style={{ padding: "5px 8px", textAlign: "right" }}>
-                          <input type="number" min="0.01" step={0.01} value={s.qty}
-                            onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(0, Number(e.target.value) || 0) } : q)))}
+                          <input type="number" min="1" step={1} value={Math.round(s.qty || 1)}
+                            onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(1, Math.round(Number(e.target.value) || 1)) } : q)))}
                             style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 5px", textAlign: "right" }} />
                         </td>
                         <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, color: "#102a47" }}>

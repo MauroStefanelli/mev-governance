@@ -11,7 +11,7 @@ import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
-import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -41,6 +41,11 @@ function App() {
   const [aiKeyVal, setAiKeyVal]     = useState("");
   const [aiKeyHas, setAiKeyHas]     = useState(false);
   const [aiKeyMsg, setAiKeyMsg]     = useState("");
+  // Campi configurazione AI estesa
+  const [aiEndpoint, setAiEndpoint] = useState("");
+  const [aiModel,    setAiModel]    = useState("");
+  const [aiStyle,    setAiStyle]    = useState("chat");
+  const [aiAuthMode, setAiAuthMode] = useState("bearer");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
 
@@ -821,7 +826,14 @@ function App() {
               setShowPwdModal(true); setPwdModalTab("password");
               setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError("");
               setAiKeyVal(""); setAiKeyMsg("");
-              try { const p = await getMyProfile(); setAiKeyHas(!!p?.hasAiKey); } catch {}
+              try {
+                const p = await getMyProfile();
+                setAiKeyHas(!!p?.hasAiKey);
+                setAiEndpoint(p?.aiEndpoint || "");
+                setAiModel(p?.aiModel || "");
+                setAiStyle(p?.aiStyle || "chat");
+                setAiAuthMode(p?.aiAuthMode || "bearer");
+              } catch {}
             }}
             title="Profilo: cambio password / API Key AI"
             style={{
@@ -905,45 +917,100 @@ function App() {
 
             {pwdModalTab === "aikey" && (
               <>
-                <div style={{ fontSize: 13, color: "#334456", marginBottom: 12, lineHeight: 1.5 }}>
-                  Inserisci la tua chiave API OpenAI personale. Verrà usata al posto della chiave di sistema quando usi il Configuratore AI.
-                  {aiKeyHas && <span style={{ display: "block", marginTop: 6, color: "#006b57", fontWeight: 600 }}>Una chiave è già memorizzata. Inserire una nuova per sostituirla.</span>}
+                {/* Info box */}
+                <div style={{ background: "#f0f7ff", border: "1px solid #c5d9f5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#334456", lineHeight: 1.6 }}>
+                  <strong style={{ color: "#102a47" }}>Configurazione AI personale</strong><br/>
+                  L'analisi automatica usa l'API AI solo quando premi il pulsante dedicato. La chiave non viene salvata nel browser né inclusa negli export.<br/>
+                  {aiKeyHas && <span style={{ color: "#006b57", fontWeight: 600 }}>Una chiave è già memorizzata.</span>}
                 </div>
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: "12px", color: "#555", marginBottom: "4px" }}>API Key (sk-...)</div>
-                  <input
-                    type="text" value={aiKeyVal}
-                    onChange={e => setAiKeyVal(e.target.value)}
-                    placeholder={aiKeyHas ? "••••••••••••••••••••••••••••••••" : "sk-..."}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid #dadce0",
-                      borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", fontFamily: "monospace" }}
-                  />
+
+                {/* Endpoint */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Endpoint (URL completo)
+                  </label>
+                  <input type="text" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)}
+                    placeholder="https://api.openai.com/v1/chat/completions"
+                    style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>
+                    OpenAI: <code>https://api.openai.com/v1/chat/completions</code> &nbsp;·&nbsp;
+                    Capgemini EU: <code>https://openai.generative-eu.engine.capgemini.com/v1/chat/completions</code>
+                  </div>
                 </div>
+
+                {/* Modello */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Modello</label>
+                  <input type="text" value={aiModel} onChange={e => setAiModel(e.target.value)}
+                    placeholder="es. gpt-4o, gpt-5.5, gpt-4.1"
+                    style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                </div>
+
+                {/* Stile + Auth su una riga */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Protocollo API</label>
+                    <select value={aiStyle} onChange={e => setAiStyle(e.target.value)}
+                      style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12 }}>
+                      <option value="chat">Chat Completions (/chat/completions)</option>
+                      <option value="responses">Responses API (/responses)</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Autenticazione</label>
+                    <select value={aiAuthMode} onChange={e => setAiAuthMode(e.target.value)}
+                      style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12 }}>
+                      <option value="bearer">Authorization: Bearer</option>
+                      <option value="api-key">Header api-key</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* API Key */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Chiave API {aiKeyHas ? "(già salvata — lascia vuoto per non cambiarla)" : ""}
+                  </label>
+                  <input type="password" value={aiKeyVal} onChange={e => setAiKeyVal(e.target.value)}
+                    placeholder={aiKeyHas ? "••••••••••••••••••••••••••••••••" : "sk-... oppure chiave Capgemini"}
+                    style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                </div>
+
                 {aiKeyMsg && (
-                  <div style={{ fontSize: "12px", color: aiKeyMsg.startsWith("Errore") ? "#ea4335" : "#006b57", marginBottom: 12, fontWeight: 600 }}>{aiKeyMsg}</div>
+                  <div style={{ fontSize: 12, color: aiKeyMsg.startsWith("Errore") ? "#ea4335" : "#006b57", marginBottom: 12, fontWeight: 600 }}>{aiKeyMsg}</div>
                 )}
+
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
                   {aiKeyHas && (
                     <button onClick={async () => {
-                      try { await saveMyAiKey(""); setAiKeyHas(false); setAiKeyVal(""); setAiKeyMsg("Chiave rimossa."); }
-                      catch (e) { setAiKeyMsg("Errore: " + e.message); }
-                    }} style={{ padding: "8px 14px", borderRadius: "6px", border: "1px solid #f5c6c2",
-                      background: "#fff", color: "#c5221f", cursor: "pointer", fontSize: "13px" }}>
+                      try {
+                        await saveMyAiSettings({ apiKey: "", endpoint: aiEndpoint, model: aiModel, style: aiStyle, authMode: aiAuthMode });
+                        setAiKeyHas(false); setAiKeyVal(""); setAiKeyMsg("Chiave rimossa.");
+                      } catch (e) { setAiKeyMsg("Errore: " + e.message); }
+                    }} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #f5c6c2", background: "#fff", color: "#c5221f", cursor: "pointer", fontSize: 13 }}>
                       Rimuovi chiave</button>
                   )}
                   <button onClick={() => setShowPwdModal(false)}
-                    style={{ padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
-                      background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}>
+                    style={{ padding: "8px 18px", borderRadius: 6, border: "1px solid #dadce0", background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: 13 }}>
                     Annulla</button>
                   <button onClick={async () => {
-                    if (!aiKeyVal.trim()) { setAiKeyMsg("Inserire una chiave valida."); return; }
+                    if (!aiEndpoint.trim() && !aiModel.trim() && !aiKeyVal.trim()) {
+                      setAiKeyMsg("Inserire almeno un campo da aggiornare."); return;
+                    }
                     try {
-                      await saveMyAiKey(aiKeyVal.trim());
-                      setAiKeyHas(true); setAiKeyVal(""); setAiKeyMsg("Chiave salvata con successo.");
+                      const res = await saveMyAiSettings({
+                        apiKey:   aiKeyVal.trim() || undefined,
+                        endpoint: aiEndpoint.trim() || undefined,
+                        model:    aiModel.trim() || undefined,
+                        style:    aiStyle,
+                        authMode: aiAuthMode,
+                      });
+                      if (aiKeyVal.trim()) setAiKeyHas(true);
+                      setAiKeyVal("");
+                      setAiKeyMsg("Configurazione AI salvata.");
                     } catch (e) { setAiKeyMsg("Errore: " + e.message); }
-                  }} style={{ padding: "8px 18px", borderRadius: "6px", border: "none",
-                    background: "#1a73e8", color: "white", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>
-                    Salva chiave</button>
+                  }} style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: "#102a47", color: "white", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                    Salva configurazione</button>
                 </div>
               </>
             )}
