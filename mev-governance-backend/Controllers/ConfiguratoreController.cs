@@ -6,6 +6,7 @@ using Npgsql;
 using System.Data;
 using System.Text.Json;
 using MevGovernanceBackend.Data;
+using MevGovernanceBackend.Services;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -169,6 +170,185 @@ public class ConfiguratoreController : ControllerBase
         {
             return StatusCode(500, new { message = "Errore salvataggio contratto", error = ex.Message });
         }
+    }
+
+    // ============================================================
+    // POST /api/configuratore/contracts/import  — multipart/form-data
+    // Crea un contratto parsando i PDF/Excel caricati per ogni lotto.
+    // Form fields:
+    //   contractId  (string)
+    //   name        (string)
+    //   rulesFile   (file, opzionale — PDF capitolato)
+    //   lotsJson    (JSON string) — array di { lotId, name, tow5Share }
+    //   catalogFile_{lotId}  (file PDF)
+    //   priceFile_{lotId}    (file XLSX o PDF)
+    // ============================================================
+    [HttpPost("contracts/import")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB max
+    public async Task<IActionResult> ImportContract([FromForm] IFormCollection form)
+    {
+        if (!CanAccess()) return Forbid();
+
+        var contractId = form["contractId"].ToString().Trim();
+        var name       = form["name"].ToString().Trim();
+        if (string.IsNullOrEmpty(contractId) || string.IsNullOrEmpty(name))
+            return BadRequest("contractId e name sono obbligatori");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(contractId, @"^[a-zA-Z0-9_\-]+$"))
+            return BadRequest("contractId non valido");
+
+        // Leggi metadati lotti dal JSON inviato dal frontend
+        var lotsJson = form["lotsJson"].ToString();
+        List<ImportLotMeta> lotMetas;
+        try
+        {
+            lotMetas = JsonSerializer.Deserialize<List<ImportLotMeta>>(lotsJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? new List<ImportLotMeta>();
+        }
+        catch
+        {
+            return BadRequest("lotsJson non valido");
+        }
+
+        var (sch, cs) = GetDbTarget();
+
+        // ── 1. Salva contratto (header) ──
+        var rulesFileName = "";
+        var rfFile = form.Files.GetFile("rulesFile");
+        if (rfFile != null)
+            rulesFileName = rfFile.FileName;
+
+        var contractPayload = new Dictionary<string, object?>
+        {
+            ["name"]      = name,
+            ["rulesFile"] = rulesFileName,
+            ["builtin"]   = false,
+            ["createdAt"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        };
+
+        var sqlContract = $@"
+            INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload"")
+            VALUES (@rk, 'contract', @cid, '', @title, @pl::jsonb)
+            ON CONFLICT (""record_key"") DO UPDATE SET
+                ""title""      = EXCLUDED.""title"",
+                ""payload""    = EXCLUDED.""payload"",
+                ""updated_at"" = now()";
+
+        try
+        {
+            await ExecuteAsync(cs, sqlContract, new List<NpgsqlParameter>
+            {
+                new("rk",    $"{contractId}|contract"),
+                new("cid",   contractId),
+                new("title", name),
+                new("pl",    JsonSerializer.Serialize(contractPayload)),
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Errore salvataggio contratto", error = ex.Message });
+        }
+
+        // ── 2. Per ogni lotto: parsa PDF catalogo + listino TOW ──
+        var lotResults = new List<object>();
+        var errors     = new List<string>();
+
+        foreach (var meta in lotMetas)
+        {
+            var lotId = meta.LotId?.Trim();
+            if (string.IsNullOrEmpty(lotId)) continue;
+
+            if (!int.TryParse(lotId, out var lotNum))
+            {
+                errors.Add($"Lotto {lotId}: lotId deve essere numerico");
+                continue;
+            }
+
+            var catalogFile = form.Files.GetFile($"catalogFile_{lotId}");
+            var priceFile   = form.Files.GetFile($"priceFile_{lotId}");
+
+            if (catalogFile == null || priceFile == null)
+            {
+                errors.Add($"Lotto {lotId}: file catalogo o listino TOW mancante");
+                continue;
+            }
+
+            List<CatalogEntry> catalog;
+            Dictionary<string, double> towPrices;
+
+            try
+            {
+                await using var catStream = catalogFile.OpenReadStream();
+                catalog = ContractParserService.ParseCatalogPdf(catStream, lotNum);
+                if (catalog.Count == 0)
+                    errors.Add($"Lotto {lotId}: nessuna voce riconosciuta nel catalogo PDF");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Lotto {lotId} catalogo: {ex.Message}");
+                catalog = new List<CatalogEntry>();
+            }
+
+            try
+            {
+                await using var priceStream = priceFile.OpenReadStream();
+                var isExcel = priceFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+                towPrices = isExcel
+                    ? ContractParserService.ParseTowPriceExcel(priceStream, lotNum)
+                    : ContractParserService.ParseTowPricePdf(priceStream, lotNum);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Lotto {lotId} listino: {ex.Message}");
+                towPrices = new Dictionary<string, double>();
+            }
+
+            var lotPayload = new Dictionary<string, object?>
+            {
+                ["name"]        = meta.Name ?? $"Lotto {lotId}",
+                ["catalogFile"] = catalogFile.FileName,
+                ["priceFile"]   = priceFile.FileName,
+                ["tow5Share"]   = meta.Tow5Share ?? 65,
+                ["active"]      = true,
+                ["codiceContratto"] = "",
+                ["catalog"]     = catalog,
+                ["towPrices"]   = towPrices,
+            };
+
+            var sqlLot = $@"
+                INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload"")
+                VALUES (@rk, 'contract_lot', @cid, @lid, @title, @pl::jsonb)
+                ON CONFLICT (""record_key"") DO UPDATE SET
+                    ""title""      = EXCLUDED.""title"",
+                    ""payload""    = EXCLUDED.""payload"",
+                    ""updated_at"" = now()";
+
+            try
+            {
+                await ExecuteAsync(cs, sqlLot, new List<NpgsqlParameter>
+                {
+                    new("rk",    $"{contractId}|{lotId}|contract-lot"),
+                    new("cid",   contractId),
+                    new("lid",   lotId),
+                    new("title", meta.Name ?? $"Lotto {lotId}"),
+                    new("pl",    JsonSerializer.Serialize(lotPayload)),
+                });
+                lotResults.Add(new { lotId, catalogEntries = catalog.Count, towEntries = towPrices.Count });
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Lotto {lotId} salvataggio DB: {ex.Message}");
+            }
+        }
+
+        return Ok(new
+        {
+            message    = errors.Count == 0 ? "Contratto importato con successo" : "Importazione completata con avvisi",
+            contractId,
+            lots       = lotResults,
+            warnings   = errors,
+        });
     }
 
     // ============================================================
@@ -528,3 +708,10 @@ public record LotPatchRequest(
     bool? Active,
     string? CodiceContratto
 );
+
+public record ImportLotMeta
+{
+    public string? LotId      { get; init; }
+    public string? Name       { get; init; }
+    public int?    Tow5Share  { get; init; }
+}

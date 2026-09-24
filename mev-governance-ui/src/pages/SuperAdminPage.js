@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   getAllAmbienti, createAmbiente,
   getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente, updateUtenteAmbienteRuolo,
-  getConfiguratoreContracts, upsertConfiguratoreContract, updateConfiguratoreLot, deleteConfiguratoreContract
+  getConfiguratoreContracts, updateConfiguratoreLot, deleteConfiguratoreContract,
+  importConfiguratoreContract
 } from "../services/mevService";
 
 export default function SuperAdminPage() {
@@ -26,6 +27,8 @@ export default function SuperAdminPage() {
   const [ncRulesFile, setNcRulesFile]     = useState(null); // PDF capitolato
   const [ncLots, setNcLots]               = useState(2);
   const [ncLotNames, setNcLotNames]       = useState({}); // { "1": "Lotto 1", ... }
+  const [ncLotFiles, setNcLotFiles]       = useState({}); // { "1": { catalogFile, priceFile }, ... }
+  const [ncLotShares, setNcLotShares]     = useState({}); // { "1": 65, ... }
   const [ncSaving, setNcSaving]           = useState(false);
   // Codici contratto per lotto (in modifica)
   const [lotCodes, setLotCodes]           = useState({}); // { "contractId|lotto": codiceContratto }
@@ -93,26 +96,45 @@ export default function SuperAdminPage() {
 
   const handleCreateArchContract = async () => {
     if (!ncName.trim()) return;
+    const count = Math.max(1, Math.min(6, ncLots));
+    // Valida che tutti i lotti abbiano i file obbligatori
+    for (let i = 1; i <= count; i++) {
+      const id = String(i);
+      if (!ncLotFiles[id]?.catalogFile) {
+        setArchMsg({ type: "error", text: `Lotto ${id}: PDF Catalogo obbligatorio.` });
+        return;
+      }
+      if (!ncLotFiles[id]?.priceFile) {
+        setArchMsg({ type: "error", text: `Lotto ${id}: file Listino TOW obbligatorio.` });
+        return;
+      }
+    }
     setNcSaving(true);
+    setArchMsg({ type: "", text: "" });
     try {
       const contractId = "contract-" + Date.now();
-      const count = Math.max(1, Math.min(6, ncLots));
       const lots = Array.from({ length: count }, (_, i) => ({
         lotId: String(i + 1),
         name: (ncLotNames[String(i + 1)] || `Lotto ${i + 1}`).trim(),
-        active: true,
+        tow5Share: ncLotShares[String(i + 1)] ?? 65,
+        catalogFile: ncLotFiles[String(i + 1)]?.catalogFile,
+        priceFile:   ncLotFiles[String(i + 1)]?.priceFile,
       }));
-      await upsertConfiguratoreContract({
+      const result = await importConfiguratoreContract({
         contractId,
         name: ncName.trim(),
-        rulesFile: ncRulesFile ? ncRulesFile.name : "",
+        rulesFile: ncRulesFile || null,
         lots,
       });
-      setNcName(""); setNcLots(2); setNcLotNames({}); setNcRulesFile(null);
+      const warnings = result.warnings?.length
+        ? ` Avvisi: ${result.warnings.join("; ")}`
+        : "";
+      setArchMsg({ type: warnings ? "error" : "ok", text: `${result.message}${warnings}` });
+      setNcName(""); setNcLots(2); setNcLotNames({}); setNcLotFiles({}); setNcLotShares({}); setNcRulesFile(null);
       setShowNewForm(false);
       await loadArch();
     } catch (e) {
-      setArchMsg({ type: "error", text: "Errore creazione contratto: " + (e.message || "") });
+      setArchMsg({ type: "error", text: "Errore importazione contratto: " + (e.message || "") });
     } finally {
       setNcSaving(false);
     }
@@ -292,7 +314,7 @@ export default function SuperAdminPage() {
                   style={{ display: "block", width: "100%", marginTop: 6, border: "1px solid #bdc9d4", borderRadius: 7, padding: "10px 12px", fontSize: 14, fontFamily: "inherit" }} />
               </label>
               <label style={{ fontWeight: 750, fontSize: 14, color: "#334456" }}>
-                Capitolato tecnico PDF
+                Capitolato tecnico PDF <span style={{ fontWeight: 400, color: "#9aa7b3" }}>(opzionale)</span>
                 <input type="file" accept=".pdf,application/pdf" onChange={e => setNcRulesFile(e.target.files[0] || null)}
                   style={{ display: "block", width: "100%", marginTop: 6, border: "1px solid #bdc9d4", borderRadius: 7, padding: "10px 12px", fontSize: 14, fontFamily: "inherit" }} />
               </label>
@@ -303,27 +325,51 @@ export default function SuperAdminPage() {
                   style={{ display: "block", width: "100%", marginTop: 6, border: "1px solid #bdc9d4", borderRadius: 7, padding: "10px 12px", fontSize: 14, fontFamily: "inherit" }} />
               </label>
             </div>
-            {/* Nomi lotti */}
-            <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
+            {/* Configurazione per ogni lotto */}
+            <div style={{ display: "grid", gap: 14, marginBottom: 20 }}>
               {Array.from({ length: Math.max(1, Math.min(6, ncLots)) }, (_, i) => String(i + 1)).map(id => (
-                <div key={id} style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: "#102a47", marginBottom: 8 }}>Lotto {id}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 2fr 2fr .8fr", gap: 12 }}>
+                <div key={id} style={{ padding: 16, background: "#f3f6f8", borderRadius: 8, borderLeft: "4px solid #008b72" }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: "#102a47", marginBottom: 12 }}>Lotto {id}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr 2fr .7fr", gap: 12 }}>
                     <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
                       Nome Lotto
                       <input value={ncLotNames[id] || ""} onChange={e => setNcLotNames(prev => ({ ...prev, [id]: e.target.value }))}
                         placeholder={`Lotto ${id}`}
                         style={{ display: "block", width: "100%", marginTop: 4, border: "1px solid #bdc9d4", borderRadius: 6, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }} />
                     </label>
+                    <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
+                      Catalogo software PDF <span style={{ color: "#e53935" }}>*</span>
+                      <input type="file" accept=".pdf,application/pdf" required
+                        onChange={e => setNcLotFiles(prev => ({ ...prev, [id]: { ...prev[id], catalogFile: e.target.files[0] || null } }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, border: `1px solid ${ncLotFiles[id]?.catalogFile ? "#bdc9d4" : "#e8a09a"}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }} />
+                      {ncLotFiles[id]?.catalogFile && <span style={{ fontSize: 11, color: "#008b72", marginTop: 2, display: "block" }}>{ncLotFiles[id].catalogFile.name}</span>}
+                    </label>
+                    <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
+                      Listino TOW (Excel o PDF) <span style={{ color: "#e53935" }}>*</span>
+                      <input type="file" accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+                        onChange={e => setNcLotFiles(prev => ({ ...prev, [id]: { ...prev[id], priceFile: e.target.files[0] || null } }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, border: `1px solid ${ncLotFiles[id]?.priceFile ? "#bdc9d4" : "#e8a09a"}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }} />
+                      {ncLotFiles[id]?.priceFile && <span style={{ fontSize: 11, color: "#008b72", marginTop: 2, display: "block" }}>{ncLotFiles[id].priceFile.name}</span>}
+                    </label>
+                    <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
+                      TOW .5 %
+                      <input type="number" min="0" max="100" step="0.01" value={ncLotShares[id] ?? 65}
+                        onChange={e => setNcLotShares(prev => ({ ...prev, [id]: parseFloat(e.target.value) || 65 }))}
+                        style={{ display: "block", width: "100%", marginTop: 4, border: "1px solid #bdc9d4", borderRadius: 6, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }} />
+                    </label>
                   </div>
                 </div>
               ))}
+            </div>
+            <div style={{ fontSize: 12, color: "#667482", marginBottom: 14 }}>
+              I file PDF e Excel vengono analizzati dal server: il catalogo software e i prezzi TOW vengono estratti e salvati nel database.
+              L'elaborazione può richiedere alcuni secondi per contratti con molte voci.
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button onClick={() => setShowNewForm(false)} style={{ padding: "9px 18px", background: "#fff", color: "#102a47", border: "1px solid #d8e0e8", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>Annulla</button>
               <button onClick={handleCreateArchContract} disabled={ncSaving || !ncName.trim()}
                 style={{ padding: "9px 20px", background: "#f4df00", color: "#102a47", border: "none", borderRadius: 7, fontWeight: 700, cursor: ncSaving ? "wait" : "pointer", fontSize: 14, opacity: ncSaving ? 0.7 : 1 }}>
-                {ncSaving ? "Creazione..." : "Importa e salva contratto"}
+                {ncSaving ? "Elaborazione documenti..." : "Importa e salva contratto"}
               </button>
             </div>
           </div>
@@ -433,42 +479,6 @@ export default function SuperAdminPage() {
                 })}
               </div>
             )}
-      </div>
-
-      {/* Crea nuovo contratto MEV */}
-      <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Crea nuovo Contratto MEV</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Codice Contratto *</div>
-            <input
-              value={newCodice}
-              onChange={e => setNewCodice(e.target.value)}
-              placeholder="es. 4490015981"
-              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 180 }}
-            />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Descrizione</div>
-            <input
-              value={newDesc}
-              onChange={e => setNewDesc(e.target.value)}
-              placeholder="es. Nuovo Progetto"
-              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 240 }}
-            />
-          </div>
-          <button
-            onClick={handleCreateAmbiente}
-            disabled={creating || !newCodice.trim()}
-            style={{
-              padding: "7px 20px", background: "#1a73e8", color: "white",
-              border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-              cursor: creating ? "wait" : "pointer", opacity: creating ? 0.7 : 1,
-            }}
-          >
-            {creating ? "Creazione..." : "Crea"}
-          </button>
-        </div>
       </div>
 
       {/* Lista contratti MEV */}

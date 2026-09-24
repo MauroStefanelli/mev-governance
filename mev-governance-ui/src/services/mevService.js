@@ -489,6 +489,44 @@ export const deleteConfiguratoreContract = async (contractId) => {
   return response.json();
 };
 
+/**
+ * Importa un contratto con parsing PDF/Excel lato backend.
+ * @param {object} opts
+ * @param {string} opts.contractId
+ * @param {string} opts.name
+ * @param {File|null} opts.rulesFile  — PDF capitolato (opzionale)
+ * @param {Array<{lotId:string, name:string, tow5Share:number, catalogFile:File, priceFile:File}>} opts.lots
+ */
+export const importConfiguratoreContract = async ({ contractId, name, rulesFile, lots }) => {
+  const form = new FormData();
+  form.append("contractId", contractId);
+  form.append("name", name);
+  if (rulesFile) form.append("rulesFile", rulesFile);
+  form.append("lotsJson", JSON.stringify(lots.map(l => ({
+    lotId: l.lotId,
+    name: l.name,
+    tow5Share: l.tow5Share ?? 65,
+  }))));
+  lots.forEach(l => {
+    form.append(`catalogFile_${l.lotId}`, l.catalogFile);
+    form.append(`priceFile_${l.lotId}`, l.priceFile);
+  });
+
+  // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const getConfiguratoreRecords = async (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records${qs ? `?${qs}` : ""}`, {
