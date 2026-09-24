@@ -3,7 +3,7 @@ import {
   getAllAmbienti, createAmbiente,
   getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente, updateUtenteAmbienteRuolo,
   getConfiguratoreContracts, updateConfiguratoreLot, deleteConfiguratoreContract,
-  importConfiguratoreContract
+  importConfiguratoreContract, uploadConfiguratoreContractLot
 } from "../services/mevService";
 
 export default function SuperAdminPage() {
@@ -37,6 +37,12 @@ export default function SuperAdminPage() {
   const [lotEnvSel, setLotEnvSel]         = useState({}); // { "contractId|lotto": ambienteId (string) }
   // Toggle attivo/disattivato lotto
   const [togglingLot, setTogglingLot]     = useState({}); // { "contractId|lotto": bool }
+
+  // Modale dettaglio contrattuale
+  const [detailModal, setDetailModal]     = useState(null); // { contract, lotId } oppure null
+
+  // Upload file su lotto esistente
+  const [lotUpload, setLotUpload]         = useState({}); // { "contractId|lotId": { catalogFile, priceFile, tow5Share, uploading } }
 
   // Utenti di un ambiente selezionato
   const [selectedAmbiente, setSelectedAmbiente] = useState(null);
@@ -100,10 +106,6 @@ export default function SuperAdminPage() {
     // Valida che tutti i lotti abbiano i file obbligatori
     for (let i = 1; i <= count; i++) {
       const id = String(i);
-      if (!ncLotFiles[id]?.catalogFile) {
-        setArchMsg({ type: "error", text: `Lotto ${id}: PDF Catalogo obbligatorio.` });
-        return;
-      }
       if (!ncLotFiles[id]?.priceFile) {
         setArchMsg({ type: "error", text: `Lotto ${id}: file Listino TOW obbligatorio.` });
         return;
@@ -117,7 +119,7 @@ export default function SuperAdminPage() {
         lotId: String(i + 1),
         name: (ncLotNames[String(i + 1)] || `Lotto ${i + 1}`).trim(),
         tow5Share: ncLotShares[String(i + 1)] ?? 65,
-        catalogFile: ncLotFiles[String(i + 1)]?.catalogFile,
+        catalogFile: ncLotFiles[String(i + 1)]?.catalogFile || null,
         priceFile:   ncLotFiles[String(i + 1)]?.priceFile,
       }));
       const result = await importConfiguratoreContract({
@@ -201,6 +203,36 @@ export default function SuperAdminPage() {
       await loadArch();
     } catch (e) {
       setArchMsg({ type: "error", text: "Errore eliminazione: " + (e.message || "") });
+    }
+  };
+
+  const handleUploadLotFiles = async (contract, lot) => {
+    const key = `${contract.contractId}|${lot.lotId}`;
+    const up = lotUpload[key] || {};
+    if (!up.catalogFile || !up.priceFile) {
+      setArchMsg({ type: "error", text: `Lotto ${lot.lotId}: seleziona sia il Catalogo PDF che il Listino TOW.` });
+      return;
+    }
+    setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], uploading: true } }));
+    setArchMsg({ type: "", text: "" });
+    try {
+      const result = await uploadConfiguratoreContractLot({
+        contractId: contract.contractId,
+        contractName: contract.name,
+        lotId: lot.lotId,
+        lotName: lot.name,
+        tow5Share: up.tow5Share ?? lot.tow5Share ?? 65,
+        catalogFile: up.catalogFile,
+        priceFile: up.priceFile,
+      });
+      const warn = result.warnings?.length ? ` Avvisi: ${result.warnings.join("; ")}` : "";
+      setArchMsg({ type: warn ? "error" : "ok", text: `${result.message}${warn}` });
+      setLotUpload(prev => { const n = { ...prev }; delete n[key]; return n; });
+      await loadArch();
+    } catch (e) {
+      setArchMsg({ type: "error", text: "Errore upload lotto: " + (e.message || "") });
+    } finally {
+      setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], uploading: false } }));
     }
   };
 
@@ -330,19 +362,12 @@ export default function SuperAdminPage() {
               {Array.from({ length: Math.max(1, Math.min(6, ncLots)) }, (_, i) => String(i + 1)).map(id => (
                 <div key={id} style={{ padding: 16, background: "#f3f6f8", borderRadius: 8, borderLeft: "4px solid #008b72" }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: "#102a47", marginBottom: 12 }}>Lotto {id}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr 2fr .7fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr .7fr", gap: 12 }}>
                     <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
                       Nome Lotto
                       <input value={ncLotNames[id] || ""} onChange={e => setNcLotNames(prev => ({ ...prev, [id]: e.target.value }))}
                         placeholder={`Lotto ${id}`}
                         style={{ display: "block", width: "100%", marginTop: 4, border: "1px solid #bdc9d4", borderRadius: 6, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }} />
-                    </label>
-                    <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
-                      Catalogo software PDF <span style={{ color: "#e53935" }}>*</span>
-                      <input type="file" accept=".pdf,application/pdf" required
-                        onChange={e => setNcLotFiles(prev => ({ ...prev, [id]: { ...prev[id], catalogFile: e.target.files[0] || null } }))}
-                        style={{ display: "block", width: "100%", marginTop: 4, border: `1px solid ${ncLotFiles[id]?.catalogFile ? "#bdc9d4" : "#e8a09a"}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }} />
-                      {ncLotFiles[id]?.catalogFile && <span style={{ fontSize: 11, color: "#008b72", marginTop: 2, display: "block" }}>{ncLotFiles[id].catalogFile.name}</span>}
                     </label>
                     <label style={{ fontWeight: 700, fontSize: 13, color: "#334456" }}>
                       Listino TOW (Excel o PDF) <span style={{ color: "#e53935" }}>*</span>
@@ -400,23 +425,72 @@ export default function SuperAdminPage() {
                         {(c.lots || []).map(l => {
                           const key = `${c.contractId}|${l.lotId}`;
                           const active = l.active !== false;
+                          const catalogCount = Array.isArray(l.catalog) ? l.catalog.length : (l.catalog ? Object.keys(l.catalog).length : 0);
+                          const towCount = l.towPrices ? Object.keys(l.towPrices).length : 0;
+                          const up = lotUpload[key] || {};
                           return (
-                            <div key={l.lotId} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto auto", gap: 7, alignItems: "center", padding: "9px 10px", background: "#f3f6f8", borderRadius: 7, borderLeft: `4px solid ${active ? "#008b72" : "#9aa7b3"}`, opacity: active ? 1 : 0.75 }}>
-                              <div>
-                                <strong style={{ display: "block", fontSize: 13, color: "#102a47" }}>Lotto {l.lotId}</strong>
-                                <span style={{ display: "block", color: "#667482", fontSize: 12 }}>{l.name}</span>
+                            <div key={l.lotId} style={{ padding: "9px 10px", background: "#f3f6f8", borderRadius: 7, borderLeft: `4px solid ${active ? "#008b72" : "#9aa7b3"}`, opacity: active ? 1 : 0.75 }}>
+                              {/* Riga principale */}
+                              <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto auto", gap: 7, alignItems: "center" }}>
+                                <div>
+                                  <strong style={{ display: "block", fontSize: 13, color: "#102a47" }}>Lotto {l.lotId}</strong>
+                                  <span style={{ display: "block", color: "#667482", fontSize: 12 }}>{l.name}</span>
+                                  {/* Riepilogo file analizzati */}
+                                  <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                    {l.priceFile
+                                      ? <span style={{ fontSize: 11, color: towCount > 0 ? "#006b57" : "#9aa7b3", background: "#fff", padding: "1px 6px", borderRadius: 4, border: "1px solid #d8e0e8" }}>
+                                          {towCount > 0 ? `${towCount} prezzi TOW` : "Listino: " + l.priceFile}
+                                        </span>
+                                      : <span style={{ fontSize: 11, color: "#e53935", background: "#fff", padding: "1px 6px", borderRadius: 4, border: "1px solid #f5c6c2" }}>Listino TOW mancante</span>
+                                    }
+                                    {l.catalogFile
+                                      ? <span style={{ fontSize: 11, color: catalogCount > 0 ? "#006b57" : "#9aa7b3", background: "#fff", padding: "1px 6px", borderRadius: 4, border: "1px solid #d8e0e8" }}>
+                                          {catalogCount > 0 ? `${catalogCount} voci catalogo` : "Catalogo: " + l.catalogFile}
+                                        </span>
+                                      : <span style={{ fontSize: 11, color: "#9aa7b3", background: "#fff", padding: "1px 6px", borderRadius: 4, border: "1px solid #d8e0e8" }}>Catalogo non caricato</span>
+                                    }
+                                  </div>
+                                </div>
+                                <span style={{ padding: "3px 7px", borderRadius: 999, background: "#fff", fontSize: 11, fontWeight: 800, color: active ? "#006b57" : "#667482" }}>
+                                  {active ? "Attivo" : "Disattivato"}
+                                </span>
+                                <button onClick={() => handleToggleLot(c.contractId, l.lotId, active)} disabled={togglingLot[key]}
+                                  style={{ padding: "5px 8px", background: "#fff", color: "#102a47", border: "1px solid #d8e0e8", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                                  {togglingLot[key] ? "..." : active ? "Disattiva" : "Riattiva"}
+                                </button>
+                                <button onClick={() => handleDeleteLot(c.contractId, l.lotId)}
+                                  style={{ padding: "5px 8px", background: "#fff", color: "#a93838", border: "1px solid #e7c6c6", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                                  Elimina
+                                </button>
                               </div>
-                              <span style={{ padding: "3px 7px", borderRadius: 999, background: "#fff", fontSize: 11, fontWeight: 800, color: active ? "#006b57" : "#667482" }}>
-                                {active ? "Attivo" : "Disattivato"}
-                              </span>
-                              <button onClick={() => handleToggleLot(c.contractId, l.lotId, active)} disabled={togglingLot[key]}
-                                style={{ padding: "5px 8px", background: "#fff", color: "#102a47", border: "1px solid #d8e0e8", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                                {togglingLot[key] ? "..." : active ? "Disattiva" : "Riattiva"}
-                              </button>
-                              <button onClick={() => handleDeleteLot(c.contractId, l.lotId)}
-                                style={{ padding: "5px 8px", background: "#fff", color: "#a93838", border: "1px solid #e7c6c6", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                                Elimina
-                              </button>
+                              {/* Upload file su lotto esistente */}
+                              <details style={{ marginTop: 8 }}>
+                                <summary style={{ fontSize: 12, color: "#334456", cursor: "pointer", fontWeight: 600, userSelect: "none" }}>
+                                  Carica / aggiorna file analisi lotto
+                                </summary>
+                                <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "2fr 2fr .6fr", gap: 8 }}>
+                                  <label style={{ fontSize: 12, color: "#334456", fontWeight: 600 }}>
+                                    Listino TOW (Excel o PDF) *
+                                    <input type="file" accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                      onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], priceFile: e.target.files[0] || null } }))}
+                                      style={{ display: "block", width: "100%", marginTop: 3, border: "1px solid #bdc9d4", borderRadius: 5, padding: "6px 8px", fontSize: 12, fontFamily: "inherit" }} />
+                                    {up.priceFile && <span style={{ fontSize: 11, color: "#008b72" }}>{up.priceFile.name}</span>}
+                                  </label>
+                                  <label style={{ fontSize: 12, color: "#334456", fontWeight: 600 }}>
+                                    Catalogo software PDF (opzionale)
+                                    <input type="file" accept=".pdf,application/pdf"
+                                      onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], catalogFile: e.target.files[0] || null } }))}
+                                      style={{ display: "block", width: "100%", marginTop: 3, border: "1px solid #bdc9d4", borderRadius: 5, padding: "6px 8px", fontSize: 12, fontFamily: "inherit" }} />
+                                    {up.catalogFile && <span style={{ fontSize: 11, color: "#008b72" }}>{up.catalogFile.name}</span>}
+                                  </label>
+                                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                                    <button onClick={() => handleUploadLotFiles(c, l)} disabled={up.uploading || !up.priceFile}
+                                      style={{ width: "100%", padding: "8px 0", background: "#1c4e80", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: up.uploading ? "wait" : "pointer", opacity: (!up.priceFile || up.uploading) ? 0.6 : 1 }}>
+                                      {up.uploading ? "..." : "Analizza"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </details>
                             </div>
                           );
                         })}
@@ -431,6 +505,13 @@ export default function SuperAdminPage() {
                           title={activeLots.length ? "Associa Codice Contratto MEV ai lotti" : "Nessun lotto attivo"}
                         >
                           {archExpanded === c.contractId ? "Chiudi configurazione" : "Usa contratto"}
+                        </button>
+                        <button
+                          onClick={() => setDetailModal({ contract: c, lotId: (c.lots || [])[0]?.lotId || "1" })}
+                          style={{ padding: "8px 14px", background: "#fff", color: "#1c4e80", border: "1px solid #b0c4d8", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}
+                          title="Visualizza dettaglio contrattuale"
+                        >
+                          Dettaglio contrattuale
                         </button>
                         {!c.builtin && (
                           <button onClick={() => handleDeleteArchContract(c.contractId)}
@@ -658,6 +739,189 @@ export default function SuperAdminPage() {
             )}
         </div>
       )}
+
+      {/* ── Modale Dettaglio Contrattuale ── */}
+      {detailModal && (() => {
+        const { contract: dc, lotId: dlotId } = detailModal;
+        const SUMMARIES = window.CONTRACT_SUMMARIES || {};
+        const summary = SUMMARIES[dc.contractId];
+        const lotSummary = summary?.lots?.[dlotId];
+        const common = summary?.common;
+        const lot = (dc.lots || []).find(l => l.lotId === dlotId) || {};
+        const catalog = Array.isArray(lot.catalog) ? lot.catalog : [];
+        const towPrices = lot.towPrices && typeof lot.towPrices === "object" ? lot.towPrices : {};
+        const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+        const summaryTable = (heads, rows) => (
+          <div style={{ overflowX: "auto", marginBottom: 12 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead><tr>{heads.map(h => <th key={h} style={{ textAlign: "left", padding: "6px 10px", background: "#f3f6f8", fontWeight: 700, color: "#334456", borderBottom: "2px solid #d8e0e8" }}>{h}</th>)}</tr></thead>
+              <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ padding: "6px 10px", borderBottom: "1px solid #eef0f2", color: "#333" }}>{c}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+        );
+        return (
+          <div onClick={() => setDetailModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(10,20,35,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 820, padding: "32px 32px 28px", position: "relative", boxShadow: "0 8px 40px rgba(0,0,0,0.22)" }}>
+              {/* Header */}
+              <button onClick={() => setDetailModal(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#667482" }}>✕</button>
+              <p style={{ margin: "0 0 2px", color: "#008b72", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 900 }}>Dettaglio contrattuale</p>
+              <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "#102a47" }}>{dc.name}</h2>
+              <p style={{ margin: "0 0 20px", color: "#667482", fontSize: 14 }}>{summary?.subtitle || "Documenti, Lotti e configurazione economica"}</p>
+
+              {/* Tab lotti */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "2px solid #d8e0e8", paddingBottom: 0 }}>
+                <button onClick={() => setDetailModal(null)} style={{ padding: "7px 14px", background: "none", border: "none", color: "#667482", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+                  ← Torna ai contratti
+                </button>
+                {(dc.lots || []).filter(l => l.active !== false).map(l => (
+                  <button key={l.lotId}
+                    onClick={() => setDetailModal({ contract: dc, lotId: l.lotId })}
+                    style={{ padding: "7px 14px", background: "none", border: "none", borderBottom: dlotId === l.lotId ? "3px solid #1c4e80" : "3px solid transparent", color: dlotId === l.lotId ? "#1c4e80" : "#667482", fontSize: 13, fontWeight: dlotId === l.lotId ? 800 : 600, cursor: "pointer", marginBottom: -2 }}>
+                    Lotto {l.lotId}
+                  </button>
+                ))}
+                {summary && <span style={{ marginLeft: "auto", padding: "7px 0", fontSize: 12, color: "#008b72", fontWeight: 700, alignSelf: "center" }}>Sintesi allegata</span>}
+              </div>
+
+              {/* Contenuto lotto con sintesi completa SE disponibile */}
+              {lotSummary && common ? (
+                <div style={{ display: "grid", gap: 20 }}>
+                  {/* Hero */}
+                  <div style={{ display: "flex", gap: 20, alignItems: "flex-start", padding: 20, background: "#f3f6f8", borderRadius: 9 }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: "0 0 4px", color: "#008b72", fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>Sintesi allegata</p>
+                      <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800, color: "#102a47" }}>{lotSummary.title}</h3>
+                      <p style={{ margin: 0, color: "#334456", fontSize: 13, lineHeight: 1.6 }}>{lotSummary.conclusion}</p>
+                    </div>
+                    <div style={{ textAlign: "center", minWidth: 80, padding: "12px 16px", background: "#fff", borderRadius: 8, border: "1px solid #d8e0e8" }}>
+                      <span style={{ display: "block", fontSize: 11, color: "#667482" }}>Garanzia</span>
+                      <strong style={{ fontSize: 16, color: "#102a47" }}>12 mesi</strong>
+                    </div>
+                  </div>
+                  {/* Dimensionamento + Copertura */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <section style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Dimensionamento</h4>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>{lotSummary.dimensioning.map((x, i) => <li key={i} style={{ fontSize: 13, color: "#334456", marginBottom: 4 }}>{x}</li>)}</ul>
+                    </section>
+                    <section style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Copertura del servizio</h4>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>{common.coverage.map((x, i) => <li key={i} style={{ fontSize: 13, color: "#334456", marginBottom: 4 }}>{x}</li>)}</ul>
+                    </section>
+                  </div>
+                  {/* Quadro TOW */}
+                  <section>
+                    <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Quadro TOW</h4>
+                    {summaryTable(["TOW", "Ambito", "Quantità contrattuale", "Peso"], lotSummary.tow)}
+                    <p style={{ fontSize: 12, color: "#667482", marginTop: 4 }}>{lotSummary.catalogNote}</p>
+                  </section>
+                  {/* Obblighi organizzativi */}
+                  <section>
+                    <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Obblighi organizzativi</h4>
+                    {summaryTable(["Obbligo", "Vincolo"], common.obligations)}
+                  </section>
+                  {/* Deliverable */}
+                  <section>
+                    <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Deliverable per TOW</h4>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {Object.entries(lotSummary.deliverables).map(([tow, items]) => (
+                        <details key={tow} style={{ border: "1px solid #d8e0e8", borderRadius: 7, padding: "8px 12px" }}>
+                          <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between" }}>
+                            <strong>{tow}</strong><span style={{ color: "#667482", fontWeight: 400 }}>{items.length} deliverable</span>
+                          </summary>
+                          <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{items.map((x, i) => <li key={i} style={{ fontSize: 13, color: "#334456", marginBottom: 3 }}>{x}</li>)}</ul>
+                        </details>
+                      ))}
+                    </div>
+                  </section>
+                  {/* Ciclo + Qualità */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <section style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Ciclo di esecuzione</h4>
+                      <ol style={{ margin: 0, paddingLeft: 18 }}>{common.lifecycle.map((x, i) => <li key={i} style={{ fontSize: 13, color: "#334456", marginBottom: 4 }}>{x}</li>)}</ol>
+                    </section>
+                    <section style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Qualità dei task</h4>
+                      {summaryTable(["Indicatore", "Soglia"], common.quality)}
+                    </section>
+                  </div>
+                  {/* SLA */}
+                  <section>
+                    <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>SLA del canone</h4>
+                    {summaryTable(["Indicatore", "Obiettivo", "Peso"], common.service)}
+                    {summaryTable(["Severità", "Tempi contrattuali"], common.severity)}
+                    <p style={{ fontSize: 12, color: "#667482" }}><strong>Garanzia:</strong> {common.warranty}</p>
+                  </section>
+                  {/* Checklist */}
+                  <section>
+                    <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Checklist operativa</h4>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      {common.checklist.map(([area, check], i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 10px", background: "#f3f6f8", borderRadius: 6 }}>
+                          <span style={{ color: "#008b72", fontWeight: 900, fontSize: 14, flexShrink: 0 }}>✓</span>
+                          <p style={{ margin: 0, fontSize: 13 }}><strong>{area}</strong><br /><span style={{ color: "#667482" }}>{check}</span></p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                  {/* Fonti */}
+                  <section style={{ borderTop: "1px solid #d8e0e8", paddingTop: 12 }}>
+                    <h4 style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: "#334456" }}>Fonti contrattuali considerate</h4>
+                    <p style={{ margin: 0, fontSize: 12, color: "#667482" }}>{(lotSummary.sources || []).join(" · ")}</p>
+                  </section>
+                </div>
+              ) : (
+                /* Sintesi generica per contratti importati */
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div style={{ display: "flex", gap: 16, alignItems: "flex-start", padding: 18, background: "#f3f6f8", borderRadius: 9 }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: "0 0 2px", color: "#008b72", fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>Lotto {dlotId}</p>
+                      <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 800, color: "#102a47" }}>{lot.name || "—"}</h3>
+                      <p style={{ margin: 0, color: "#667482", fontSize: 13 }}>Riepilogo ricavato dalla configurazione importata. Per questo contratto non è ancora disponibile una sintesi operativa estesa.</p>
+                    </div>
+                    <div style={{ textAlign: "center", minWidth: 80, padding: "12px 16px", background: "#fff", borderRadius: 8, border: "1px solid #d8e0e8" }}>
+                      <span style={{ display: "block", fontSize: 11, color: "#667482" }}>Voci catalogo</span>
+                      <strong style={{ fontSize: 16, color: "#102a47" }}>{catalog.length}</strong>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <section style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Documenti</h4>
+                      <p style={{ fontSize: 13, margin: "0 0 6px" }}><strong>Capitolato:</strong> {dc.rulesFile || "Non indicato"}</p>
+                      <p style={{ fontSize: 13, margin: "0 0 6px" }}><strong>Catalogo:</strong> {lot.catalogFile || "Non caricato"}</p>
+                      <p style={{ fontSize: 13, margin: 0 }}><strong>File economico:</strong> {lot.priceFile || "Non caricato"}</p>
+                    </section>
+                    <section style={{ padding: 16, background: "#f3f6f8", borderRadius: 8 }}>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Configurazione economica</h4>
+                      <p style={{ fontSize: 13, margin: "0 0 10px" }}>TOW .5 configurato al <strong>{lot.tow5Share ?? "—"}%</strong>.</p>
+                      {Object.keys(towPrices).length > 0
+                        ? summaryTable(["TOW", "Valore unitario"], Object.entries(towPrices).map(([tow, price]) => [tow, euro.format(price)]))
+                        : <p style={{ fontSize: 13, color: "#9aa7b3" }}>Nessun prezzo TOW disponibile.</p>
+                      }
+                    </section>
+                  </div>
+                  {catalog.length > 0 && (
+                    <section>
+                      <h4 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 800, color: "#102a47" }}>Voci di catalogo ({catalog.length})</h4>
+                      <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid #d8e0e8", borderRadius: 7 }}>
+                        {summaryTable(["ID", "Ambito", "Nome", "Realizzazione S/M/C", "Modifica S/M/C"],
+                          catalog.map(e => [
+                            e.id ?? e.Id ?? "",
+                            e.ambito ?? "",
+                            e.nome ?? "",
+                            `${euro.format(e.prezzi?.Realizzazione?.Semplice ?? e.prezzi?.realizzazione?.Semplice ?? 0)} / ${euro.format(e.prezzi?.Realizzazione?.Medio ?? e.prezzi?.realizzazione?.Medio ?? 0)} / ${euro.format(e.prezzi?.Realizzazione?.Complesso ?? e.prezzi?.realizzazione?.Complesso ?? 0)}`,
+                            `${euro.format(e.prezzi?.Modifica?.Semplice ?? e.prezzi?.modifica?.Semplice ?? 0)} / ${euro.format(e.prezzi?.Modifica?.Medio ?? e.prezzi?.modifica?.Medio ?? 0)} / ${euro.format(e.prezzi?.Modifica?.Complesso ?? e.prezzi?.modifica?.Complesso ?? 0)}`,
+                          ])
+                        )}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

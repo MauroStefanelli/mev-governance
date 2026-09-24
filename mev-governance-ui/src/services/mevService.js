@@ -508,11 +508,37 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
     tow5Share: l.tow5Share ?? 65,
   }))));
   lots.forEach(l => {
-    form.append(`catalogFile_${l.lotId}`, l.catalogFile);
+    if (l.catalogFile) form.append(`catalogFile_${l.lotId}`, l.catalogFile);
     form.append(`priceFile_${l.lotId}`, l.priceFile);
   });
 
   // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+/**
+ * Carica/aggiorna i file PDF/Excel di un singolo lotto esistente.
+ * Riusa l'endpoint /import passando solo quel lotto (sovrascrive il lotto nel DB senza toccare gli altri).
+ */
+export const uploadConfiguratoreContractLot = async ({ contractId, contractName, lotId, lotName, tow5Share, catalogFile, priceFile }) => {
+  const form = new FormData();
+  form.append("contractId", contractId);
+  form.append("name", contractName);
+  form.append("lotsJson", JSON.stringify([{ lotId, name: lotName, tow5Share: tow5Share ?? 65 }]));
+  form.append(`catalogFile_${lotId}`, catalogFile);
+  form.append(`priceFile_${lotId}`, priceFile);
+
   const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
     method: "POST",

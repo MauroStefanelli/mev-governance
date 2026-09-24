@@ -268,26 +268,29 @@ public class ConfiguratoreController : ControllerBase
             var catalogFile = form.Files.GetFile($"catalogFile_{lotId}");
             var priceFile   = form.Files.GetFile($"priceFile_{lotId}");
 
-            if (catalogFile == null || priceFile == null)
+            if (priceFile == null)
             {
-                errors.Add($"Lotto {lotId}: file catalogo o listino TOW mancante");
+                errors.Add($"Lotto {lotId}: file listino TOW mancante");
                 continue;
             }
 
-            List<CatalogEntry> catalog;
+            List<CatalogEntry> catalog = new();
             Dictionary<string, double> towPrices;
 
-            try
+            // Il catalogo PDF è opzionale — può essere caricato in un secondo momento
+            if (catalogFile != null)
             {
-                await using var catStream = catalogFile.OpenReadStream();
-                catalog = ContractParserService.ParseCatalogPdf(catStream, lotNum);
-                if (catalog.Count == 0)
-                    errors.Add($"Lotto {lotId}: nessuna voce riconosciuta nel catalogo PDF");
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Lotto {lotId} catalogo: {ex.Message}");
-                catalog = new List<CatalogEntry>();
+                try
+                {
+                    await using var catStream = catalogFile.OpenReadStream();
+                    catalog = ContractParserService.ParseCatalogPdf(catStream, lotNum);
+                    if (catalog.Count == 0)
+                        errors.Add($"Lotto {lotId}: nessuna voce riconosciuta nel catalogo PDF");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Lotto {lotId} catalogo: {ex.Message}");
+                }
             }
 
             try
@@ -307,7 +310,7 @@ public class ConfiguratoreController : ControllerBase
             var lotPayload = new Dictionary<string, object?>
             {
                 ["name"]        = meta.Name ?? $"Lotto {lotId}",
-                ["catalogFile"] = catalogFile.FileName,
+                ["catalogFile"] = catalogFile?.FileName ?? "",
                 ["priceFile"]   = priceFile.FileName,
                 ["tow5Share"]   = meta.Tow5Share ?? 65,
                 ["active"]      = true,
@@ -370,9 +373,14 @@ public class ConfiguratoreController : ControllerBase
         try
         {
             var rows = await QueryAsync(cs, existingSql, new List<NpgsqlParameter> { new("rk", rk) }, sch);
-            var payload = rows.Count > 0
-                ? (rows[0].GetValueOrDefault("payload") as Dictionary<string, object?> ?? new Dictionary<string, object?>())
-                : new Dictionary<string, object?> { ["name"] = $"Lotto {lotId}" };
+            // QueryAsync deserializza il payload come JsonElement; lo convertiamo in Dictionary
+            Dictionary<string, object?> payload;
+            if (rows.Count > 0 && rows[0].GetValueOrDefault("payload") is System.Text.Json.JsonElement je)
+                payload = JsonElementToDict(je);
+            else if (rows.Count > 0 && rows[0].GetValueOrDefault("payload") is Dictionary<string, object?> d)
+                payload = d;
+            else
+                payload = new Dictionary<string, object?> { ["name"] = $"Lotto {lotId}" };
 
             if (req.Name != null) payload["name"] = req.Name;
             if (req.CatalogFile != null) payload["catalogFile"] = req.CatalogFile;
@@ -658,6 +666,30 @@ public class ConfiguratoreController : ControllerBase
 
         return contracts;
     }
+
+    // ============================================================
+    // Helper: converte JsonElement (output di JsonSerializer.Deserialize<object>)
+    // in Dictionary<string,object?> — necessario per il merge del payload lotto
+    // ============================================================
+    private static Dictionary<string, object?> JsonElementToDict(System.Text.Json.JsonElement el)
+    {
+        var d = new Dictionary<string, object?>();
+        if (el.ValueKind != System.Text.Json.JsonValueKind.Object) return d;
+        foreach (var prop in el.EnumerateObject())
+            d[prop.Name] = JsonElementToValue(prop.Value);
+        return d;
+    }
+
+    private static object? JsonElementToValue(System.Text.Json.JsonElement el) => el.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.Object  => JsonElementToDict(el),
+        System.Text.Json.JsonValueKind.Array   => el.EnumerateArray().Select(JsonElementToValue).ToList(),
+        System.Text.Json.JsonValueKind.String  => el.GetString(),
+        System.Text.Json.JsonValueKind.Number  => el.TryGetInt64(out var i) ? (object?)i : el.GetDouble(),
+        System.Text.Json.JsonValueKind.True    => true,
+        System.Text.Json.JsonValueKind.False   => false,
+        _ => null
+    };
 
     // ============================================================
     // Helper: esecuzione comando (INSERT/UPDATE/DELETE)
