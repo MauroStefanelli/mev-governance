@@ -1152,7 +1152,7 @@ function ReleaseScheduleSection({ contractId }) {
     catch (e) { setMsg("Errore eliminazione: " + (e?.message || "")); }
   };
 
-  // Import da file Excel (.xlsx/.xls) o CSV
+  // Import da file Excel (.xlsx/.xls)
   const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !contractId) return;
@@ -1164,15 +1164,27 @@ function ReleaseScheduleSection({ contractId }) {
       const ws  = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-      // Trova la prima riga dati: quella dove cols[0] non è vuoto e non è "Release"
-      // (gestisce sia 1 che 2 righe di intestazione)
-      let firstDataRow = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const v = String(rows[i][0] || "").trim().toLowerCase();
-        if (v && v !== "release" && v !== "") { firstDataRow = i; break; }
-      }
-      const dataRows = rows.slice(firstDataRow).filter(r => r[0] && String(r[0]).trim());
+      // Legge la riga header (riga 1) per trovare dinamicamente le colonne
+      // "Release" è in col 0; poi cerchiamo Inizio/Fine nell'header riga 1
+      // Struttura attesa riga 0: gruppi (con celle unite)
+      // Struttura attesa riga 1: Release | ... | Inizio | Fine | ... per ogni gruppo
+      const hdr1 = rows[1] || [];
 
+      // Mappa posizioni: cerca coppie Inizio/Fine nell'ordine dei gruppi
+      // I gruppi nell'ordine sono: Sviluppo, Coll.Funz., Coll.E2E, UAT, Certificazione, Pass in prod, Disp.cliente
+      // "Pass in prod" = solo "Data", "Disp.cliente" = "Fine" dopo "Data"
+      const datePositions = [];
+      for (let i = 1; i < hdr1.length; i++) {
+        const v = String(hdr1[i] || "").trim().toLowerCase();
+        if (v === "inizio" || v === "data") datePositions.push({ start: i });
+        else if ((v === "fine") && datePositions.length > 0 && datePositions[datePositions.length-1].end === undefined) {
+          datePositions[datePositions.length-1].end = i;
+        }
+      }
+      // datePositions[0]=devStart/devEnd, [1]=cfStart/cfEnd, [2]=e2eStart/e2eEnd,
+      // [3]=uatStart/uatEnd, [4]=certStart/certEnd, [5]=passInProd/dispClient
+
+      // Converte Date o stringa in yyyy-mm-dd usando UTC per evitare shift timezone
       const fmtCell = (v) => {
         if (!v && v !== 0) return "";
         if (v instanceof Date) {
@@ -1181,7 +1193,6 @@ function ReleaseScheduleSection({ contractId }) {
           const d = String(v.getDate()).padStart(2,"0");
           return `${y}-${m}-${d}`;
         }
-        // Numero seriale Excel (se cellDates non l'ha convertito)
         if (typeof v === "number") {
           const date = XLSX.SSF.parse_date_code(v);
           if (date) return `${date.y}-${String(date.m).padStart(2,"0")}-${String(date.d).padStart(2,"0")}`;
@@ -1189,17 +1200,23 @@ function ReleaseScheduleSection({ contractId }) {
         return parseExcelDate(String(v));
       };
 
+      // Righe dati: dalla riga 2 in poi, dove cols[0] non è vuoto
+      const dataRows = rows.slice(2).filter(r => r[0] && String(r[0]).trim());
+
+      const getCol = (row, pos) => (pos !== undefined ? fmtCell(row[pos]) : "");
+
       let ok = 0, err = 0;
       for (let i = 0; i < dataRows.length; i++) {
         const cols = dataRows[i];
+        const p = datePositions;
         const rel = {
           name:       String(cols[0] || "").trim(),
-          devStart:   fmtCell(cols[1]),  devEnd:     fmtCell(cols[2]),
-          cfStart:    fmtCell(cols[3]),  cfEnd:      fmtCell(cols[4]),
-          e2eStart:   fmtCell(cols[5]),  e2eEnd:     fmtCell(cols[6]),
-          uatStart:   fmtCell(cols[7]),  uatEnd:     fmtCell(cols[8]),
-          certStart:  fmtCell(cols[9]),  certEnd:    fmtCell(cols[10]),
-          passInProd: fmtCell(cols[11]), dispClient: fmtCell(cols[12]),
+          devStart:   getCol(cols, p[0]?.start),  devEnd:     getCol(cols, p[0]?.end),
+          cfStart:    getCol(cols, p[1]?.start),  cfEnd:      getCol(cols, p[1]?.end),
+          e2eStart:   getCol(cols, p[2]?.start),  e2eEnd:     getCol(cols, p[2]?.end),
+          uatStart:   getCol(cols, p[3]?.start),  uatEnd:     getCol(cols, p[3]?.end),
+          certStart:  getCol(cols, p[4]?.start),  certEnd:    getCol(cols, p[4]?.end),
+          passInProd: getCol(cols, p[5]?.start),  dispClient: getCol(cols, p[5]?.end),
           sort_order: i,
         };
         if (!rel.name) continue;
