@@ -153,50 +153,67 @@ function ReleaseScheduleSection({ contractId }) {
         <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata. Aggiungi la prima con "+ Nuova release".</p>
       ) : records.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "auto" }}>
+          <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
             <thead>
+              {/* Riga 1 — nomi gruppi */}
               <tr style={{ background: "#102a47", color: "#fff" }}>
-                <th rowSpan={2} style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap", verticalAlign: "middle", minWidth: 100, borderRight: "1px solid #1e3a5f" }}>
-                  Nome Release
+                <th rowSpan={2} style={{
+                  padding: "8px 14px", textAlign: "left", verticalAlign: "middle",
+                  borderRight: "2px solid #1e3a5f", minWidth: 110, fontSize: 12
+                }}>
+                  Release
                 </th>
                 {RELEASE_GROUPS.map(g => (
-                  <th key={g.group} colSpan={g.end ? 2 : 1}
-                    style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap", fontSize: 10, fontWeight: 700, borderRight: "1px solid #1e3a5f", borderBottom: "1px solid #1e3a5f" }}>
+                  <th key={g.group} colSpan={g.end ? 2 : 1} style={{
+                    padding: "6px 10px", textAlign: "center", fontSize: 11, fontWeight: 700,
+                    borderRight: "2px solid #1e3a5f", borderBottom: "1px solid #1e3a5f",
+                    letterSpacing: "0.3px"
+                  }}>
                     {g.group}
                   </th>
                 ))}
-                <th rowSpan={2} style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap", minWidth: 110 }}>Azioni</th>
+                <th rowSpan={2} style={{
+                  padding: "8px 10px", textAlign: "center", verticalAlign: "middle",
+                  fontSize: 11, minWidth: 100
+                }}>
+                  Azioni
+                </th>
               </tr>
-              <tr style={{ background: "#1a3a5c", color: "#c8d9ee" }}>
-                {RELEASE_GROUPS.map(g => g.end ? [
-                  <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Inizio</th>,
-                  <th key={g.end}   style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Fine</th>,
-                ] : (
-                  <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Data</th>
-                ))}
+              {/* Riga 2 — Inizio / Fine per ogni gruppo */}
+              <tr style={{ background: "#1a3a5c", color: "#bcd0e8" }}>
+                {RELEASE_GROUPS.flatMap(g => g.end ? [
+                  <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "1px solid #243f5c" }}>Inizio</th>,
+                  <th key={g.end}   style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Fine</th>,
+                ] : [
+                  <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Data</th>,
+                ])}
               </tr>
             </thead>
             <tbody>
               {records.map((rec, ri) => {
-                const p = typeof rec.payload === "string" ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })() : rec.payload || {};
+                const p = typeof rec.payload === "string"
+                  ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })()
+                  : rec.payload || {};
                 return (
                   <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>{rec.title}</td>
-                    {RELEASE_GROUPS.map(g => g.end ? [
-                      <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "7px 14px", fontWeight: 700, color: "#1e293b", borderRight: "2px solid #e2e8f0", fontSize: 12 }}>
+                      {rec.title}
+                    </td>
+                    {RELEASE_GROUPS.flatMap(g => g.end ? [
+                      <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", fontSize: 12, color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "1px solid #e2e8f0" }}>
                         {fmtRelDate(p[g.start])}
                       </td>,
-                      <td key={g.end} style={{ padding: "5px 6px", textAlign: "center", color: p[g.end] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
+                      <td key={g.end} style={{ padding: "6px 8px", textAlign: "center", fontSize: 12, color: p[g.end] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>
                         {fmtRelDate(p[g.end])}
                       </td>,
-                    ] : (
-                      <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
+                    ] : [
+                      <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", fontSize: 12, color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>
                         {fmtRelDate(p[g.start])}
-                      </td>
-                    ))}
-                    <td style={{ padding: "5px 8px", textAlign: "center", whiteSpace: "nowrap" }}>
-                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 8px", fontSize: 10, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Modifica</button>
-                      <button onClick={() => del(rec)}      style={{ padding: "3px 8px", fontSize: 10, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Elimina</button>
+                      </td>,
+                    ])}
+                    <td style={{ padding: "5px 8px", textAlign: "center" }}>
+                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 9px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>✏️</button>
+                      <button onClick={() => del(rec)}      style={{ padding: "3px 9px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>✕</button>
                     </td>
                   </tr>
                 );

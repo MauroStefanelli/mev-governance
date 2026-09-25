@@ -451,7 +451,7 @@ function App() {
             border: "1px solid rgba(255,255,255,0.35)", borderRadius: "4px",
             padding: "2px 7px", marginLeft: "2px", textTransform: "uppercase",
           }}>
-            DEV_Rel_13
+            DEV_Rel_14
           </span>
 
           {/* Selettore Contratto — sempre visibile accanto al titolo */}
