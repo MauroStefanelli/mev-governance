@@ -1117,7 +1117,8 @@ function ReleaseScheduleSection() {
 
   const openNew = () => { setDraft(EMPTY_RELEASE()); setEditing("new"); setMsg(""); };
   const openEdit = (rec) => {
-    const p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : rec.payload || {};
+    let p = {};
+    try { p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : (rec.payload || {}); } catch {}
     setDraft({ name: rec.title || "", ...p });
     setEditing(rec);
     setMsg("");

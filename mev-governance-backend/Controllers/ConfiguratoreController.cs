@@ -670,11 +670,18 @@ public class ConfiguratoreController : ControllerBase
                 var name = reader.GetName(i);
                 var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
 
-                // payload è restituito come TEXT json → lo deserializziamo come oggetto
+                // payload è restituito come TEXT json → lo deserializziamo come JsonElement
+                // Usiamo JsonDocument per preservare correttamente l'escaping dei caratteri
+                // (evita control characters raw nel JSON finale della risposta HTTP)
                 if (name == "payload" && value is string s && !string.IsNullOrWhiteSpace(s))
                 {
-                    try { row[name] = JsonSerializer.Deserialize<object>(s); }
-                    catch { row[name] = s; }
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(s);
+                        // Clona il RootElement per renderlo indipendente dal doc
+                        row[name] = doc.RootElement.Clone();
+                    }
+                    catch { row[name] = new Dictionary<string, object?>(); }
                 }
                 else if (value is DateTime dt)
                 {

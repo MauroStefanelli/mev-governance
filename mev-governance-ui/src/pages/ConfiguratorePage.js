@@ -669,7 +669,7 @@ function ConfiguratorePage({ onUnauthorized }) {
   const loadArchive = useCallback(() => {
     getConfiguratoreRecords({ entity_type: "initiative_evaluation" })
       .then((d) => setArchiveRecords(d.records || []))
-      .catch(() => {});
+      .catch((e) => { console.warn("loadArchive failed:", e); });
   }, []);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
