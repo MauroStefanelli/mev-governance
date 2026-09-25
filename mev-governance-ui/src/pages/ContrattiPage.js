@@ -1161,22 +1161,42 @@ function ReleaseScheduleSection({ contractId }) {
           <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", marginBottom: 12 }}>
             {editing === "new" ? "Nuova release" : `Modifica: ${editing.title}`}
           </div>
-          <div style={{ marginBottom: 12 }}>
+          {/* Nome release */}
+          <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>Nome release</label>
-            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12…"
+            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600, maxWidth: 320 }} placeholder="es. R2025-04, Sprint 12…"
               value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px 12px" }}>
-            {RELEASE_DATE_FIELDS.map(f => (
-              <label key={f.key} style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                {f.label}
-                <input type="date" style={{ ...inputStyle, marginTop: 3 }}
-                  value={draft[f.key] || ""} onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))} />
-              </label>
-            ))}
-          </div>
-          {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginTop: 8, fontWeight: 600 }}>{msg}</div>}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+          {/* Griglia date: una riga per gruppo, colonne: Fase | Inizio | Fine */}
+          <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
+            <thead>
+              <tr style={{ background: "#e2e8f0" }}>
+                <th style={{ padding: "5px 10px", textAlign: "left",   fontSize: 11, fontWeight: 700, color: "#475569", width: 160 }}>Fase</th>
+                <th style={{ padding: "5px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#475569", width: 160 }}>Inizio</th>
+                <th style={{ padding: "5px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#475569", width: 160 }}>Fine</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RELEASE_GROUPS.map((g, i) => (
+                <tr key={g.group} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "#1e293b" }}>{g.group}</td>
+                  <td style={{ padding: "4px 8px" }}>
+                    <input type="date" style={{ ...inputStyle, width: 150 }}
+                      value={draft[g.start] || ""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} />
+                  </td>
+                  <td style={{ padding: "4px 8px" }}>
+                    {g.end
+                      ? <input type="date" style={{ ...inputStyle, width: 150 }}
+                          value={draft[g.end] || ""} onChange={e => setDraft(d => ({ ...d, [g.end]: e.target.value }))} />
+                      : <span style={{ fontSize: 11, color: "#94a3b8" }}>—</span>
+                    }
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginBottom: 8, fontWeight: 600 }}>{msg}</div>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={cancel} style={{ padding: "7px 16px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Annulla</button>
             <button onClick={save} disabled={saving} style={{ padding: "7px 16px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               {saving ? "Salvataggio…" : "Salva"}
