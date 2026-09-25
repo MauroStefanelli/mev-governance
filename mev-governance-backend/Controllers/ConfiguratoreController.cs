@@ -33,6 +33,13 @@ public class ConfiguratoreController : ControllerBase
         return User.IsInRole("SuperAdmin") || User.IsInRole("Developer");
     }
 
+    // Records (release_calendar e simili) accessibili anche ad Admin e Manager
+    private bool CanAccessRecords()
+    {
+        return User.IsInRole("SuperAdmin") || User.IsInRole("Developer")
+            || User.IsInRole("Admin") || User.IsInRole("Manager");
+    }
+
     private static readonly string[] ValidEntities =
     {
         "initiative_evaluation", "release_calendar", "implementation_plan",
@@ -577,7 +584,7 @@ public class ConfiguratoreController : ControllerBase
     [HttpPost("records")]
     public async Task<IActionResult> UpsertRecord([FromBody] PcRecordRequest req)
     {
-        if (!CanAccess()) return Forbid();
+        if (!CanAccessRecords()) return Forbid();
         if (string.IsNullOrWhiteSpace(req.RecordKey) || string.IsNullOrWhiteSpace(req.EntityType))
             return BadRequest("record_key e entity_type sono obbligatori");
         if (!ValidEntities.Contains(req.EntityType))
@@ -628,7 +635,7 @@ public class ConfiguratoreController : ControllerBase
     [HttpDelete("records/{id}")]
     public async Task<IActionResult> DeleteRecord(string id)
     {
-        if (!CanAccess()) return Forbid();
+        if (!CanAccessRecords()) return Forbid();
         if (!Guid.TryParse(id, out var gid))
             return BadRequest("Id non valido");
 
