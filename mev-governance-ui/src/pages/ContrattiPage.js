@@ -1106,7 +1106,19 @@ function ReleaseScheduleSection({ contractId }) {
     if (!contractId) return;
     setLoadingRec(true);
     getReleaseSchedules(contractId)
-      .then(d => setRecords(d.records || []))
+      .then(d => {
+        const recs = d.records || [];
+        // Ordina per sort_order nel payload, poi per title
+        recs.sort((a, b) => {
+          const pa = typeof a.payload === "string" ? (() => { try { return JSON.parse(a.payload); } catch { return {}; } })() : a.payload || {};
+          const pb = typeof b.payload === "string" ? (() => { try { return JSON.parse(b.payload); } catch { return {}; } })() : b.payload || {};
+          const oa = pa.sort_order ?? 9999;
+          const ob = pb.sort_order ?? 9999;
+          if (oa !== ob) return oa - ob;
+          return (a.title || "").localeCompare(b.title || "");
+        });
+        setRecords(recs);
+      })
       .catch(() => setRecords([]))
       .finally(() => setLoadingRec(false));
   }, [contractId]);
@@ -1150,35 +1162,45 @@ function ReleaseScheduleSection({ contractId }) {
       const buf = await file.arrayBuffer();
       const wb  = XLSX.read(buf, { type: "array", cellDates: true });
       const ws  = wb.Sheets[wb.SheetNames[0]];
-      // Legge come array di array (skipHeader: false → riga 0 = intestazioni)
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      const dataRows = rows.slice(1).filter(r => r[0] && String(r[0]).trim());
+
+      // Trova la prima riga dati: quella dove cols[0] non è vuoto e non è "Release"
+      // (gestisce sia 1 che 2 righe di intestazione)
+      let firstDataRow = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const v = String(rows[i][0] || "").trim().toLowerCase();
+        if (v && v !== "release" && v !== "") { firstDataRow = i; break; }
+      }
+      const dataRows = rows.slice(firstDataRow).filter(r => r[0] && String(r[0]).trim());
+
+      const fmtCell = (v) => {
+        if (!v && v !== 0) return "";
+        if (v instanceof Date) {
+          const y = v.getFullYear();
+          const m = String(v.getMonth()+1).padStart(2,"0");
+          const d = String(v.getDate()).padStart(2,"0");
+          return `${y}-${m}-${d}`;
+        }
+        // Numero seriale Excel (se cellDates non l'ha convertito)
+        if (typeof v === "number") {
+          const date = XLSX.SSF.parse_date_code(v);
+          if (date) return `${date.y}-${String(date.m).padStart(2,"0")}-${String(date.d).padStart(2,"0")}`;
+        }
+        return parseExcelDate(String(v));
+      };
+
       let ok = 0, err = 0;
-      for (const cols of dataRows) {
-        const fmtCell = (v) => {
-          if (!v && v !== 0) return "";
-          if (v instanceof Date) {
-            const y = v.getFullYear();
-            const m = String(v.getMonth()+1).padStart(2,"0");
-            const d = String(v.getDate()).padStart(2,"0");
-            return `${y}-${m}-${d}`;
-          }
-          return parseExcelDate(String(v));
-        };
+      for (let i = 0; i < dataRows.length; i++) {
+        const cols = dataRows[i];
         const rel = {
           name:       String(cols[0] || "").trim(),
-          devStart:   fmtCell(cols[1]),
-          devEnd:     fmtCell(cols[2]),
-          cfStart:    fmtCell(cols[3]),
-          cfEnd:      fmtCell(cols[4]),
-          e2eStart:   fmtCell(cols[5]),
-          e2eEnd:     fmtCell(cols[6]),
-          uatStart:   fmtCell(cols[7]),
-          uatEnd:     fmtCell(cols[8]),
-          certStart:  fmtCell(cols[9]),
-          certEnd:    fmtCell(cols[10]),
-          passInProd: fmtCell(cols[11]),
-          dispClient: fmtCell(cols[12]),
+          devStart:   fmtCell(cols[1]),  devEnd:     fmtCell(cols[2]),
+          cfStart:    fmtCell(cols[3]),  cfEnd:      fmtCell(cols[4]),
+          e2eStart:   fmtCell(cols[5]),  e2eEnd:     fmtCell(cols[6]),
+          uatStart:   fmtCell(cols[7]),  uatEnd:     fmtCell(cols[8]),
+          certStart:  fmtCell(cols[9]),  certEnd:    fmtCell(cols[10]),
+          passInProd: fmtCell(cols[11]), dispClient: fmtCell(cols[12]),
+          sort_order: i,
         };
         if (!rel.name) continue;
         try { await upsertReleaseSchedule(contractId, rel); ok++; } catch { err++; }
