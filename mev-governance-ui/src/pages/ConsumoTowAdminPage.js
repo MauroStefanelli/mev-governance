@@ -103,13 +103,18 @@ function ReleaseScheduleSection({ contractId }) {
       const wb  = XLSX.read(buf, { type: "array", cellDates: true });
       const ws  = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      // Trova prima riga dati (salta header singolo o doppio)
-      let firstDataRow = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const v = String(rows[i][0] || "").trim().toLowerCase();
-        if (v && v !== "release" && v !== "") { firstDataRow = i; break; }
+
+      // Legge riga 1 (header Inizio/Fine) per mappare dinamicamente le colonne
+      const hdr1 = rows[1] || [];
+      const datePositions = [];
+      for (let i = 1; i < hdr1.length; i++) {
+        const v = String(hdr1[i] || "").trim().toLowerCase();
+        if (v === "inizio" || v === "data") datePositions.push({ start: i });
+        else if (v === "fine" && datePositions.length > 0 && datePositions[datePositions.length-1].end === undefined) {
+          datePositions[datePositions.length-1].end = i;
+        }
       }
-      const dataRows = rows.slice(firstDataRow).filter(r => r[0] && String(r[0]).trim());
+
       const fmtCell = (v) => {
         if (!v && v !== 0) return "";
         if (v instanceof Date) {
@@ -122,17 +127,22 @@ function ReleaseScheduleSection({ contractId }) {
         }
         return parseExcelDate(String(v));
       };
+
+      const dataRows = rows.slice(2).filter(r => r[0] && String(r[0]).trim());
+      const getCol = (row, pos) => (pos !== undefined ? fmtCell(row[pos]) : "");
+
       let ok = 0, err = 0;
       for (let i = 0; i < dataRows.length; i++) {
         const cols = dataRows[i];
+        const p = datePositions;
         const rel = {
           name:       String(cols[0]||"").trim(),
-          devStart:   fmtCell(cols[1]),  devEnd:     fmtCell(cols[2]),
-          cfStart:    fmtCell(cols[3]),  cfEnd:      fmtCell(cols[4]),
-          e2eStart:   fmtCell(cols[5]),  e2eEnd:     fmtCell(cols[6]),
-          uatStart:   fmtCell(cols[7]),  uatEnd:     fmtCell(cols[8]),
-          certStart:  fmtCell(cols[9]),  certEnd:    fmtCell(cols[10]),
-          passInProd: fmtCell(cols[11]), dispClient: fmtCell(cols[12]),
+          devStart:   getCol(cols, p[0]?.start),  devEnd:     getCol(cols, p[0]?.end),
+          cfStart:    getCol(cols, p[1]?.start),  cfEnd:      getCol(cols, p[1]?.end),
+          e2eStart:   getCol(cols, p[2]?.start),  e2eEnd:     getCol(cols, p[2]?.end),
+          uatStart:   getCol(cols, p[3]?.start),  uatEnd:     getCol(cols, p[3]?.end),
+          certStart:  getCol(cols, p[4]?.start),  certEnd:    getCol(cols, p[4]?.end),
+          passInProd: getCol(cols, p[5]?.start),  dispClient: getCol(cols, p[5]?.end),
           sort_order: i,
         };
         if (!rel.name) continue;
