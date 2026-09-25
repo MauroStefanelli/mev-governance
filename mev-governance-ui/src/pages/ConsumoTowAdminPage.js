@@ -72,11 +72,15 @@ function ReleaseScheduleSection({ contractId }) {
 
   const save = async () => {
     if (!draft.name.trim()) { setMsg("Inserire il nome della release."); return; }
+    if (!contractId) { setMsg("Nessun contratto selezionato."); return; }
     setSaving(true);
     try {
       await upsertReleaseSchedule(contractId, { ...draft, name: draft.name.trim() });
       setMsg("Salvato."); setEditing(null); load();
-    } catch (e) { setMsg("Errore: " + e.message); }
+    } catch (e) {
+      const msg = e?.message || (e?.status ? `Errore HTTP ${e.status}` : JSON.stringify(e));
+      setMsg("Errore: " + msg);
+    }
     finally { setSaving(false); }
   };
 
@@ -114,134 +118,83 @@ function ReleaseScheduleSection({ contractId }) {
         </div>
       </div>
 
-      {/* Form */}
-      {editing && (
-        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", marginBottom: 12 }}>
-            {editing === "new" ? "Nuova release" : `Modifica: ${editing.title}`}
-          </div>
-          {/* Nome release */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>Nome release</label>
-            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600, maxWidth: 320 }} placeholder="es. R2025-04, Sprint 12…"
-              value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
-          </div>
-          {/* Griglia date: una riga per gruppo, colonne: Fase | Inizio | Fine */}
-          <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
-            <thead>
-              <tr style={{ background: "#e2e8f0" }}>
-                <th style={{ padding: "5px 10px", textAlign: "left",   fontSize: 11, fontWeight: 700, color: "#475569", width: 160 }}>Fase</th>
-                <th style={{ padding: "5px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#475569", width: 160 }}>Inizio</th>
-                <th style={{ padding: "5px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, color: "#475569", width: 160 }}>Fine</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RELEASE_GROUPS.map((g, i) => (
-                <tr key={g.group} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "#1e293b" }}>{g.group}</td>
-                  <td style={{ padding: "4px 8px" }}>
-                    <input type="date" style={{ ...inputStyle, width: 150 }}
-                      value={draft[g.start] || ""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} />
-                  </td>
-                  <td style={{ padding: "4px 8px" }}>
-                    {g.end
-                      ? <input type="date" style={{ ...inputStyle, width: 150 }}
-                          value={draft[g.end] || ""} onChange={e => setDraft(d => ({ ...d, [g.end]: e.target.value }))} />
-                      : <span style={{ fontSize: 11, color: "#94a3b8" }}>—</span>
-                    }
+      {/* Tabella unica: intestazione + righe salvate + riga form editing */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+          <thead>
+            <tr style={{ background: "#102a47", color: "#fff" }}>
+              <th rowSpan={2} style={{ padding: "8px 14px", textAlign: "left", verticalAlign: "middle", borderRight: "2px solid #1e3a5f", minWidth: 130 }}>Release</th>
+              {RELEASE_GROUPS.map(g => (
+                <th key={g.group} colSpan={g.end ? 2 : 1} style={{ padding: "6px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, borderRight: "2px solid #1e3a5f", borderBottom: "1px solid #1e3a5f" }}>
+                  {g.group}
+                </th>
+              ))}
+              <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "center", verticalAlign: "middle", fontSize: 11, minWidth: 90 }}>Azioni</th>
+            </tr>
+            <tr style={{ background: "#1a3a5c", color: "#bcd0e8" }}>
+              {RELEASE_GROUPS.flatMap(g => g.end ? [
+                <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "1px solid #243f5c" }}>Inizio</th>,
+                <th key={g.end}   style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Fine</th>,
+              ] : [
+                <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Data</th>,
+              ])}
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((rec, ri) => {
+              const p = typeof rec.payload === "string" ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })() : rec.payload || {};
+              return (
+                <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "7px 14px", fontWeight: 700, color: "#1e293b", borderRight: "2px solid #e2e8f0" }}>{rec.title}</td>
+                  {RELEASE_GROUPS.flatMap(g => g.end ? [
+                    <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "1px solid #e2e8f0" }}>{fmtRelDate(p[g.start])}</td>,
+                    <td key={g.end}   style={{ padding: "6px 8px", textAlign: "center", color: p[g.end]   ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>{fmtRelDate(p[g.end])}</td>,
+                  ] : [
+                    <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>{fmtRelDate(p[g.start])}</td>,
+                  ])}
+                  <td style={{ padding: "5px 8px", textAlign: "center" }}>
+                    <button onClick={() => openEdit(rec)} style={{ marginRight: 4, padding: "3px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✏️</button>
+                    <button onClick={() => del(rec)}      style={{ padding: "3px 8px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer" }}>✕</button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginBottom: 8, fontWeight: 600 }}>{msg}</div>}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={cancel} style={{ padding: "7px 16px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Annulla</button>
-            <button onClick={save} disabled={saving} style={{ padding: "7px 16px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              {saving ? "Salvataggio…" : "Salva"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Tabella */}
-      {!contractId ? (
-        <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto per visualizzare le release pianificate.</p>
-      ) : loadingRec ? (
-        <p style={{ color: "#64748b", fontSize: 13 }}>Caricamento release in corso…</p>
-      ) : records.length === 0 && !editing ? (
-        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata. Aggiungi la prima con "+ Nuova release".</p>
-      ) : records.length > 0 ? (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
-            <thead>
-              {/* Riga 1 — nomi gruppi */}
-              <tr style={{ background: "#102a47", color: "#fff" }}>
-                <th rowSpan={2} style={{
-                  padding: "8px 14px", textAlign: "left", verticalAlign: "middle",
-                  borderRight: "2px solid #1e3a5f", minWidth: 110, fontSize: 12
-                }}>
-                  Release
-                </th>
-                {RELEASE_GROUPS.map(g => (
-                  <th key={g.group} colSpan={g.end ? 2 : 1} style={{
-                    padding: "6px 10px", textAlign: "center", fontSize: 11, fontWeight: 700,
-                    borderRight: "2px solid #1e3a5f", borderBottom: "1px solid #1e3a5f",
-                    letterSpacing: "0.3px"
-                  }}>
-                    {g.group}
-                  </th>
-                ))}
-                <th rowSpan={2} style={{
-                  padding: "8px 10px", textAlign: "center", verticalAlign: "middle",
-                  fontSize: 11, minWidth: 100
-                }}>
-                  Azioni
-                </th>
-              </tr>
-              {/* Riga 2 — Inizio / Fine per ogni gruppo */}
-              <tr style={{ background: "#1a3a5c", color: "#bcd0e8" }}>
+              );
+            })}
+            {editing && (
+              <tr style={{ background: "#eff6ff", borderBottom: "2px solid #1a73e8" }}>
+                <td style={{ padding: "4px 6px", borderRight: "2px solid #e2e8f0" }}>
+                  <input style={{ ...inputStyle, width: 120, fontWeight: 700 }} placeholder="Nome release"
+                    value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} autoFocus />
+                </td>
                 {RELEASE_GROUPS.flatMap(g => g.end ? [
-                  <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "1px solid #243f5c" }}>Inizio</th>,
-                  <th key={g.end}   style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Fine</th>,
+                  <td key={g.start} style={{ padding: "4px 5px", borderRight: "1px solid #e2e8f0" }}>
+                    <input type="date" style={{ ...inputStyle, width: 130 }}
+                      value={draft[g.start] || ""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} />
+                  </td>,
+                  <td key={g.end} style={{ padding: "4px 5px", borderRight: "2px solid #e2e8f0" }}>
+                    <input type="date" style={{ ...inputStyle, width: 130 }}
+                      value={draft[g.end] || ""} onChange={e => setDraft(d => ({ ...d, [g.end]: e.target.value }))} />
+                  </td>,
                 ] : [
-                  <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Data</th>,
+                  <td key={g.start} style={{ padding: "4px 5px", borderRight: "2px solid #e2e8f0" }}>
+                    <input type="date" style={{ ...inputStyle, width: 130 }}
+                      value={draft[g.start] || ""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} />
+                  </td>,
                 ])}
+                <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
+                  <button onClick={save} disabled={saving} style={{ marginRight: 4, padding: "3px 10px", fontSize: 11, background: "#1a73e8", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: 700 }}>
+                    {saving ? "…" : "✓"}
+                  </button>
+                  <button onClick={cancel} style={{ padding: "3px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✕</button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {records.map((rec, ri) => {
-                const p = typeof rec.payload === "string"
-                  ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })()
-                  : rec.payload || {};
-                return (
-                  <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "7px 14px", fontWeight: 700, color: "#1e293b", borderRight: "2px solid #e2e8f0", fontSize: 12 }}>
-                      {rec.title}
-                    </td>
-                    {RELEASE_GROUPS.flatMap(g => g.end ? [
-                      <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", fontSize: 12, color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "1px solid #e2e8f0" }}>
-                        {fmtRelDate(p[g.start])}
-                      </td>,
-                      <td key={g.end} style={{ padding: "6px 8px", textAlign: "center", fontSize: 12, color: p[g.end] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>
-                        {fmtRelDate(p[g.end])}
-                      </td>,
-                    ] : [
-                      <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", fontSize: 12, color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>
-                        {fmtRelDate(p[g.start])}
-                      </td>,
-                    ])}
-                    <td style={{ padding: "5px 8px", textAlign: "center" }}>
-                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 9px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>✏️</button>
-                      <button onClick={() => del(rec)}      style={{ padding: "3px 9px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>✕</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+            )}
+          </tbody>
+        </table>
+        {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginTop: 8, fontWeight: 600 }}>{msg}</div>}
+        {!contractId && <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 8 }}>Seleziona un contratto per visualizzare le release.</p>}
+        {contractId && !loadingRec && records.length === 0 && !editing && <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 8 }}>Nessuna release pianificata. Usa "+ Nuova release".</p>}
+        {loadingRec && <p style={{ color: "#64748b", fontSize: 13, marginTop: 8 }}>Caricamento…</p>}
+      </div>
     </div>
   );
 }
