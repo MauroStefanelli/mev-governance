@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import * as XLSX from "xlsx";
 import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -1139,36 +1140,53 @@ function ReleaseScheduleSection({ contractId }) {
     catch (e) { setMsg("Errore eliminazione: " + (e?.message || "")); }
   };
 
-  // Import da file Excel/CSV con tab o ; come separatore
+  // Import da file Excel (.xlsx/.xls) o CSV
   const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !contractId) return;
     e.target.value = "";
     setImporting(true); setMsg("");
     try {
-      const text = await file.text();
-      // Determina separatore: tab o ;
-      const sep = text.includes("\t") ? "\t" : ";";
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      // Salta header (prima riga)
-      const dataLines = lines.slice(1);
+      const buf = await file.arrayBuffer();
+      const wb  = XLSX.read(buf, { type: "array", cellDates: true });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      // Legge come array di array (skipHeader: false → riga 0 = intestazioni)
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const dataRows = rows.slice(1).filter(r => r[0] && String(r[0]).trim());
       let ok = 0, err = 0;
-      for (const line of dataLines) {
-        const cols = line.split(sep).map(c => c.trim().replace(/^"|"$/g, ""));
-        if (!cols[0]) continue;
-        const rel = {};
-        EXCEL_COLS.forEach((k, i) => { rel[k] = k === "name" ? cols[i] : parseExcelDate(cols[i]); });
+      for (const cols of dataRows) {
+        const fmtCell = (v) => {
+          if (!v && v !== 0) return "";
+          if (v instanceof Date) {
+            const y = v.getFullYear();
+            const m = String(v.getMonth()+1).padStart(2,"0");
+            const d = String(v.getDate()).padStart(2,"0");
+            return `${y}-${m}-${d}`;
+          }
+          return parseExcelDate(String(v));
+        };
+        const rel = {
+          name:       String(cols[0] || "").trim(),
+          devStart:   fmtCell(cols[1]),
+          devEnd:     fmtCell(cols[2]),
+          cfStart:    fmtCell(cols[3]),
+          cfEnd:      fmtCell(cols[4]),
+          e2eStart:   fmtCell(cols[5]),
+          e2eEnd:     fmtCell(cols[6]),
+          uatStart:   fmtCell(cols[7]),
+          uatEnd:     fmtCell(cols[8]),
+          certStart:  fmtCell(cols[9]),
+          certEnd:    fmtCell(cols[10]),
+          passInProd: fmtCell(cols[11]),
+          dispClient: fmtCell(cols[12]),
+        };
         if (!rel.name) continue;
-        try {
-          await upsertReleaseSchedule(contractId, rel);
-          ok++;
-        } catch { err++; }
+        try { await upsertReleaseSchedule(contractId, rel); ok++; } catch { err++; }
       }
       setMsg(`Importate ${ok} release${err > 0 ? `, ${err} errori` : ""}.`);
       load();
-    } catch (ex) {
-      setMsg("Errore import: " + (ex?.message || ""));
-    } finally { setImporting(false); }
+    } catch (ex) { setMsg("Errore import: " + (ex?.message || "")); }
+    finally { setImporting(false); }
   };
 
   const inp = { border: "1px solid #cbd5e1", borderRadius: 5, padding: "4px 6px", fontSize: 11, width: "100%", boxSizing: "border-box", background: "#fff" };
