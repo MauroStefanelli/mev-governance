@@ -10,7 +10,8 @@ import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
-import { getMevList, getLastAlign, changeMyPassword, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
+import ConfiguratorePage from "./pages/ConfiguratorePage";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -21,6 +22,9 @@ function App() {
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole]         = useState("");
+  const [roles, setRoles]       = useState(() => {
+    try { return JSON.parse(localStorage.getItem("roles") || "[]"); } catch { return []; }
+  });
   // true finché non abbiamo verificato se la sessione salvata è ancora valida
   const [bootstrapping, setBootstrapping] = useState(true);
   const [page, setPage]             = useState("mev");
@@ -28,11 +32,20 @@ function App() {
   const [filteredRows, setFilteredRows] = useState([]);
   const [lastAlign, setLastAlign]   = useState(null);
   const [showPwdModal, setShowPwdModal] = useState(false);
+  const [pwdModalTab, setPwdModalTab]   = useState("password"); // "password" | "aikey"
   const [pwdOld, setPwdOld]         = useState("");
   const [pwdNew, setPwdNew]         = useState("");
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
+  const [aiKeyVal, setAiKeyVal]     = useState("");
+  const [aiKeyHas, setAiKeyHas]     = useState(false);
+  const [aiKeyMsg, setAiKeyMsg]     = useState("");
+  // Campi configurazione AI estesa
+  const [aiEndpoint, setAiEndpoint] = useState("");
+  const [aiModel,    setAiModel]    = useState("");
+  const [aiStyle,    setAiStyle]    = useState("chat");
+  const [aiAuthMode, setAiAuthMode] = useState("bearer");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
 
@@ -88,8 +101,17 @@ function App() {
         setToken(jwt);
         setUsername(p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] || localStorage.getItem("XUSER") || "");
         setFullName(p?.fullName || localStorage.getItem("fullName") || "");
-        const restoredRole = p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || localStorage.getItem("role") || "";
+        const roleClaim = p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+        // I claim role multipli arrivano come array, singolo come stringa
+        const restoredRole = Array.isArray(roleClaim) ? (roleClaim[0] || "") : (roleClaim || localStorage.getItem("role") || "");
         setRole(restoredRole);
+        const restoredRoles = Array.isArray(roleClaim)
+          ? roleClaim
+          : (roleClaim ? [roleClaim] : (() => {
+              const saved = localStorage.getItem("roles");
+              try { return saved ? JSON.parse(saved) : []; } catch { return []; }
+            })());
+        setRoles([...new Set(restoredRoles)]);
         try { setAmbienti(JSON.parse(localStorage.getItem("ambienti") || "[]")); } catch {}
         setAmbienteId(parseInt(localStorage.getItem("ambienteId") || "0", 10));
         // Per Client: carica pagine permesse
@@ -116,14 +138,14 @@ function App() {
             restoreSession(data.token);
           } else {
             // Refresh fallito: pulisce tutto → mostra login
-            ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+            ["jwt","refreshToken","XUSER","fullName","role","roles","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
           }
         } catch {
-          ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+          ["jwt","refreshToken","XUSER","fullName","role","roles","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
         }
       } else {
         // Nessuna sessione valida: pulisce eventuali residui
-        ["jwt","refreshToken","XUSER","fullName","role","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
+        ["jwt","refreshToken","XUSER","fullName","role","roles","ambienti","ambienteId"].forEach(k => localStorage.removeItem(k));
       }
 
       setBootstrapping(false);
@@ -135,8 +157,8 @@ function App() {
   // ── Logout automatico se il refresh token è scaduto ─────────────────────────
   useEffect(() => {
     const handleAuthExpired = () => {
-      ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
-      setToken(""); setUsername(""); setFullName(""); setRole("");
+      ["jwt", "refreshToken", "XUSER", "fullName", "role", "roles", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
+      setToken(""); setUsername(""); setFullName(""); setRole(""); setRoles([]);
       setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
       setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
       showToast("Sessione scaduta. Effettua di nuovo il login.", "warn", 8000);
@@ -200,10 +222,15 @@ function App() {
     localStorage.setItem("fullName",    data.fullName);
     localStorage.setItem("role",        data.role);
 
+    const extraRoles = Array.isArray(data.roles) ? data.roles : [data.role];
+    const allRoles = [...new Set([data.role, ...extraRoles].filter(Boolean))];
+    localStorage.setItem("roles", JSON.stringify(allRoles));
+
     setToken(data.token);
     setUsername(data.username);
     setFullName(data.fullName);
     setRole(data.role);
+    setRoles(allRoles);
 
     const ambientiList = data.ambienti || [];
     const activeId = data.ambienteId || 0;
@@ -249,8 +276,8 @@ function App() {
       } catch { /* ignora errori di rete */ }
     }
     // Pulisce TUTTO il localStorage relativo alla sessione, compreso refreshToken
-    ["jwt", "refreshToken", "XUSER", "fullName", "role", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
-    setToken(""); setUsername(""); setFullName(""); setRole("");
+    ["jwt", "refreshToken", "XUSER", "fullName", "role", "roles", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
+    setToken(""); setUsername(""); setFullName(""); setRole(""); setRoles([]);
     setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
     setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
   };
@@ -338,6 +365,12 @@ function App() {
   const ambienteAttivo = ambienti.find(a => a.id === ambienteId);
   const descrizioneAttiva = ambienteAttivo?.descrizione || "";
 
+  // Helper: verifica se l'utente ha (almeno) uno dei ruoli indicati
+  const hasRole = useCallback((...wanted) => {
+    const myRoles = roles.length > 0 ? roles : (role ? [role] : []);
+    return wanted.some(r => myRoles.includes(r));
+  }, [roles, role]);
+
   /*const navItems = [
     { id: "mev",               label: "MEV" },
     { id: "contratti",         label: "Contratti" },
@@ -411,6 +444,14 @@ function App() {
           />
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
             MEV Governance
+          </span>
+          <span style={{
+            fontSize: "10px", fontWeight: 700, letterSpacing: "0.8px",
+            background: "rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.9)",
+            border: "1px solid rgba(255,255,255,0.35)", borderRadius: "4px",
+            padding: "2px 7px", marginLeft: "2px", textTransform: "uppercase",
+          }}>
+            DEV_Rel_14
           </span>
 
           {/* Selettore Contratto — sempre visibile accanto al titolo */}
@@ -566,13 +607,13 @@ function App() {
             </button>
           ))}
 
-          {role === "Admin" && (
+          {hasRole("Admin") && !hasRole("SuperAdmin") && (
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setShowAdminMenu(!showAdminMenu)}
                 style={{
                   background:
-                    ["tools", "admin", "dbconfig", "consumotow"].includes(page)
+                    ["tools", "admin", "dbconfig", "consumotow", "configuratore"].includes(page)
                       ? "rgba(255,255,255,0.22)"
                       : "transparent",
                   color: "white",
@@ -599,6 +640,7 @@ function App() {
                     { id: "admin",      label: "Utenti" },
                     { id: "consumotow", label: "Contratti" },
                     { id: "dbconfig",   label: "App Config" },
+                    ...(hasRole("Developer") ? [{ id: "configuratore", label: "Configuratore Offerta" }] : []),
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -624,12 +666,12 @@ function App() {
             </div>
           )}
 
-          {role === "SuperAdmin" && (
+          {hasRole("SuperAdmin") && (
             <div style={{ position: "relative" }}>
               <button
                 onClick={() => setShowAdminMenu(!showAdminMenu)}
                 style={{
-                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin"].includes(page)
+                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin", "configuratore"].includes(page)
                     ? "rgba(255,255,255,0.22)" : "transparent",
                   color: "white",
                   border: "1px solid transparent",
@@ -650,11 +692,64 @@ function App() {
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
                   {[
-                    { id: "tools",      label: "Caricamento Ordini" },
-                    { id: "admin",      label: "Utenti" },
-                    { id: "consumotow", label: "TOW Contratti" },
-                    { id: "dbconfig",   label: "Configurazione" },
-                    { id: "superadmin", label: "Gestione Contratti" },
+                    { id: "superadmin",   label: "Gestione Contratti" },
+                    { id: "consumotow",   label: "Gestione Contratti" },
+                    { id: "configuratore",label: "Configuratore Offerta" },
+                    { id: "tools",        label: "Caricamento Ordini" },
+                    { id: "admin",        label: "Utenti" },
+                    { id: "dbconfig",     label: "Configurazione" },
+                  ].map(({ id, label }) => (
+                    <div
+                      key={id}
+                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
+                      style={{
+                        padding: "8px 16px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: page === id ? 600 : 400,
+                        color: "white",
+                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Menu Configuratore per Developer puro (senza Admin/SuperAdmin) */}
+          {hasRole("Developer") && !hasRole("Admin") && !hasRole("SuperAdmin") && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowAdminMenu(!showAdminMenu)}
+                style={{
+                  background: ["configuratore"].includes(page) ? "rgba(255,255,255,0.22)" : "transparent",
+                  color: "white",
+                  border: "1px solid transparent",
+                  cursor: "pointer",
+                  padding: "6px 16px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              >
+                Developer {showAdminMenu ? "▲" : "▼"}
+              </button>
+              {showAdminMenu && (
+                <div style={{
+                  position: "absolute", top: "38px", right: 0,
+                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+                  borderRadius: "8px", minWidth: "180px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                }}>
+                  {[
+                    { id: "configuratore", label: "Configuratore Offerta" },
                   ].map(({ id, label }) => (
                     <div
                       key={id}
@@ -735,8 +830,20 @@ function App() {
             <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "11px" }}>{role}</div>
           </div>
           <button
-            onClick={() => { setShowPwdModal(true); setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError(""); }}
-            title="Cambia password"
+            onClick={async () => {
+              setShowPwdModal(true); setPwdModalTab("password");
+              setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError("");
+              setAiKeyVal(""); setAiKeyMsg("");
+              try {
+                const p = await getMyProfile();
+                setAiKeyHas(!!p?.hasAiKey);
+                setAiEndpoint(p?.aiEndpoint || "");
+                setAiModel(p?.aiModel || "");
+                setAiStyle(p?.aiStyle || "chat");
+                setAiAuthMode(p?.aiAuthMode || "bearer");
+              } catch {}
+            }}
+            title="Profilo: cambio password / API Key AI"
             style={{
               background: "rgba(255,255,255,0.12)", color: "white",
               border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
@@ -754,7 +861,7 @@ function App() {
         </div>
       </header>
 
-      {/* ── Modale cambio password ── */}
+      {/* ── Modale profilo: cambio password + API Key AI ── */}
       {showPwdModal && (
         <div style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
@@ -762,50 +869,159 @@ function App() {
         }}>
           <div style={{
             background: "white", borderRadius: "12px", padding: "28px 32px",
-            width: "360px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            width: "400px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
           }}>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8", marginBottom: "20px" }}>
-              Cambia Password
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#102a47", marginBottom: "16px" }}>
+              Profilo utente
             </div>
-            {[
-              { label: "Password attuale", val: pwdOld, set: setPwdOld },
-              { label: "Nuova password",   val: pwdNew, set: setPwdNew },
-              { label: "Conferma nuova",   val: pwdNew2, set: setPwdNew2 },
-            ].map(({ label, val, set }) => (
-              <div key={label} style={{ marginBottom: "14px" }}>
-                <div style={{ fontSize: "12px", color: "#555", marginBottom: "4px" }}>{label}</div>
-                <input
-                  type="password" value={val}
-                  onChange={e => set(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleChangePassword()}
-                  style={{
-                    width: "100%", padding: "8px 10px", border: "1px solid #dadce0",
-                    borderRadius: "6px", fontSize: "13px", boxSizing: "border-box",
-                  }}
-                />
-              </div>
-            ))}
-            {pwdError && (
-              <div style={{ fontSize: "12px", color: "#ea4335", marginBottom: "12px" }}>{pwdError}</div>
+            {/* Tab selector */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#eef2f5", borderRadius: 8, padding: 4 }}>
+              {[["password", "Cambia password"], ["aikey", "API Key AI"]].map(([tab, label]) => (
+                <button key={tab} onClick={() => { setPwdModalTab(tab); setPwdError(""); setAiKeyMsg(""); }}
+                  style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13,
+                    background: pwdModalTab === tab ? "#102a47" : "transparent",
+                    color: pwdModalTab === tab ? "#fff" : "#667482" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {pwdModalTab === "password" && (
+              <>
+                {[
+                  { label: "Password attuale", val: pwdOld, set: setPwdOld },
+                  { label: "Nuova password",   val: pwdNew, set: setPwdNew },
+                  { label: "Conferma nuova",   val: pwdNew2, set: setPwdNew2 },
+                ].map(({ label, val, set }) => (
+                  <div key={label} style={{ marginBottom: "14px" }}>
+                    <div style={{ fontSize: "12px", color: "#555", marginBottom: "4px" }}>{label}</div>
+                    <input
+                      type="password" value={val}
+                      onChange={e => set(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleChangePassword()}
+                      style={{
+                        width: "100%", padding: "8px 10px", border: "1px solid #dadce0",
+                        borderRadius: "6px", fontSize: "13px", boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                ))}
+                {pwdError && (
+                  <div style={{ fontSize: "12px", color: "#ea4335", marginBottom: "12px" }}>{pwdError}</div>
+                )}
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                  <button onClick={() => setShowPwdModal(false)}
+                    style={{ padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
+                      background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}>
+                    Annulla</button>
+                  <button onClick={handleChangePassword} disabled={pwdSaving}
+                    style={{ padding: "8px 18px", borderRadius: "6px", border: "none",
+                      background: "#1a73e8", color: "white", cursor: "pointer",
+                      fontSize: "13px", fontWeight: 600, opacity: pwdSaving ? 0.7 : 1 }}>
+                    {pwdSaving ? "Salvataggio..." : "Salva password"}</button>
+                </div>
+              </>
             )}
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setShowPwdModal(false)}
-                style={{
-                  padding: "8px 18px", borderRadius: "6px", border: "1px solid #dadce0",
-                  background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px",
-                }}
-              >Annulla</button>
-              <button
-                onClick={handleChangePassword}
-                disabled={pwdSaving}
-                style={{
-                  padding: "8px 18px", borderRadius: "6px", border: "none",
-                  background: "#1a73e8", color: "white", cursor: "pointer",
-                  fontSize: "13px", fontWeight: 600, opacity: pwdSaving ? 0.7 : 1,
-                }}
-              >{pwdSaving ? "Salvataggio..." : "Salva"}</button>
-            </div>
+
+            {pwdModalTab === "aikey" && (
+              <>
+                {/* Info box */}
+                <div style={{ background: "#f0f7ff", border: "1px solid #c5d9f5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#334456", lineHeight: 1.6 }}>
+                  <strong style={{ color: "#102a47" }}>Configurazione AI personale</strong><br/>
+                  L'analisi automatica usa l'API AI solo quando premi il pulsante dedicato. La chiave non viene salvata nel browser né inclusa negli export.<br/>
+                  {aiKeyHas && <span style={{ color: "#006b57", fontWeight: 600 }}>Una chiave è già memorizzata.</span>}
+                </div>
+
+                {/* Endpoint */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Endpoint (URL completo)
+                  </label>
+                  <input type="text" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)}
+                    placeholder="https://api.openai.com/v1/chat/completions"
+                    style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>
+                    OpenAI: <code>https://api.openai.com/v1/chat/completions</code> &nbsp;·&nbsp;
+                    Capgemini EU: <code>https://openai.generative-eu.engine.capgemini.com/v1/chat/completions</code>
+                  </div>
+                </div>
+
+                {/* Modello */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Modello</label>
+                  <input type="text" value={aiModel} onChange={e => setAiModel(e.target.value)}
+                    placeholder="es. gpt-4o, gpt-5.5, gpt-4.1"
+                    style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                </div>
+
+                {/* Stile + Auth su una riga */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Protocollo API</label>
+                    <select value={aiStyle} onChange={e => setAiStyle(e.target.value)}
+                      style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12 }}>
+                      <option value="chat">Chat Completions (/chat/completions)</option>
+                      <option value="responses">Responses API (/responses)</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Autenticazione</label>
+                    <select value={aiAuthMode} onChange={e => setAiAuthMode(e.target.value)}
+                      style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12 }}>
+                      <option value="bearer">Authorization: Bearer</option>
+                      <option value="api-key">Header api-key</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* API Key */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Chiave API {aiKeyHas ? "(già salvata — lascia vuoto per non cambiarla)" : ""}
+                  </label>
+                  <input type="password" value={aiKeyVal} onChange={e => setAiKeyVal(e.target.value)}
+                    placeholder={aiKeyHas ? "••••••••••••••••••••••••••••••••" : "sk-... oppure chiave Capgemini"}
+                    style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                </div>
+
+                {aiKeyMsg && (
+                  <div style={{ fontSize: 12, color: aiKeyMsg.startsWith("Errore") ? "#ea4335" : "#006b57", marginBottom: 12, fontWeight: 600 }}>{aiKeyMsg}</div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  {aiKeyHas && (
+                    <button onClick={async () => {
+                      try {
+                        await saveMyAiSettings({ apiKey: "", endpoint: aiEndpoint, model: aiModel, style: aiStyle, authMode: aiAuthMode });
+                        setAiKeyHas(false); setAiKeyVal(""); setAiKeyMsg("Chiave rimossa.");
+                      } catch (e) { setAiKeyMsg("Errore: " + e.message); }
+                    }} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #f5c6c2", background: "#fff", color: "#c5221f", cursor: "pointer", fontSize: 13 }}>
+                      Rimuovi chiave</button>
+                  )}
+                  <button onClick={() => setShowPwdModal(false)}
+                    style={{ padding: "8px 18px", borderRadius: 6, border: "1px solid #dadce0", background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: 13 }}>
+                    Annulla</button>
+                  <button onClick={async () => {
+                    if (!aiEndpoint.trim() && !aiModel.trim() && !aiKeyVal.trim()) {
+                      setAiKeyMsg("Inserire almeno un campo da aggiornare."); return;
+                    }
+                    try {
+                      const res = await saveMyAiSettings({
+                        apiKey:   aiKeyVal.trim() || undefined,
+                        endpoint: aiEndpoint.trim() || undefined,
+                        model:    aiModel.trim() || undefined,
+                        style:    aiStyle,
+                        authMode: aiAuthMode,
+                      });
+                      if (aiKeyVal.trim()) setAiKeyHas(true);
+                      setAiKeyVal("");
+                      setAiKeyMsg("Configurazione AI salvata.");
+                    } catch (e) { setAiKeyMsg("Errore: " + e.message); }
+                  }} style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: "#102a47", color: "white", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                    Salva configurazione</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -816,11 +1032,12 @@ function App() {
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "admin"             && ["Admin","SuperAdmin"].includes(role) && <AdminPage />}
-        {page === "dbconfig"          && ["Admin","SuperAdmin"].includes(role) && <DbConfigPage />}
-        {page === "tools"             && (["Admin","SuperAdmin"].includes(role) || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
-        {page === "consumotow"        && (["Admin","SuperAdmin"].includes(role) || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "superadmin"        && (role === "SuperAdmin" || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
+        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage />}
+        {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
+        {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
+        {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
+        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}

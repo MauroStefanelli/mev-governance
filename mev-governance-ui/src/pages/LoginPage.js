@@ -18,6 +18,7 @@ function LoginPage({ onLogin }) {
       localStorage.setItem("XUSER", data.username);
       localStorage.setItem("fullName", data.fullName);
       localStorage.setItem("role", data.role);
+      localStorage.setItem("roles", JSON.stringify(data.roles || [data.role]));
       onLogin(data);
     } catch (err) {
       setError("Credenziali non valide");

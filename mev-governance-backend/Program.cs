@@ -90,10 +90,13 @@ var dbSchema = (Environment.GetEnvironmentVariable("DB_SCHEMA") ?? "public").Tri
 // Rende lo schema disponibile come IConfiguration per il DbContext
 builder.Configuration["DB_SCHEMA"] = dbSchema;
 var isPostgres = false;
+// Connection string attiva (formato Npgsql) esposta ai controller per query raw
+string? activeConnStr = null;
 
 if (DbConfigConnectionString != null && DbConfigIsPostgres)
 {
     isPostgres = true;
+    activeConnStr = DbConfigConnectionString;
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(DbConfigConnectionString,
             npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", dbSchema)));
@@ -111,6 +114,7 @@ else if (!string.IsNullOrEmpty(databaseUrl))
         connStr = ParsePostgresUrl(databaseUrl, dbSchema);
     else
         connStr = databaseUrl;
+    activeConnStr = connStr;
 
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(connStr,
@@ -122,6 +126,9 @@ else
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite($"Data Source={dbPath}"));
 }
+
+// Espone la connection string attiva via IConfiguration (usata dai controller per query raw)
+builder.Configuration["DB_CONNECTION_STRING"] = activeConnStr;
 
 
 // Parsing manuale della URL postgresql:// senza usare System.Uri
@@ -212,6 +219,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
+builder.Services.AddHttpClient("ConfiguratoreAi", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(95);
+});
 
 var app = builder.Build();
 
@@ -332,6 +344,26 @@ using (var scope = app.Services.CreateScope())
                     ""AmbienteId""   INTEGER NOT NULL,
                     ""TowContratto"" TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserRoles"" (
+                    ""Id""     SERIAL PRIMARY KEY,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""Role""   TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""PC_DataRecords"" (
+                    ""Id""         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    ""record_key"" TEXT NOT NULL UNIQUE,
+                    ""entity_type"" TEXT NOT NULL,
+                    ""contract_id"" TEXT NOT NULL DEFAULT '',
+                    ""lot_id""      TEXT NOT NULL DEFAULT '',
+                    ""title""       TEXT NOT NULL,
+                    ""payload""     JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                    ""created_at""  TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    ""updated_at""  TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS ""idx_pc_entity_contract""
+                    ON ""{sch}"".""PC_DataRecords"" (""entity_type"", ""contract_id"");
+                CREATE INDEX IF NOT EXISTS ""idx_pc_updated""
+                    ON ""{sch}"".""PC_DataRecords"" (""updated_at"" DESC);
             ");
             // Aggiunge tutte le colonne MevItems/Users/altri che le migration AddColumn
             // potrebbero aver mancato se search_path era errato al primo deploy
@@ -377,6 +409,11 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""LastLogout""               TIMESTAMPTZ    NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""RefreshToken""             TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""RefreshTokenExpiry""       TIMESTAMPTZ    NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiApiKey""                 TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiEndpoint""              TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiModel""                 TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiStyle""                 TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiAuthMode""              TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Contratti""          ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""BuoniConsegna""      ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
@@ -450,6 +487,25 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PATCH] Conversioni tipo ConsumoTow verificate.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PATCH ERROR] {ex.Message}"); }
+
+    // Patch PC_DataRecords: trigger aggiorna updated_at + indice su entity_type (best-effort)
+    try
+    {
+#pragma warning disable EF1002
+        db.Database.ExecuteSqlRaw($@"
+            DROP TRIGGER IF EXISTS pc_set_updated_at ON ""{sch}"".""PC_DataRecords"";
+            CREATE OR REPLACE FUNCTION {sch}.pc_set_updated_at()
+            RETURNS TRIGGER AS $$ BEGIN NEW.""updated_at"" = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+            CREATE TRIGGER pc_set_updated_at
+              BEFORE UPDATE ON ""{sch}"".""PC_DataRecords""
+              FOR EACH ROW EXECUTE FUNCTION {sch}.pc_set_updated_at();
+            CREATE INDEX IF NOT EXISTS idx_pc_records_entity_type ON ""{sch}"".""PC_DataRecords"" (""entity_type"");
+            CREATE INDEX IF NOT EXISTS idx_pc_records_contract_id ON ""{sch}"".""PC_DataRecords"" (""contract_id"");
+        ");
+#pragma warning restore EF1002
+        Console.WriteLine("[PATCH] Trigger PC_DataRecords verificato.");
+    }
+    catch (Exception ex) { Console.Error.WriteLine($"[PATCH PC Trigger ERROR] {ex.Message}"); }
 
     // Patch RtiSocietaRighe: aggiunge sequence per Id (se non già serial) e converte date in timestamptz
     try

@@ -183,9 +183,9 @@ public class AmbienteController : ControllerBase
         if (_db.UserAmbienti.Any(ua => ua.UserId == req.UserId && ua.AmbienteId == id))
             return BadRequest("L'utente è già associato a questo ambiente.");
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
         if (!validRoles.Contains(req.Ruolo))
-            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client");
+            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client, Developer");
 
         var ua = new UserAmbiente { UserId = req.UserId, AmbienteId = id, Ruolo = req.Ruolo };
         _db.UserAmbienti.Add(ua);
@@ -203,9 +203,9 @@ public class AmbienteController : ControllerBase
         if (!User.IsInRole("SuperAdmin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
         if (!validRoles.Contains(req.Ruolo))
-            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client");
+            return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client, Developer");
 
         var ua = _db.UserAmbienti.FirstOrDefault(x => x.AmbienteId == id && x.UserId == userId);
         if (ua == null) return NotFound();

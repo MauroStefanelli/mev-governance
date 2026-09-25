@@ -290,8 +290,48 @@ export const changeMyPassword = async (oldPassword, newPassword) => {
   if (response.status === 401) throw new Error("401");
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text);
+    let msg = text;
+    try { msg = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(msg);
   }
+  return response.json();
+};
+
+export const saveMyAiKey = async (apiKey) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/aikey`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ apiKey })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = text;
+    try { msg = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(msg);
+  }
+  return response.json();
+};
+
+export const saveMyAiSettings = async ({ apiKey, endpoint, model, style, authMode }) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/aisettings`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ apiKey: apiKey ?? null, endpoint: endpoint ?? null, model: model ?? null, style: style ?? null, authMode: authMode ?? null })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = text;
+    try { msg = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(msg);
+  }
+  return response.json();
+};
+
+export const getMyProfile = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) return null;
   return response.json();
 };
 
@@ -412,6 +452,254 @@ export const updateUserRole = async (id, role) => {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
+  }
+  return response.json();
+};
+
+// Imposta i ruoli aggiuntivi (extra) di un utente; il ruolo primario resta user.Role
+export const setUserRoles = async (id, roles) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/roles`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ roles })
+  });
+  if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+// ── Configuratore Offerta ──────────────────────────────────────────────────
+// Contratti e lotti (entity_type 'contract' / 'contract_lot' su PC_DataRecords)
+export const getConfiguratoreContracts = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore recupero contratti configuratore");
+  return response.json();
+};
+
+export const getConfiguratoreContract = async (contractId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore recupero contratto configuratore");
+  return response.json();
+};
+
+export const upsertConfiguratoreContract = async (payload) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const updateConfiguratoreLot = async (contractId, lotId, payload) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}/lots/${encodeURIComponent(lotId)}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const deleteConfiguratoreContract = async (contractId) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore eliminazione contratto configuratore");
+  return response.json();
+};
+
+/**
+ * Importa un contratto con parsing PDF/Excel lato backend.
+ * @param {object} opts
+ * @param {string} opts.contractId
+ * @param {string} opts.name
+ * @param {File|null} opts.rulesFile  — PDF capitolato (opzionale)
+ * @param {Array<{lotId:string, name:string, tow5Share:number, catalogFile:File, priceFile:File}>} opts.lots
+ */
+export const importConfiguratoreContract = async ({ contractId, name, rulesFile, lots }) => {
+  const form = new FormData();
+  form.append("contractId", contractId);
+  form.append("name", name);
+  if (rulesFile) form.append("rulesFile", rulesFile);
+  form.append("lotsJson", JSON.stringify(lots.map(l => ({
+    lotId: l.lotId,
+    name: l.name,
+    tow5Share: l.tow5Share ?? 65,
+  }))));
+  lots.forEach(l => {
+    if (l.catalogFile) form.append(`catalogFile_${l.lotId}`, l.catalogFile);
+    form.append(`priceFile_${l.lotId}`, l.priceFile);
+  });
+
+  // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+/**
+ * Carica/aggiorna i file PDF/Excel di un singolo lotto esistente.
+ * Riusa l'endpoint /import passando solo quel lotto (sovrascrive il lotto nel DB senza toccare gli altri).
+ */
+export const uploadConfiguratoreContractLot = async ({ contractId, contractName, lotId, lotName, tow5Share, catalogFile, priceFile }) => {
+  const form = new FormData();
+  form.append("contractId", contractId);
+  form.append("name", contractName);
+  form.append("lotsJson", JSON.stringify([{ lotId, name: lotName, tow5Share: tow5Share ?? 65 }]));
+  form.append(`catalogFile_${lotId}`, catalogFile);
+  form.append(`priceFile_${lotId}`, priceFile);
+
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const getConfiguratoreRecords = async (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records${qs ? `?${qs}` : ""}`, {
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore recupero records configuratore");
+  const data = await response.json();
+  // Il backend può restituire un array diretto o {records:[...]} — normalizziamo sempre
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  return { records };
+};
+
+export const upsertConfiguratoreRecord = async (payload) => {
+  // Normalizza le chiavi in snake_case per il backend C# (che usa [JsonPropertyName])
+  const body = {
+    record_key:  payload.record_key  ?? payload.recordKey,
+    entity_type: payload.entity_type ?? payload.entityType,
+    contract_id: payload.contract_id ?? payload.contractId ?? null,
+    lot_id:      payload.lot_id      ?? payload.lotId      ?? null,
+    title:       payload.title       ?? null,
+    payload:     payload.payload     ?? null,
+  };
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+export const deleteConfiguratoreRecord = async (id) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records/${id}`, {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) throw new Error("Errore eliminazione record configuratore");
+  return response.json();
+};
+
+// ── Release schedule per contratto ──────────────────────────────────────────
+export const getReleaseSchedules = async (contractId) => {
+  const params = new URLSearchParams({ entity_type: "release_calendar", contract_id: contractId });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000); // 20s timeout
+  try {
+    const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records?${params}`, {
+      headers: authHeaders(),
+      signal: controller.signal,
+    });
+    if (!response.ok) return { records: [] };
+    const data = await response.json();
+    const records = Array.isArray(data) ? data : (data.records || data.data || []);
+    return { records };
+  } catch {
+    return { records: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+export const upsertReleaseSchedule = async (contractId, release) => {
+  return upsertConfiguratoreRecord({
+    record_key:  `${contractId}|release|${(release.name || "").replace(/\s+/g, "-").toLowerCase() || Date.now()}`,
+    entity_type: "release_calendar",
+    contract_id: contractId,
+    lot_id:      null,
+    title:       release.name || "Release senza nome",
+    payload:     release,
+  });
+};
+
+// ── Configuratore Offerta — AI (secondo parere e sviluppo) ───────────────────
+export const analyzeInitiativeWithAi = async (context) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/analyze`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(context)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let detail = text;
+    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
+    throw new Error(detail);
+  }
+  return response.json();
+};
+
+export const analyzeDevelopmentWithAi = async (context) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/development`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(context)
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let detail = text;
+    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
+    throw new Error(detail);
   }
   return response.json();
 };

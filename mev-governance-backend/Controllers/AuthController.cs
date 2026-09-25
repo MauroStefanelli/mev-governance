@@ -52,7 +52,8 @@ public class AuthController : ControllerBase
         var ambienti = GetAmbientiForUser(user);
         var defaultAmbienteId = ambienti.FirstOrDefault()?.Id ?? 0;
 
-        var token = GenerateToken(user, defaultAmbienteId);
+        var roles = GetUserRoles(user.Id);
+        var token = GenerateToken(user, defaultAmbienteId, roles);
 
         var refreshToken = GenerateRefreshToken();
         user.RefreshToken = refreshToken;
@@ -67,6 +68,7 @@ public class AuthController : ControllerBase
             username = user.Username,
             fullName = user.FullName,
             role = user.Role,
+            roles,
             ambienti,
             ambienteId = defaultAmbienteId
         });
@@ -102,7 +104,7 @@ public class AuthController : ControllerBase
         if (!ambienti.Any(a => a.Id == request.AmbienteId))
             return Forbid();
 
-        var newToken = GenerateToken(user, request.AmbienteId);
+        var newToken = GenerateToken(user, request.AmbienteId, GetUserRoles(user.Id));
         return Ok(new { token = newToken, ambienteId = request.AmbienteId });
     }
 
@@ -155,7 +157,7 @@ public class AuthController : ControllerBase
             catch { /* ignora token malformato */ }
         }
 
-        var newJwt = GenerateToken(user, currentAmbienteId);
+        var newJwt = GenerateToken(user, currentAmbienteId, GetUserRoles(user.Id));
         var newRefresh = GenerateRefreshToken();
 
         user.RefreshToken = newRefresh;
@@ -226,7 +228,34 @@ public class AuthController : ControllerBase
             })
             .ToList();
 
-        return Ok(users);
+        var extraRoles = new List<KeyValuePair<int, string>>();
+        try
+        {
+            extraRoles = _db.UserRoles
+                .Where(ur => users.Select(u => u.Id).Contains(ur.UserId))
+                .Select(ur => new KeyValuePair<int, string>(ur.UserId, ur.Role))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[USER-ROLES] GetUsers warning: {ex.Message}");
+        }
+
+        var result = users.Select(u => new
+        {
+            u.Id,
+            u.Username,
+            u.FullName,
+            u.Email,
+            u.Role,
+            roles = extraRoles.Where(x => x.Key == u.Id).Select(x => x.Value).ToList(),
+            u.IsActive,
+            u.SendEmail,
+            u.LastLogin,
+            u.LastLogout
+        }).ToList();
+
+        return Ok(result);
     }
 
     // ============================================================
@@ -260,9 +289,9 @@ public class AuthController : ControllerBase
         if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
         if (!validRoles.Contains(request.Role))
-            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client");
+            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client, Developer");
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null)
@@ -271,7 +300,63 @@ public class AuthController : ControllerBase
         user.Role = request.Role;
         _db.SaveChanges();
 
-        return Ok(new { id = user.Id, username = user.Username, role = user.Role });
+        return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
+    }
+
+    // ============================================================
+    // GET /api/auth/users/{id}/roles — elenco ruoli aggiuntivi utente
+    // ============================================================
+    [HttpGet("users/{id}/roles")]
+    [Authorize]
+    public IActionResult GetUserRolesEndpoint(int id)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null)
+            return NotFound("Utente non trovato");
+
+        return Ok(new { userId = user.Id, role = user.Role, roles = GetUserRoles(user.Id) });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/roles — imposta ruoli aggiuntivi utente
+    // Body: { "roles": ["Developer", ...] } (il ruolo primario resta in user.Role)
+    // ============================================================
+    [HttpPut("users/{id}/roles")]
+    [Authorize]
+    public IActionResult SetUserRolesEndpoint(int id, [FromBody] SetRolesRequest request)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null)
+            return NotFound("Utente non trovato");
+
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
+        var clean = (request.Roles ?? new List<string>())
+            .Where(r => !string.IsNullOrWhiteSpace(r) && r != user.Role)
+            .Where(r => validRoles.Contains(r))
+            .Distinct()
+            .ToList();
+
+        try
+        {
+            var existing = _db.UserRoles.Where(ur => ur.UserId == id).ToList();
+            _db.UserRoles.RemoveRange(existing);
+            foreach (var r in clean)
+                _db.UserRoles.Add(new UserRole { UserId = id, Role = r });
+            _db.SaveChanges();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SET-USER-ROLES] Warning: {ex.Message}");
+            return StatusCode(500, new { message = "Tabella UserRoles non disponibile nel DB corrente. Il ruolo aggiuntivo non è stato salvato." });
+        }
+
+        return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
     }
 
     [HttpPost("users")]
@@ -304,6 +389,118 @@ public class AuthController : ControllerBase
             user.Username
         });
     }
+
+    // ============================================================
+    // PUT /api/auth/me/password — cambio password self-service
+    // ============================================================
+    [HttpPut("me/password")]
+    [Authorize]
+    public async Task<IActionResult> ChangeMyPassword([FromBody] ChangeMyPasswordRequest req)
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+
+        if (!BCrypt.Net.BCrypt.Verify(req.OldPassword, user.PasswordHash))
+            return BadRequest(new { message = "Password attuale non corretta" });
+
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 6)
+            return BadRequest(new { message = "La nuova password deve avere almeno 6 caratteri" });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Password aggiornata" });
+    }
+
+    // ============================================================
+    // PUT /api/auth/users/{id}/password — reset password (Admin)
+    // ============================================================
+    [HttpPut("users/{id}/password")]
+    [Authorize]
+    public async Task<IActionResult> ResetUserPassword(int id, [FromBody] ResetPasswordRequest req)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 4)
+            return BadRequest(new { message = "Password troppo corta (min 4 caratteri)" });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Password aggiornata", id });
+    }
+
+    // ============================================================
+    // PUT /api/auth/me/aikey — manteniamo per retrocompatibilità
+    // ============================================================
+    [HttpPut("me/aikey")]
+    [Authorize]
+    public async Task<IActionResult> SaveMyAiKey([FromBody] SaveAiKeyRequest req)
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+        user.AiApiKey = string.IsNullOrWhiteSpace(req.ApiKey) ? null : req.ApiKey.Trim();
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "API key aggiornata", hasKey = user.AiApiKey != null });
+    }
+
+    // ============================================================
+    // PUT /api/auth/me/aisettings — salva configurazione AI completa
+    // ============================================================
+    [HttpPut("me/aisettings")]
+    [Authorize]
+    public async Task<IActionResult> SaveMyAiSettings([FromBody] SaveAiSettingsRequest req)
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+
+        if (req.ApiKey  != null) user.AiApiKey   = string.IsNullOrWhiteSpace(req.ApiKey)   ? null : req.ApiKey.Trim();
+        if (req.Endpoint != null) user.AiEndpoint = string.IsNullOrWhiteSpace(req.Endpoint) ? null : req.Endpoint.Trim();
+        if (req.Model    != null) user.AiModel    = string.IsNullOrWhiteSpace(req.Model)    ? null : req.Model.Trim();
+        if (req.Style    != null) user.AiStyle    = string.IsNullOrWhiteSpace(req.Style)    ? null : req.Style.Trim();
+        if (req.AuthMode != null) user.AiAuthMode = string.IsNullOrWhiteSpace(req.AuthMode) ? null : req.AuthMode.Trim();
+
+        await _db.SaveChangesAsync();
+        return Ok(new {
+            message   = "Configurazione AI aggiornata",
+            hasKey    = user.AiApiKey   != null,
+            endpoint  = user.AiEndpoint,
+            model     = user.AiModel,
+            style     = user.AiStyle,
+            authMode  = user.AiAuthMode
+        });
+    }
+
+    // ============================================================
+    // GET /api/auth/me — profilo self (include configurazione AI)
+    // ============================================================
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetMe()
+    {
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+        var user = await _db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+        return Ok(new {
+            user.Id, user.Username, user.FullName, user.Email, user.Role,
+            hasAiKey  = !string.IsNullOrEmpty(user.AiApiKey),
+            aiEndpoint = user.AiEndpoint,
+            aiModel    = user.AiModel,
+            aiStyle    = user.AiStyle,
+            aiAuthMode = user.AiAuthMode
+        });
+    }
+
     // ============================================================
     // EDITOR LOGINS
     // ============================================================
@@ -361,14 +558,14 @@ public class AuthController : ControllerBase
     // ============================================================
     // GENERATE JWT
     // ============================================================
-    private string GenerateToken(AppUser user, int ambienteId = 0)
+    private string GenerateToken(AppUser user, int ambienteId = 0, List<string>? extraRoles = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var expires = DateTime.UtcNow.AddMinutes(60);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
@@ -376,6 +573,13 @@ public class AuthController : ControllerBase
             new Claim("fullName", user.FullName),
             new Claim("ambienteId", ambienteId.ToString())
         };
+
+        // Ruoli multipli: emette un claim Role aggiuntivo per ogni ruolo extra
+        if (extraRoles != null)
+        {
+            foreach (var r in extraRoles.Where(r => !string.IsNullOrEmpty(r) && r != user.Role))
+                claims.Add(new Claim(ClaimTypes.Role, r));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
@@ -386,6 +590,30 @@ public class AuthController : ControllerBase
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    // ============================================================
+    // RUOLI MULTIPLI
+    // Restituisce i ruoli aggiuntivi dell'utente (escluso il primario user.Role)
+    // La tabella UserRoles permette di associare più ruoli a un utente.
+    // ============================================================
+    private List<string> GetUserRoles(int userId)
+    {
+        // Best-effort: se la tabella UserRoles non esiste ancora (primo deploy)
+        // o il DB non la supporta, il login NON deve fallire → lista vuota.
+        try
+        {
+            return _db.UserRoles
+                .Where(ur => ur.UserId == userId && !string.IsNullOrEmpty(ur.Role))
+                .Select(ur => ur.Role)
+                .Distinct()
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[USER-ROLES] Warning: {ex.Message}");
+            return new List<string>();
+        }
     }
 
     // ============================================================
@@ -409,6 +637,45 @@ public class EmergencyController : ControllerBase
     private const string EmergencyKey = "MEV-RESET-2025-Capgemini";
 
     public EmergencyController(AppDbContext db) { _db = db; }
+
+    /// <summary>
+    /// Esegue ALTER TABLE DDL di emergenza per aggiungere colonne mancanti senza usare EF.
+    /// Utile quando il modello EF è stato aggiornato ma il DB non ha ancora le nuove colonne.
+    /// </summary>
+    [HttpPost("emergency-ddl")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EmergencyDdl([FromBody] EmergencyResetRequest req)
+    {
+        if (req.Key != EmergencyKey)
+            return Unauthorized(new { message = "Chiave non valida" });
+
+        var schema = (Environment.GetEnvironmentVariable("DB_SCHEMA") ?? "public").Trim().ToLower();
+        var sch = System.Text.RegularExpressions.Regex.IsMatch(schema, @"^[a-zA-Z0-9_]+$") ? schema : "public";
+
+        var conn = _db.Database.GetDbConnection();
+        await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiApiKey""   TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiEndpoint"" TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiModel""    TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiStyle""    TEXT NULL;
+                ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiAuthMode"" TEXT NULL;
+            ";
+            await cmd.ExecuteNonQueryAsync();
+            return Ok(new { message = $"ALTER TABLE eseguita su schema '{sch}'.Users.AiApiKey — OK" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
+    }
 
     [HttpPost("emergency-reset")]
     [AllowAnonymous]
@@ -455,5 +722,10 @@ public record CreateUserRequest(
 public record LoginRequest(string Username, string Password);
 public record RefreshRequest(string RefreshToken, string? CurrentToken = null);
 public record UpdateRoleRequest(string Role);
+public record SetRolesRequest(List<string> Roles);
 public record SwitchAmbienteRequest(int AmbienteId);
+public record ChangeMyPasswordRequest(string OldPassword, string NewPassword);
+public record ResetPasswordRequest(string NewPassword);
+public record SaveAiKeyRequest(string? ApiKey);
+public record SaveAiSettingsRequest(string? ApiKey, string? Endpoint, string? Model, string? Style, string? AuthMode);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);

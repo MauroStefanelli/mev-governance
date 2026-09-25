@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
   getAllAmbienti, createAmbiente,
-  getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente, updateUtenteAmbienteRuolo
+  getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente, updateUtenteAmbienteRuolo,
 } from "../services/mevService";
+import ContractArchivePage from "./ContractArchivePage";
 
 export default function SuperAdminPage() {
   const [ambienti, setAmbienti]       = useState([]);
@@ -112,45 +113,12 @@ export default function SuperAdminPage() {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
       <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1a73e8", marginBottom: 20 }}>Gestione Contratti</h2>
 
-      {/* Crea nuovo contratto */}
-      <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Crea nuovo Contratto</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Codice Contratto *</div>
-            <input
-              value={newCodice}
-              onChange={e => setNewCodice(e.target.value)}
-              placeholder="es. 4490015981"
-              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 180 }}
-            />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Descrizione</div>
-            <input
-              value={newDesc}
-              onChange={e => setNewDesc(e.target.value)}
-              placeholder="es. Nuovo Progetto"
-              style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13, width: 240 }}
-            />
-          </div>
-          <button
-            onClick={handleCreateAmbiente}
-            disabled={creating || !newCodice.trim()}
-            style={{
-              padding: "7px 20px", background: "#1a73e8", color: "white",
-              border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-              cursor: creating ? "wait" : "pointer", opacity: creating ? 0.7 : 1,
-            }}
-          >
-            {creating ? "Creazione..." : "Crea"}
-          </button>
-        </div>
-      </div>
+      {/* ── Archivio configurazioni (ContractArchivePage) ── */}
+      <ContractArchivePage ambienti={ambienti} />
 
-      {/* Lista contratti */}
+      {/* Lista contratti MEV */}
       <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Contratti Esistenti</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Contratti MEV Esistenti</div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -231,6 +199,8 @@ export default function SuperAdminPage() {
                 <option>Admin</option>
                 <option>Editor</option>
                 <option>Client</option>
+                <option>Developer</option>
+                <option>SuperAdmin</option>
               </select>
             </div>
             <button
@@ -281,6 +251,8 @@ export default function SuperAdminPage() {
                               <option>Admin</option>
                               <option>Editor</option>
                               <option>Client</option>
+                              <option>Developer</option>
+                              <option>SuperAdmin</option>
                             </select>
                           ) : (
                             <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: ruoloColor.bg, color: ruoloColor.fg }}>
@@ -321,6 +293,7 @@ export default function SuperAdminPage() {
             )}
         </div>
       )}
+
     </div>
   );
 }

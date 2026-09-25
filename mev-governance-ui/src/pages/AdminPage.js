@@ -9,6 +9,7 @@ import {
   deleteUser, 
   getUserAccessLog,
   updateUserRole,
+  setUserRoles,
   resetAll,
   getClientPages,
   setClientPages,
@@ -128,6 +129,25 @@ function AdminPage() {
       notify(`Ruolo aggiornato: ${result.role}`);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSavingRole((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleToggleExtraRole = async (id, roleToToggle) => {
+    setSavingRole((prev) => ({ ...prev, [id]: true }));
+    setError("");
+    const user = users.find(u => u.id === id);
+    const current = user?.roles || [];
+    const next = current.includes(roleToToggle)
+      ? current.filter(r => r !== roleToToggle)
+      : [...current, roleToToggle];
+    try {
+      const result = await setUserRoles(id, next);
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, roles: result.roles || [] } : u));
+      notify(`Ruoli aggiornati: ${(result.roles || []).length > 0 ? result.roles.join(", ") : "(nessuno extra)"}`);
+    } catch (err) {
+      setError(err.message === "401" ? "Sessione scaduta" : (err.message || "Errore aggiornamento ruoli"));
     } finally {
       setSavingRole((prev) => ({ ...prev, [id]: false }));
     }
@@ -266,6 +286,8 @@ function AdminPage() {
               <option value="Editor">Editor</option>
               <option value="Admin">Admin</option>
               <option value="Client">Client</option>
+              <option value="Developer">Developer</option>
+              <option value="SuperAdmin">SuperAdmin</option>
             </select>
           </div>
           <button type="submit" style={{ padding: "6px 16px", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
@@ -313,7 +335,21 @@ function AdminPage() {
                   <option value="Editor">Editor</option>
                   <option value="Admin">Admin</option>
                   <option value="Client">Client</option>
+                  <option value="SuperAdmin">SuperAdmin</option>
+                  <option value="Developer">Developer</option>
                 </select>
+                <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "8px", fontSize: "11px", color: "#444" }}>
+                  {["Developer", "Admin", "Editor", "Client"].filter(r => r !== u.role).map(r => (
+                    <label key={r} style={{ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={(u.roles || []).includes(r)}
+                        onChange={() => handleToggleExtraRole(u.id, r)}
+                      />
+                      {r}
+                    </label>
+                  ))}
+                </div>
               </td>
               <td style={{ textAlign: "center" }}>
                 <span style={{
