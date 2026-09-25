@@ -7,6 +7,7 @@ import {
   deleteConfiguratoreRecord,
   analyzeInitiativeWithAi,
   getReleaseSchedules,
+  getTowImpatto,
 } from "../services/mevService";
 import JSZip from "jszip";
 import {
@@ -65,7 +66,10 @@ function ConfiguratorePage({ onUnauthorized }) {
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
+  const [showArchive, setShowArchive] = useState(false);
+  const [showDescModal, setShowDescModal] = useState(false);
   const [releaseList, setReleaseList] = useState([]); // release del contratto selezionato
+  const [towImpattoDb, setTowImpattoDb] = useState({}); // { "BASE": { "TOW01.1": 30, ... }, "QDO": {...} }
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
   const [mappedLoading, setMappedLoading] = useState(false);
@@ -110,11 +114,16 @@ function ConfiguratorePage({ onUnauthorized }) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    Promise.all([getConfiguratoreContracts(), getConfiguratoreRecords({ entity_type: "initiative_evaluation" })])
-      .then(([c, r]) => {
+    Promise.all([
+      getConfiguratoreContracts(),
+      getConfiguratoreRecords({ entity_type: "initiative_evaluation" }),
+      getTowImpatto().catch(() => null),
+    ])
+      .then(([c, r, imp]) => {
         if (!alive) return;
         setContracts(c);
         setArchiveRecords(r.records || []);
+        if (imp && typeof imp === "object") setTowImpattoDb(imp);
       })
       .catch((err) => {
         if (err && (err.status === 401 || err.status === 403)) return onUnauthorized();
@@ -191,26 +200,41 @@ function ConfiguratorePage({ onUnauthorized }) {
   const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
 
-  // Pre-popola towPercentages dal towImpact del lotto quando cambia il contratto/lotto attivo.
+  // Pre-popola towPercentages dal towImpattoDb (Gestione Contratto Monitoraggio) o dal towImpact del lotto.
+  // Usa codiceContratto del lotto come chiave nel towImpattoDb.
   // Non sovrascrive se l'utente ha già modificato manualmente (solo al cambio di activeLot).
   useEffect(() => {
-    if (!activeLot?.towImpact) return;
-    const imp = activeLot.towImpact;
-    if (Object.keys(imp).length === 0) return;
+    // Determina le percentuali: prima dal DB di Gestione Contratto, poi da activeLot
+    const codice = activeLot?.codiceContratto || "";
+    const fromDb  = codice && towImpattoDb[codice] ? towImpattoDb[codice] : null;
+    const fromLot = activeLot?.towImpact && Object.keys(activeLot.towImpact).length > 0 ? activeLot.towImpact : null;
+    const imp = fromDb || fromLot;
+    if (!imp) return;
+
     setTowPercentages(prev => {
       const existing = prev?.[selectedContractId]?.[lot] || {};
-      // Applica solo se l'utente non ha già impostato valori non-zero
       const hasUserValues = Object.values(existing).some(v => Number(v) > 0);
       if (hasUserValues) return prev;
+
+      // fromDb ha chiavi tipo "TOW01.1" → estrai il suffisso dopo il punto
+      // fromLot ha chiavi "1","3","4"
+      const get = (key) => {
+        if (fromDb) {
+          const fullKey = `TOW0${lot}.${key}`;
+          return Number(fromDb[fullKey]) || 0;
+        }
+        return Number(imp[key]) || 0;
+      };
+
       return {
         ...prev,
         [selectedContractId]: {
           ...(prev?.[selectedContractId] || {}),
-          [lot]: { 1: Number(imp['1']) || 0, 3: Number(imp['3']) || 0, 4: Number(imp['4']) || 0 },
+          [lot]: { 1: get("1"), 3: get("3"), 4: get("4") },
         },
       };
     });
-  }, [activeLot]); // eslint-disable-line
+  }, [activeLot, towImpattoDb]); // eslint-disable-line
 
   // ── Persist contratti ──
   const persistContract = async (contract) => {
@@ -1069,14 +1093,20 @@ function ConfiguratorePage({ onUnauthorized }) {
 
       {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
       <div style={{ ...styles.card, marginBottom: 16, padding: "14px 18px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: archiveRecords.length > 0 ? 10 : 0 }}>
-          <div>
-            <strong style={{ fontSize: 14, color: "#102a47" }}>Valutazioni salvate</strong>
-            <span style={{ marginLeft: 8, fontSize: 12, color: "#667482" }}>
-              {archiveRecords.length === 0 ? "Nessuna iniziativa salvata" : `${archiveRecords.length} iniziativ${archiveRecords.length === 1 ? "a" : "e"}`}
-            </span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => setShowArchive(v => !v)}>
+              <span style={{ fontSize: 13, color: showArchive ? "#1a73e8" : "#102a47", fontWeight: 700 }}>
+                {showArchive ? "▾" : "▸"} Valutazioni salvate x iniziative
+              </span>
+              <span style={{ fontSize: 12, color: "#667482" }}>
+                {archiveRecords.length === 0 ? "Nessuna" : `${archiveRecords.length} iniziativ${archiveRecords.length === 1 ? "a" : "e"}`}
+              </span>
+            </button>
             {editingRecordKey && (
-              <span style={{ marginLeft: 10, fontSize: 11, background: "#fff8e1", color: "#92600a", border: "1px solid #f6c90e", borderRadius: 4, padding: "2px 8px", fontWeight: 700 }}>
+              <span style={{ fontSize: 11, background: "#fff8e1", color: "#92600a", border: "1px solid #f6c90e", borderRadius: 4, padding: "2px 8px", fontWeight: 700 }}>
                 In modifica
               </span>
             )}
@@ -1098,7 +1128,7 @@ function ConfiguratorePage({ onUnauthorized }) {
             </button>
           </div>
         </div>
-        {archiveRecords.length > 0 && (
+        {showArchive && archiveRecords.length > 0 && (
           <div style={{ display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
             {archiveRecords.map((rec) => {
               const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
@@ -1181,17 +1211,13 @@ function ConfiguratorePage({ onUnauthorized }) {
               </label>
               <label style={styles.label}>Release
                 {releaseList.length > 0 ? (
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <select style={{ ...styles.input, flex: 1 }}
-                      value={releaseList.includes(initiative.release) ? initiative.release : ""}
-                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
-                      <option value="">— seleziona —</option>
-                      {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <input style={{ ...styles.input, flex: 1 }} placeholder="o digita libero"
-                      value={releaseList.includes(initiative.release) ? "" : initiative.release}
-                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
-                  </div>
+                  <select style={styles.input}
+                    value={initiative.release}
+                    onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
+                    <option value="">— seleziona —</option>
+                    <option value="Da pianificare">Da pianificare</option>
+                    {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 ) : (
                   <input style={styles.input} value={initiative.release}
                     placeholder="es. R2025-04"
@@ -1201,9 +1227,39 @@ function ConfiguratorePage({ onUnauthorized }) {
               <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
                 <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
               </label>
-              <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Descrizione
-                <textarea style={styles.textarea} value={initiative.description} onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))} rows={5} />
+              <label style={{ ...styles.label, gridColumn: "1 / -1" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span>Descrizione</span>
+                  <button type="button"
+                    style={{ fontSize: 11, padding: "2px 9px", border: "1px solid #bdc9d4", borderRadius: 5, background: "#f1f5f9", cursor: "pointer", color: "#334155" }}
+                    onClick={() => setShowDescModal(true)}>
+                    ⤢ Espandi
+                  </button>
+                </div>
+                <textarea style={styles.textarea} value={initiative.description} onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))} rows={3} />
               </label>
+              {/* Modale descrizione */}
+              {showDescModal && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  onClick={() => setShowDescModal(false)}>
+                  <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "min(860px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(0,0,0,0.22)" }}
+                    onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                      <strong style={{ fontSize: 16, color: "#102a47" }}>Descrizione iniziativa</strong>
+                      <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b", lineHeight: 1 }} onClick={() => setShowDescModal(false)}>✕</button>
+                    </div>
+                    <textarea
+                      autoFocus
+                      style={{ flex: 1, minHeight: 420, resize: "vertical", border: "1px solid #bdc9d4", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, fontFamily: "inherit" }}
+                      value={initiative.description}
+                      onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))}
+                    />
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+                      <button style={btnStyles.primary} onClick={() => setShowDescModal(false)}>Chiudi</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               <button style={btnStyles.primary} onClick={analyze}>Analizza e suggerisci</button>
@@ -1643,7 +1699,14 @@ function ConfiguratorePage({ onUnauthorized }) {
 
           {/* TOW automatici */}
           <div style={styles.card}>
-            <h3 style={{ margin: "0 0 10px" }}>TOW automatici (Lotto {lot})</h3>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
+              <h3 style={{ margin: 0 }}>TOW automatici (Lotto {lot})</h3>
+              {activeLot?.codiceContratto && towImpattoDb[activeLot.codiceContratto] && (
+                <span style={{ fontSize: 11, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 4, padding: "2px 7px" }}>
+                  % da contratto {activeLot.codiceContratto}
+                </span>
+              )}
+            </div>
             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
               {["1", "3", "4"].map((n) => {
                 const k = `TOW0${lot}.${n}`;
@@ -1651,6 +1714,7 @@ function ConfiguratorePage({ onUnauthorized }) {
                 const unit = towPricesMap[k] || 0;
                 const qty = unit ? amount / unit : null;
                 const pctCurrent = towPercentages?.[selectedContractId]?.[lot]?.[n] ?? 0;
+                const fromDb = activeLot?.codiceContratto && towImpattoDb[activeLot.codiceContratto]?.[k];
                 return (
                   <div key={n} style={styles.card}>
                     <strong>{k}</strong>
@@ -1670,6 +1734,9 @@ function ConfiguratorePage({ onUnauthorized }) {
                         style={{ width: 70, border: "1px solid #bdc9d4", borderRadius: 5, padding: "4px 6px", fontSize: 13, textAlign: "right" }}
                       />
                       <span style={{ fontSize: 12, color: "#444" }}>%</span>
+                      {fromDb != null && (
+                        <span style={{ fontSize: 10, color: "#7c3aed", marginLeft: 4 }} title={`Valore da Gestione Contratto: ${fromDb}%`}>★</span>
+                      )}
                     </label>
                     <div style={{ fontWeight: 600 }}>{euro.format(amount)}</div>
                     <div style={{ color: "#666", fontSize: 12 }}>{qty === null ? "Quantità n.d." : `Quantità equivalente: ${qty.toLocaleString("it-IT", { maximumFractionDigits: 3 })}`}</div>
