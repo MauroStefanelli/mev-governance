@@ -3,7 +3,7 @@ import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFigl
   getTowImpatto, setTowImpatto as saveTowImpattoToDb, getMevList,
   getRtiSocieta, createRtiSocieta, updateRtiSocieta, deleteRtiSocieta, bulkImportRtiSocieta,
   resetMevAndConsumoTow, getOrdiniConsegna, recalcConsumoTow,
-  getConfiguratoreContracts, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord,
+  getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord,
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
@@ -42,25 +42,13 @@ function fmtRelDate(d) {
   catch { return d; }
 }
 
-function ReleaseScheduleSection() {
-  const [contracts,  setContracts]  = useState([]);
-  const [contractId, setContractId] = useState("");
+function ReleaseScheduleSection({ contractId }) {
   const [records,    setRecords]    = useState([]);
   const [loadingRec, setLoadingRec] = useState(false);
   const [editing,    setEditing]    = useState(null);
   const [draft,      setDraft]      = useState(EMPTY_RELEASE());
   const [saving,     setSaving]     = useState(false);
   const [msg,        setMsg]        = useState("");
-
-  useEffect(() => {
-    getConfiguratoreContracts()
-      .then(d => {
-        const list = Array.isArray(d) ? d : (d?.contracts || []);
-        setContracts(list);
-        if (list.length > 0) setContractId(list[0].contractId || list[0].contract_id || "");
-      })
-      .catch(() => {});
-  }, []); // eslint-disable-line
 
   const load = useCallback(() => {
     if (!contractId) return;
@@ -109,16 +97,11 @@ function ReleaseScheduleSection() {
           <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release — legate al contratto selezionato</div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <select value={contractId} onChange={e => setContractId(e.target.value)}
-            style={{ padding: "7px 12px", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, minWidth: 180, background: "#f8fafc" }}>
-            {contracts.length === 0
-              ? <option value="">— nessun contratto —</option>
-              : contracts.map(c => (
-                  <option key={c.contractId || c.contract_id} value={c.contractId || c.contract_id}>
-                    {c.name || c.contractId}
-                  </option>
-                ))}
-          </select>
+          {contractId && (
+            <span style={{ padding: "5px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+              {contractId}
+            </span>
+          )}
           <button onClick={openNew} disabled={!contractId}
             style={{ padding: "7px 16px", background: contractId ? "#102a47" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: contractId ? "pointer" : "not-allowed" }}>
             + Nuova release
@@ -2016,7 +1999,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         onScroll={e => { if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
       />
 
-      <ReleaseScheduleSection />
+      <ReleaseScheduleSection contractId={selectedContratto} />
     </div>
   );
 }
