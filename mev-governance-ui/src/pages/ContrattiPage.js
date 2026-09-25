@@ -1139,7 +1139,7 @@ function ReleaseScheduleSection() {
 
   const del = async (rec) => {
     if (!window.confirm(`Eliminare la release "${rec.title}"?`)) return;
-    try { await deleteConfiguratoreRecord(rec.id); load(); }
+    try { await deleteConfiguratoreRecord(rec.Id || rec.id); load(); }
     catch (e) { setMsg("Errore: " + e.message); }
   };
 
@@ -1254,9 +1254,9 @@ function ReleaseScheduleSection() {
             </thead>
             <tbody>
               {records.map((rec, ri) => {
-                const p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : rec.payload || {};
+                const p = typeof rec.payload === "string" ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })() : rec.payload || {};
                 return (
-                  <tr key={rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                     <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>{rec.title}</td>
                     {RELEASE_GROUPS.map(g => g.end ? (
                       [

@@ -1105,7 +1105,7 @@ function ConfiguratorePage({ onUnauthorized }) {
               const ini = payload.initiative || {};
               const isCurrentlyEditing = editingRecordKey && editingRecordKey === rec.record_key;
               return (
-                <div key={rec.id} style={{
+                <div key={rec.Id || rec.id} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "8px 12px", borderRadius: 7, gap: 10,
                   background: isCurrentlyEditing ? "#fff8e1" : "#f8f9fa",
@@ -1128,7 +1128,7 @@ function ConfiguratorePage({ onUnauthorized }) {
                     <button style={{ ...btnStyles.secondary, fontSize: 12, padding: "5px 12px" }} onClick={() => reworkInitiative(rec)}>
                       {isCurrentlyEditing ? "Già aperta" : "Apri"}
                     </button>
-                    <button style={{ ...btnStyles.danger, fontSize: 12, padding: "5px 10px" }} onClick={() => deleteArchiveRecord(rec.id)}>✕</button>
+                    <button style={{ ...btnStyles.danger, fontSize: 12, padding: "5px 10px" }} onClick={() => deleteArchiveRecord(rec.Id || rec.id)}>✕</button>
                   </div>
                 </div>
               );
