@@ -360,6 +360,10 @@ using (var scope = app.Services.CreateScope())
                     ""created_at""  TIMESTAMPTZ NOT NULL DEFAULT now(),
                     ""updated_at""  TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
+                CREATE INDEX IF NOT EXISTS ""idx_pc_entity_contract""
+                    ON ""{sch}"".""PC_DataRecords"" (""entity_type"", ""contract_id"");
+                CREATE INDEX IF NOT EXISTS ""idx_pc_updated""
+                    ON ""{sch}"".""PC_DataRecords"" (""updated_at"" DESC);
             ");
             // Aggiunge tutte le colonne MevItems/Users/altri che le migration AddColumn
             // potrebbero aver mancato se search_path era errato al primo deploy

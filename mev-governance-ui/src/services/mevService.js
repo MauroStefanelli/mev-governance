@@ -642,13 +642,22 @@ export const deleteConfiguratoreRecord = async (id) => {
 // ── Release schedule per contratto ──────────────────────────────────────────
 export const getReleaseSchedules = async (contractId) => {
   const params = new URLSearchParams({ entity_type: "release_calendar", contract_id: contractId });
-  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records?${params}`, {
-    headers: authHeaders()
-  });
-  if (!response.ok) return { records: [] };
-  const data = await response.json();
-  const records = Array.isArray(data) ? data : (data.records || data.data || []);
-  return { records };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000); // 20s timeout
+  try {
+    const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records?${params}`, {
+      headers: authHeaders(),
+      signal: controller.signal,
+    });
+    if (!response.ok) return { records: [] };
+    const data = await response.json();
+    const records = Array.isArray(data) ? data : (data.records || data.data || []);
+    return { records };
+  } catch {
+    return { records: [] };
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 export const upsertReleaseSchedule = async (contractId, release) => {

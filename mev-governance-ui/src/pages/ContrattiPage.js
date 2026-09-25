@@ -1092,6 +1092,7 @@ function ReleaseScheduleSection() {
   const [contracts,    setContracts]    = useState([]);
   const [contractId,   setContractId]   = useState("");
   const [records,      setRecords]      = useState([]);
+  const [loadingRec,   setLoadingRec]   = useState(false);
   const [editing,      setEditing]      = useState(null);
   const [draft,        setDraft]        = useState(EMPTY_RELEASE());
   const [saving,       setSaving]       = useState(false);
@@ -1110,7 +1111,11 @@ function ReleaseScheduleSection() {
 
   const load = useCallback(() => {
     if (!contractId) return;
-    getReleaseSchedules(contractId).then(d => setRecords(d.records || [])).catch(() => setRecords([]));
+    setLoadingRec(true);
+    getReleaseSchedules(contractId)
+      .then(d => setRecords(d.records || []))
+      .catch(() => setRecords([]))
+      .finally(() => setLoadingRec(false));
   }, [contractId]);
 
   useEffect(() => { load(); }, [load]);
@@ -1181,6 +1186,13 @@ function ReleaseScheduleSection() {
             style={{ padding: "7px 16px", background: contractId ? "#102a47" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: contractId ? "pointer" : "not-allowed" }}>
             + Nuova release
           </button>
+          <button
+            onClick={load}
+            disabled={!contractId || loadingRec}
+            style={{ padding: "7px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, cursor: contractId ? "pointer" : "not-allowed", color: "#475569" }}
+            title="Ricarica">
+            {loadingRec ? "…" : "↻"}
+          </button>
         </div>
       </div>
 
@@ -1218,6 +1230,8 @@ function ReleaseScheduleSection() {
       {/* Tabella release — intestazioni a doppio livello, font compatto */}
       {!contractId ? (
         <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto per visualizzare le release pianificate.</p>
+      ) : loadingRec ? (
+        <p style={{ color: "#64748b", fontSize: 13 }}>Caricamento release in corso…</p>
       ) : records.length === 0 && !editing ? (
         <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata per questo contratto. Aggiungi la prima con "+ Nuova release".</p>
       ) : records.length > 0 ? (
