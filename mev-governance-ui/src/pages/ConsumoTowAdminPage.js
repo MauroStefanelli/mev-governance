@@ -9,46 +9,39 @@ import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFigl
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
 // ── Pianificazione Release ────────────────────────────────────────────────────
 const RELEASE_GROUPS = [
-  { group: "Sviluppo",       start: "devStart",   end: "devEnd"   },
-  { group: "Coll. Funz.",    start: "cfStart",    end: "cfEnd"    },
-  { group: "Coll. E2E",      start: "e2eStart",   end: "e2eEnd"   },
-  { group: "UAT",            start: "uatStart",   end: "uatEnd"   },
-  { group: "Certificazione", start: "certStart",  end: "certEnd"  },
-  { group: "Pass in prod",   start: "passInProd", end: null       },
-  { group: "Disp. cliente",  start: "dispClient", end: null       },
+  { group: "Sviluppo",       start: "devStart",   end: "devEnd",   color: "#dbeafe" },
+  { group: "Coll. Funz.",    start: "cfStart",    end: "cfEnd",    color: "#ede9fe" },
+  { group: "Coll. E2E",      start: "e2eStart",   end: "e2eEnd",   color: "#dcfce7" },
+  { group: "UAT",            start: "uatStart",   end: "uatEnd",   color: "#fef9c3" },
+  { group: "Certificazione", start: "certStart",  end: "certEnd",  color: "#fee2e2" },
+  { group: "Pass in prod",   start: "passInProd", end: null,       color: "#f0fdf4" },
+  { group: "Disp. cliente",  start: "dispClient", end: null,       color: "#fdf4ff" },
 ];
-const RELEASE_DATE_FIELDS = [
-  { key: "devStart",   label: "Sviluppo inizio" },
-  { key: "devEnd",     label: "Sviluppo fine" },
-  { key: "cfStart",    label: "Coll. Funzionale inizio" },
-  { key: "cfEnd",      label: "Coll. Funzionale fine" },
-  { key: "e2eStart",   label: "Coll. E2E inizio" },
-  { key: "e2eEnd",     label: "Coll. E2E fine" },
-  { key: "uatStart",   label: "UAT inizio" },
-  { key: "uatEnd",     label: "UAT fine" },
-  { key: "certStart",  label: "Certificazione inizio" },
-  { key: "certEnd",    label: "Certificazione fine" },
-  { key: "passInProd", label: "Pass in prod" },
-  { key: "dispClient", label: "Disp. al cliente" },
-];
-const EMPTY_RELEASE = () => ({
-  name: "", devStart: "", devEnd: "", cfStart: "", cfEnd: "",
-  e2eStart: "", e2eEnd: "", uatStart: "", uatEnd: "",
-  certStart: "", certEnd: "", passInProd: "", dispClient: "",
-});
+const EXCEL_COLS = ["name","devStart","devEnd","cfStart","cfEnd","e2eStart","e2eEnd","uatStart","uatEnd","certStart","certEnd","passInProd","dispClient"];
+const EMPTY_RELEASE = () => ({ name:"", devStart:"", devEnd:"", cfStart:"", cfEnd:"", e2eStart:"", e2eEnd:"", uatStart:"", uatEnd:"", certStart:"", certEnd:"", passInProd:"", dispClient:"" });
+const GRP_HEADER = ["#1e3a8a","#4c1d95","#14532d","#713f12","#7f1d1d","#14532d","#581c87"];
+function parseExcelDate(s) {
+  if (!s || !s.trim()) return "";
+  const parts = s.trim().split("/");
+  if (parts.length !== 3) return "";
+  const [d, m, y] = parts;
+  const year = y.length === 2 ? (parseInt(y) >= 50 ? "19" + y : "20" + y) : y;
+  return `${year}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+}
 function fmtRelDate(d) {
   if (!d) return "–";
-  try { return new Date(d).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" }); }
+  try { return new Date(d + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" }); }
   catch { return d; }
 }
 
 function ReleaseScheduleSection({ contractId }) {
-  const [records,    setRecords]    = useState([]);
-  const [loadingRec, setLoadingRec] = useState(false);
-  const [editing,    setEditing]    = useState(null);
-  const [draft,      setDraft]      = useState(EMPTY_RELEASE());
-  const [saving,     setSaving]     = useState(false);
-  const [msg,        setMsg]        = useState("");
+  const [records,   setRecords]   = useState([]);
+  const [loadingRec,setLoadingRec]= useState(false);
+  const [editing,   setEditing]   = useState(null);
+  const [draft,     setDraft]     = useState(EMPTY_RELEASE());
+  const [saving,    setSaving]    = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [msg,       setMsg]       = useState("");
 
   const load = useCallback(() => {
     if (!contractId) return;
@@ -78,122 +71,162 @@ function ReleaseScheduleSection({ contractId }) {
       await upsertReleaseSchedule(contractId, { ...draft, name: draft.name.trim() });
       setMsg("Salvato."); setEditing(null); load();
     } catch (e) {
-      const msg = e?.message || (e?.status ? `Errore HTTP ${e.status}` : JSON.stringify(e));
-      setMsg("Errore: " + msg);
-    }
-    finally { setSaving(false); }
+      setMsg("Errore: " + (e?.message || (e?.status ? `HTTP ${e.status}` : JSON.stringify(e))));
+    } finally { setSaving(false); }
   };
 
   const del = async (rec) => {
     if (!window.confirm(`Eliminare la release "${rec.title}"?`)) return;
     try { await deleteConfiguratoreRecord(rec.Id || rec.id); load(); }
-    catch (e) { setMsg("Errore: " + e.message); }
+    catch (e) { setMsg("Errore eliminazione: " + (e?.message || "")); }
   };
 
-  const inputStyle = { border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 8px", fontSize: 12, width: "100%", boxSizing: "border-box" };
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !contractId) return;
+    e.target.value = "";
+    setImporting(true); setMsg("");
+    try {
+      const text = await file.text();
+      const sep = text.includes("\t") ? "\t" : ";";
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const dataLines = lines.slice(1);
+      let ok = 0, err = 0;
+      for (const line of dataLines) {
+        const cols = line.split(sep).map(c => c.trim().replace(/^"|"$/g, ""));
+        if (!cols[0]) continue;
+        const rel = {};
+        EXCEL_COLS.forEach((k, i) => { rel[k] = k === "name" ? cols[i] : parseExcelDate(cols[i]); });
+        if (!rel.name) continue;
+        try { await upsertReleaseSchedule(contractId, rel); ok++; } catch { err++; }
+      }
+      setMsg(`Importate ${ok} release${err > 0 ? `, ${err} errori` : ""}.`);
+      load();
+    } catch (ex) { setMsg("Errore import: " + (ex?.message || "")); }
+    finally { setImporting(false); }
+  };
+
+  const inp = { border: "1px solid #cbd5e1", borderRadius: 5, padding: "4px 6px", fontSize: 11, width: "100%", boxSizing: "border-box", background: "#fff" };
+  const cellBg = (gi, ri) => RELEASE_GROUPS[gi]?.color ? (ri%2===0 ? RELEASE_GROUPS[gi].color+"55" : RELEASE_GROUPS[gi].color+"99") : (ri%2===0 ? "#fff" : "#f8fafc");
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 24px", marginTop: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 24px", marginTop: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Pianificazione Release</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release — legate al contratto selezionato</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>Pianificazione Release</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+            Contratto: <strong style={{ color: "#1e293b" }}>{contractId || "—"}</strong>
+            {loadingRec && <span style={{ marginLeft: 8, color: "#94a3b8" }}>Caricamento…</span>}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {contractId && (
-            <span style={{ padding: "5px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-              {contractId}
-            </span>
-          )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={openNew} disabled={!contractId}
-            style={{ padding: "7px 16px", background: contractId ? "#102a47" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: contractId ? "pointer" : "not-allowed" }}>
+            style={{ padding: "7px 14px", background: contractId ? "#0f172a" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: contractId ? "pointer" : "not-allowed" }}>
             + Nuova release
           </button>
-          <button onClick={load} disabled={!contractId || loadingRec}
-            style={{ padding: "7px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, cursor: contractId ? "pointer" : "not-allowed", color: "#475569" }}
-            title="Ricarica">
+          <label style={{ padding: "7px 14px", background: contractId && !importing ? "#0ea5e9" : "#94a3b8", color: "#fff", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: contractId ? "pointer" : "not-allowed" }}>
+            {importing ? "Importando…" : "↑ Importa Excel"}
+            <input type="file" accept=".xlsx,.xls,.csv,.txt,.tsv" style={{ display: "none" }} disabled={!contractId || importing} onChange={handleImport} />
+          </label>
+          <button onClick={load} disabled={loadingRec}
+            style={{ padding: "7px 10px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "#475569" }} title="Ricarica">
             {loadingRec ? "…" : "↻"}
           </button>
         </div>
       </div>
 
-      {/* Tabella unica: intestazione + righe salvate + riga form editing */}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+      {msg && (
+        <div style={{ fontSize: 12, fontWeight: 600, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a",
+          background: msg.startsWith("Errore") ? "#fef2f2" : "#f0fdf4",
+          border: `1px solid ${msg.startsWith("Errore") ? "#fca5a5" : "#86efac"}`,
+          borderRadius: 6, padding: "6px 12px", marginBottom: 12 }}>
+          {msg}
+        </div>
+      )}
+
+      <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap", minWidth: "100%" }}>
           <thead>
-            <tr style={{ background: "#102a47", color: "#fff" }}>
-              <th rowSpan={2} style={{ padding: "8px 14px", textAlign: "left", verticalAlign: "middle", borderRight: "2px solid #1e3a5f", minWidth: 130 }}>Release</th>
-              {RELEASE_GROUPS.map(g => (
-                <th key={g.group} colSpan={g.end ? 2 : 1} style={{ padding: "6px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, borderRight: "2px solid #1e3a5f", borderBottom: "1px solid #1e3a5f" }}>
+            <tr>
+              <th rowSpan={2} style={{ padding: "10px 14px", textAlign: "left", verticalAlign: "middle", background: "#0f172a", color: "#fff", borderRight: "1px solid #1e3a5f", minWidth: 110, fontSize: 12, fontWeight: 800 }}>Release</th>
+              {RELEASE_GROUPS.map((g, gi) => (
+                <th key={g.group} colSpan={g.end ? 2 : 1} style={{ padding: "8px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, background: GRP_HEADER[gi], color: "#fff", borderRight: "1px solid rgba(255,255,255,0.2)", borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
                   {g.group}
                 </th>
               ))}
-              <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "center", verticalAlign: "middle", fontSize: 11, minWidth: 90 }}>Azioni</th>
+              <th rowSpan={2} style={{ padding: "10px 10px", textAlign: "center", verticalAlign: "middle", background: "#0f172a", color: "#fff", fontSize: 11, minWidth: 80 }}>Azioni</th>
             </tr>
-            <tr style={{ background: "#1a3a5c", color: "#bcd0e8" }}>
-              {RELEASE_GROUPS.flatMap(g => g.end ? [
-                <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "1px solid #243f5c" }}>Inizio</th>,
-                <th key={g.end}   style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Fine</th>,
+            <tr>
+              {RELEASE_GROUPS.flatMap((g, gi) => g.end ? [
+                <th key={g.start} style={{ padding: "5px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, background: GRP_HEADER[gi]+"cc", color: "#e2e8f0", borderRight: "1px solid rgba(255,255,255,0.1)" }}>Inizio</th>,
+                <th key={g.end}   style={{ padding: "5px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, background: GRP_HEADER[gi]+"cc", color: "#e2e8f0", borderRight: "1px solid rgba(255,255,255,0.2)" }}>Fine</th>,
               ] : [
-                <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Data</th>,
+                <th key={g.start} style={{ padding: "5px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, background: GRP_HEADER[gi]+"cc", color: "#e2e8f0", borderRight: "1px solid rgba(255,255,255,0.2)" }}>Data</th>,
               ])}
             </tr>
           </thead>
           <tbody>
+            {records.length === 0 && !editing && !loadingRec && (
+              <tr><td colSpan={2 + RELEASE_GROUPS.reduce((s,g) => s+(g.end?2:1),0)}
+                style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13, background: "#fafafa" }}>
+                {contractId ? 'Nessuna release. Usa "+ Nuova release" o "↑ Importa Excel".' : "Seleziona un contratto."}
+              </td></tr>
+            )}
             {records.map((rec, ri) => {
               const p = typeof rec.payload === "string" ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })() : rec.payload || {};
-              return (
-                <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <td style={{ padding: "7px 14px", fontWeight: 700, color: "#1e293b", borderRight: "2px solid #e2e8f0" }}>{rec.title}</td>
+              const isEditing = editing && editing !== "new" && (editing.Id||editing.id) === (rec.Id||rec.id);
+              if (isEditing) return (
+                <tr key={rec.Id||rec.id} style={{ background: "#eff6ff", outline: "2px solid #3b82f6", outlineOffset: "-2px" }}>
+                  <td style={{ padding: "4px 6px", borderRight: "1px solid #bfdbfe" }}>
+                    <input style={{ ...inp, width: 100, fontWeight: 700 }} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} autoFocus />
+                  </td>
                   {RELEASE_GROUPS.flatMap(g => g.end ? [
-                    <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "1px solid #e2e8f0" }}>{fmtRelDate(p[g.start])}</td>,
-                    <td key={g.end}   style={{ padding: "6px 8px", textAlign: "center", color: p[g.end]   ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>{fmtRelDate(p[g.end])}</td>,
+                    <td key={g.start} style={{ padding: "3px 4px", borderRight: "1px solid #ddd6fe" }}><input type="date" style={{ ...inp, width: 118 }} value={draft[g.start]||""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} /></td>,
+                    <td key={g.end}   style={{ padding: "3px 4px", borderRight: "1px solid #e2e8f0" }}><input type="date" style={{ ...inp, width: 118 }} value={draft[g.end]||""}   onChange={e => setDraft(d => ({ ...d, [g.end]:   e.target.value }))} /></td>,
                   ] : [
-                    <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>{fmtRelDate(p[g.start])}</td>,
+                    <td key={g.start} style={{ padding: "3px 4px", borderRight: "1px solid #e2e8f0" }}><input type="date" style={{ ...inp, width: 118 }} value={draft[g.start]||""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} /></td>,
                   ])}
-                  <td style={{ padding: "5px 8px", textAlign: "center" }}>
-                    <button onClick={() => openEdit(rec)} style={{ marginRight: 4, padding: "3px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✏️</button>
-                    <button onClick={() => del(rec)}      style={{ padding: "3px 8px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer" }}>✕</button>
+                  <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                    <button onClick={save} disabled={saving} style={{ marginRight: 4, padding: "4px 10px", fontSize: 11, background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: 700 }}>{saving?"…":"✓ Salva"}</button>
+                    <button onClick={cancel} style={{ padding: "4px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✕</button>
+                  </td>
+                </tr>
+              );
+              return (
+                <tr key={rec.Id||rec.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "8px 14px", fontWeight: 700, color: "#0f172a", background: ri%2===0?"#f8fafc":"#fff", borderRight: "1px solid #e2e8f0", fontSize: 12 }}>{rec.title}</td>
+                  {RELEASE_GROUPS.flatMap((g, gi) => g.end ? [
+                    <td key={g.start} style={{ padding: "7px 8px", textAlign: "center", background: cellBg(gi,ri), borderRight: "1px solid rgba(0,0,0,0.06)", fontSize: 12, color: p[g.start]?"#1e293b":"#d1d5db", fontVariantNumeric: "tabular-nums" }}>{fmtRelDate(p[g.start])}</td>,
+                    <td key={g.end}   style={{ padding: "7px 8px", textAlign: "center", background: cellBg(gi,ri), borderRight: "1px solid rgba(0,0,0,0.1)",  fontSize: 12, color: p[g.end]  ?"#1e293b":"#d1d5db", fontVariantNumeric: "tabular-nums" }}>{fmtRelDate(p[g.end])}</td>,
+                  ] : [
+                    <td key={g.start} style={{ padding: "7px 8px", textAlign: "center", background: cellBg(gi,ri), borderRight: "1px solid rgba(0,0,0,0.1)",  fontSize: 12, color: p[g.start]?"#1e293b":"#d1d5db", fontVariantNumeric: "tabular-nums" }}>{fmtRelDate(p[g.start])}</td>,
+                  ])}
+                  <td style={{ padding: "5px 8px", textAlign: "center", background: ri%2===0?"#f8fafc":"#fff" }}>
+                    <button onClick={() => openEdit(rec)} title="Modifica" style={{ marginRight: 4, padding: "3px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✏️</button>
+                    <button onClick={() => del(rec)}      title="Elimina"  style={{ padding: "3px 8px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer" }}>✕</button>
                   </td>
                 </tr>
               );
             })}
-            {editing && (
-              <tr style={{ background: "#eff6ff", borderBottom: "2px solid #1a73e8" }}>
-                <td style={{ padding: "4px 6px", borderRight: "2px solid #e2e8f0" }}>
-                  <input style={{ ...inputStyle, width: 120, fontWeight: 700 }} placeholder="Nome release"
-                    value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} autoFocus />
+            {editing === "new" && (
+              <tr style={{ background: "#f0fdf4", outline: "2px solid #22c55e", outlineOffset: "-2px" }}>
+                <td style={{ padding: "4px 6px", borderRight: "1px solid #bbf7d0" }}>
+                  <input style={{ ...inp, width: 100, fontWeight: 700 }} placeholder="Nome release" value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} autoFocus />
                 </td>
                 {RELEASE_GROUPS.flatMap(g => g.end ? [
-                  <td key={g.start} style={{ padding: "4px 5px", borderRight: "1px solid #e2e8f0" }}>
-                    <input type="date" style={{ ...inputStyle, width: 130 }}
-                      value={draft[g.start] || ""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} />
-                  </td>,
-                  <td key={g.end} style={{ padding: "4px 5px", borderRight: "2px solid #e2e8f0" }}>
-                    <input type="date" style={{ ...inputStyle, width: 130 }}
-                      value={draft[g.end] || ""} onChange={e => setDraft(d => ({ ...d, [g.end]: e.target.value }))} />
-                  </td>,
+                  <td key={g.start} style={{ padding: "3px 4px", borderRight: "1px solid #dcfce7" }}><input type="date" style={{ ...inp, width: 118 }} value={draft[g.start]||""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} /></td>,
+                  <td key={g.end}   style={{ padding: "3px 4px", borderRight: "1px solid #e2e8f0" }}><input type="date" style={{ ...inp, width: 118 }} value={draft[g.end]||""}   onChange={e => setDraft(d => ({ ...d, [g.end]:   e.target.value }))} /></td>,
                 ] : [
-                  <td key={g.start} style={{ padding: "4px 5px", borderRight: "2px solid #e2e8f0" }}>
-                    <input type="date" style={{ ...inputStyle, width: 130 }}
-                      value={draft[g.start] || ""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} />
-                  </td>,
+                  <td key={g.start} style={{ padding: "3px 4px", borderRight: "1px solid #e2e8f0" }}><input type="date" style={{ ...inp, width: 118 }} value={draft[g.start]||""} onChange={e => setDraft(d => ({ ...d, [g.start]: e.target.value }))} /></td>,
                 ])}
-                <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
-                  <button onClick={save} disabled={saving} style={{ marginRight: 4, padding: "3px 10px", fontSize: 11, background: "#1a73e8", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: 700 }}>
-                    {saving ? "…" : "✓"}
-                  </button>
-                  <button onClick={cancel} style={{ padding: "3px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✕</button>
+                <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                  <button onClick={save} disabled={saving} style={{ marginRight: 4, padding: "4px 10px", fontSize: 11, background: "#16a34a", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: 700 }}>{saving?"…":"✓ Salva"}</button>
+                  <button onClick={cancel} style={{ padding: "4px 8px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer" }}>✕</button>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginTop: 8, fontWeight: 600 }}>{msg}</div>}
-        {!contractId && <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 8 }}>Seleziona un contratto per visualizzare le release.</p>}
-        {contractId && !loadingRec && records.length === 0 && !editing && <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 8 }}>Nessuna release pianificata. Usa "+ Nuova release".</p>}
-        {loadingRec && <p style={{ color: "#64748b", fontSize: 13, marginTop: 8 }}>Caricamento…</p>}
       </div>
     </div>
   );
