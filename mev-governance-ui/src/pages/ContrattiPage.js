@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord, getConfiguratoreContracts } from "../services/mevService";
+import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
@@ -1041,6 +1041,7 @@ function ConsumoTowSection({ towRows }) {
         </>
       )
       }
+      <ReleaseScheduleSection contractId={selectedTipo} />
     </div >
   );
 }
@@ -1087,27 +1088,13 @@ function formatDate(d) {
   catch { return d; }
 }
 
-function ReleaseScheduleSection() {
-  // Carica i contratti del Configuratore per il selector
-  const [contracts,    setContracts]    = useState([]);
-  const [contractId,   setContractId]   = useState("");
-  const [records,      setRecords]      = useState([]);
-  const [loadingRec,   setLoadingRec]   = useState(false);
-  const [editing,      setEditing]      = useState(null);
-  const [draft,        setDraft]        = useState(EMPTY_RELEASE());
-  const [saving,       setSaving]       = useState(false);
-  const [msg,          setMsg]          = useState("");
-
-  // Carica la lista contratti del Configuratore
-  useEffect(() => {
-    getConfiguratoreContracts()
-      .then(d => {
-        const list = d?.contracts || d || [];
-        setContracts(list);
-        if (list.length > 0 && !contractId) setContractId(list[0].contractId || list[0].contract_id || "");
-      })
-      .catch(() => {});
-  }, []); // eslint-disable-line
+function ReleaseScheduleSection({ contractId }) {
+  const [records,    setRecords]    = useState([]);
+  const [loadingRec, setLoadingRec] = useState(false);
+  const [editing,    setEditing]    = useState(null);
+  const [draft,      setDraft]      = useState(EMPTY_RELEASE());
+  const [saving,     setSaving]     = useState(false);
+  const [msg,        setMsg]        = useState("");
 
   const load = useCallback(() => {
     if (!contractId) return;
@@ -1120,13 +1107,12 @@ function ReleaseScheduleSection() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openNew = () => { setDraft(EMPTY_RELEASE()); setEditing("new"); setMsg(""); };
+  const openNew  = () => { setDraft(EMPTY_RELEASE()); setEditing("new"); setMsg(""); };
   const openEdit = (rec) => {
     let p = {};
     try { p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : (rec.payload || {}); } catch {}
     setDraft({ name: rec.title || "", ...p });
-    setEditing(rec);
-    setMsg("");
+    setEditing(rec); setMsg("");
   };
   const cancel = () => { setEditing(null); setMsg(""); };
 
@@ -1135,9 +1121,7 @@ function ReleaseScheduleSection() {
     setSaving(true);
     try {
       await upsertReleaseSchedule(contractId, { ...draft, name: draft.name.trim() });
-      setMsg("Salvato.");
-      setEditing(null);
-      load();
+      setMsg("Salvato."); setEditing(null); load();
     } catch (e) { setMsg("Errore: " + e.message); }
     finally { setSaving(false); }
   };
@@ -1148,55 +1132,30 @@ function ReleaseScheduleSection() {
     catch (e) { setMsg("Errore: " + e.message); }
   };
 
-  const cardStyle = {
-    background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
-    padding: "20px 24px", marginTop: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-  };
-  const inputStyle = {
-    border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 8px",
-    fontSize: 12, width: "100%", boxSizing: "border-box",
-  };
+  const inputStyle = { border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 8px", fontSize: 12, width: "100%", boxSizing: "border-box" };
 
   return (
-    <div style={cardStyle}>
-      {/* Header + selector contratto */}
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 24px", marginTop: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Pianificazione Release</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release — legate al contratto selezionato</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release — contratto: <strong>{contractId || "—"}</strong></div>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {/* Selector contratto */}
-          <select
-            value={contractId}
-            onChange={e => setContractId(e.target.value)}
-            style={{ padding: "7px 12px", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, minWidth: 180, background: "#f8fafc" }}>
-            {contracts.length === 0
-              ? <option value="">— nessun contratto —</option>
-              : contracts.map(c => (
-                  <option key={c.contractId || c.contract_id} value={c.contractId || c.contract_id}>
-                    {c.name || c.contractId}
-                  </option>
-                ))
-            }
-          </select>
-          <button
-            onClick={openNew}
-            disabled={!contractId}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button onClick={openNew} disabled={!contractId}
             style={{ padding: "7px 16px", background: contractId ? "#102a47" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: contractId ? "pointer" : "not-allowed" }}>
             + Nuova release
           </button>
-          <button
-            onClick={load}
-            disabled={!contractId || loadingRec}
-            style={{ padding: "7px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, cursor: contractId ? "pointer" : "not-allowed", color: "#475569" }}
+          <button onClick={load} disabled={!contractId || loadingRec}
+            style={{ padding: "7px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, cursor: "pointer", color: "#475569" }}
             title="Ricarica">
             {loadingRec ? "…" : "↻"}
           </button>
         </div>
       </div>
 
-      {/* Form inserimento/modifica */}
+      {/* Form */}
       {editing && (
         <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", marginBottom: 12 }}>
@@ -1204,7 +1163,7 @@ function ReleaseScheduleSection() {
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>Nome release</label>
-            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12, Fase 1…"
+            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12…"
               value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px 12px" }}>
@@ -1212,8 +1171,7 @@ function ReleaseScheduleSection() {
               <label key={f.key} style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
                 {f.label}
                 <input type="date" style={{ ...inputStyle, marginTop: 3 }}
-                  value={draft[f.key] || ""}
-                  onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))} />
+                  value={draft[f.key] || ""} onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))} />
               </label>
             ))}
           </div>
@@ -1227,43 +1185,37 @@ function ReleaseScheduleSection() {
         </div>
       )}
 
-      {/* Tabella release — intestazioni a doppio livello, font compatto */}
+      {/* Tabella */}
       {!contractId ? (
-        <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto per visualizzare le release pianificate.</p>
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto nella pagina per visualizzare le release pianificate.</p>
       ) : loadingRec ? (
         <p style={{ color: "#64748b", fontSize: 13 }}>Caricamento release in corso…</p>
       ) : records.length === 0 && !editing ? (
-        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata per questo contratto. Aggiungi la prima con "+ Nuova release".</p>
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata. Usa "+ Nuova release" per aggiungerne una.</p>
       ) : records.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "auto" }}>
+          <table style={{ borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
             <thead>
-              {/* Riga 1: gruppi */}
               <tr style={{ background: "#102a47", color: "#fff" }}>
-                <th rowSpan={2} style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap", verticalAlign: "middle", minWidth: 100, borderRight: "1px solid #1e3a5f" }}>
-                  Nome Release
+                <th rowSpan={2} style={{ padding: "8px 14px", textAlign: "left", verticalAlign: "middle", borderRight: "2px solid #1e3a5f", minWidth: 110 }}>
+                  Release
                 </th>
                 {RELEASE_GROUPS.map(g => (
-                  <th key={g.group}
-                    colSpan={g.end ? 2 : 1}
-                    style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap", fontSize: 10, fontWeight: 700, borderRight: "1px solid #1e3a5f", borderBottom: "1px solid #1e3a5f", letterSpacing: "0.2px" }}>
+                  <th key={g.group} colSpan={g.end ? 2 : 1} style={{ padding: "6px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, borderRight: "2px solid #1e3a5f", borderBottom: "1px solid #1e3a5f" }}>
                     {g.group}
                   </th>
                 ))}
-                <th rowSpan={2} style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap", minWidth: 110 }}>
+                <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "center", verticalAlign: "middle", fontSize: 11, minWidth: 100 }}>
                   Azioni
                 </th>
               </tr>
-              {/* Riga 2: Inizio / Fine */}
-              <tr style={{ background: "#1a3a5c", color: "#c8d9ee" }}>
-                {RELEASE_GROUPS.map(g => g.end ? (
-                  [
-                    <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Inizio</th>,
-                    <th key={g.end}   style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Fine</th>,
-                  ]
-                ) : (
-                  <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Data</th>
-                ))}
+              <tr style={{ background: "#1a3a5c", color: "#bcd0e8" }}>
+                {RELEASE_GROUPS.flatMap(g => g.end ? [
+                  <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "1px solid #243f5c" }}>Inizio</th>,
+                  <th key={g.end}   style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Fine</th>,
+                ] : [
+                  <th key={g.start} style={{ padding: "4px 8px", textAlign: "center", fontSize: 10, fontWeight: 600, borderRight: "2px solid #1e3a5f" }}>Data</th>,
+                ])}
               </tr>
             </thead>
             <tbody>
@@ -1271,24 +1223,16 @@ function ReleaseScheduleSection() {
                 const p = typeof rec.payload === "string" ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })() : rec.payload || {};
                 return (
                   <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>{rec.title}</td>
-                    {RELEASE_GROUPS.map(g => g.end ? (
-                      [
-                        <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap" }}>
-                          {formatDate(p[g.start])}
-                        </td>,
-                        <td key={g.end} style={{ padding: "5px 6px", textAlign: "center", color: p[g.end] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
-                          {formatDate(p[g.end])}
-                        </td>,
-                      ]
-                    ) : (
-                      <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
-                        {formatDate(p[g.start])}
-                      </td>
-                    ))}
-                    <td style={{ padding: "5px 8px", textAlign: "center", whiteSpace: "nowrap" }}>
-                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 8px", fontSize: 10, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Modifica</button>
-                      <button onClick={() => del(rec)} style={{ padding: "3px 8px", fontSize: 10, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Elimina</button>
+                    <td style={{ padding: "7px 14px", fontWeight: 700, color: "#1e293b", borderRight: "2px solid #e2e8f0" }}>{rec.title}</td>
+                    {RELEASE_GROUPS.flatMap(g => g.end ? [
+                      <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "1px solid #e2e8f0" }}>{formatDate(p[g.start])}</td>,
+                      <td key={g.end}   style={{ padding: "6px 8px", textAlign: "center", color: p[g.end]   ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>{formatDate(p[g.end])}</td>,
+                    ] : [
+                      <td key={g.start} style={{ padding: "6px 8px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#d1d5db", borderRight: "2px solid #e2e8f0" }}>{formatDate(p[g.start])}</td>,
+                    ])}
+                    <td style={{ padding: "5px 8px", textAlign: "center" }}>
+                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 9px", fontSize: 11, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>✏️</button>
+                      <button onClick={() => del(rec)}      style={{ padding: "3px 9px", fontSize: 11, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>✕</button>
                     </td>
                   </tr>
                 );
@@ -1330,7 +1274,6 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
   return (
     <div style={{ padding: "24px 28px", background: "#f8fafc", minHeight: "100vh" }}>
       <ConsumoTowSection towRows={towRows} />
-      <ReleaseScheduleSection />
     </div>
   );
 }
