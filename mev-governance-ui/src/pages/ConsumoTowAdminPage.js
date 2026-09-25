@@ -3,9 +3,229 @@ import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFigl
   getTowImpatto, setTowImpatto as saveTowImpattoToDb, getMevList,
   getRtiSocieta, createRtiSocieta, updateRtiSocieta, deleteRtiSocieta, bulkImportRtiSocieta,
   resetMevAndConsumoTow, getOrdiniConsegna, recalcConsumoTow,
+  getConfiguratoreContracts, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord,
 } from "../services/mevService";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
+// ── Pianificazione Release ────────────────────────────────────────────────────
+const RELEASE_GROUPS = [
+  { group: "Sviluppo",       start: "devStart",   end: "devEnd"   },
+  { group: "Coll. Funz.",    start: "cfStart",    end: "cfEnd"    },
+  { group: "Coll. E2E",      start: "e2eStart",   end: "e2eEnd"   },
+  { group: "UAT",            start: "uatStart",   end: "uatEnd"   },
+  { group: "Certificazione", start: "certStart",  end: "certEnd"  },
+  { group: "Pass in prod",   start: "passInProd", end: null       },
+  { group: "Disp. cliente",  start: "dispClient", end: null       },
+];
+const RELEASE_DATE_FIELDS = [
+  { key: "devStart",   label: "Sviluppo inizio" },
+  { key: "devEnd",     label: "Sviluppo fine" },
+  { key: "cfStart",    label: "Coll. Funzionale inizio" },
+  { key: "cfEnd",      label: "Coll. Funzionale fine" },
+  { key: "e2eStart",   label: "Coll. E2E inizio" },
+  { key: "e2eEnd",     label: "Coll. E2E fine" },
+  { key: "uatStart",   label: "UAT inizio" },
+  { key: "uatEnd",     label: "UAT fine" },
+  { key: "certStart",  label: "Certificazione inizio" },
+  { key: "certEnd",    label: "Certificazione fine" },
+  { key: "passInProd", label: "Pass in prod" },
+  { key: "dispClient", label: "Disp. al cliente" },
+];
+const EMPTY_RELEASE = () => ({
+  name: "", devStart: "", devEnd: "", cfStart: "", cfEnd: "",
+  e2eStart: "", e2eEnd: "", uatStart: "", uatEnd: "",
+  certStart: "", certEnd: "", passInProd: "", dispClient: "",
+});
+function fmtRelDate(d) {
+  if (!d) return "–";
+  try { return new Date(d).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" }); }
+  catch { return d; }
+}
+
+function ReleaseScheduleSection() {
+  const [contracts,  setContracts]  = useState([]);
+  const [contractId, setContractId] = useState("");
+  const [records,    setRecords]    = useState([]);
+  const [loadingRec, setLoadingRec] = useState(false);
+  const [editing,    setEditing]    = useState(null);
+  const [draft,      setDraft]      = useState(EMPTY_RELEASE());
+  const [saving,     setSaving]     = useState(false);
+  const [msg,        setMsg]        = useState("");
+
+  useEffect(() => {
+    getConfiguratoreContracts()
+      .then(d => {
+        const list = Array.isArray(d) ? d : (d?.contracts || []);
+        setContracts(list);
+        if (list.length > 0) setContractId(list[0].contractId || list[0].contract_id || "");
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line
+
+  const load = useCallback(() => {
+    if (!contractId) return;
+    setLoadingRec(true);
+    getReleaseSchedules(contractId)
+      .then(d => setRecords(d.records || []))
+      .catch(() => setRecords([]))
+      .finally(() => setLoadingRec(false));
+  }, [contractId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openNew  = () => { setDraft(EMPTY_RELEASE()); setEditing("new"); setMsg(""); };
+  const openEdit = (rec) => {
+    let p = {};
+    try { p = typeof rec.payload === "string" ? JSON.parse(rec.payload) : (rec.payload || {}); } catch {}
+    setDraft({ name: rec.title || "", ...p });
+    setEditing(rec); setMsg("");
+  };
+  const cancel = () => { setEditing(null); setMsg(""); };
+
+  const save = async () => {
+    if (!draft.name.trim()) { setMsg("Inserire il nome della release."); return; }
+    setSaving(true);
+    try {
+      await upsertReleaseSchedule(contractId, { ...draft, name: draft.name.trim() });
+      setMsg("Salvato."); setEditing(null); load();
+    } catch (e) { setMsg("Errore: " + e.message); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (rec) => {
+    if (!window.confirm(`Eliminare la release "${rec.title}"?`)) return;
+    try { await deleteConfiguratoreRecord(rec.Id || rec.id); load(); }
+    catch (e) { setMsg("Errore: " + e.message); }
+  };
+
+  const inputStyle = { border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 8px", fontSize: 12, width: "100%", boxSizing: "border-box" };
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 24px", marginTop: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Pianificazione Release</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Date di rilascio per release — legate al contratto selezionato</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <select value={contractId} onChange={e => setContractId(e.target.value)}
+            style={{ padding: "7px 12px", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, minWidth: 180, background: "#f8fafc" }}>
+            {contracts.length === 0
+              ? <option value="">— nessun contratto —</option>
+              : contracts.map(c => (
+                  <option key={c.contractId || c.contract_id} value={c.contractId || c.contract_id}>
+                    {c.name || c.contractId}
+                  </option>
+                ))}
+          </select>
+          <button onClick={openNew} disabled={!contractId}
+            style={{ padding: "7px 16px", background: contractId ? "#102a47" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: contractId ? "pointer" : "not-allowed" }}>
+            + Nuova release
+          </button>
+          <button onClick={load} disabled={!contractId || loadingRec}
+            style={{ padding: "7px 12px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, cursor: contractId ? "pointer" : "not-allowed", color: "#475569" }}
+            title="Ricarica">
+            {loadingRec ? "…" : "↻"}
+          </button>
+        </div>
+      </div>
+
+      {/* Form */}
+      {editing && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", marginBottom: 12 }}>
+            {editing === "new" ? "Nuova release" : `Modifica: ${editing.title}`}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>Nome release</label>
+            <input style={{ ...inputStyle, fontSize: 14, fontWeight: 600 }} placeholder="es. R2025-04, Sprint 12…"
+              value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "8px 12px" }}>
+            {RELEASE_DATE_FIELDS.map(f => (
+              <label key={f.key} style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
+                {f.label}
+                <input type="date" style={{ ...inputStyle, marginTop: 3 }}
+                  value={draft[f.key] || ""} onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))} />
+              </label>
+            ))}
+          </div>
+          {msg && <div style={{ fontSize: 12, color: msg.startsWith("Errore") ? "#dc2626" : "#16a34a", marginTop: 8, fontWeight: 600 }}>{msg}</div>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+            <button onClick={cancel} style={{ padding: "7px 16px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Annulla</button>
+            <button onClick={save} disabled={saving} style={{ padding: "7px 16px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              {saving ? "Salvataggio…" : "Salva"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabella */}
+      {!contractId ? (
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Seleziona un contratto per visualizzare le release pianificate.</p>
+      ) : loadingRec ? (
+        <p style={{ color: "#64748b", fontSize: 13 }}>Caricamento release in corso…</p>
+      ) : records.length === 0 && !editing ? (
+        <p style={{ color: "#94a3b8", fontSize: 13 }}>Nessuna release pianificata. Aggiungi la prima con "+ Nuova release".</p>
+      ) : records.length > 0 ? (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, tableLayout: "auto" }}>
+            <thead>
+              <tr style={{ background: "#102a47", color: "#fff" }}>
+                <th rowSpan={2} style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap", verticalAlign: "middle", minWidth: 100, borderRight: "1px solid #1e3a5f" }}>
+                  Nome Release
+                </th>
+                {RELEASE_GROUPS.map(g => (
+                  <th key={g.group} colSpan={g.end ? 2 : 1}
+                    style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap", fontSize: 10, fontWeight: 700, borderRight: "1px solid #1e3a5f", borderBottom: "1px solid #1e3a5f" }}>
+                    {g.group}
+                  </th>
+                ))}
+                <th rowSpan={2} style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap", minWidth: 110 }}>Azioni</th>
+              </tr>
+              <tr style={{ background: "#1a3a5c", color: "#c8d9ee" }}>
+                {RELEASE_GROUPS.map(g => g.end ? [
+                  <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Inizio</th>,
+                  <th key={g.end}   style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Fine</th>,
+                ] : (
+                  <th key={g.start} style={{ padding: "3px 5px", textAlign: "center", fontSize: 9, fontWeight: 600, borderRight: "1px solid #1e3a5f" }}>Data</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((rec, ri) => {
+                const p = typeof rec.payload === "string" ? (() => { try { return JSON.parse(rec.payload); } catch { return {}; } })() : rec.payload || {};
+                return (
+                  <tr key={rec.Id || rec.id} style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1e293b", whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>{rec.title}</td>
+                    {RELEASE_GROUPS.map(g => g.end ? [
+                      <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap" }}>
+                        {fmtRelDate(p[g.start])}
+                      </td>,
+                      <td key={g.end} style={{ padding: "5px 6px", textAlign: "center", color: p[g.end] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
+                        {fmtRelDate(p[g.end])}
+                      </td>,
+                    ] : (
+                      <td key={g.start} style={{ padding: "5px 6px", textAlign: "center", color: p[g.start] ? "#1e293b" : "#cbd5e1", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid #e2e8f0" }}>
+                        {fmtRelDate(p[g.start])}
+                      </td>
+                    ))}
+                    <td style={{ padding: "5px 8px", textAlign: "center", whiteSpace: "nowrap" }}>
+                      <button onClick={() => openEdit(rec)} style={{ marginRight: 5, padding: "3px 8px", fontSize: 10, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Modifica</button>
+                      <button onClick={() => del(rec)}      style={{ padding: "3px 8px", fontSize: 10, background: "#fff", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 4, cursor: "pointer", fontWeight: 600 }}>Elimina</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export const TOW_IMPATTO_KEY = "tow-impatto-perc"; // { "NomeContratto": { "TOW02.1": 30.5, ... } }
 
 export const loadTowImpatto = (contratto) => {
@@ -1796,6 +2016,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         onScroll={e => { if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
       />
 
+      <ReleaseScheduleSection />
     </div>
   );
 }
