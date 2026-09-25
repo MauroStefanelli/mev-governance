@@ -445,6 +445,14 @@ function App() {
           <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
             MEV Governance
           </span>
+          <span style={{
+            fontSize: "10px", fontWeight: 700, letterSpacing: "0.8px",
+            background: "rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.9)",
+            border: "1px solid rgba(255,255,255,0.35)", borderRadius: "4px",
+            padding: "2px 7px", marginLeft: "2px", textTransform: "uppercase",
+          }}>
+            DEV_Rel_07
+          </span>
 
           {/* Selettore Contratto — sempre visibile accanto al titolo */}
           {ambienti.length === 1 && (

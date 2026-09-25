@@ -944,6 +944,44 @@ function ConfiguratorePage({ onUnauthorized }) {
   const c = activeContract || builtinContract;
   const lots = c ? (c.lots || []).filter((l) => l.active !== false) : [];
 
+  // Pill riassuntiva dell'iniziativa — mostrata in step 2, 3, 4
+  const InitiativeBanner = () => {
+    const hasData = initiative.code || initiative.title || initiative.system;
+    if (!hasData) return null;
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+        background: "#f0f7ff", border: "1px solid #bfdbfe",
+        borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 13,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Iniziativa</span>
+        {initiative.code && (
+          <span style={{ fontWeight: 800, color: "#1e293b" }}>{initiative.code}</span>
+        )}
+        {initiative.title && (
+          <span style={{ color: "#334155" }}>{initiative.title}</span>
+        )}
+        {initiative.system && (
+          <>
+            <span style={{ color: "#94a3b8" }}>·</span>
+            <span style={{ color: "#475569" }}>{initiative.system}</span>
+          </>
+        )}
+        {initiative.release && (
+          <>
+            <span style={{ color: "#94a3b8" }}>·</span>
+            <span style={{ background: "#dbeafe", color: "#1d4ed8", borderRadius: 4, padding: "1px 7px", fontWeight: 600, fontSize: 11 }}>{initiative.release}</span>
+          </>
+        )}
+        <button
+          onClick={() => setStep(1)}
+          style={{ marginLeft: "auto", fontSize: 11, padding: "3px 10px", background: "white", border: "1px solid #bfdbfe", borderRadius: 5, color: "#1a73e8", cursor: "pointer", fontWeight: 600 }}>
+          ← Modifica
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div style={{ padding: 24, fontFamily: "inherit" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
@@ -1360,6 +1398,7 @@ function ConfiguratorePage({ onUnauthorized }) {
       {/* STEP 2: INTERVENTI / SUGGERIMENTI */}
       {step === 2 && (
         <div>
+          <InitiativeBanner />
           <div style={{ ...styles.card, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
@@ -1584,6 +1623,7 @@ function ConfiguratorePage({ onUnauthorized }) {
       {/* STEP 3: OFFERTA */}
       {step === 3 && (
         <div>
+          <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <h3 style={{ margin: 0 }}>Offerta economica — Lotto {lot}</h3>
@@ -1709,6 +1749,7 @@ function ConfiguratorePage({ onUnauthorized }) {
       {/* STEP 4: REVISIONE */}
       {step === 4 && (
         <div>
+          <InitiativeBanner />
           {/* Banner modifica record esistente */}
           {editingRecordKey && (
             <div style={{ background: "#fff8e1", border: "1px solid #f6c90e", borderRadius: 8, padding: "10px 16px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
