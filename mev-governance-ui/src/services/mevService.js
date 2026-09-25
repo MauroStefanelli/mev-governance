@@ -600,7 +600,10 @@ export const getConfiguratoreRecords = async (params = {}) => {
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) throw new Error("Errore recupero records configuratore");
-  return response.json();
+  const data = await response.json();
+  // Il backend può restituire un array diretto o {records:[...]} — normalizziamo sempre
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  return { records };
 };
 
 export const upsertConfiguratoreRecord = async (payload) => {
@@ -643,7 +646,9 @@ export const getReleaseSchedules = async (contractId) => {
     headers: authHeaders()
   });
   if (!response.ok) return { records: [] };
-  return response.json();
+  const data = await response.json();
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  return { records };
 };
 
 export const upsertReleaseSchedule = async (contractId, release) => {
