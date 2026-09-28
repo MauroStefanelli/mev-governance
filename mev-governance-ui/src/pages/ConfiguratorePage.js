@@ -613,12 +613,12 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
         .map((p, i) => ({ ...p, apply: p.action !== "exclude", _index: i }));
       setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
     } catch (err) {
-      const msg = err.message || String(err);
-      const isAuthErr = msg.toLowerCase().includes("api key")
+      const msg = err?.message || (err?.status ? `Errore ${err.status}` : String(err));
+      const isAuthErr = msg.includes("401") || msg.includes("403")
+        || msg.toLowerCase().includes("api key")
         || msg.toLowerCase().includes("authorization")
         || msg.toLowerCase().includes("bearer")
-        || msg.includes("401")
-        || msg.includes("403");
+        || msg.toLowerCase().includes("chiave ai");
       if (isAuthErr) {
         setError("Chiave AI non valida o non configurata. Vai su Profilo utente (icona in alto a destra) → tab \"API Key AI\" e inserisci la tua API key Capgemini o OpenAI.");
       } else {
@@ -1052,30 +1052,12 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
         <div>
           <h2 style={{ margin: 0, fontSize: 20 }}>Configuratore Offerta TOW</h2>
           <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            {c?.name} · Lotto {lot} · {catalog.length} voci di catalogo
+            Contratto {initiativeContractId} · {catalog.length} voci di catalogo
           </p>
         </div>
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
-          {showContractForm ? "Chiudi form contratto" : "+ Nuovo contratto"}
+          {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}
         </button>
-      </div>
-
-      {/* Selezione contratto / lotto */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "12px 0 16px" }}>
-        <select value={selectedContractId} onChange={(e) => handleSelectContract(e.target.value)} style={styles.input}>
-          {allContracts.map((cc) => (
-            <option key={cc.contractId} value={cc.contractId}>{cc.name}</option>
-          ))}
-        </select>
-        {lots.map((l) => (
-          <button
-            key={l.lotId}
-            onClick={() => { setLot(l.lotId); setStep(1); }}
-            style={lot === l.lotId ? styles.lotBtnActive : styles.lotBtn}
-          >
-            {l.name || `Lotto ${l.lotId}`}
-          </button>
-        ))}
       </div>
 
       {error && (
