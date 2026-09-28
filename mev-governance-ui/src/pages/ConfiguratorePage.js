@@ -376,7 +376,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     // Azzera solo i valori del contratto/lotto corrente, così il useEffect li ripopola dai dati contratto
     setTowPercentages(prev => ({
       ...prev,
-      [selectedContractId]: { ...(prev?.[selectedContractId] || {}), [lot]: { 1: 0, 3: 0, 4: 0 } }
+      [initiativeContractId]: { ...(prev?.[initiativeContractId] || {}), [lot]: { 1: 0, 3: 0, 4: 0 } }
     }));
     setDiscount(0);
     setContingency(0);
@@ -687,7 +687,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
         })),
         lot,
-        contractId: selectedContractId,   // chiave in towPercentages (ID interno, non codice contratto)
+        contractId: initiativeContractId,   // chiave in towPercentages (per contratto/ambiente)
         towPercentages,
         tow,
         discount,
@@ -696,7 +696,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         priceMode,
         builtin: !!activeContract?.builtin,
       }),
-    [items, lot, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
+    [items, lot, initiativeContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -1748,7 +1748,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                        if (!src) return;
                        const imp = towImpattoDb[src] || {};
                        const currentLot = lot;
-                       const currentContract = selectedContractId;
+                       const currentContract = initiativeContractId;
                        const v1 = Number(imp[`TOW0${currentLot}.1`]) || 0;
                        const v3 = Number(imp[`TOW0${currentLot}.3`]) || 0;
                        const v4 = Number(imp[`TOW0${currentLot}.4`]) || 0;
@@ -1768,17 +1768,13 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                 </label>
               )}
              </div>
-             {/* DEBUG TEMPORANEO — rimuovere dopo verifica */}
-             <div style={{ fontSize: 10, color: "#888", marginBottom: 6, fontFamily: "monospace" }}>
-               lot={lot} · contract={selectedContractId} · pct={JSON.stringify(towPercentages?.[selectedContractId]?.[lot])}
-             </div>
              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
               {["1", "3", "4"].map((n) => {
                 const k = `TOW0${lot}.${n}`;
                 const amount = calculation.autoTow[k] || 0;
                 const unit = towPricesMap[k] || 0;
                 const qty = unit ? amount / unit : null;
-                const pctCurrent = towPercentages?.[selectedContractId]?.[lot]?.[n] ?? 0;
+                const pctCurrent = towPercentages?.[initiativeContractId]?.[lot]?.[n] ?? 0;
                 const srcKey = towImpattoSrc || activeLot?.codiceContratto || "";
                 const fromDb = srcKey && towImpattoDb[srcKey]?.[k];
                 return (
@@ -1792,9 +1788,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                         value={pctCurrent}
                         onChange={(e) => setTowPercentages((prev) => ({
                           ...prev,
-                          [selectedContractId]: {
-                            ...(prev?.[selectedContractId] || {}),
-                            [lot]: { ...(prev?.[selectedContractId]?.[lot] || { 1: 0, 3: 0, 4: 0 }), [n]: Number(e.target.value) || 0 },
+                          [initiativeContractId]: {
+                            ...(prev?.[initiativeContractId] || {}),
+                            [lot]: { ...(prev?.[initiativeContractId]?.[lot] || { 1: 0, 3: 0, 4: 0 }), [n]: Number(e.target.value) || 0 },
                           },
                         }))}
                         style={{ width: 70, border: "1px solid #bdc9d4", borderRadius: 5, padding: "4px 6px", fontSize: 13, textAlign: "right" }}
