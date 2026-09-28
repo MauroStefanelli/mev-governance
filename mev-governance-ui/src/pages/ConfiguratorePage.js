@@ -703,7 +703,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
         })),
         lot,
-        contractId: initiativeContractId,
+        contractId: selectedContractId,   // chiave in towPercentages (ID interno, non codice contratto)
         towPercentages,
         tow,
         discount,
@@ -712,7 +712,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         priceMode,
         builtin: !!activeContract?.builtin,
       }),
-    [items, lot, initiativeContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
+    [items, lot, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -1518,7 +1518,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               <div style={{ ...styles.card, marginTop: 10, background: "#f0f7ff" }}>
                 <div>
                   <small>Secondo parere AI · {aiProposals.model || "AI"} — <em>rivedi le proposte e applica solo quelle corrette</em></small>
-                  <p style={{ margin: "6px 0" }}>{esc(aiProposals.analysis?.summary || "Analisi completata.")}</p>
+                  <p style={{ margin: "6px 0", whiteSpace: "pre-wrap" }}>{aiProposals.analysis?.summary || "Analisi completata."}</p>
                 </div>
                 <div>
                   {aiProposals.proposals.map((p, i) => {
@@ -1526,9 +1526,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                     return (
                       <label key={i} style={{ display: "block", margin: "6px 0", fontSize: 13 }}>
                         <input type="checkbox" checked={p.apply} onChange={(e) => setAiProposals((prev) => ({ ...prev, proposals: prev.proposals.map((q, j) => (j === i ? { ...q, apply: e.target.checked } : q)) }))} />
-                        {" "}ID {esc(p.catalogId)} · {esc(cc?.nome || "Voce catalogo")} — {esc(p.rationale || "")}
+                        {" "}ID {p.catalogId} · {cc?.nome || "Voce catalogo"} — {p.rationale || ""}
                         <div style={{ fontSize: 12, color: "#555" }}>
-                          {esc(p.type || "MODIFICA")} · {esc(p.complexity || "Medio")} · Q.tà {esc(p.quantity || 1)} · Confidenza {Math.round((Number(p.confidence) || 0) * 100)}%
+                          {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1} · Confidenza {Math.round((Number(p.confidence) || 0) * 100)}%
                         </div>
                       </label>
                     );
