@@ -227,19 +227,27 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   useEffect(() => {
     const src = initiative.contractType || "";
     setTowImpattoSrc(src);
-    if (!src || !towImpattoDb[src]) return;
+    if (!src) return;
     const imp = towImpattoDb[src];
-    setTowPercentages(prev => ({
-      ...prev,
-      [initiativeContractId]: {
-        ...(prev?.[initiativeContractId] || {}),
-        [lot]: {
-          1: Number(imp[`TOW0${lot}.1`]) || 0,
-          3: Number(imp[`TOW0${lot}.3`]) || 0,
-          4: Number(imp[`TOW0${lot}.4`]) || 0,
+    if (!imp) {
+      console.warn(`[TOW] towImpattoDb non ha chiave "${src}". Chiavi disponibili:`, Object.keys(towImpattoDb));
+      return;
+    }
+    const v1 = Number(imp[`TOW0${lot}.1`]) || 0;
+    const v3 = Number(imp[`TOW0${lot}.3`]) || 0;
+    const v4 = Number(imp[`TOW0${lot}.4`]) || 0;
+    console.log(`[TOW] applico src=${src} lot=${lot} contract=${initiativeContractId}`, {v1,v3,v4});
+    setTowPercentages(prev => {
+      const next = {
+        ...prev,
+        [initiativeContractId]: {
+          ...(prev?.[initiativeContractId] || {}),
+          [lot]: { 1: v1, 3: v3, 4: v4 },
         },
-      },
-    }));
+      };
+      console.log('[TOW] towPercentages dopo:', JSON.stringify(next));
+      return next;
+    });
   }, [initiative.contractType, towImpattoDb, initiativeContractId, lot]); // eslint-disable-line
 
   // Pre-popola towPercentages quando l'utente sceglie una fonte dal select "% da contratto" in step 3.
@@ -1753,6 +1761,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           </div>
 
           {/* TOW automatici */}
+          {/* DEBUG — rimuovere */}
+          <div style={{background:"#fef9c3",padding:"6px 10px",fontSize:11,fontFamily:"monospace",borderRadius:4,marginBottom:8}}>
+            DEBUG: lot={lot} | initiativeContractId={initiativeContractId} | contractType={initiative.contractType} | towImpattoSrc={towImpattoSrc} | towImpattoDb keys={Object.keys(towImpattoDb).join(",")} | pct={JSON.stringify(towPercentages?.[initiativeContractId]?.[lot])}
+          </div>
            <div style={styles.card}>
              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
                <h3 style={{ margin: 0 }}>TOW automatici (Lotto {lot})</h3>
