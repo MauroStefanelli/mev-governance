@@ -52,7 +52,7 @@ public class SettingsController : ControllerBase
     // ── TOW Impatto (% impatto per contratto) — condiviso tra tutti gli utenti ─
 
     [HttpGet("tow-impatto")]
-    [Authorize] // tutti gli utenti autenticati possono leggere
+    [Authorize(Policy = "AnyAuthenticated")]
     public IActionResult GetTowImpatto()
     {
         var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);

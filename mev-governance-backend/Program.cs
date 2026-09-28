@@ -210,9 +210,12 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
-    // SuperAdmin ha tutti i permessi di Admin, più i propri
-    options.AddPolicy("AdminOrSuper", policy =>
-        policy.RequireRole("Admin", "SuperAdmin"));
+     // SuperAdmin ha tutti i permessi di Admin, più i propri
+     options.AddPolicy("AdminOrSuper", policy =>
+         policy.RequireRole("Admin", "SuperAdmin"));
+     // Qualsiasi utente autenticato (per endpoint di sola lettura)
+     options.AddPolicy("AnyAuthenticated", policy =>
+         policy.RequireAuthenticatedUser());
 });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
