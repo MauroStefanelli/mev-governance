@@ -107,4 +107,19 @@ public class ConfiguratoreAiController : ControllerBase
             ? Ok(new { ok, model })
             : StatusCode(502, new { ok, model, message = error });
     }
+
+    // ============================================================
+    // GET /api/configuratore/ai/models — lista modelli disponibili
+    // sull'endpoint configurato dall'utente
+    // ============================================================
+    [HttpGet("models")]
+    public async Task<IActionResult> Models()
+    {
+        if (!CanAccess()) return Forbid();
+        var (key, ep, mdl, sty, auth) = GetUserAiSettings();
+        var (models, error) = await _ai.ListModelsAsync(key, ep, auth);
+        if (error != null)
+            return StatusCode(502, new { message = error });
+        return Ok(new { models });
+    }
 }

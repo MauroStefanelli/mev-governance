@@ -482,6 +482,56 @@ public class AiService
         }
     }
 
+    // ============================================================
+    // Lista modelli disponibili sull'endpoint configurato
+    // ============================================================
+    public async Task<(List<string> Models, string? Error)> ListModelsAsync(
+        string? userApiKey = null, string? userEndpoint = null, string? userAuthMode = null)
+    {
+        try
+        {
+            var s = Settings(userApiKey, userEndpoint, null, null, userAuthMode);
+            // Ricava base URL: sostituisce /chat/completions con /models
+            var baseUrl = s.Endpoint
+                .Replace("/chat/completions", "/models", StringComparison.OrdinalIgnoreCase)
+                .Replace("/responses", "/models", StringComparison.OrdinalIgnoreCase);
+            if (!baseUrl.EndsWith("/models", StringComparison.OrdinalIgnoreCase))
+                baseUrl = baseUrl.TrimEnd('/') + "/models";
+
+            ValidateEndpoint(baseUrl);
+            using var client = _httpClientFactory.CreateClient("ConfiguratoreAi");
+            using var req = new HttpRequestMessage(HttpMethod.Get, baseUrl);
+            if (s.AuthMode == "api-key")
+                req.Headers.TryAddWithoutValidation("api-key", s.ApiKey);
+            else
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", s.ApiKey);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var resp = await client.SendAsync(req, cts.Token);
+            var body = await resp.Content.ReadAsStringAsync(cts.Token);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                string detail = body.Length > 200 ? body[..200] : body;
+                try { using var d = JsonDocument.Parse(body); if (d.RootElement.TryGetProperty("error", out var e) && e.TryGetProperty("message", out var m)) detail = m.GetString() ?? detail; } catch { }
+                return (new List<string>(), $"Errore {(int)resp.StatusCode}: {detail}");
+            }
+
+            var models = new List<string>();
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                foreach (var item in data.EnumerateArray())
+                    if (item.TryGetProperty("id", out var id))
+                        models.Add(id.GetString() ?? "");
+            models.Sort();
+            return (models, null);
+        }
+        catch (Exception ex)
+        {
+            return (new List<string>(), ex.Message);
+        }
+    }
+
     private sealed record AiSettings(string Endpoint, string Model, string ApiKey, string ApiStyle, string AuthMode, string Provider);
 }
 

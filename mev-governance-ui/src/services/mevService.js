@@ -674,8 +674,17 @@ export const upsertReleaseSchedule = async (contractId, release) => {
 // ── Configuratore Offerta — AI (secondo parere e sviluppo) ───────────────────
 export const testAiConnection = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/test`, {
-    method: "GET",
-    headers: authHeaders(),
+    method: "GET", headers: authHeaders(),
+  });
+  const text = await response.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch { data = { message: text }; }
+  return { ok: response.ok, status: response.status, ...data };
+};
+
+export const listAiModels = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/models`, {
+    method: "GET", headers: authHeaders(),
   });
   const text = await response.text();
   let data = {};
