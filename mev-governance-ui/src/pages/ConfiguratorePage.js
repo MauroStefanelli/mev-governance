@@ -188,6 +188,31 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
     return [builtinContract, ...list.filter((c) => c.contractId !== "poste-tet-2025")];
   }, [contracts, builtinContract]);
 
+  // Quando ambienteId cambia, sincronizza selectedContractId e lot con il lotto
+  // che ha codiceContratto corrispondente all'ambiente selezionato.
+  useEffect(() => {
+    if (!ambienteId || !allContracts.length) return;
+    for (const c of allContracts) {
+      for (const l of c.lots || []) {
+        if (l.codiceContratto && l.codiceContratto === String(ambienteId)) {
+          setSelectedContractId(c.contractId);
+          setLot(String(l.lotId));
+          return;
+        }
+      }
+    }
+    // Cerca anche per ambienteId numerico convertito a codiceContratto via API ambienti
+    // Se non trovato, cerca il lotto con lotId == ambienteId come fallback
+    for (const c of allContracts) {
+      const matched = (c.lots || []).find((l) => String(l.lotId) === String(ambienteId));
+      if (matched) {
+        setSelectedContractId(c.contractId);
+        setLot(String(matched.lotId));
+        return;
+      }
+    }
+  }, [ambienteId, allContracts]); // eslint-disable-line
+
   const activeLot = useMemo(() => {
     const c = activeContract || builtinContract;
     if (!c) return null;
@@ -198,6 +223,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
   const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
+
+  // initiativeContractId: contract_id usato nel DB per le iniziative.
+  // Priorità: codiceContratto del lotto attivo (es. "4490015980") > ambienteId > selectedContractId.
+  // NON è "poste-tet-2025" — quello è il nome interno del contratto configuratore.
+  const initiativeContractId = useMemo(() => {
+    const fromLot = activeLot?.codiceContratto;
+    if (fromLot) return fromLot;
+    if (ambienteId) return String(ambienteId);
+    return selectedContractId;
+  }, [activeLot, ambienteId, selectedContractId]);
 
   // Pre-popola towPercentages dal towImpattoDb (Gestione Contratto Monitoraggio) o dal towImpact del lotto.
   // Usa towImpattoSrc (scelto dall'utente) o codiceContratto del lotto come chiave nel towImpattoDb.
@@ -317,14 +352,14 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
     try {
       const data = await getConfiguratoreRecords({
         entity_type: "initiative_evaluation",
-        contract_id: selectedContractId,
+        contract_id: initiativeContractId,
         lot_id: lot,
       });
       return data.records || [];
     } catch {
       return [];
     }
-  }, [selectedContractId, lot]);
+  }, [initiativeContractId, lot]);
 
   const persistInitiativeEvaluation = async (showMessage = true) => {
     if (!initiative.code && !initiative.title) {
@@ -334,16 +369,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
     const systems = [...new Set([initiative.system, ...importedInterventions.map((x) => x.sistema)].filter(Boolean))];
     const keyPart = appNorm(initiative.code || initiative.title).replace(/ /g, "-");
     // Se il record è stato aperto per modifica usa la sua chiave, altrimenti genera nuova
-    const recordKey = editingRecordKey || `${selectedContractId}|${lot}|initiative|${keyPart}`;
+    const recordKey = editingRecordKey || `${initiativeContractId}|${lot}|initiative|${keyPart}`;
     const body = {
       record_key: recordKey,
       entity_type: "initiative_evaluation",
-      contract_id: selectedContractId,
+      contract_id: initiativeContractId,
       lot_id: String(lot),
       title: `${initiative.code ? initiative.code + " · " : ""}${initiative.title}`,
       payload: {
         version: 6,
-        contractId: selectedContractId,
+        contractId: initiativeContractId,
         contractName: activeContract?.name || "",
         lot,
         priceMode,
@@ -679,8 +714,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
           unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
         })),
         lot,
-        contractId: selectedContractId,
-        tow5Share,
+        contractId: initiativeContractId,
         towPercentages,
         tow,
         discount,
@@ -689,7 +723,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
         priceMode,
         builtin: !!activeContract?.builtin,
       }),
-    [items, lot, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
+    [items, lot, initiativeContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -697,10 +731,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
 
   // ── Archivio ──
   const loadArchive = useCallback(() => {
-    getConfiguratoreRecords({ entity_type: "initiative_evaluation", contract_id: selectedContractId, lot_id: lot })
+    getConfiguratoreRecords({ entity_type: "initiative_evaluation", contract_id: initiativeContractId, lot_id: lot })
       .then((d) => setArchiveRecords(d.records || []))
       .catch((e) => { console.warn("loadArchive failed:", e); });
-  }, [selectedContractId, lot]);
+  }, [initiativeContractId, lot]);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
 
@@ -872,8 +906,8 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
         generatedAt: new Date().toISOString(),
         source: "Configuratore MEV v1",
         targetTool: codeChangeTool,
-        contractId: selectedContractId,
-        contractName: r.name || selectedContractId,
+        contractId: initiativeContractId,
+        contractName: r.name || initiativeContractId,
         lot: String(lot),
         initiative,
         systems,
@@ -925,7 +959,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
   const exportSnapshotJson = () => {
     const data = {
       version: 6,
-      contractId: selectedContractId,
+      contractId: initiativeContractId,
       contractName: activeContract?.name || "",
       lot,
       priceMode,
