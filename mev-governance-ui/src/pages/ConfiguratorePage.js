@@ -70,6 +70,7 @@ function ConfiguratorePage({ onUnauthorized }) {
   const [showDescModal, setShowDescModal] = useState(false);
   const [releaseList, setReleaseList] = useState([]); // release del contratto selezionato
   const [towImpattoDb, setTowImpattoDb] = useState({}); // { "BASE": { "TOW01.1": 30, ... }, "QDO": {...} }
+  const [towImpattoSrc, setTowImpattoSrc] = useState(""); // contratto sorgente % impatto scelto dall'utente
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
   const [mappedLoading, setMappedLoading] = useState(false);
@@ -201,11 +202,10 @@ function ConfiguratorePage({ onUnauthorized }) {
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
 
   // Pre-popola towPercentages dal towImpattoDb (Gestione Contratto Monitoraggio) o dal towImpact del lotto.
-  // Usa codiceContratto del lotto come chiave nel towImpattoDb.
+  // Usa towImpattoSrc (scelto dall'utente) o codiceContratto del lotto come chiave nel towImpattoDb.
   // Non sovrascrive se l'utente ha già modificato manualmente (solo al cambio di activeLot).
   useEffect(() => {
-    // Determina le percentuali: prima dal DB di Gestione Contratto, poi da activeLot
-    const codice = activeLot?.codiceContratto || "";
+    const codice = towImpattoSrc || activeLot?.codiceContratto || "";
     const fromDb  = codice && towImpattoDb[codice] ? towImpattoDb[codice] : null;
     const fromLot = activeLot?.towImpact && Object.keys(activeLot.towImpact).length > 0 ? activeLot.towImpact : null;
     const imp = fromDb || fromLot;
@@ -216,8 +216,6 @@ function ConfiguratorePage({ onUnauthorized }) {
       const hasUserValues = Object.values(existing).some(v => Number(v) > 0);
       if (hasUserValues) return prev;
 
-      // fromDb ha chiavi tipo "TOW01.1" → estrai il suffisso dopo il punto
-      // fromLot ha chiavi "1","3","4"
       const get = (key) => {
         if (fromDb) {
           const fullKey = `TOW0${lot}.${key}`;
@@ -234,7 +232,7 @@ function ConfiguratorePage({ onUnauthorized }) {
         },
       };
     });
-  }, [activeLot, towImpattoDb]); // eslint-disable-line
+  }, [activeLot, towImpattoDb, towImpattoSrc]); // eslint-disable-line
 
   // ── Persist contratti ──
   const persistContract = async (contract) => {
@@ -582,7 +580,12 @@ function ConfiguratorePage({ onUnauthorized }) {
         .map((p, i) => ({ ...p, apply: p.action !== "exclude", _index: i }));
       setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
     } catch (err) {
-      setError("Analisi AI non riuscita: " + (err.message || err));
+      const msg = err.message || String(err);
+      if (msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("authorization") || msg.toLowerCase().includes("bearer")) {
+        setError("Chiave AI non configurata. Clicca sull'icona utente (in alto a destra) → tab \"AI\" e inserisci la tua API key OpenAI o Capgemini.");
+      } else {
+        setError("Analisi AI non riuscita: " + msg);
+      }
     } finally {
       setAiBusy(false);
     }
@@ -1168,12 +1171,17 @@ function ConfiguratorePage({ onUnauthorized }) {
       </div>
 
       {/* Stepper */}
-      <div style={{ display: "flex", gap: 4, margin: "8px 0 20px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 4, margin: "8px 0 20px", flexWrap: "wrap", alignItems: "center" }}>
         {STEPS.map((s, i) => (
           <button key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
             {i + 1}. {s}
           </button>
         ))}
+        <button
+          style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
+          onClick={async () => { await persistInitiativeEvaluation(true); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          Salva e Chiudi
+        </button>
       </div>
 
       {/* STEP 1: INIZIATIVA */}
@@ -1699,12 +1707,35 @@ function ConfiguratorePage({ onUnauthorized }) {
 
           {/* TOW automatici */}
           <div style={styles.card}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0 }}>TOW automatici (Lotto {lot})</h3>
-              {activeLot?.codiceContratto && towImpattoDb[activeLot.codiceContratto] && (
-                <span style={{ fontSize: 11, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 4, padding: "2px 7px" }}>
-                  % da contratto {activeLot.codiceContratto}
-                </span>
+              {Object.keys(towImpattoDb).length > 0 && (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
+                  % da contratto:
+                  <select
+                    value={towImpattoSrc}
+                    onChange={e => {
+                      const src = e.target.value;
+                      setTowImpattoSrc(src);
+                      if (!src) return;
+                      const imp = towImpattoDb[src] || {};
+                      setTowPercentages(prev => ({
+                        ...prev,
+                        [selectedContractId]: {
+                          ...(prev?.[selectedContractId] || {}),
+                          [lot]: {
+                            1: Number(imp[`TOW0${lot}.1`]) || 0,
+                            3: Number(imp[`TOW0${lot}.3`]) || 0,
+                            4: Number(imp[`TOW0${lot}.4`]) || 0,
+                          },
+                        },
+                      }));
+                    }}
+                    style={{ border: "1px solid #bdc9d4", borderRadius: 5, padding: "3px 8px", fontSize: 12, background: "#fff" }}>
+                    <option value="">— nessuno —</option>
+                    {Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </label>
               )}
             </div>
             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
@@ -1714,7 +1745,8 @@ function ConfiguratorePage({ onUnauthorized }) {
                 const unit = towPricesMap[k] || 0;
                 const qty = unit ? amount / unit : null;
                 const pctCurrent = towPercentages?.[selectedContractId]?.[lot]?.[n] ?? 0;
-                const fromDb = activeLot?.codiceContratto && towImpattoDb[activeLot.codiceContratto]?.[k];
+                const srcKey = towImpattoSrc || activeLot?.codiceContratto || "";
+                const fromDb = srcKey && towImpattoDb[srcKey]?.[k];
                 return (
                   <div key={n} style={styles.card}>
                     <strong>{k}</strong>
@@ -1735,7 +1767,7 @@ function ConfiguratorePage({ onUnauthorized }) {
                       />
                       <span style={{ fontSize: 12, color: "#444" }}>%</span>
                       {fromDb != null && (
-                        <span style={{ fontSize: 10, color: "#7c3aed", marginLeft: 4 }} title={`Valore da Gestione Contratto: ${fromDb}%`}>★</span>
+                        <span style={{ fontSize: 10, color: "#7c3aed", marginLeft: 4 }} title={`Valore da Gestione Contratto (${srcKey}): ${fromDb}%`}>★</span>
                       )}
                     </label>
                     <div style={{ fontWeight: 600 }}>{euro.format(amount)}</div>
@@ -1749,16 +1781,22 @@ function ConfiguratorePage({ onUnauthorized }) {
           {/* TOW manuali 2 e 6 */}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>TOW manuali</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "100px 130px 150px 1fr", gap: "4px 8px", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Nome TOW</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>QTA</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Valore Unit. €</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Totale</div>
+            </div>
             {["2", "6"].map((n) => {
               const k = `TOW0${lot}.${n}`;
               return (
-                <div key={n} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                  <strong style={{ width: 90 }}>{k}</strong>
-                  <input style={{ ...styles.input, width: 120 }} type="number" min="0" step=".001" value={tow[k] || 0} placeholder="Quantità"
+                <div key={n} style={{ display: "grid", gridTemplateColumns: "100px 130px 150px 1fr", gap: "4px 8px", alignItems: "center", marginBottom: 6 }}>
+                  <strong style={{ fontSize: 13 }}>{k}</strong>
+                  <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} type="number" min="0" step=".001" value={tow[k] || 0} placeholder="Quantità"
                     onChange={(e) => setTow((t) => ({ ...t, [k]: Number(e.target.value) || 0 }))} />
-                  <input style={{ ...styles.input, width: 140 }} type="number" min="0" step=".01" value={towPricesMap[k] || tow[k + "_price"] || 0} placeholder="Prezzo unitario"
+                  <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} type="number" min="0" step=".01" value={towPricesMap[k] || tow[k + "_price"] || 0} placeholder="Prezzo unitario"
                     onChange={(e) => setTow((t) => ({ ...t, [k + "_price"]: Number(e.target.value) || 0 }))} />
-                  <span>{euro.format((tow[k] || 0) * (towPricesMap[k] || tow[k + "_price"] || 0))}</span>
+                  <span style={{ fontWeight: 600 }}>{euro.format((tow[k] || 0) * (towPricesMap[k] || tow[k + "_price"] || 0))}</span>
                 </div>
               );
             })}
@@ -1842,26 +1880,59 @@ function ConfiguratorePage({ onUnauthorized }) {
 
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>Dettaglio righe</h3>
-            <table style={styles.table}>
-              <thead>
-                <tr style={styles.thead}><th>ID</th><th>Voce</th><th>Tipo · Complessità · Q.tà</th><th>Razionale</th><th>Importo</th></tr>
-              </thead>
-              <tbody>
-                {items.map((it) => {
-                  const cc = catalog.find((x) => x.id === it.id);
+            {(() => {
+              // Raggruppa per interventionId; le voci senza interventionId vanno in gruppo "—"
+              const groups = {};
+              items.forEach(it => {
+                const gid = it.interventionId || "—";
+                if (!groups[gid]) groups[gid] = [];
+                groups[gid].push(it);
+              });
+              return Object.entries(groups).map(([gid, gitems]) => {
+                const groupTotal = gitems.reduce((s, it) => {
                   const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
-                  return (
-                    <tr key={it.key}>
-                      <td>{it.id}</td>
-                      <td>{esc(cc?.nome || "Voce manuale")}</td>
-                      <td>{it.type} · {it.complexity} · {it.qty}</td>
-                      <td>{esc(it.reason || it.additionalInfo || "—")}</td>
-                      <td>{euro.format(unit * it.qty)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  return s + unit * it.qty;
+                }, 0);
+                return (
+                  <details key={gid} style={{ marginBottom: 6, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+                    <summary style={{ padding: "9px 14px", background: "#f8fafc", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between", listStyle: "none" }}>
+                      <span>ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span> <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span></span>
+                      <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
+                    </summary>
+                    <table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
+                      <thead>
+                        <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>ID</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Voce</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Tipo</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Complessità</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Q.tà</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Razionale</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11, textAlign: "right" }}>Importo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gitems.map((it) => {
+                          const cc = catalog.find((x) => x.id === it.id);
+                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                          return (
+                            <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{it.id}</td>
+                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</td>
+                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{it.type}</td>
+                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{it.complexity}</td>
+                              <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "center" }}>{it.qty}</td>
+                              <td style={{ padding: "6px 10px", fontSize: 11, color: "#64748b", maxWidth: 200 }}>{esc(it.reason || it.additionalInfo || "—")}</td>
+                              <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right", fontWeight: 600 }}>{euro.format(unit * it.qty)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </details>
+                );
+              });
+            })()}
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
