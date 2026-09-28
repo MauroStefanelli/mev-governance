@@ -132,22 +132,23 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     setLoading(true);
     Promise.all([
       getConfiguratoreContracts(),
-      getTowImpatto().catch(() => null),
+      getTowImpatto().catch((e) => { console.error("[TOW] getTowImpatto errore:", e); return null; }),
     ])
       .then(([c, imp]) => {
         if (!alive) return;
         setContracts(c);
+        console.log("[TOW] getTowImpatto risposta:", imp);
         if (imp && typeof imp === "object" && Object.keys(imp).length > 0) {
           setTowImpattoDb(imp);
         } else {
-          // Fallback: struttura vuota con chiavi note — i valori verranno caricati al retry
-          console.warn("[TOW] getTowImpatto ha restituito vuoto, riprovo tra 3s");
+          console.warn("[TOW] risposta vuota, retry 3s");
           setTimeout(() => {
             if (!alive) return;
             getTowImpatto().then(imp2 => {
+              console.log("[TOW] retry risposta:", imp2);
               if (imp2 && typeof imp2 === "object" && Object.keys(imp2).length > 0)
                 setTowImpattoDb(imp2);
-            }).catch(() => {});
+            }).catch((e) => console.error("[TOW] retry errore:", e));
           }, 3000);
         }
       })

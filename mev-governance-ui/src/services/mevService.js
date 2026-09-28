@@ -842,8 +842,10 @@ export const getTowImpatto = async () => {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
-  if (!response.ok) return {};
-  return response.json();
+  if (!response.ok) { console.error("[TOW] HTTP", response.status); return {}; }
+  const text = await response.text();
+  console.log("[TOW] raw response:", text.slice(0, 200));
+  try { return JSON.parse(text); } catch(e) { console.error("[TOW] JSON parse error:", e); return {}; }
 };
 
 export const setTowImpatto = async (data) => {
