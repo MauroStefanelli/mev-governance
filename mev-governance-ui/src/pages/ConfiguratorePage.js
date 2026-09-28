@@ -290,6 +290,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     });
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleSelectContract = async (id) => {
     setSelectedContractId(id);
     setLot((allContracts.find((c) => c.contractId === id)?.lots || [])[0]?.lotId || "1");
@@ -736,7 +737,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         priceMode,
         builtin: !!activeContract?.builtin,
       }),
-    [items, lot, initiativeContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract]
+    [items, lot, initiativeContractId, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -1027,9 +1028,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   };
 
   // ── Render ──
-  if (loading) return <div style={{ padding: 40 }}>Caricamento configuratore…</div>;
+  if (loading) return <div role="status" aria-live="polite" style={{ padding: 40, margin: 24, borderRadius: 16, background: "#f4f7fb", color: "#174ea6" }}>Caricamento configuratore…</div>;
 
   const c = activeContract || builtinContract;
+  // eslint-disable-next-line no-unused-vars
   const lots = c ? (c.lots || []).filter((l) => l.active !== false) : [];
 
   // Pill riassuntiva dell'iniziativa — mostrata in step 2, 3, 4
@@ -1071,10 +1073,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   };
 
   return (
-    <div style={{ padding: 24, fontFamily: "inherit" }}>
+    <div style={{ padding: "clamp(12px, 3vw, 32px)", fontFamily: "inherit", background: "#f4f7fb", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1440, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20 }}>Configuratore Offerta TOW</h2>
+          <h2 style={{ margin: 0, fontSize: "clamp(22px, 3vw, 30px)", letterSpacing: "-0.7px", fontWeight: 750 }}>Configuratore Offerta TOW</h2>
           <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
             Contratto {initiativeContractId} · {catalog.length} voci di catalogo
           </p>
@@ -1084,8 +1086,28 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         </button>
       </div>
 
+      {/* Stepper */}
+      <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "24px 0", flexWrap: "wrap", alignItems: "stretch", padding: 10, background: "#fff", border: "1px solid #dce5ef", borderRadius: 16 }}>
+        {STEPS.map((s, i) => (
+          <button aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
+            <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: step === i + 1 ? "#fff" : "#edf2f8", color: "#174ea6", marginRight: 8 }}>{i + 1}</span>{s}
+          </button>
+        ))}
+        <button
+          style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
+          onClick={async () => {
+            await persistInitiativeEvaluation(true);
+            resetInitiative();
+            setEditingRecordKey(null);
+            setStep(1);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}>
+          Salva e Chiudi
+        </button>
+      </nav>
+
       {error && (
-        <p style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
+        <p role="alert" style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
           {error}
           <button style={{ marginLeft: 8, border: "none", background: "none", cursor: "pointer" }} onClick={() => setError("")}>✕</button>
         </p>
@@ -1105,7 +1127,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           </label>
           {contractForm.lots.map((l, idx) => (
             <div key={idx} style={{ ...styles.card, background: "#fafafa", marginTop: 10 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                 <strong>Lotto {l.id}</strong>
                 <input style={{ ...styles.input, width: 180 }} placeholder="Nome lotto" value={l.name} onChange={(e) => updateContractLotField(idx, { name: e.target.value })} />
                 <label style={styles.label}>
@@ -1139,13 +1161,14 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
       {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
       <div style={{ ...styles.card, marginBottom: 16, padding: "14px 18px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+              aria-expanded={showArchive}
               onClick={() => setShowArchive(v => !v)}>
               <span style={{ fontSize: 13, color: showArchive ? "#1a73e8" : "#102a47", fontWeight: 700 }}>
-                {showArchive ? "▾" : "▸"} Valutazioni salvate x iniziative
+                {showArchive ? "▾" : "▸"} Archivio iniziative
               </span>
               <span style={{ fontSize: 12, color: "#667482" }}>
                 {archiveRecords.length === 0 ? "Nessuna" : `${archiveRecords.length} iniziativ${archiveRecords.length === 1 ? "a" : "e"}`}
@@ -1183,7 +1206,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               return (
                 <div key={rec.Id || rec.id} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "8px 12px", borderRadius: 7, gap: 10,
+                  padding: "12px 14px", borderRadius: 10, gap: 10, flexWrap: "wrap",
                   background: isCurrentlyEditing ? "#fff8e1" : "#f8f9fa",
                   border: isCurrentlyEditing ? "1.5px solid #f6c90e" : "1px solid #e8ecf0",
                 }}>
@@ -1204,33 +1227,13 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                     <button style={{ ...btnStyles.secondary, fontSize: 12, padding: "5px 12px" }} onClick={() => reworkInitiative(rec)}>
                       {isCurrentlyEditing ? "Già aperta" : "Apri"}
                     </button>
-                    <button style={{ ...btnStyles.danger, fontSize: 12, padding: "5px 10px" }} onClick={() => deleteArchiveRecord(rec.Id || rec.id)}>✕</button>
+                    <button style={{ ...btnStyles.danger, fontSize: 12, padding: "10px 12px" }} onClick={() => deleteArchiveRecord(rec.Id || rec.id)}>✕</button>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
-
-      {/* Stepper */}
-      <div style={{ display: "flex", gap: 4, margin: "8px 0 20px", flexWrap: "wrap", alignItems: "center" }}>
-        {STEPS.map((s, i) => (
-          <button key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
-            {i + 1}. {s}
-          </button>
-        ))}
-        <button
-          style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
-          onClick={async () => {
-            await persistInitiativeEvaluation(true);
-            resetInitiative();
-            setEditingRecordKey(null);
-            setStep(1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}>
-          Salva e Chiudi
-        </button>
       </div>
 
       {/* STEP 1: INIZIATIVA */}
@@ -1320,7 +1323,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               {showDescModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
                   onClick={() => setShowDescModal(false)}>
-                  <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "min(860px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(0,0,0,0.22)" }}
+                  <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "min(860px, 94vw)", boxSizing: "border-box", overflowY: "auto", maxHeight: "88dvh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(0,0,0,0.22)" }}
                     onClick={e => e.stopPropagation()}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                       <strong style={{ fontSize: 16, color: "#102a47" }}>Descrizione iniziativa</strong>
@@ -1328,7 +1331,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                     </div>
                     <textarea
                       autoFocus
-                      style={{ flex: 1, minHeight: 420, resize: "vertical", border: "1px solid #bdc9d4", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, fontFamily: "inherit" }}
+                      style={{ flex: 1, minHeight: "min(420px, 48dvh)", resize: "vertical", border: "1px solid #bdc9d4", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, fontFamily: "inherit" }}
                       value={initiative.description}
                       onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))}
                     />
@@ -1389,7 +1392,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                   </div>
 
                   {/* Metriche */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 14 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 8, marginBottom: 14 }}>
                     {[
                       ["File nella cartella",  techProfile.totalFiles],
                       ["Sorgenti analizzati",  techProfile.readFiles],
@@ -1404,7 +1407,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                   </div>
 
                   {/* Sezioni tecniche */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px 16px", marginBottom: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: "10px 16px", marginBottom: 12 }}>
                     <Section title="Linguaggi"              items={techProfile.technologies} />
                     <Section title="Framework e piattaforme" items={techProfile.frameworks} />
                     <Section title="Dati e persistenza"     items={techProfile.databases} />
@@ -1460,15 +1463,15 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                         {x.descrizione ? <span style={{ marginLeft: 8, color: "#666", fontWeight: 400, fontSize: 12 }}>{esc(x.descrizione)}</span> : null}
                       </div>
                       {x.mappings.length > 0 ? (
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                        <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, fontSize: 13 }}>
                           <thead>
                             <tr style={{ background: "#102a47", color: "#fff" }}>
-                              <th style={{ padding: "7px 10px", textAlign: "left" }}>Componente</th>
-                              <th style={{ padding: "7px 10px", textAlign: "left" }}>Tipo</th>
-                              <th style={{ padding: "7px 10px", textAlign: "left" }}>Complessità</th>
-                              <th style={{ padding: "7px 10px", textAlign: "right" }}>Q.tà</th>
-                              <th style={{ padding: "7px 10px", textAlign: "right" }}>Prezzo unitario (€)</th>
-                              <th style={{ padding: "7px 10px", textAlign: "right" }}>Totale (€)</th>
+                              <th style={{ padding: "10px 12px", textAlign: "left" }}>Componente</th>
+                              <th style={{ padding: "10px 12px", textAlign: "left" }}>Tipo</th>
+                              <th style={{ padding: "10px 12px", textAlign: "left" }}>Complessità</th>
+                              <th style={{ padding: "10px 12px", textAlign: "right" }}>Q.tà</th>
+                              <th style={{ padding: "10px 12px", textAlign: "right" }}>Prezzo unitario (€)</th>
+                              <th style={{ padding: "10px 12px", textAlign: "right" }}>Totale (€)</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1483,40 +1486,40 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                               const unit = m.unit ?? unitPrice;
                               return (
                                 <tr key={mi} style={{ background: mi % 2 ? "#f7f9fb" : "#fff", borderBottom: "1px solid #eef2f5" }}>
-                                  <td style={{ padding: "6px 10px" }}>
+                                  <td style={{ padding: "10px 12px" }}>
                                     <div style={{ fontWeight: 600 }}>{esc(m.name)}</div>
                                     {m.detailDescription ? <div style={{ color: "#667482", fontSize: 11 }}>{esc(m.detailDescription)}</div> : null}
                                   </td>
-                                  <td style={{ padding: "6px 10px" }}>
+                                  <td style={{ padding: "10px 12px" }}>
                                     <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.type || "REALIZZAZIONE"}
                                       onChange={e => updMapping({ type: e.target.value, unit: null })}>
                                       <option>REALIZZAZIONE</option><option>MODIFICA</option>
                                     </select>
                                   </td>
-                                  <td style={{ padding: "6px 10px" }}>
+                                  <td style={{ padding: "10px 12px" }}>
                                     <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.complexity || "Medio"}
                                       onChange={e => updMapping({ complexity: e.target.value, unit: null })}>
                                       {validC.map(v => <option key={v}>{v}</option>)}
                                     </select>
                                   </td>
-                                  <td style={{ padding: "6px 10px", textAlign: "right" }}>
+                                  <td style={{ padding: "10px 12px", textAlign: "right" }}>
                                     <input type="number" min={0} step={0.01} value={qty}
                                       onChange={e => updMapping({ qty: Number(e.target.value) || 0, total: (Number(e.target.value) || 0) * unit })}
                                       style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
                                   </td>
-                                  <td style={{ padding: "6px 10px", textAlign: "right" }}>
+                                  <td style={{ padding: "10px 12px", textAlign: "right" }}>
                                     <input type="number" min={0} step={0.01} value={unit}
                                       onChange={e => updMapping({ unit: Number(e.target.value) || 0, total: qty * (Number(e.target.value) || 0) })}
                                       style={{ ...styles.input, width: 90, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
                                   </td>
-                                  <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700 }}>
+                                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>
                                     {euro.format(qty * unit)}
                                   </td>
                                 </tr>
                               );
                             })}
                           </tbody>
-                        </table>
+                        </table></div>
                       ) : (
                         <div style={{ padding: "8px 12px", color: "#667482", fontSize: 12 }}>Nessuna valorizzazione di catalogo.</div>
                       )}
@@ -1533,7 +1536,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       {step === 2 && (
         <div>
           <InitiativeBanner />
-          <div style={{ ...styles.card, marginBottom: 14 }}>
+          <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, borderTop: "3px solid #6366f1" }}>
+            <h3 style={{ margin: "0 0 8px" }}>Supporto AI alla valutazione</h3>
+            {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell’iniziativa. Potrai esaminare il riepilogo e scegliere le proposte da applicare.</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
               <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}
@@ -1542,14 +1547,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               </button>
             </div>
             {aiBusy && (
-              <div style={{ marginTop: 10, padding: "10px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 12, color: "#92400e" }}>
+              <div role="status" aria-live="polite" style={{ marginTop: 16, padding: "16px 18px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 12, color: "#92400e" }}>
                 <strong>Analisi AI in corso</strong> — il modello sta esaminando l'iniziativa, gli interventi e il catalogo.<br/>
                 <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span><br/>
                 <span style={{ color: "#555", marginTop: 4, display: "block" }}>Al termine vedrai un sommario testuale e una lista di proposte (voci di catalogo suggerite) che potrai applicare o ignorare.</span>
               </div>
             )}
             {aiProposals && (
-              <div style={{ ...styles.card, marginTop: 10, background: "#f0f7ff" }}>
+              <div style={{ ...styles.card, marginTop: 16, background: "#f5f7ff", borderColor: "#c7d2fe" }}>
+                <div role="status" style={{ fontWeight: 700, color: "#3730a3", marginBottom: 10 }}>{aiBusy ? "Risultato precedente · aggiornamento in corso" : "Analisi disponibile"} · {aiProposals.proposals.length} proposte</div>
+                {aiProposals.proposals.length === 0 && <p style={styles.hint}>Nessuna proposta da applicare. Consulta il riepilogo dell’analisi.</p>}
                 <div>
                   <small>Secondo parere AI · {aiProposals.model || "AI"} — <em>rivedi le proposte e applica solo quelle corrette</em></small>
                   <p style={{ margin: "6px 0", whiteSpace: "pre-wrap" }}>{aiProposals.analysis?.summary || "Analisi completata."}</p>
@@ -1558,7 +1565,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                   {aiProposals.proposals.map((p, i) => {
                     const cc = catalog.find((x) => String(x.id) === String(p.catalogId));
                     return (
-                      <label key={i} style={{ display: "block", margin: "6px 0", fontSize: 13 }}>
+                      <label key={i} style={{ display: "block", margin: "10px 0", padding: 14, borderRadius: 10, border: p.apply ? "1px solid #818cf8" : "1px solid #dce5ef", background: "#fff", cursor: "pointer", fontSize: 14 }}>
                         <input type="checkbox" checked={p.apply} onChange={(e) => setAiProposals((prev) => ({ ...prev, proposals: prev.proposals.map((q, j) => (j === i ? { ...q, apply: e.target.checked } : q)) }))} />
                         {" "}ID {p.catalogId} · {cc?.nome || "Voce catalogo"} — {p.rationale || ""}
                         <div style={{ fontSize: 12, color: "#555" }}>
@@ -1567,7 +1574,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                       </label>
                     );
                   })}
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                     <button style={btnStyles.primary} onClick={applyAiProposals} disabled={!aiProposals.proposals.length}>Applica proposte selezionate</button>
                     <button style={btnStyles.secondary} onClick={() => setAiProposals(null)}>Chiudi</button>
                   </div>
@@ -1623,12 +1630,12 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                     <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>ID {cc.id} · {esc(cc.ambito)}</div>
                     <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
                     {cc.descrizione && (
-                      <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "5px 8px" }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "10px 12px" }}>
                         <span style={{ fontWeight: 600, color: "#102a47" }}>Voce catalogo: </span>{esc(cc.descrizione)}
                       </p>
                     )}
                     {s.reason && (
-                      <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "5px 8px", borderLeft: "3px solid #1a73e8" }}>
+                      <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "10px 12px", borderLeft: "3px solid #1a73e8" }}>
                         <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{esc(s.reason)}
                       </p>
                     )}
@@ -1637,27 +1644,27 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
                 {/* Tabella prezzi S/M/C */}
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: "#102a47", color: "#fff" }}>
-                        <th style={{ padding: "5px 8px", textAlign: "left" }}>Tipo</th>
-                        <th style={{ padding: "5px 8px", textAlign: "left" }}>Complessità</th>
-                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Pz. Semplice</th>
-                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Pz. Medio</th>
-                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Pz. Complesso</th>
-                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Q.tà</th>
-                        <th style={{ padding: "5px 8px", textAlign: "right" }}>Importo proposto</th>
+                        <th style={{ padding: "10px 12px", textAlign: "left" }}>Tipo</th>
+                        <th style={{ padding: "10px 12px", textAlign: "left" }}>Complessità</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right" }}>Pz. Semplice</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right" }}>Pz. Medio</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right" }}>Pz. Complesso</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right" }}>Q.tà</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right" }}>Importo proposto</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr style={{ background: "#f9fbfd" }}>
-                        <td style={{ padding: "5px 8px" }}>
+                        <td style={{ padding: "10px 12px" }}>
                           <select style={{ ...styles.input, fontSize: 11, padding: "3px 5px", minWidth: 110 }} value={s.type}
                             onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, type: e.target.value } : q)))}>
                             <option>REALIZZAZIONE</option><option>MODIFICA</option>
                           </select>
                         </td>
-                        <td style={{ padding: "5px 8px" }}>
+                        <td style={{ padding: "10px 12px" }}>
                           <select style={{ ...styles.input, fontSize: 11, padding: "3px 5px" }} value={s.complexity}
                             onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, complexity: e.target.value } : q)))}>
                             {vals.length > 0
@@ -1666,26 +1673,26 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                             }
                           </select>
                         </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Semplice" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Semplice" ? 700 : 400 }}>
+                        <td style={{ padding: "10px 12px", textAlign: "right", color: s.complexity === "Semplice" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Semplice" ? 700 : 400 }}>
                           {cc.prezzi?.[s.type]?.Semplice != null ? euro.format(cc.prezzi[s.type].Semplice) : "–"}
                         </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Medio" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Medio" ? 700 : 400 }}>
+                        <td style={{ padding: "10px 12px", textAlign: "right", color: s.complexity === "Medio" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Medio" ? 700 : 400 }}>
                           {cc.prezzi?.[s.type]?.Medio != null ? euro.format(cc.prezzi[s.type].Medio) : "–"}
                         </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", color: s.complexity === "Complesso" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Complesso" ? 700 : 400 }}>
+                        <td style={{ padding: "10px 12px", textAlign: "right", color: s.complexity === "Complesso" ? "#1a73e8" : "#444", fontWeight: s.complexity === "Complesso" ? 700 : 400 }}>
                           {cc.prezzi?.[s.type]?.Complesso != null ? euro.format(cc.prezzi[s.type].Complesso) : "–"}
                         </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right" }}>
+                        <td style={{ padding: "10px 12px", textAlign: "right" }}>
                           <input type="number" min="1" step={1} value={Math.round(s.qty || 1)}
                             onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, qty: Math.max(1, Math.round(Number(e.target.value) || 1)) } : q)))}
                             style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 5px", textAlign: "right" }} />
                         </td>
-                        <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, color: "#102a47" }}>
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#102a47" }}>
                           {euro.format(importoProposto)}
                         </td>
                       </tr>
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
 
                 {/* Campo note */}
@@ -1733,7 +1740,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                            {esc((cc.descrizione || "").slice(0, 100))}{cc.descrizione?.length > 100 ? "…" : ""}
                          </div>
                        </div>
-                       <button style={{ ...btnStyles.secondary, whiteSpace: "nowrap", fontSize: 12, padding: "5px 10px",
+                       <button style={{ ...btnStyles.secondary, whiteSpace: "nowrap", fontSize: 12, padding: "10px 12px",
                          background: alreadyAdded ? "#e8f0fe" : "#fff", color: alreadyAdded ? "#1a73e8" : "#334456",
                          border: alreadyAdded ? "1px solid #4285f4" : "1px solid #d8e0e8" }}
                          onClick={(e) => { e.preventDefault(); addManualItem(cc); }}>
@@ -1804,7 +1811,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                 </label>
               )}
              </div>
-             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
+             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px),1fr))" }}>
               {["1", "3", "4"].map((n) => {
                 const k = `TOW0${lot}.${n}`;
                 const amount = calculation.autoTow[k] || 0;
@@ -1847,7 +1854,8 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           {/* TOW manuali 2 e 6 */}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>TOW manuali</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "100px 130px 150px 1fr", gap: "4px 8px", alignItems: "center", marginBottom: 6 }}>
+            <div role="region" aria-label="TOW manuali: quantità e importi" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%" }}>
+            <div style={{ display: "grid", minWidth: 560, gridTemplateColumns: "100px 130px 150px 1fr", gap: "4px 8px", alignItems: "center", marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Nome TOW</div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>QTA</div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Valore Unit. €</div>
@@ -1856,7 +1864,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
             {["2", "6"].map((n) => {
               const k = `TOW0${lot}.${n}`;
               return (
-                <div key={n} style={{ display: "grid", gridTemplateColumns: "100px 130px 150px 1fr", gap: "4px 8px", alignItems: "center", marginBottom: 6 }}>
+                <div key={n} style={{ display: "grid", minWidth: 560, gridTemplateColumns: "100px 130px 150px 1fr", gap: "4px 8px", alignItems: "center", marginBottom: 6 }}>
                   <strong style={{ fontSize: 13 }}>{k}</strong>
                   <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} type="number" min="0" step=".001" value={tow[k] || 0} placeholder="Quantità"
                     onChange={(e) => setTow((t) => ({ ...t, [k]: Number(e.target.value) || 0 }))} />
@@ -1869,6 +1877,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                 </div>
               );
             })}
+          </div>
           </div>
 
           {/* Riga offerta */}
@@ -1893,16 +1902,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                       <span>ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span> <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span></span>
                       <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
                     </summary>
-                    <table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
+                    <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
                       <thead>
                         <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>ID Catalogo / componente</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Tipo</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Complessità</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Q.tà</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Prezzo unitario</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Totale</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Note</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>ID Catalogo / componente</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Prezzo unitario</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Totale</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Note</th>
                           <th></th>
                         </tr>
                       </thead>
@@ -1912,30 +1921,30 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                           const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
                           return (
                             <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
-                              <td style={{ padding: "6px 10px" }}>
+                              <td style={{ padding: "10px 12px" }}>
                                 <strong>ID {it.id}</strong>
                                 <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
                               </td>
-                              <td style={{ padding: "6px 10px" }}>
+                              <td style={{ padding: "10px 12px" }}>
                                 <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
                                   <option>REALIZZAZIONE</option><option>MODIFICA</option>
                                 </select>
                               </td>
-                              <td style={{ padding: "6px 10px" }}>
+                              <td style={{ padding: "10px 12px" }}>
                                 <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
                                   {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
                                 </select>
                               </td>
-                              <td style={{ padding: "6px 10px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
-                              <td style={{ padding: "6px 10px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
-                              <td style={{ padding: "6px 10px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
-                              <td style={{ padding: "6px 10px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
-                              <td style={{ padding: "6px 10px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                              <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
+                              <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
+                              <td style={{ padding: "10px 12px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
+                              <td style={{ padding: "10px 12px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
+                              <td style={{ padding: "10px 12px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
                             </tr>
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                   </details>
                 );
               });
@@ -1962,7 +1971,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           )}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 12px" }}>Revisione offerta</h3>
-            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))" }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 140px),1fr))" }}>
               <div style={styles.card}><span style={{ color: "#666" }}>Lotto</span><div><strong>{lot}</strong></div></div>
               <div style={styles.card}><span style={{ color: "#666" }}>Voci catalogo</span><div><strong>{items.length}</strong></div></div>
               <div style={styles.card}><span style={{ color: "#666" }}>Sconto</span><div><strong>{discount}%</strong></div></div>
@@ -1997,16 +2006,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                       <span>ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span> <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span></span>
                       <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
                     </summary>
-                    <table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
+                    <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
                       <thead>
                         <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>ID</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Voce</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Tipo</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Complessità</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Q.tà</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Razionale</th>
-                          <th style={{ padding: "6px 10px", fontSize: 11, textAlign: "right" }}>Importo</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>ID</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Voce</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Razionale</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Importo</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2015,18 +2024,18 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                           const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
                           return (
                             <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
-                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{it.id}</td>
-                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</td>
-                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{it.type}</td>
-                              <td style={{ padding: "6px 10px", fontSize: 12 }}>{it.complexity}</td>
-                              <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "center" }}>{it.qty}</td>
-                              <td style={{ padding: "6px 10px", fontSize: 11, color: "#64748b", maxWidth: 200 }}>{esc(it.reason || it.additionalInfo || "—")}</td>
-                              <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right", fontWeight: 600 }}>{euro.format(unit * it.qty)}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.id}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.type}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.complexity}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12, textAlign: "center" }}>{it.qty}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12, color: "#64748b", maxWidth: 200 }}>{esc(it.reason || it.additionalInfo || "—")}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 12, textAlign: "right", fontWeight: 600 }}>{euro.format(unit * it.qty)}</td>
                             </tr>
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                   </details>
                 );
               });
@@ -2056,7 +2065,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
             )}
           </h3>
           {showApplicativi && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
               <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
               <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
             </div>
@@ -2103,7 +2112,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
             </div>
             <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
             <label style={styles.label}>Link al codice o repository
-              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
                 <input style={{ ...styles.input, marginTop: 0, flex: 1 }} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} placeholder="https://github.com/..." />
                 <button type="button" style={{ ...btnStyles.secondary, whiteSpace: "nowrap", padding: "8px 12px" }}
                   onClick={() => {
@@ -2125,7 +2134,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
             </label>
             <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
              <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
-             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
                <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
              </div>
@@ -2181,7 +2190,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       </div>
 
       {toastMsg && (
-        <div style={styles.toast}>
+        <div role="status" aria-live="polite" style={styles.toast}>
           {toastMsg}
         </div>
       )}
@@ -2190,148 +2199,28 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 }
 
 const styles = {
-  card: {
-    background: "#fff",
-    border: "1px solid #e3e6e9",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  input: {
-    padding: "7px 10px",
-    borderRadius: 6,
-    border: "1px solid #cbd2d9",
-    fontSize: 13,
-    marginTop: 4,
-  },
-  inputFile: {
-    marginBottom: 6,
-  },
-  textarea: {
-    width: "100%",
-    padding: 7,
-    borderRadius: 6,
-    border: "1px solid #cbd2d9",
-    fontSize: 13,
-    marginTop: 4,
-    fontFamily: "inherit",
-  },
-  label: {
-    display: "flex",
-    flexDirection: "column",
-    fontSize: 12,
-    color: "#444",
-    gap: 2,
-  },
-  grid2: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: 12,
-  },
-  hint: { color: "#667", fontSize: 12, marginTop: 4 },
-  checkRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 },
-  suggestion: {
-    border: "1px solid #e0e4e8",
-    borderRadius: 8,
-    padding: 12,
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 10,
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-    background: "#fcfcfd",
-  },
-  step: {
-    padding: "7px 14px",
-    borderRadius: 6,
-    border: "1px solid #cbd2d9",
-    background: "#fff",
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  stepActive: {
-    padding: "7px 14px",
-    borderRadius: 6,
-    border: "1px solid #1a73e8",
-    background: "#e8f0fe",
-    color: "#174ea6",
-    fontWeight: 600,
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  lotBtn: {
-    padding: "6px 12px",
-    borderRadius: 6,
-    border: "1px solid #cbd2d9",
-    background: "#fff",
-    fontSize: 13,
-    cursor: "pointer",
-    opacity: 0.75,
-  },
-  lotBtnActive: {
-    padding: "6px 12px",
-    borderRadius: 6,
-    border: "1px solid #1a73e8",
-    background: "#e8f0fe",
-    color: "#174ea6",
-    fontWeight: 600,
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 13,
-  },
-  thead: {
-    background: "#f5f6f8",
-    textAlign: "left",
-    fontSize: 12,
-  },
-  toast: {
-    position: "fixed",
-    bottom: 24,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "#174ea6",
-    color: "#fff",
-    padding: "10px 18px",
-    borderRadius: 8,
-    fontSize: 13,
-    boxShadow: "0 4px 16px rgba(0,0,0,.2)",
-    zIndex: 1000,
-  },
+  card: { background: "#fff", border: "1px solid #dce5ef", borderRadius: 16, padding: "clamp(14px, 2vw, 24px)", marginBottom: 20, minWidth: 0, boxSizing: "border-box", boxShadow: "0 3px 14px rgba(24, 48, 78, 0.04)" },
+  input: { padding: "10px 12px", minHeight: 42, minWidth: 0, maxWidth: "100%", boxSizing: "border-box", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#172b4d", fontSize: 14, fontFamily: "inherit", marginTop: 5 },
+  inputFile: { marginBottom: 8, maxWidth: "100%" },
+  textarea: { width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 9, border: "1px solid #bac8da", fontSize: 14, marginTop: 5, fontFamily: "inherit", lineHeight: 1.6, resize: "vertical", color: "#172b4d", background: "#fff" },
+  label: { display: "flex", flexDirection: "column", minWidth: 0, fontSize: 13, fontWeight: 500, color: "#40536d", gap: 4 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 18 },
+  hint: { color: "#52657d", fontSize: 13, lineHeight: 1.6, marginTop: 6 },
+  checkRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14 },
+  suggestion: { border: "1px solid #dce5ef", borderRadius: 12, padding: 16, minWidth: 0, display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap", background: "#fafcff" },
+  step: { flex: "1 1 150px", textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#52657d", fontWeight: 600, fontSize: 14, cursor: "pointer" },
+  stepActive: { flex: "1 1 150px", textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #174ea6", background: "#174ea6", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 3px 8px rgba(23,78,166,.16)" },
+  lotBtn: { padding: "10px 14px", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#52657d", fontSize: 14, cursor: "pointer" },
+  lotBtnActive: { padding: "10px 14px", borderRadius: 9, border: "1px solid #174ea6", background: "#eaf2ff", color: "#174ea6", fontWeight: 600, fontSize: 14, cursor: "pointer" },
+  table: { width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 14, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" },
+  thead: { background: "#edf2f8", color: "#40536d", textAlign: "left", fontSize: 12 },
+  toast: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", width: "max-content", maxWidth: "calc(100vw - 32px)", boxSizing: "border-box", background: "#17385e", color: "#fff", padding: "14px 20px", borderRadius: 12, fontSize: 14, boxShadow: "0 6px 24px rgba(0,0,0,.2)", zIndex: 1000 },
 };
 
 const btnStyles = {
-  primary: {
-    padding: "8px 16px",
-    borderRadius: 6,
-    border: "none",
-    background: "#1a73e8",
-    color: "#fff",
-    fontWeight: 600,
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  secondary: {
-    padding: "8px 16px",
-    borderRadius: 6,
-    border: "1px solid #cbd2d9",
-    background: "#fff",
-    color: "#1f2a37",
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  danger: {
-    padding: "8px 12px",
-    borderRadius: 6,
-    border: "1px solid #d9a3a3",
-    background: "#fdecec",
-    color: "#b00020",
-    fontSize: 13,
-    cursor: "pointer",
-  },
+  primary: { minHeight: 44, padding: "10px 16px", borderRadius: 9, border: "1px solid #174ea6", background: "#174ea6", color: "#fff", fontWeight: 600, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  secondary: { minHeight: 44, padding: "10px 16px", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  danger: { minHeight: 44, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
 };
 
 export default ConfiguratorePage;
