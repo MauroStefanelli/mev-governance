@@ -1179,7 +1179,13 @@ function ConfiguratorePage({ onUnauthorized }) {
         ))}
         <button
           style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
-          onClick={async () => { await persistInitiativeEvaluation(true); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+          onClick={async () => {
+            await persistInitiativeEvaluation(true);
+            resetInitiative();
+            setEditingRecordKey(null);
+            setStep(1);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}>
           Salva e Chiudi
         </button>
       </div>
@@ -1794,8 +1800,11 @@ function ConfiguratorePage({ onUnauthorized }) {
                   <strong style={{ fontSize: 13 }}>{k}</strong>
                   <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} type="number" min="0" step=".001" value={tow[k] || 0} placeholder="Quantità"
                     onChange={(e) => setTow((t) => ({ ...t, [k]: Number(e.target.value) || 0 }))} />
-                  <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} type="number" min="0" step=".01" value={towPricesMap[k] || tow[k + "_price"] || 0} placeholder="Prezzo unitario"
-                    onChange={(e) => setTow((t) => ({ ...t, [k + "_price"]: Number(e.target.value) || 0 }))} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <input style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} type="number" min="0" step=".01" value={towPricesMap[k] || tow[k + "_price"] || 0} placeholder="Prezzo unitario"
+                      onChange={(e) => setTow((t) => ({ ...t, [k + "_price"]: Number(e.target.value) || 0 }))} />
+                    <span style={{ fontSize: 10, color: "#64748b" }}>{euro.format(towPricesMap[k] || tow[k + "_price"] || 0)}</span>
+                  </div>
                   <span style={{ fontWeight: 600 }}>{euro.format((tow[k] || 0) * (towPricesMap[k] || tow[k + "_price"] || 0))}</span>
                 </div>
               );
@@ -1805,43 +1814,72 @@ function ConfiguratorePage({ onUnauthorized }) {
           {/* Riga offerta */}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>Voci di catalogo</h3>
-            <table style={styles.table}>
-              <thead>
-                <tr style={styles.thead}>
-                  <th>ID Catalogo / componente</th><th>Tipo</th><th>Complessità</th><th>Q.tà</th><th>Prezzo unitario</th><th>Totale</th><th>Note</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => {
-                  const cc = catalog.find((x) => x.id === it.id);
-                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
-                  return (
-                    <tr key={it.key}>
-                      <td>
-                        <strong>ID {it.id}</strong>
-                        <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
-                      </td>
-                      <td>
-                        <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
-                          <option>REALIZZAZIONE</option>
-                          <option>MODIFICA</option>
-                        </select>
-                      </td>
-                      <td>
-                        <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
-                          {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
-                        </select>
-                      </td>
-                      <td><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
-                      <td><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
-                      <td><strong>{euro.format(unit * it.qty)}</strong></td>
-                      <td><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
-                      <td><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {(() => {
+              // Raggruppa items per interventionId
+              const groups = {};
+              items.forEach(it => {
+                const gid = it.interventionId || "—";
+                if (!groups[gid]) groups[gid] = [];
+                groups[gid].push(it);
+              });
+              return Object.entries(groups).map(([gid, gitems]) => {
+                const groupTotal = gitems.reduce((s, it) => {
+                  const u = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  return s + u * it.qty;
+                }, 0);
+                return (
+                  <details key={gid} open style={{ marginBottom: 8, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+                    <summary style={{ padding: "9px 14px", background: "#f8fafc", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between", listStyle: "none" }}>
+                      <span>ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span> <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span></span>
+                      <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
+                    </summary>
+                    <table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
+                      <thead>
+                        <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>ID Catalogo / componente</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Tipo</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Complessità</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Q.tà</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Prezzo unitario</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Totale</th>
+                          <th style={{ padding: "6px 10px", fontSize: 11 }}>Note</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gitems.map((it) => {
+                          const cc = catalog.find((x) => x.id === it.id);
+                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                          return (
+                            <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "6px 10px" }}>
+                                <strong>ID {it.id}</strong>
+                                <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
+                              </td>
+                              <td style={{ padding: "6px 10px" }}>
+                                <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
+                                  <option>REALIZZAZIONE</option><option>MODIFICA</option>
+                                </select>
+                              </td>
+                              <td style={{ padding: "6px 10px" }}>
+                                <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
+                                  {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
+                                </select>
+                              </td>
+                              <td style={{ padding: "6px 10px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
+                              <td style={{ padding: "6px 10px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
+                              <td style={{ padding: "6px 10px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
+                              <td style={{ padding: "6px 10px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
+                              <td style={{ padding: "6px 10px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </details>
+                );
+              });
+            })()}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, gap: 8, flexWrap: "wrap" }}>
               <strong>Totale catalogo: {euro.format(calculation.cat)}</strong>
               <strong>Altri TOW: {euro.format(calculation.oth)}</strong>

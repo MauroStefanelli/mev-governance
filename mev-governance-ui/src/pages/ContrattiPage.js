@@ -401,7 +401,7 @@ const renderCalloutLabel = (props) => {
 };
 
 // ── Sezione principale ────────────────────────────────────────────────────────
-function ConsumoTowSection({ towRows }) {
+function ConsumoTowSection({ towRows, ambienteId }) {
   const tipiContratto = [...new Set(
     towRows.map(r => r.towContratto).filter(Boolean)
   )].sort();
@@ -1042,7 +1042,7 @@ function ConsumoTowSection({ towRows }) {
         </>
       )
       }
-      <ReleaseScheduleSection contractId={selectedTipo} />
+      <ReleaseScheduleSection contractId={String(ambienteId || selectedTipo)} />
     </div >
   );
 }
@@ -1426,7 +1426,7 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
 
   return (
     <div style={{ padding: "24px 28px", background: "#f8fafc", minHeight: "100vh" }}>
-      <ConsumoTowSection towRows={towRows} />
+      <ConsumoTowSection towRows={towRows} ambienteId={ambienteId} />
     </div>
   );
 }
