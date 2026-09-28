@@ -101,7 +101,8 @@ public class ConfiguratoreAiController : ControllerBase
     public async Task<IActionResult> Test()
     {
         if (!CanAccess()) return Forbid();
-        var (ok, model, error) = await _ai.TestAsync();
+        var (key, ep, mdl, sty, auth) = GetUserAiSettings();
+        var (ok, model, error) = await _ai.TestAsync(key, ep, mdl, sty, auth);
         return ok
             ? Ok(new { ok, model })
             : StatusCode(502, new { ok, model, message = error });
