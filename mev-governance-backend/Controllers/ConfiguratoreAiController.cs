@@ -61,7 +61,10 @@ public class ConfiguratoreAiController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = ex.Message });
+            var msg = ex.Message;
+            if (msg.Contains("API key") || msg.Contains("401") || msg.Contains("403") || msg.Contains("Unauthorized"))
+                return StatusCode(401, new { message = "Chiave AI non configurata o non valida. Vai su Profilo → API Key AI e inserisci la tua chiave Capgemini o OpenAI." });
+            return StatusCode(500, new { message = msg });
         }
     }
 
@@ -83,7 +86,10 @@ public class ConfiguratoreAiController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = ex.Message });
+            var msg = ex.Message;
+            if (msg.Contains("API key") || msg.Contains("401") || msg.Contains("403") || msg.Contains("Unauthorized"))
+                return StatusCode(401, new { message = "Chiave AI non configurata o non valida. Vai su Profilo → API Key AI e inserisci la tua chiave Capgemini o OpenAI." });
+            return StatusCode(500, new { message = msg });
         }
     }
 
