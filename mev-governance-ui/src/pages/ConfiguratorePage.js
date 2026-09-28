@@ -137,7 +137,19 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       .then(([c, imp]) => {
         if (!alive) return;
         setContracts(c);
-        if (imp && typeof imp === "object") setTowImpattoDb(imp);
+        if (imp && typeof imp === "object" && Object.keys(imp).length > 0) {
+          setTowImpattoDb(imp);
+        } else {
+          // Fallback: struttura vuota con chiavi note — i valori verranno caricati al retry
+          console.warn("[TOW] getTowImpatto ha restituito vuoto, riprovo tra 3s");
+          setTimeout(() => {
+            if (!alive) return;
+            getTowImpatto().then(imp2 => {
+              if (imp2 && typeof imp2 === "object" && Object.keys(imp2).length > 0)
+                setTowImpattoDb(imp2);
+            }).catch(() => {});
+          }, 3000);
+        }
       })
       .catch((err) => {
         if (err && (err.status === 401 || err.status === 403)) return onUnauthorized();
@@ -1256,7 +1268,17 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                <label style={styles.label}>Tipo contratto
                  <select style={styles.input}
                    value={initiative.contractType || ""}
-                   onChange={(e) => setInitiative((i) => ({ ...i, contractType: e.target.value }))}>
+                   onChange={(e) => {
+                     const val = e.target.value;
+                     setInitiative((i) => ({ ...i, contractType: val }));
+                     // Se towImpattoDb non è ancora caricato, forzalo ora
+                     if (val && Object.keys(towImpattoDb).length === 0) {
+                       getTowImpatto().then(imp => {
+                         if (imp && typeof imp === "object" && Object.keys(imp).length > 0)
+                           setTowImpattoDb(imp);
+                       }).catch(() => {});
+                     }
+                   }}>
                    <option value="">— nessuno —</option>
                    {Object.keys(towImpattoDb).length > 0
                      ? Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)
@@ -1761,10 +1783,6 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           </div>
 
           {/* TOW automatici */}
-          {/* DEBUG — rimuovere */}
-          <div style={{background:"#fef9c3",padding:"6px 10px",fontSize:11,fontFamily:"monospace",borderRadius:4,marginBottom:8}}>
-            DEBUG: lot={lot} | initiativeContractId={initiativeContractId} | contractType={initiative.contractType} | towImpattoSrc={towImpattoSrc} | towImpattoDb keys={Object.keys(towImpattoDb).join(",")} | pct={JSON.stringify(towPercentages?.[initiativeContractId]?.[lot])}
-          </div>
            <div style={styles.card}>
              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
                <h3 style={{ margin: 0 }}>TOW automatici (Lotto {lot})</h3>
