@@ -2070,7 +2070,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         onScroll={e => { if (scrollRef.current) scrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
       />
 
-      <ReleaseScheduleSection contractId={selectedContratto} />
+      <ReleaseScheduleSection contractId={String(ambienteId || selectedContratto)} />
     </div>
   );
 }
