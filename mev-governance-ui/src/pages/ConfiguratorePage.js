@@ -54,7 +54,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [showContractForm, setShowContractForm] = useState(false);
   const [contractForm, setContractForm] = useState({ name: "", rulesFile: "", lots: [{ id: "1", name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] });
 
-  const [initiative, setInitiative] = useState({ code: "", title: "", system: "", release: "", requirements: "", description: "" });
+  const [initiative, setInitiative] = useState({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
   const [importedInterventions, setImportedInterventions] = useState([]);
   const [items, setItems] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -89,6 +89,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [applicationSearch, setApplicationSearch] = useState("");
   const [applicationDraft, setApplicationDraft] = useState(null);
   const [applications, setApplications] = useState([]);
+  const [showApplicativi, setShowApplicativi] = useState(false); // collassato per default
 
   const toastTimer = useRef(null);
   const toast = (m) => {
@@ -239,7 +240,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         },
       };
     });
-  }, [activeLot, towImpattoDb, towImpattoSrc]); // eslint-disable-line
+  }, [activeLot, towImpattoDb, towImpattoSrc, selectedContractId, lot]); // eslint-disable-line
 
   // ── Persist contratti ──
   const persistContract = async (contract) => {
@@ -383,12 +384,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
   // ── Reset / iniziativa ──
   const resetInitiative = () => {
-    setInitiative({ code: "", title: "", system: "", release: "", requirements: "", description: "" });
+    setInitiative({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
     setImportedInterventions([]);
     setItems([]);
     setSuggestions([]);
     setTow({});
-    setTowPercentages({});
+    // Azzera solo i valori del contratto/lotto corrente, così il useEffect li ripopola dai dati contratto
+    setTowPercentages(prev => ({
+      ...prev,
+      [selectedContractId]: { ...(prev?.[selectedContractId] || {}), [lot]: { 1: 0, 3: 0, 4: 0 } }
+    }));
     setDiscount(0);
     setContingency(0);
     setAiProposals(null);
@@ -1237,21 +1242,32 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               <label style={styles.label}>Sistema / applicazione
                 <input style={styles.input} value={initiative.system} onChange={(e) => setInitiative((i) => ({ ...i, system: e.target.value }))} />
               </label>
-              <label style={styles.label}>Release
-                {releaseList.length > 0 ? (
-                  <select style={styles.input}
-                    value={initiative.release}
-                    onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
-                    <option value="">— seleziona —</option>
-                    <option value="Da pianificare">Da pianificare</option>
-                    {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                ) : (
-                  <input style={styles.input} value={initiative.release}
-                    placeholder="es. R2025-04"
-                    onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
-                )}
-              </label>
+               <label style={styles.label}>Tipo contratto
+                 <select style={styles.input}
+                   value={initiative.contractType || ""}
+                   onChange={(e) => setInitiative((i) => ({ ...i, contractType: e.target.value }))}>
+                   <option value="">— nessuno —</option>
+                   {Object.keys(towImpattoDb).length > 0
+                     ? Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)
+                     : ["BASE", "QDO"].map(k => <option key={k} value={k}>{k}</option>)
+                   }
+                 </select>
+               </label>
+               <label style={styles.label}>Release
+                 {releaseList.length > 0 ? (
+                   <select style={styles.input}
+                     value={initiative.release}
+                     onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
+                     <option value="">— nessuna —</option>
+                     <option value="Da pianificare">Da pianificare</option>
+                     {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
+                   </select>
+                 ) : (
+                   <input style={styles.input} value={initiative.release}
+                     placeholder="es. R2025-04 (opzionale)"
+                     onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                 )}
+               </label>
               <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
                 <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
               </label>
@@ -2007,13 +2023,25 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
       {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
       <div style={{ ...styles.card, marginTop: 28 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <h3 style={{ margin: 0 }}>Applicativi e tecnologie · Lotto {lot}</h3>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
-            <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
-          </div>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, cursor: "pointer", userSelect: "none" }}
+          onClick={() => setShowApplicativi(v => !v)}
+        >
+          <h3 style={{ margin: 0 }}>
+            {showApplicativi ? "▾" : "▸"} Applicativi e tecnologie · Lotto {lot}
+            {!showApplicativi && applications.length > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 400, color: "#64748b", marginLeft: 8 }}>({applications.length} configurati)</span>
+            )}
+          </h3>
+          {showApplicativi && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+              <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
+              <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
+            </div>
+          )}
         </div>
+        {showApplicativi && (
+        <>
         {applications.length === 0 ? (
           <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
         ) : (
@@ -2074,14 +2102,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               </div>
             </label>
             <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
-            <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
-              <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
-            </div>
-          </div>
+             <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
+             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+               <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
+               <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
+             </div>
+           </div>
+         )}
+         </>
         )}
-      </div>
+       </div>
 
       {/* SVILUPPO INIZIATIVA */}
       <div style={{ ...styles.card, marginTop: 28 }}>

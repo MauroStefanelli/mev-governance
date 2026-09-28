@@ -698,13 +698,11 @@ export const analyzeInitiativeWithAi = async (context) => {
     headers: authHeaders(),
     body: JSON.stringify(context)
   });
-  if (!response.ok) {
-    const text = await response.text();
-    let detail = text;
-    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
-    throw new Error(detail);
-  }
-  return response.json();
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`Risposta non valida dal server (HTTP ${response.status}): ${text.slice(0, 200)}`); }
+  if (!response.ok) throw new Error(data?.message || `Errore HTTP ${response.status}`);
+  return data;
 };
 
 export const analyzeDevelopmentWithAi = async (context) => {
@@ -713,13 +711,11 @@ export const analyzeDevelopmentWithAi = async (context) => {
     headers: authHeaders(),
     body: JSON.stringify(context)
   });
-  if (!response.ok) {
-    const text = await response.text();
-    let detail = text;
-    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
-    throw new Error(detail);
-  }
-  return response.json();
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`Risposta non valida dal server (HTTP ${response.status}): ${text.slice(0, 200)}`); }
+  if (!response.ok) throw new Error(data?.message || `Errore HTTP ${response.status}`);
+  return data;
 };
 
 export const getUserAccessLogSafe = async (username) => {
