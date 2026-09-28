@@ -1599,12 +1599,19 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   });
   return [...groups.entries()].map(([gid, items]) => {
     const inter = importedInterventions.find((x) => String(x.id) === String(gid));
+    const isNoIntervention = gid === "__NOX__";
+    const isManual = gid === "__MANUALE__";
     return (
-      <details key={gid} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
+      <details key={gid} open={isNoIntervention || isManual} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
         <summary style={{ cursor: "pointer", padding: "10px 14px", fontWeight: 700, fontSize: 13, background: "#f8f9fa", borderRadius: "8px 8px 0 0", listStyle: "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <span style={{ flex: "0 0 auto", marginTop: 1 }}>▶</span>
           <span style={{ flex: 1 }}>
-            <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {gid}</span>
+            {isNoIntervention
+              ? <span style={{ color: "#1a73e8" }}>Voci di catalogo suggerite</span>
+              : isManual
+                ? <span style={{ color: "#1a73e8" }}>Voci aggiunte manualmente</span>
+                : <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {gid}</span>
+            }
             <span style={{ marginLeft: 8, fontSize: 11, color: "#777", fontWeight: 400 }}>({items.length} voc{items.length === 1 ? "e" : "i"})</span>
             {inter?.titolo ? <span style={{ display: "block", color: "#222", fontWeight: 600, marginTop: 2 }}>{esc(inter.titolo)}</span> : null}
             {inter?.descrizione ? <span style={{ display: "block", color: "#555", fontWeight: 400, fontSize: 12, marginTop: 1 }}>{esc(inter.descrizione)}</span> : null}
