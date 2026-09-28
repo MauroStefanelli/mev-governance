@@ -579,8 +579,13 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
       setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
     } catch (err) {
       const msg = err.message || String(err);
-      if (msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("authorization") || msg.toLowerCase().includes("bearer")) {
-        setError("Chiave AI non configurata. Clicca sull'icona utente (in alto a destra) → tab \"AI\" e inserisci la tua API key OpenAI o Capgemini.");
+      const isAuthErr = msg.toLowerCase().includes("api key")
+        || msg.toLowerCase().includes("authorization")
+        || msg.toLowerCase().includes("bearer")
+        || msg.includes("401")
+        || msg.includes("403");
+      if (isAuthErr) {
+        setError("Chiave AI non valida o non configurata. Vai su Profilo utente (icona in alto a destra) → tab \"API Key AI\" e inserisci la tua API key Capgemini o OpenAI.");
       } else {
         setError("Analisi AI non riuscita: " + msg);
       }
@@ -692,10 +697,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId }) {
 
   // ── Archivio ──
   const loadArchive = useCallback(() => {
-    getConfiguratoreRecords({ entity_type: "initiative_evaluation", contract_id: selectedContractId })
+    getConfiguratoreRecords({ entity_type: "initiative_evaluation", contract_id: selectedContractId, lot_id: lot })
       .then((d) => setArchiveRecords(d.records || []))
       .catch((e) => { console.warn("loadArchive failed:", e); });
-  }, [selectedContractId]);
+  }, [selectedContractId, lot]);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
 
