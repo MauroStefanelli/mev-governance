@@ -678,7 +678,6 @@ export const analyzeInitiativeWithAi = async (context) => {
     headers: authHeaders(),
     body: JSON.stringify(context)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) {
     const text = await response.text();
     let detail = text;
@@ -694,7 +693,6 @@ export const analyzeDevelopmentWithAi = async (context) => {
     headers: authHeaders(),
     body: JSON.stringify(context)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) {
     const text = await response.text();
     let detail = text;
