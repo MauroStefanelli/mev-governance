@@ -388,11 +388,21 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     setItems([]);
     setSuggestions([]);
     setTow({});
+    setTowPercentages({});
     setDiscount(0);
     setContingency(0);
     setAiProposals(null);
     setEconomyNotes("");
     setSourceWorkbookName("");
+    // Scheda tecnica / sviluppo
+    setTechProfile(null);
+    setImplementationFiles([]);
+    setImplementationBranch("");
+    setImplementationApprovalNotes("");
+    setImplementationTests("");
+    // Applicativi
+    setApplicationDraft(null);
+    setStep(1);
   };
 
   // ── Step 1: import Excel ──
@@ -711,6 +721,17 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [initiativeContractId, lot]);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
+
+  // Reset completo al cambio contratto (cambio ambiente in App.js)
+  const prevContractRef = useRef(null);
+  useEffect(() => {
+    if (prevContractRef.current !== null && prevContractRef.current !== initiativeContractId) {
+      resetInitiative();
+      setEditingRecordKey(null);
+    }
+    prevContractRef.current = initiativeContractId;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initiativeContractId]);
 
   // Carica le release del contratto selezionato per il campo Release in Step 1
   useEffect(() => {
@@ -1465,14 +1486,22 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           <div style={{ ...styles.card, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
-              <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}>
-                {aiBusy ? "Analisi AI…" : "Secondo parere AI"}
+              <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}
+                title="Invia l'iniziativa al modello AI: riceverai un sommario e proposte di voci di catalogo da aggiungere/escludere/modificare">
+                {aiBusy ? "Analisi AI in corso…" : "Secondo parere AI"}
               </button>
             </div>
+            {aiBusy && (
+              <div style={{ marginTop: 10, padding: "10px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 12, color: "#92400e" }}>
+                <strong>Analisi AI in corso</strong> — il modello sta esaminando l'iniziativa, gli interventi e il catalogo.<br/>
+                <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span><br/>
+                <span style={{ color: "#555", marginTop: 4, display: "block" }}>Al termine vedrai un sommario testuale e una lista di proposte (voci di catalogo suggerite) che potrai applicare o ignorare.</span>
+              </div>
+            )}
             {aiProposals && (
               <div style={{ ...styles.card, marginTop: 10, background: "#f0f7ff" }}>
                 <div>
-                  <small>Secondo parere AI · {aiProposals.model || "AI"}</small>
+                  <small>Secondo parere AI · {aiProposals.model || "AI"} — <em>rivedi le proposte e applica solo quelle corrette</em></small>
                   <p style={{ margin: "6px 0" }}>{esc(aiProposals.analysis?.summary || "Analisi completata.")}</p>
                 </div>
                 <div>
