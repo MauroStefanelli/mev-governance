@@ -51,17 +51,6 @@ public class SettingsController : ControllerBase
 
     // ── TOW Impatto (% impatto per contratto) — condiviso tra tutti gli utenti ─
 
-    [HttpGet("tow-impatto")]
-    [Authorize(Policy = "AnyAuthenticated")]
-    public IActionResult GetTowImpatto()
-    {
-        var s = _db.AppSettings.FirstOrDefault(x => x.Id == 1);
-        var json = s?.TowImpattoJson;
-        if (string.IsNullOrEmpty(json)) return Ok(new { });
-        try { return Content(json, "application/json"); }
-        catch { return Ok(new { }); }
-    }
-
     [HttpPut("tow-impatto")]
     public IActionResult SetTowImpatto([FromBody] object dto)
     {
@@ -327,8 +316,21 @@ public class AppSettingsDto
 }
 
 // ── Reset dati operativi per l'ambiente corrente ───────────────────────────────
-// Cancella: MevItems, ConsumoTow, Contratti, BuoniConsegna, OrdiniConsegna, VerbaliAvanzamento
-// Filtra per ambienteId estratto dal JWT — non tocca altri ambienti né utenti/settings.
-// ─────────────────────────────────────────────────────────────────────────────
-
-
+// Controller separato per endpoint di sola lettura accessibili a tutti gli utenti autenticati.
+// Necessario perché SettingsController ha [Authorize(Policy="AdminOrSuper")] a livello classe
+// e ASP.NET Core somma le policy invece di sovrascriverle.
+[ApiController]
+[Route("api/settings")]
+[Authorize]
+public class SettingsReadController(AppDbContext db) : ControllerBase
+{
+    [HttpGet("tow-impatto")]
+    public IActionResult GetTowImpatto()
+    {
+        var s = db.AppSettings.FirstOrDefault(x => x.Id == 1);
+        var json = s?.TowImpattoJson;
+        if (string.IsNullOrEmpty(json)) return Ok(new { });
+        try { return Content(json, "application/json"); }
+        catch { return Ok(new { }); }
+    }
+}
