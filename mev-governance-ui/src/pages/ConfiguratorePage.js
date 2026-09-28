@@ -222,8 +222,27 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     return selectedContractId;
   }, [codiceContratto, ambienteId, selectedContractId]);
 
+  // Quando il tipo contratto cambia in step 1 (initiative.contractType),
+  // sincronizza towImpattoSrc e applica subito le percentuali al contratto/lotto corrente.
+  useEffect(() => {
+    const src = initiative.contractType || "";
+    setTowImpattoSrc(src);
+    if (!src || !towImpattoDb[src]) return;
+    const imp = towImpattoDb[src];
+    setTowPercentages(prev => ({
+      ...prev,
+      [initiativeContractId]: {
+        ...(prev?.[initiativeContractId] || {}),
+        [lot]: {
+          1: Number(imp[`TOW0${lot}.1`]) || 0,
+          3: Number(imp[`TOW0${lot}.3`]) || 0,
+          4: Number(imp[`TOW0${lot}.4`]) || 0,
+        },
+      },
+    }));
+  }, [initiative.contractType, towImpattoDb, initiativeContractId, lot]); // eslint-disable-line
 
-  // Pre-popola towPercentages quando l'utente sceglie una fonte dal select (towImpattoSrc).
+  // Pre-popola towPercentages quando l'utente sceglie una fonte dal select "% da contratto" in step 3.
   // Gestito direttamente nell'onChange del select — nessun useEffect per evitare race condition.
 
   // ── Persist contratti ──
@@ -1734,34 +1753,20 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           </div>
 
           {/* TOW automatici */}
-          <div style={styles.card}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-              <h3 style={{ margin: 0 }}>TOW automatici (Lotto {lot})</h3>
-              {Object.keys(towImpattoDb).length > 0 && (
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
-                  % da contratto:
-                   <select
-                     value={towImpattoSrc}
-                     onChange={e => {
-                       const src = e.target.value;
-                       setTowImpattoSrc(src);
-                       if (!src) return;
-                       const imp = towImpattoDb[src] || {};
-                       const currentLot = lot;
-                       const currentContract = initiativeContractId;
-                       const v1 = Number(imp[`TOW0${currentLot}.1`]) || 0;
-                       const v3 = Number(imp[`TOW0${currentLot}.3`]) || 0;
-                       const v4 = Number(imp[`TOW0${currentLot}.4`]) || 0;
-                       console.log(`[TOW] src=${src} lot=${currentLot} contract=${currentContract}`, {v1,v3,v4}, 'imp keys:', Object.keys(imp));
-                       setTowPercentages(prev => ({
-                         ...prev,
-                         [currentContract]: {
-                           ...(prev?.[currentContract] || {}),
-                           [currentLot]: { 1: v1, 3: v3, 4: v4 },
-                         },
-                       }));
-                     }}
-                    style={{ border: "1px solid #bdc9d4", borderRadius: 5, padding: "3px 8px", fontSize: 12, background: "#fff" }}>
+           <div style={styles.card}>
+             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+               <h3 style={{ margin: 0 }}>TOW automatici (Lotto {lot})</h3>
+               {Object.keys(towImpattoDb).length > 0 && (
+                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
+                   % da contratto:
+                    <select
+                      value={towImpattoSrc}
+                      onChange={e => {
+                        const src = e.target.value;
+                        // Aggiorna anche initiative.contractType per coerenza con step 1
+                        setInitiative(i => ({ ...i, contractType: src }));
+                      }}
+                     style={{ border: "1px solid #bdc9d4", borderRadius: 5, padding: "3px 8px", fontSize: 12, background: "#fff" }}>
                     <option value="">— nessuno —</option>
                     {Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)}
                   </select>
