@@ -88,14 +88,27 @@ public class AiService
             try
             {
                 using var doc = JsonDocument.Parse(bodyText);
-                if (doc.RootElement.TryGetProperty("error", out var err) &&
-                    err.TryGetProperty("message", out var msg))
-                    detail = msg.GetString();
+                var root = doc.RootElement;
+                // Struttura OpenAI/Capgemini: {"error": {"message": "..."}}
+                if (root.TryGetProperty("error", out var err))
+                {
+                    if (err.TryGetProperty("message", out var msg)) detail = msg.GetString();
+                    else if (err.TryGetProperty("code", out var code)) detail = code.GetString();
+                    else detail = err.ToString();
+                }
+                // Struttura alternativa: {"message": "..."}
+                else if (root.TryGetProperty("message", out var msg2)) detail = msg2.GetString();
+                // Struttura alternativa: {"detail": "..."}
+                else if (root.TryGetProperty("detail", out var det)) detail = det.GetString();
             }
             catch { }
 
+            // Se non abbiamo estratto un messaggio utile, includi il body grezzo (troncato a 300 char)
+            if (string.IsNullOrWhiteSpace(detail))
+                detail = bodyText.Length > 300 ? bodyText[..300] + "…" : bodyText;
+
             var service = s.Endpoint.Contains("capgemini") ? "Capgemini" : "OpenAI";
-            throw new InvalidOperationException(detail ?? $"{service} ha risposto con errore {(int)resp.StatusCode}");
+            throw new InvalidOperationException($"{service} errore {(int)resp.StatusCode}: {detail}");
         }
 
         try
@@ -253,13 +266,18 @@ public class AiService
     private JsonObject BuildPayload(AiSettings s, string endpointCheck, JsonNode input, bool structured)
     {
         JsonObject payload;
+        bool isCapgeminiEndpoint = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase);
+
         if (s.ApiStyle == "chat_completions")
         {
             payload = new JsonObject
             {
                 ["model"] = s.Model,
-                ["messages"] = input is JsonArray arr ? arr.DeepClone() : new JsonArray { new JsonObject { ["role"] = "user", ["content"] = input?.ToJsonString() } }
+                ["messages"] = input is JsonArray arr ? arr.DeepClone() : new JsonArray { new JsonObject { ["role"] = "user", ["content"] = input?.ToJsonString() } },
             };
+            // Alcuni gateway (es. Capgemini) richiedono max_tokens esplicito altrimenti rispondono 500
+            if (isCapgeminiEndpoint)
+                payload["max_tokens"] = 4096;
         }
         else
         {
