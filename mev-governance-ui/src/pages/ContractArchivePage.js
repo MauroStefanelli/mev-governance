@@ -12,7 +12,7 @@ const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR'
 
 // ── Stili allineati a ConfiguratorePage ───────────────────────────────────
 const S = {
-  page: { padding: 'clamp(12px,3vw,32px)', fontFamily: 'inherit', background: '#f4f7fb', color: '#172b4d', lineHeight: 1.5, minWidth: 0, maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box' },
+  page: { padding: 'clamp(12px,3vw,32px)', fontFamily: 'inherit', background: '#f4f7fb', color: '#172b4d', lineHeight: 1.5, minWidth: 0, maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box', overflowWrap: 'anywhere' },
   card: { background: '#fff', border: '1px solid #dce5ef', borderRadius: 16, padding: 'clamp(14px,2vw,24px)', marginBottom: 20, minWidth: 0, boxSizing: 'border-box', boxShadow: '0 3px 14px rgba(24,48,78,0.04)' },
   sectionHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 },
   eyebrow: { margin: 0, color: '#1a73e8', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.12em', fontWeight: 800 },
@@ -20,40 +20,40 @@ const S = {
   h2: { fontSize: 18, color: '#172b4d', margin: 0, fontWeight: 700 },
   muted: { color: '#52657d', margin: '.3rem 0 0', fontSize: 13 },
   // Bottoni
-  btnPrimary: { minHeight: 44, padding: '10px 16px', borderRadius: 9, border: '1px solid #174ea6', background: 'linear-gradient(135deg,#102a47 0%,#1a73e8 100%)', color: '#fff', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' },
+  btnPrimary: { minHeight: 44, padding: '10px 16px', borderRadius: 9, border: '1px solid #174ea6', background: '#174ea6', color: '#fff', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' },
   btnGhost: { minHeight: 44, padding: '10px 16px', borderRadius: 9, border: '1px solid #bac8da', background: '#fff', color: '#29415e', fontWeight: 500, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' },
   btnCompact: { minHeight: 36, padding: '6px 12px', fontSize: 12 },
   btnDanger: { minHeight: 36, padding: '6px 12px', borderRadius: 9, border: '1px solid #f1b9c0', background: '#fff1f2', color: '#a81832', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' },
   btnDisabled: { opacity: 0.45, cursor: 'not-allowed' },
   // Lista contratti
-  contractList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,440px),1fr))', gap: 16, marginTop: 0 },
-  contractCard: { background: '#fff', border: '1px solid #dce5ef', borderRadius: 16, padding: 20, display: 'grid', gap: 14, boxShadow: '0 3px 14px rgba(24,48,78,0.04)', minWidth: 0 },
+  contractList: { display: 'grid', alignItems: 'start', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,440px),1fr))', gap: 16, marginTop: 0 },
+  contractCard: { background: '#fff', border: '1px solid #dce5ef', borderRadius: 20, padding: 'clamp(16px,2vw,24px)', display: 'grid', gap: 20, boxShadow: '0 6px 24px rgba(24,48,78,0.05)', minWidth: 0 },
   // Lotti
-  lotManager: { display: 'grid', gap: 8 },
-  lotRow: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto auto', gap: 8, alignItems: 'center', padding: '10px 12px', background: '#f0f7ff', borderRadius: 10, borderLeft: '4px solid #1a73e8' },
-  lotRowInactive: { borderLeft: '4px solid #bac8da', background: '#f8f9fb', opacity: 0.75 },
+  lotManager: { display: 'grid', gap: 12, minWidth: 0 },
+  lotRow: { display: 'grid', gap: 14, minWidth: 0, padding: 16, background: '#f7faff', border: '1px solid #dae5f3', borderRadius: 14 },
+  lotRowInactive: { borderColor: '#e2e8f0', background: '#f8f9fb' },
   lotStatus: { padding: '3px 9px', borderRadius: 999, background: '#fff', fontSize: 11, fontWeight: 700, border: '1px solid #dce5ef' },
-  cardActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  cardActions: { display: 'flex', gap: 10, flexWrap: 'wrap', borderTop: '1px solid #e7edf5', paddingTop: 18 },
   // Form
   contractForm: { marginTop: 0 },
   mainFields: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,200px),1fr))', gap: 16, marginBottom: 16 },
   lotSection: { padding: 16, background: '#f4f7fb', borderRadius: 10, marginBottom: 12, border: '1px solid #dce5ef' },
   lotGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 12, marginTop: 10 },
-  labelStyle: { fontWeight: 500, fontSize: 13, color: '#40536d', display: 'flex', flexDirection: 'column', gap: 4 },
+  labelStyle: { minWidth: 0, fontWeight: 500, fontSize: 13, color: '#40536d', display: 'flex', flexDirection: 'column', gap: 4 },
   inputStyle: { padding: '10px 12px', minHeight: 42, minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', borderRadius: 9, border: '1px solid #bac8da', background: '#fff', color: '#172b4d', fontSize: 14, fontFamily: 'inherit', marginTop: 4 },
   hint: { marginTop: 14, background: '#f0f7ff', borderLeft: '4px solid #1a73e8', padding: '12px 14px', color: '#1e40af', fontSize: 13, borderRadius: '0 8px 8px 0' },
-  panelActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid #dce5ef' },
+  panelActions: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid #dce5ef' },
   // Summary page
-  summaryPage: { padding: 'clamp(12px,3vw,32px)', background: '#f4f7fb', minWidth: 0, maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box' },
-  lotTabs: { display: 'flex', background: '#fff', padding: 4, borderRadius: 12, width: 'max-content', marginBottom: 20, border: '1px solid #dce5ef', gap: 4 },
-  lotTab: { border: 0, background: 'transparent', padding: '9px 18px', borderRadius: 9, fontWeight: 600, color: '#52657d', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 },
+  summaryPage: { fontFamily: 'inherit', color: '#172b4d', lineHeight: 1.6, padding: 'clamp(12px,3vw,32px)', background: '#f4f7fb', minWidth: 0, maxWidth: 1440, margin: '0 auto', boxSizing: 'border-box', overflowWrap: 'anywhere' },
+  lotTabs: { display: 'flex', flexWrap: 'wrap', maxWidth: '100%', boxSizing: 'border-box', background: '#fff', padding: 6, borderRadius: 14, width: 'fit-content', marginBottom: 20, border: '1px solid #dce5ef', gap: 4 },
+  lotTab: { minHeight: 44, border: 0, background: 'transparent', padding: '9px 18px', borderRadius: 9, fontWeight: 600, color: '#52657d', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 },
   lotTabActive: { background: '#174ea6', color: '#fff', boxShadow: '0 3px 8px rgba(23,78,166,.16)' },
-  summaryHero: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'center', padding: 24, background: 'linear-gradient(135deg,#102a47 0%,#1a73e8 100%)', borderRadius: 16, color: '#fff', marginBottom: 20 },
+  summaryHero: { display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'center', padding: 'clamp(20px,3vw,32px)', background: 'linear-gradient(120deg,#102a47,#174ea6)', borderRadius: 20, color: '#fff', marginBottom: 24 },
   summaryHeroText: { margin: 0, maxWidth: 900, fontSize: 14, lineHeight: 1.6 },
   summaryStat: { minWidth: 140, padding: 16, borderRadius: 10, background: 'rgba(255,255,255,.13)', textAlign: 'center' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))', gap: 16, margin: '16px 0' },
-  summaryCard: { background: '#fff', border: '1px solid #dce5ef', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(24,48,78,0.04)' },
-  summarySection: { background: '#fff', border: '1px solid #dce5ef', borderRadius: 12, padding: 20, margin: '16px 0', boxShadow: '0 2px 8px rgba(24,48,78,0.04)' },
+  summaryCard: { minWidth: 0, background: '#fff', border: '1px solid #dce5ef', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(24,48,78,0.04)' },
+  summarySection: { minWidth: 0, background: '#fff', border: '1px solid #dce5ef', borderRadius: 12, padding: 20, margin: '16px 0', boxShadow: '0 2px 8px rgba(24,48,78,0.04)' },
   summaryNote: { margin: '14px 0 0', padding: '12px 14px', background: '#f0f7ff', borderLeft: '4px solid #1a73e8', fontSize: 13, color: '#1e40af', borderRadius: '0 8px 8px 0' },
   summaryAccordions: { display: 'grid', gap: 8 },
   summaryDetails: { border: '1px solid #dce5ef', borderRadius: 10, background: '#f8fafc' },
@@ -62,17 +62,17 @@ const S = {
   checklistMark: { display: 'grid', placeItems: 'center', flex: '0 0 26px', height: 26, borderRadius: '50%', background: '#1a73e8', color: '#fff', fontWeight: 900, fontSize: 14 },
   msgOk: { padding: '10px 14px', borderRadius: 9, fontSize: 13, background: '#dcfce7', color: '#166534', fontWeight: 600, marginBottom: 16, border: '1px solid #bbf7d0' },
   msgErr: { padding: '10px 14px', borderRadius: 9, fontSize: 13, background: '#fdecec', color: '#b00020', fontWeight: 600, marginBottom: 16, border: '1px solid #fecaca' },
-  table: { width: '100%', borderCollapse: 'collapse', minWidth: 400 },
-  thead: { background: '#102a47', color: '#fff' },
+  table: { width: '100%', borderCollapse: 'collapse', minWidth: 400, lineHeight: 1.6, fontVariantNumeric: 'tabular-nums' },
+  thead: { background: '#edf2f8', color: '#40536d' },
 };
 
 function SummaryTable({ headers, rows }) {
   return (
-    <div style={{ overflowX: 'auto', border: '1px solid #dce5ef', borderRadius: 10, marginBottom: 0 }}>
+    <div role="region" aria-label="Tabella di sintesi contrattuale" tabIndex={0} style={{ maxWidth: '100%', overflowX: 'auto', border: '1px solid #dce5ef', borderRadius: 10, marginBottom: 0 }}>
       <table style={S.table}>
         <thead>
           <tr>{headers.map(h => (
-            <th key={h} style={{ ...S.thead, textAlign: 'left', padding: '11px 12px', fontSize: 13 }}>{h}</th>
+            <th scope="col" key={h} style={{ ...S.thead, textAlign: 'left', padding: '11px 12px', fontSize: 13 }}>{h}</th>
           ))}</tr>
         </thead>
         <tbody>
@@ -114,17 +114,17 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
 
   const overlay = {
     position: 'fixed', inset: 0, background: 'rgba(16,42,71,.5)', zIndex: 1200,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px,2vw,24px)', boxSizing: 'border-box',
   };
   const box = {
     background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(16,42,71,.22)',
-    maxWidth: 880, width: '100%', maxHeight: '84vh', display: 'flex', flexDirection: 'column',
+    maxWidth: 1000, minWidth: 0, width: '100%', maxHeight: '90dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
   };
   const head = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '18px 24px', borderBottom: '1px solid #dce5ef',
+    gap: 16, padding: '18px clamp(16px,3vw,28px)', borderBottom: '1px solid #dce5ef',
   };
-  const body = { overflowY: 'auto', padding: 24, flex: 1 };
+  const body = { overflowY: 'auto', padding: 'clamp(12px,3vw,28px)', minHeight: 0, flex: 1 };
 
   const hasImpactRows = modal.type === 'tow' && (modal.data || []).some(row => ['1','3','4'].includes(row[0]?.split?.('.')?.[1]));
   const impactDirty = Object.values(impact).some(v => v !== '' && v !== null);
@@ -141,7 +141,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
 
   return (
     <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={box}>
+      <div role="dialog" aria-label={modal.title} style={box}>
         <div style={head}>
           <div>
             <p style={{ margin: 0, color: '#1a73e8', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.1em' }}>
@@ -149,16 +149,16 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
             </p>
             <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#172b4d', fontWeight: 700 }}>{modal.title}</h2>
           </div>
-          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: 4 }}>×</button>
+          <button aria-label="Chiudi dettaglio lotto" onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: 8, minWidth: 44, minHeight: 44, borderRadius: 10 }}>×</button>
         </div>
         <div style={body}>
           {modal.type === 'catalog' && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 500 }}>
+            <div role="region" aria-label="Dati del lotto" tabIndex={0} style={{ overflowX: 'auto', border: '1px solid #dce5ef', borderRadius: 12 }}>
+              <table style={{ ...S.table, fontSize: 13, minWidth: 560 }}>
                 <thead>
                   <tr>
                     {['ID', 'Ambito', 'Nome componente', 'Semplice (€)', 'Medio (€)', 'Complesso (€)'].map(h => (
-                      <th key={h} style={{ background: '#102a47', color: '#fff', padding: '10px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th scope="col" key={h} style={{ ...S.thead, padding: '12px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -168,16 +168,16 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                     const real = pr.REALIZZAZIONE || {};
                     return (
                       <tr key={i} style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{v.id}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', color: '#475569' }}>{v.ambito}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5' }}>{v.nome}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
+                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{v.id}</td>
+                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', color: '#475569' }}>{v.ambito}</td>
+                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5' }}>{v.nome}</td>
+                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
                           {real.Semplice != null ? euro.format(real.Semplice) : '–'}
                         </td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
+                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
                           {real.Medio != null ? euro.format(real.Medio) : '–'}
                         </td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
+                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
                           {real.Complesso != null ? euro.format(real.Complesso) : '–'}
                         </td>
                       </tr>
@@ -192,12 +192,12 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
           )}
           {modal.type === 'tow' && (
             <>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 500 }}>
+              <div role="region" aria-label="Dati del lotto" tabIndex={0} style={{ overflowX: 'auto', border: '1px solid #dce5ef', borderRadius: 12 }}>
+                <table style={{ ...S.table, fontSize: 13, minWidth: 560 }}>
                   <thead>
                     <tr>
                       {['TOW', 'Ambito', 'Quantità contrattuale', 'Peso %', '% Impatto (Configuratore)'].map(h => (
-                        <th key={h} style={{ background: '#102a47', color: '#fff', padding: '10px 12px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                        <th scope="col" key={h} style={{ ...S.thead, padding: '12px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -208,18 +208,19 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                       const autoTow = ['1','3','4'].includes(suffix);
                       return (
                         <tr key={i} style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{row[0]}</td>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', color: '#475569' }}>{row[1]}</td>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5' }}>{row[2]}</td>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', textAlign: 'right', fontWeight: 600 }}>{row[3]}</td>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef2f5', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{row[0]}</td>
+                          <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', color: '#475569' }}>{row[1]}</td>
+                          <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5' }}>{row[2]}</td>
+                          <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right', fontWeight: 600 }}>{row[3]}</td>
+                          <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'center' }}>
                             {autoTow ? (
                               <input
                                 type="number" min={0} max={100} step={0.01}
                                 value={impact[suffix] ?? ''}
                                 onChange={e => setImpact(p => ({ ...p, [suffix]: e.target.value === '' ? '' : Number(e.target.value) }))}
                                 placeholder="0"
-                                style={{ width: 72, border: '1px solid #bac8da', borderRadius: 7, padding: '5px 8px', fontSize: 13, textAlign: 'right', fontFamily: 'inherit' }}
+                                aria-label={`Percentuale impatto ${towKey}`}
+                                style={{ minHeight: 42, boxSizing: 'border-box', width: 88, border: '1px solid #bac8da', borderRadius: 7, padding: '5px 8px', fontSize: 13, textAlign: 'right', fontFamily: 'inherit' }}
                               />
                             ) : (
                               <span style={{ color: '#94a3b8', fontSize: 11 }}>–</span>
@@ -239,7 +240,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                     style={{ ...S.btnPrimary, opacity: saving ? 0.7 : 1 }}>
                     {saving ? 'Salvataggio…' : 'Salva % impatto'}
                   </button>
-                  {saved && <span style={{ color: '#166534', fontWeight: 700, fontSize: 13 }}>Salvato — il Configuratore userà questi valori come default</span>}
+                  {saved && <span role="status" style={{ color: '#166534', fontWeight: 700, fontSize: 13 }}>Salvato — il Configuratore userà questi valori come default</span>}
                   <span style={{ color: '#64748b', fontSize: 12 }}>I valori si applicano ai TOW automatici (TOWxx.1, TOWxx.3, TOWxx.4) nel Configuratore Offerta.</span>
                 </div>
               )}
@@ -274,9 +275,9 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
       </div>
 
       {/* Tab lotti */}
-      <div style={S.lotTabs}>
+      <div aria-label="Selezione lotto" style={S.lotTabs}>
         {visibleLots.map(l => (
-          <button key={l.lotId}
+          <button aria-pressed={l.lotId === lotId} key={l.lotId}
             style={{ ...S.lotTab, ...(l.lotId === lotId ? S.lotTabActive : {}) }}
             onClick={() => onLotChange(l.lotId)}>
             Lotto {l.lotId}
@@ -288,7 +289,7 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
         <div>
           {/* Hero */}
           <div style={S.summaryHero}>
-            <div>
+            <div style={{ flex: '1 1 360px', minWidth: 0 }}>
               <p style={{ ...S.eyebrow, color: 'rgba(255,255,255,.7)' }}>Sintesi allegata</p>
               <h2 style={{ fontSize: 24, color: '#fff', margin: '3px 0 10px' }}>{lotSummary.title}</h2>
               <p style={S.summaryHeroText}>{lotSummary.conclusion}</p>
@@ -334,7 +335,7 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
                     <strong>{tow}</strong>
                     <span style={{ color: '#667482', fontSize: 13 }}>{items.length} deliverable</span>
                   </summary>
-                  <ul style={{ margin: 0, padding: '0 20px 15px 36px', columns: 2 }}>
+                  <ul style={{ margin: 0, padding: '0 20px 15px 36px', columnWidth: 260, columnCount: 2 }}>
                     {items.map((x, i) => <li key={i} style={{ margin: '5px 0' }}>{x}</li>)}
                   </ul>
                 </details>
@@ -387,7 +388,7 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
         /* Sintesi generica per contratti importati */
         <div>
           <div style={S.summaryHero}>
-            <div>
+            <div style={{ flex: '1 1 360px', minWidth: 0 }}>
               <p style={{ ...S.eyebrow, color: 'rgba(255,255,255,.7)' }}>Lotto {lotId}</p>
               <h2 style={{ fontSize: 22, color: '#fff', margin: '3px 0 10px' }}>{lot.name || '—'}</h2>
               <p style={S.summaryHeroText}>Riepilogo ricavato dalla configurazione importata. Per questo contratto non è ancora disponibile una sintesi operativa estesa.</p>
@@ -689,36 +690,43 @@ export default function ContractArchivePage({ ambienti = [] }) {
     <>
     <div style={S.page}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 'clamp(22px,3vw,30px)', letterSpacing: '-0.7px', fontWeight: 750 }}>Gestione Contratti</h2>
+          <p style={S.eyebrow}>Archivio contrattuale</p>
+          <h2 style={{ margin: '6px 0 0', fontSize: 'clamp(22px,3vw,30px)', letterSpacing: '-0.7px', fontWeight: 750 }}>Gestione Contratti</h2>
           <p style={{ margin: '4px 0 0', color: '#52657d', fontSize: 13 }}>
             Cataloghi, prezzi e regole vengono mantenuti separati per ciascun Lotto.
           </p>
         </div>
-        <button style={S.btnPrimary} onClick={() => setShowForm(f => !f)}>
+        <button aria-expanded={showForm} style={S.btnPrimary} onClick={() => setShowForm(f => !f)}>
           {showForm ? 'Annulla' : '+ Nuovo contratto'}
         </button>
       </div>
 
-      {/* Stepper-like eyebrow */}
-      <div style={{ background: '#fff', border: '1px solid #dce5ef', borderRadius: 16, padding: '10px 18px', marginBottom: 20, marginTop: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#1a73e8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Archivio configurazioni</span>
-        <span style={{ color: '#bac8da' }}>·</span>
-        <span style={{ fontSize: 13, color: '#52657d' }}>
-          {archLoading ? 'Caricamento…' : `${archContracts.length} contratt${archContracts.length === 1 ? 'o' : 'i'} configurati`}
-        </span>
+      <div aria-label="Riepilogo archivio" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,180px),1fr))', gap: 12, marginBottom: 28 }}>
+        <div style={{ ...S.card, marginBottom: 0, padding: '18px 20px' }}>
+          <span style={S.muted}>Contratti configurati</span>
+          <strong style={{ display: 'block', fontSize: 30, letterSpacing: '-1px', color: '#174ea6' }}>{archLoading ? '…' : archContracts.length}</strong>
+        </div>
+        <div style={{ ...S.card, marginBottom: 0, padding: '18px 20px' }}>
+          <span style={S.muted}>Lotti attivi</span>
+          <strong style={{ display: 'block', fontSize: 30, letterSpacing: '-1px' }}>{archLoading ? '…' : archContracts.reduce((total, c) => total + (c.lots || []).filter(l => !l.deleted && l.active !== false).length, 0)}</strong>
+        </div>
+        <div style={{ ...S.card, marginBottom: 0, padding: '18px 20px' }}>
+          <span style={S.muted}>Lotti disattivati</span>
+          <strong style={{ display: 'block', fontSize: 30, letterSpacing: '-1px', color: '#52657d' }}>{archLoading ? '…' : archContracts.reduce((total, c) => total + (c.lots || []).filter(l => !l.deleted && l.active === false).length, 0)}</strong>
+        </div>
       </div>
 
       {/* Messaggio */}
       {archMsg.text && (
-        <div style={archMsg.type === 'ok' ? S.msgOk : S.msgErr}>{archMsg.text}</div>
+        <div role={archMsg.type === 'ok' ? 'status' : 'alert'} style={archMsg.type === 'ok' ? S.msgOk : S.msgErr}>{archMsg.text}</div>
       )}
 
       {/* ── Form nuovo contratto ── */}
       {showForm && (
         <div style={{ ...S.card, borderTop: '3px solid #1a73e8' }}>
-          <form onSubmit={handleImport}>
+          <form aria-busy={ncSaving} onSubmit={handleImport}>
             <div style={S.sectionHead}>
               <div>
                 <p style={S.eyebrow}>Nuova configurazione</p>
@@ -798,7 +806,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
               <strong>File economico:</strong> usa un Excel contenente il listino TOW. Il catalogo PDF deve avere ID, ambito, nome componente, complessità e prezzi.
             </div>
             <div style={S.panelActions}>
-              <button type="submit" style={S.btnPrimary} disabled={ncSaving || !ncName.trim()}>
+              <button type="submit" style={{ ...S.btnPrimary, ...((ncSaving || !ncName.trim()) ? S.btnDisabled : {}) }} disabled={ncSaving || !ncName.trim()}>
                 {ncSaving ? 'Elaborazione documenti…' : 'Importa e salva contratto'}
               </button>
             </div>
@@ -808,9 +816,9 @@ export default function ContractArchivePage({ ambienti = [] }) {
 
       {/* ── Lista contratti ── */}
       {archLoading && archContracts.length === 0
-        ? <p style={{ color: '#52657d', padding: '20px 0' }}>Caricamento contratti...</p>
+        ? <div role="status" style={{ ...S.card, textAlign: 'center', padding: 40 }}><strong>Caricamento dell’archivio…</strong><p style={S.muted}>Recupero dei contratti e dei lotti configurati.</p></div>
         : archContracts.length === 0
-          ? <p style={{ color: '#52657d' }}>Nessun contratto nell'archivio.</p>
+          ? <div style={{ ...S.card, textAlign: 'center', padding: 40, borderStyle: 'dashed' }}><h3 style={S.h2}>L’archivio è vuoto</h3><p style={S.muted}>Usa «Nuovo contratto» per aggiungere i dati, i lotti e i documenti economici.</p></div>
           : (
             <div style={S.contractList}>
               {archContracts.map(c => {
@@ -822,8 +830,9 @@ export default function ContractArchivePage({ ambienti = [] }) {
                     {/* Intestazione */}
                     <div>
                       <p style={S.eyebrow}>{c.builtin ? 'Configurazione iniziale' : 'Configurazione locale'}</p>
-                      <h2 style={{ ...S.h2, marginTop: 4, fontSize: 16 }}>{c.name || c.contractId}</h2>
-                      <p style={{ ...S.muted, fontSize: 12 }}>{c.rulesFile || 'Capitolato non indicato'}</p>
+                      <h2 style={{ ...S.h2, marginTop: 6, fontSize: 21, lineHeight: 1.3, letterSpacing: '-0.3px' }}>{c.name || c.contractId}</h2>
+                      <p style={{ ...S.muted, fontSize: 12 }}>Capitolato · {c.rulesFile || 'Non indicato'}</p>
+                      <p style={{ ...S.muted, marginTop: 10 }}>{visible.length} lotti · {active.length} attivi</p>
                     </div>
 
                     {/* Lotti */}
@@ -857,7 +866,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                             return [k, summaryRow?.[1] || '', euro.format(l.towPrices[k]), summaryRow?.[3] || ''];
                                           }),
                                         })}
-                                        style={{ fontSize: 11, color: '#166534', background: '#dcfce7', padding: '2px 9px', borderRadius: 5, border: '1px solid #bbf7d0', cursor: 'pointer', fontWeight: 700 }}>
+                                        style={{ minHeight: 36, fontSize: 12, color: '#166534', background: '#e8f6ef', padding: '6px 10px', borderRadius: 5, border: '1px solid #bbf7d0', cursor: 'pointer', fontWeight: 700 }}>
                                         {towKeys.length} prezzi TOW
                                       </button>
                                     );
@@ -872,7 +881,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                           towImpact: l.towImpact || {},
                                           data: lotSum.tow,
                                         })}
-                                        style={{ fontSize: 11, color: '#1e40af', background: '#dbeafe', padding: '2px 9px', borderRadius: 5, border: '1px solid #bfdbfe', cursor: 'pointer', fontWeight: 700 }}>
+                                        style={{ minHeight: 36, fontSize: 12, color: '#1e40af', background: '#eaf2ff', padding: '6px 10px', borderRadius: 5, border: '1px solid #bfdbfe', cursor: 'pointer', fontWeight: 700 }}>
                                         Quadro TOW
                                       </button>
                                     );
@@ -891,7 +900,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                     return (
                                       <button
                                         onClick={() => setModal({ type: 'catalog', title: `Lotto ${l.lotId} – ${l.name || ''} – Catalogo`, data: cat })}
-                                        style={{ fontSize: 11, color: '#166534', background: '#dcfce7', padding: '2px 9px', borderRadius: 5, border: '1px solid #bbf7d0', cursor: 'pointer', fontWeight: 700 }}>
+                                        style={{ minHeight: 36, fontSize: 12, color: '#166534', background: '#e8f6ef', padding: '6px 10px', borderRadius: 5, border: '1px solid #bbf7d0', cursor: 'pointer', fontWeight: 700 }}>
                                         {cat.length} voci catalogo
                                       </button>
                                     );
@@ -911,7 +920,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                 })()}
                               </div>
                             </div>
-                            <span style={{ ...S.lotStatus, color: isActive ? '#166534' : '#52657d' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingTop: 12, borderTop: '1px solid #e1e9f3' }}>
+                            <span style={{ ...S.lotStatus, marginRight: 'auto', color: isActive ? '#166534' : '#52657d', background: isActive ? '#e8f6ef' : '#edf0f4' }}>
                               {isActive ? 'Attivo' : 'Disattivato'}
                             </span>
                             <button
@@ -925,6 +935,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                               onClick={() => handleDeleteLot(c.contractId, l.lotId)}>
                               Elimina
                             </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -935,7 +946,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                       const key = c.contractId + '|' + l.lotId;
                       const up = lotUpload[key] || {};
                       return (
-                        <details key={'up-' + l.lotId} style={{ borderTop: '1px solid #eef2f5', paddingTop: 6 }}>
+                        <details key={'up-' + l.lotId} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', background: '#fbfcfe', minWidth: 0 }}>
                           <summary style={{ fontSize: 12, color: '#29415e', cursor: 'pointer', fontWeight: 700, userSelect: 'none', padding: '4px 2px' }}>
                             ↻ Aggiorna file Lotto {l.lotId} — {l.name}
                           </summary>
@@ -996,7 +1007,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
 
                     {/* Pannello associazione Codice MEV */}
                     {isExpanded && (
-                      <div style={{ borderTop: '1px solid #dce5ef', paddingTop: 14, display: 'grid', gap: 10 }}>
+                      <div style={{ border: '1px solid #cbdcf3', background: '#f5f9ff', borderRadius: 14, padding: 16, display: 'grid', gap: 16, minWidth: 0 }}>
                         <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: '#29415e' }}>
                           Associa Codice Contratto MEV per Lotto
                         </p>
@@ -1013,7 +1024,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                   setLotEnvSel(p => ({ ...p, [key]: e.target.value }));
                                   setLotCodes(p => ({ ...p, [key]: env ? env.codiceContratto : '' }));
                                 }}
-                                style={{ padding: '8px 10px', border: '1px solid #bac8da', borderRadius: 8, fontSize: 12, maxWidth: 240, fontFamily: 'inherit', minHeight: 38 }}>
+                                style={{ padding: '8px 10px', border: '1px solid #bac8da', borderRadius: 8, fontSize: 12, width: '100%', maxWidth: 240, minWidth: 0, boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 38 }}>
                                 <option value="">-- scegli contratto MEV --</option>
                                 {ambienti.map(a => (
                                   <option key={a.id} value={a.id}>{a.codiceContratto} — {a.descrizione}</option>
@@ -1023,7 +1034,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                 value={lotCodes[key] || ''}
                                 onChange={e => setLotCodes(p => ({ ...p, [key]: e.target.value }))}
                                 placeholder="Codice contratto"
-                                style={{ padding: '8px 10px', border: '1px solid #bac8da', borderRadius: 8, fontSize: 12, width: 160, fontFamily: 'inherit', minHeight: 38 }} />
+                                style={{ padding: '8px 10px', border: '1px solid #bac8da', borderRadius: 8, fontSize: 12, width: 160, maxWidth: '100%', boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 38 }} />
                               <button
                                 style={{ ...S.btnPrimary, ...S.btnCompact, opacity: savingLot[key] ? 0.7 : 1 }}
                                 disabled={!!savingLot[key]}
