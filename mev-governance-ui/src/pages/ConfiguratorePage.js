@@ -41,7 +41,7 @@ import {
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
-function ConfiguratorePage({ onUnauthorized }) {
+function ConfiguratorePage({ onUnauthorized, ambienteId }) {
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
   const [lot, setLot] = useState("1");
@@ -117,13 +117,11 @@ function ConfiguratorePage({ onUnauthorized }) {
     setLoading(true);
     Promise.all([
       getConfiguratoreContracts(),
-      getConfiguratoreRecords({ entity_type: "initiative_evaluation" }),
       getTowImpatto().catch(() => null),
     ])
-      .then(([c, r, imp]) => {
+      .then(([c, imp]) => {
         if (!alive) return;
         setContracts(c);
-        setArchiveRecords(r.records || []);
         if (imp && typeof imp === "object") setTowImpattoDb(imp);
       })
       .catch((err) => {
@@ -694,10 +692,10 @@ function ConfiguratorePage({ onUnauthorized }) {
 
   // ── Archivio ──
   const loadArchive = useCallback(() => {
-    getConfiguratoreRecords({ entity_type: "initiative_evaluation" })
+    getConfiguratoreRecords({ entity_type: "initiative_evaluation", contract_id: selectedContractId })
       .then((d) => setArchiveRecords(d.records || []))
       .catch((e) => { console.warn("loadArchive failed:", e); });
-  }, []);
+  }, [selectedContractId]);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
 

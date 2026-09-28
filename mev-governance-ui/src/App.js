@@ -451,7 +451,7 @@ function App() {
             border: "1px solid rgba(255,255,255,0.35)", borderRadius: "4px",
             padding: "2px 7px", marginLeft: "2px", textTransform: "uppercase",
           }}>
-            DEV_Rel_24
+            DEV_Rel_25
           </span>
 
           {/* Selettore Contratto — sempre visibile accanto al titolo */}
@@ -1037,7 +1037,7 @@ function App() {
         {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
-        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} />}
+        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
       </main>
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}

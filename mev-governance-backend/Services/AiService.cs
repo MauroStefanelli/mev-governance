@@ -43,9 +43,17 @@ public class AiService
         var endpoint = !string.IsNullOrWhiteSpace(userEndpoint) ? userEndpoint : Env("AI_ENDPOINT", "https://api.openai.com/v1/chat/completions");
         var model    = !string.IsNullOrWhiteSpace(userModel)    ? userModel    : Env("AI_MODEL", "gpt-4o");
         var apiKey   = !string.IsNullOrWhiteSpace(userApiKey)   ? userApiKey   : Env("AI_API_KEY", "");
-        var apiStyle = !string.IsNullOrWhiteSpace(userStyle)    ? userStyle    : Env("AI_API_STYLE", "chat");
         var authMode = !string.IsNullOrWhiteSpace(userAuthMode) ? userAuthMode : Env("AI_AUTH_MODE", "bearer");
         var provider = Env("AI_PROVIDER", "openai");
+
+        // Capgemini EU gateway richiede obbligatoriamente lo stile chat_completions
+        // (messages/model), indipendentemente dalla configurazione AI_API_STYLE.
+        bool isCapgemini = endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase);
+        string defaultStyle = isCapgemini ? "chat_completions" : "chat";
+        var apiStyle = !string.IsNullOrWhiteSpace(userStyle) ? userStyle : Env("AI_API_STYLE", defaultStyle);
+        if (isCapgemini && apiStyle != "chat_completions")
+            apiStyle = "chat_completions";
+
         return new AiSettings(endpoint, model, apiKey, apiStyle, authMode, provider);
     }
 
@@ -364,9 +372,11 @@ public class AiService
         string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
         var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
+        // "developer" è supportato solo dai modelli o-series di OpenAI; tutti gli altri (incluso Capgemini) usano "system"
+        var systemRole = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) ? "system" : "developer";
         var messages = new JsonArray
         {
-            new JsonObject { ["role"] = "developer", ["content"] = AnalyzeInstructions },
+            new JsonObject { ["role"] = systemRole, ["content"] = AnalyzeInstructions },
             new JsonObject { ["role"] = "user", ["content"] = "Contesto da valutare:\n" + context.ToString() }
         };
         var payload = BuildPayload(s, s.Endpoint, messages, structured: true);
@@ -395,9 +405,10 @@ public class AiService
         string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
         var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
+        var systemRole = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) ? "system" : "developer";
         var messages = new JsonArray
         {
-            new JsonObject { ["role"] = "developer", ["content"] = DevelopmentInstructions },
+            new JsonObject { ["role"] = systemRole, ["content"] = DevelopmentInstructions },
             new JsonObject { ["role"] = "user", ["content"] = "Piano da analizzare:\n" + context.ToString() }
         };
         var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
