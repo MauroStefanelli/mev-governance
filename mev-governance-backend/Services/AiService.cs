@@ -438,20 +438,25 @@ public class AiService
     // ============================================================
     // POST /api/configuratore/ai/test — verifica connessione
     // ============================================================
-    public async Task<(bool Ok, string Model, string? Error)> TestAsync()
+    public async Task<(bool Ok, string Model, string? Error)> TestAsync(
+        string? userApiKey = null, string? userEndpoint = null,
+        string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
         try
         {
-            var s = Settings();
-            var payload = new JsonObject { ["model"] = s.Model, ["input"] = "Rispondi soltanto con OK.", ["store"] = false };
+            var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
+            JsonObject payload;
             if (s.ApiStyle == "chat_completions")
                 payload = new JsonObject
                 {
                     ["model"] = s.Model,
                     ["messages"] = new JsonArray { new JsonObject { ["role"] = "user", ["content"] = "Rispondi soltanto con OK." } }
                 };
+            else
+                payload = new JsonObject { ["model"] = s.Model, ["input"] = "Rispondi soltanto con OK.", ["store"] = false };
             var response = await PostAsync(s, payload);
-            return (true, response.GetStringProp("model") ?? s.Model, null);
+            var modelUsed = response.GetStringProp("model") ?? s.Model;
+            return (true, modelUsed, null);
         }
         catch (Exception ex)
         {
