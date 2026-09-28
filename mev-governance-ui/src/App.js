@@ -11,7 +11,7 @@ import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
-import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, testAiConnection, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -43,6 +43,8 @@ function App() {
   const [aiKeyMsg, setAiKeyMsg]     = useState("");
   const [aiTestResult, setAiTestResult] = useState(null); // null | {ok, model, message}
   const [aiTestBusy, setAiTestBusy] = useState(false);
+  const [aiModelList, setAiModelList] = useState(null); // null | string[] | {error}
+  const [aiModelsBusy, setAiModelsBusy] = useState(false);
   // Campi configurazione AI estesa
   const [aiEndpoint, setAiEndpoint] = useState("");
   const [aiModel,    setAiModel]    = useState("");
@@ -453,7 +455,7 @@ function App() {
             border: "1px solid rgba(255,255,255,0.35)", borderRadius: "4px",
             padding: "2px 7px", marginLeft: "2px", textTransform: "uppercase",
           }}>
-            DEV_Rel_30
+            DEV_Rel_31
           </span>
 
           {/* Selettore Contratto — sempre visibile accanto al titolo */}
@@ -884,7 +886,7 @@ function App() {
             {/* Tab selector */}
             <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#eef2f5", borderRadius: 8, padding: 4 }}>
               {[["password", "Cambia password"], ["aikey", "API Key AI"]].map(([tab, label]) => (
-                <button key={tab} onClick={() => { setPwdModalTab(tab); setPwdError(""); setAiKeyMsg(""); setAiTestResult(null); }}
+                <button key={tab} onClick={() => { setPwdModalTab(tab); setPwdError(""); setAiKeyMsg(""); setAiTestResult(null); setAiModelList(null); }}
                   style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13,
                     background: pwdModalTab === tab ? "#102a47" : "transparent",
                     color: pwdModalTab === tab ? "#fff" : "#667482" }}>
@@ -957,8 +959,12 @@ function App() {
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 12, color: "#555", fontWeight: 600, display: "block", marginBottom: 4 }}>Modello</label>
                   <input type="text" value={aiModel} onChange={e => { setAiModel(e.target.value); setAiTestResult(null); }}
-                    placeholder="es. gpt-4o, gpt-4.1"
+                    placeholder="es. gpt-4o"
                     style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>
+                    Capgemini EU tipici: <code>gpt-4o</code> · <code>gpt-4o-mini</code> · <code>gpt-4-turbo</code><br/>
+                    <strong>Nota:</strong> usa solo il nome del modello (es. <code>gpt-4o</code>), non il prefisso del profilo API.
+                  </div>
                 </div>
 
                 {/* Stile + Auth */}
@@ -1006,11 +1012,49 @@ function App() {
                   </div>
                 )}
 
+                {/* Lista modelli disponibili */}
+                {aiModelList && (
+                  <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 6, fontSize: 12, lineHeight: 1.6, background: "#f8faff", border: "1px solid #bfdbfe", color: "#1e3a5f" }}>
+                    {aiModelList.error
+                      ? <span style={{ color: "#c5221f" }}>✗ {aiModelList.error}</span>
+                      : aiModelList.length === 0
+                        ? <span style={{ color: "#888" }}>Nessun modello trovato (il gateway potrebbe non supportare /models).</span>
+                        : <>
+                            <strong>Modelli disponibili ({aiModelList.length}):</strong>
+                            <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                              {aiModelList.map(m => (
+                                <span key={m} onClick={() => { setAiModel(m); setAiModelList(null); setAiTestResult(null); }}
+                                  style={{ padding: "2px 8px", borderRadius: 4, background: "#dbeafe", color: "#1d4ed8", cursor: "pointer", fontFamily: "monospace", fontSize: 11, border: "1px solid #bfdbfe" }}
+                                  title="Clicca per selezionare">
+                                  {m}
+                                </span>
+                              ))}
+                            </div>
+                            <div style={{ marginTop: 6, color: "#555", fontSize: 11 }}>Clicca un modello per selezionarlo.</div>
+                          </>
+                    }
+                  </div>
+                )}
+
                 {aiKeyMsg && (
                   <div style={{ fontSize: 12, color: aiKeyMsg.startsWith("Errore") ? "#ea4335" : "#006b57", marginBottom: 12, fontWeight: 600 }}>{aiKeyMsg}</div>
                 )}
 
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  {/* Elenca modelli */}
+                  <button disabled={aiModelsBusy} onClick={async () => {
+                    setAiModelsBusy(true); setAiModelList(null); setAiTestResult(null); setAiKeyMsg("");
+                    try {
+                      const res = await listAiModels();
+                      if (!res.ok) setAiModelList({ error: res.message || `HTTP ${res.status}` });
+                      else setAiModelList(res.models || []);
+                    } catch (e) {
+                      setAiModelList({ error: e.message || String(e) });
+                    } finally { setAiModelsBusy(false); }
+                  }} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #c7d7f5", background: "#f0f4ff", color: "#3b4fa8", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: aiModelsBusy ? 0.7 : 1 }}>
+                    {aiModelsBusy ? "Caricamento…" : "Elenca modelli"}
+                  </button>
+
                   {/* Testa connessione */}
                   <button disabled={aiTestBusy} onClick={async () => {
                     setAiTestBusy(true); setAiTestResult(null); setAiKeyMsg("");
