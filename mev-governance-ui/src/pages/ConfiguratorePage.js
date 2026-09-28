@@ -106,6 +106,20 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
   useEffect(() => { ensurePdfLoader().catch(() => {}); }, []);
 
+  // Sincronizza il lotto interno con l'ambiente attivo.
+  // Il contratto builtin ha lotto "1" (Postali) e lotto "2" (TOW).
+  // Gli ambienti con codiceContratto valorizzato appartengono al lotto TOW ("2").
+  useEffect(() => {
+    if (codiceContratto) {
+      // Se il contratto builtin ha un lotto con questo codiceContratto, usa quello
+      const match = builtinContract.lots.find(l => l.codiceContratto === codiceContratto);
+      if (match) { setLot(match.lotId); return; }
+      // Fallback: codiceContratto valorizzato → lotto 2 (TOW)
+      setLot("2");
+    }
+    // Se codiceContratto è vuoto non cambiamo il lotto (resta quello precedente o "1")
+  }, [codiceContratto]); // eslint-disable-line
+
   useEffect(() => {
     const current = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
     setApplications(current);
@@ -209,26 +223,8 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [codiceContratto, ambienteId, selectedContractId]);
 
 
-  // Pre-popola towPercentages quando l'utente sceglie una fonte dal select (towImpattoSrc)
-  // Scrive sempre i valori dalla fonte scelta, sovrascrivendo quelli esistenti.
-  const prevTowImpattoSrcRef = useRef("");
-  useEffect(() => {
-    if (!towImpattoSrc) return;
-    if (towImpattoSrc === prevTowImpattoSrcRef.current) return; // stesso valore, non riscatta
-    prevTowImpattoSrcRef.current = towImpattoSrc;
-    const imp = towImpattoDb[towImpattoSrc] || {};
-    setTowPercentages(prev => ({
-      ...prev,
-      [selectedContractId]: {
-        ...(prev?.[selectedContractId] || {}),
-        [lot]: {
-          1: Number(imp[`TOW0${lot}.1`]) || 0,
-          3: Number(imp[`TOW0${lot}.3`]) || 0,
-          4: Number(imp[`TOW0${lot}.4`]) || 0,
-        },
-      },
-    }));
-  }, [towImpattoSrc, towImpattoDb, selectedContractId, lot]); // eslint-disable-line
+  // Pre-popola towPercentages quando l'utente sceglie una fonte dal select (towImpattoSrc).
+  // Gestito direttamente nell'onChange del select — nessun useEffect per evitare race condition.
 
   // ── Persist contratti ──
   const persistContract = async (contract) => {
@@ -1747,9 +1743,23 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                    <select
                      value={towImpattoSrc}
                      onChange={e => {
-                       // Resetta il ref così il useEffect rileva il cambio anche se si ri-seleziona lo stesso valore
-                       prevTowImpattoSrcRef.current = "";
-                       setTowImpattoSrc(e.target.value);
+                       const src = e.target.value;
+                       setTowImpattoSrc(src);
+                       if (!src) return;
+                       const imp = towImpattoDb[src] || {};
+                       const currentLot = lot;
+                       const currentContract = selectedContractId;
+                       const v1 = Number(imp[`TOW0${currentLot}.1`]) || 0;
+                       const v3 = Number(imp[`TOW0${currentLot}.3`]) || 0;
+                       const v4 = Number(imp[`TOW0${currentLot}.4`]) || 0;
+                       console.log(`[TOW] src=${src} lot=${currentLot} contract=${currentContract}`, {v1,v3,v4}, 'imp keys:', Object.keys(imp));
+                       setTowPercentages(prev => ({
+                         ...prev,
+                         [currentContract]: {
+                           ...(prev?.[currentContract] || {}),
+                           [currentLot]: { 1: v1, 3: v3, 4: v4 },
+                         },
+                       }));
                      }}
                     style={{ border: "1px solid #bdc9d4", borderRadius: 5, padding: "3px 8px", fontSize: 12, background: "#fff" }}>
                     <option value="">— nessuno —</option>
@@ -1757,8 +1767,12 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                   </select>
                 </label>
               )}
-            </div>
-            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
+             </div>
+             {/* DEBUG TEMPORANEO — rimuovere dopo verifica */}
+             <div style={{ fontSize: 10, color: "#888", marginBottom: 6, fontFamily: "monospace" }}>
+               lot={lot} · contract={selectedContractId} · pct={JSON.stringify(towPercentages?.[selectedContractId]?.[lot])}
+             </div>
+             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
               {["1", "3", "4"].map((n) => {
                 const k = `TOW0${lot}.${n}`;
                 const amount = calculation.autoTow[k] || 0;
