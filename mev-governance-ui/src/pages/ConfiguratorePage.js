@@ -209,38 +209,26 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [codiceContratto, ambienteId, selectedContractId]);
 
 
-  // Pre-popola towPercentages dal towImpattoDb (Gestione Contratto Monitoraggio) o dal towImpact del lotto.
-  // Usa towImpattoSrc (scelto dall'utente) o codiceContratto del lotto come chiave nel towImpattoDb.
-  // Non sovrascrive se l'utente ha già modificato manualmente (solo al cambio di activeLot).
+  // Pre-popola towPercentages quando l'utente sceglie una fonte dal select (towImpattoSrc)
+  // Scrive sempre i valori dalla fonte scelta, sovrascrivendo quelli esistenti.
+  const prevTowImpattoSrcRef = useRef("");
   useEffect(() => {
-    const codice = towImpattoSrc || activeLot?.codiceContratto || "";
-    const fromDb  = codice && towImpattoDb[codice] ? towImpattoDb[codice] : null;
-    const fromLot = activeLot?.towImpact && Object.keys(activeLot.towImpact).length > 0 ? activeLot.towImpact : null;
-    const imp = fromDb || fromLot;
-    if (!imp) return;
-
-    setTowPercentages(prev => {
-      const existing = prev?.[selectedContractId]?.[lot] || {};
-      const hasUserValues = Object.values(existing).some(v => Number(v) > 0);
-      if (hasUserValues) return prev;
-
-      const get = (key) => {
-        if (fromDb) {
-          const fullKey = `TOW0${lot}.${key}`;
-          return Number(fromDb[fullKey]) || 0;
-        }
-        return Number(imp[key]) || 0;
-      };
-
-      return {
-        ...prev,
-        [selectedContractId]: {
-          ...(prev?.[selectedContractId] || {}),
-          [lot]: { 1: get("1"), 3: get("3"), 4: get("4") },
+    if (!towImpattoSrc) return;
+    if (towImpattoSrc === prevTowImpattoSrcRef.current) return; // stesso valore, non riscatta
+    prevTowImpattoSrcRef.current = towImpattoSrc;
+    const imp = towImpattoDb[towImpattoSrc] || {};
+    setTowPercentages(prev => ({
+      ...prev,
+      [selectedContractId]: {
+        ...(prev?.[selectedContractId] || {}),
+        [lot]: {
+          1: Number(imp[`TOW0${lot}.1`]) || 0,
+          3: Number(imp[`TOW0${lot}.3`]) || 0,
+          4: Number(imp[`TOW0${lot}.4`]) || 0,
         },
-      };
-    });
-  }, [activeLot, towImpattoDb, towImpattoSrc, selectedContractId, lot]); // eslint-disable-line
+      },
+    }));
+  }, [towImpattoSrc, towImpattoDb, selectedContractId, lot]); // eslint-disable-line
 
   // ── Persist contratti ──
   const persistContract = async (contract) => {
@@ -1756,25 +1744,13 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               {Object.keys(towImpattoDb).length > 0 && (
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
                   % da contratto:
-                  <select
-                    value={towImpattoSrc}
-                    onChange={e => {
-                      const src = e.target.value;
-                      setTowImpattoSrc(src);
-                      if (!src) return;
-                      const imp = towImpattoDb[src] || {};
-                      setTowPercentages(prev => ({
-                        ...prev,
-                        [selectedContractId]: {
-                          ...(prev?.[selectedContractId] || {}),
-                          [lot]: {
-                            1: Number(imp[`TOW0${lot}.1`]) || 0,
-                            3: Number(imp[`TOW0${lot}.3`]) || 0,
-                            4: Number(imp[`TOW0${lot}.4`]) || 0,
-                          },
-                        },
-                      }));
-                    }}
+                   <select
+                     value={towImpattoSrc}
+                     onChange={e => {
+                       // Resetta il ref così il useEffect rileva il cambio anche se si ri-seleziona lo stesso valore
+                       prevTowImpattoSrcRef.current = "";
+                       setTowImpattoSrc(e.target.value);
+                     }}
                     style={{ border: "1px solid #bdc9d4", borderRadius: 5, padding: "3px 8px", fontSize: 12, background: "#fff" }}>
                     <option value="">— nessuno —</option>
                     {Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)}
