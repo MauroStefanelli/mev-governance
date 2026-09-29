@@ -42,6 +42,7 @@ function App() {
   const [pwdSaving, setPwdSaving]   = useState(false);
   const [aiKeyVal, setAiKeyVal]     = useState("");
   const [aiKeyHas, setAiKeyHas]     = useState(false);
+  const [aiKeyEnabled, setAiKeyEnabled] = useState(false);
   const [aiKeyMsg, setAiKeyMsg]     = useState("");
   const [aiTestResult, setAiTestResult] = useState(null); // null | {ok, model, message}
   const [aiTestBusy, setAiTestBusy] = useState(false);
@@ -475,6 +476,7 @@ function App() {
             setAiKeyVal(""); setAiKeyMsg("");
             getMyProfile().then(p => {
               setAiKeyHas(!!p?.hasAiKey);
+              setAiKeyEnabled(!!p?.aiKeyEnabled);
               setAiEndpoint(p?.aiEndpoint || "");
               setAiModel(p?.aiModel || "");
               setAiStyle(p?.aiStyle || "chat");
@@ -556,6 +558,7 @@ function App() {
                 try {
                   const p = await getMyProfile();
                   setAiKeyHas(!!p?.hasAiKey);
+                  setAiKeyEnabled(!!p?.aiKeyEnabled);
                   setAiEndpoint(p?.aiEndpoint || "");
                   setAiModel(p?.aiModel || "");
                   setAiStyle(p?.aiStyle || "chat");
@@ -589,7 +592,7 @@ function App() {
             </div>
             {/* Tab selector */}
             <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "#eef2f5", borderRadius: 8, padding: 4 }}>
-              {[["password", "Cambia password"], ["aikey", "API Key AI"]].map(([tab, label]) => (
+              {[["password", "Cambia password"], ...(aiKeyEnabled ? [["aikey", "API Key AI"]] : [])].map(([tab, label]) => (
                 <button key={tab} onClick={() => { setPwdModalTab(tab); setPwdError(""); setAiKeyMsg(""); setAiTestResult(null); setAiModelList(null); }}
                   style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13,
                     background: pwdModalTab === tab ? "#102a47" : "transparent",

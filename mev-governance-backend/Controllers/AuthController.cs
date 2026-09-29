@@ -286,7 +286,9 @@ public class AuthController : ControllerBase
             u.SendEmail,
             u.LastLogin,
             u.LastLogout,
-            theme = themes.TryGetValue(u.Id, out var t) ? t : "light"
+            theme = themes.TryGetValue(u.Id, out var t) ? t : "light",
+            u.AiKeyEnabled,
+            hasAiKey = !string.IsNullOrEmpty(u.AiApiKey)
         }).ToList();
 
         return Ok(result);
@@ -505,6 +507,20 @@ public class AuthController : ControllerBase
         return Ok(new { Id = id, Theme = newTheme });
     }
 
+    // PUT /api/auth/users/{id}/toggleaikey — abilita/disabilita accesso API key (Admin+SuperAdmin)
+    [HttpPut("users/{id}/toggleaikey")]
+    [Authorize]
+    public IActionResult ToggleAiKey(int id)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        user.AiKeyEnabled = !user.AiKeyEnabled;
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.AiKeyEnabled });
+    }
+
     // ============================================================
     // PUT /api/auth/me/password — cambio password self-service
     // ============================================================
@@ -622,11 +638,12 @@ public class AuthController : ControllerBase
 
          return Ok(new {
              user.Id, user.Username, user.FullName, user.Email, user.Role,
-             hasAiKey  = !string.IsNullOrEmpty(user.AiApiKey),
-             aiEndpoint = user.AiEndpoint,
-             aiModel    = user.AiModel,
-             aiStyle    = user.AiStyle,
-             aiAuthMode = user.AiAuthMode,
+             hasAiKey      = !string.IsNullOrEmpty(user.AiApiKey),
+             aiKeyEnabled  = user.AiKeyEnabled,
+             aiEndpoint    = user.AiEndpoint,
+             aiModel       = user.AiModel,
+             aiStyle       = user.AiStyle,
+             aiAuthMode    = user.AiAuthMode,
              theme
          });
      }

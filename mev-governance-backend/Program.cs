@@ -466,6 +466,16 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PRE-PATCH] Colonna Theme verificata.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Theme ERROR] {ex.Message}"); }
+
+        // Blocco separato: colonna AiKeyEnabled
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiKeyEnabled"" BOOLEAN NOT NULL DEFAULT false;");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] Colonna AiKeyEnabled verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AiKeyEnabled ERROR] {ex.Message}"); }
     }
 
     try

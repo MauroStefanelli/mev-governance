@@ -4,7 +4,8 @@ import {
   getUsers, 
   createUser, 
   toggleUser, 
-  toggleEmailUser, 
+  toggleEmailUser,
+  toggleAiKey,
   resetPassword, 
   deleteUser, 
   getUserAccessLog,
@@ -171,6 +172,7 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
   const [editModal, setEditModal] = useState(null); // { id, username, fullName, email }
   const [editSaving, setEditSaving] = useState(false);
   const [savingTheme, setSavingTheme] = useState({}); // { [userId]: true/false }
+  const [savingAiKey, setSavingAiKey] = useState({}); // { [userId]: true/false }
 
   const formatDateTime = (iso) => {
 
@@ -332,6 +334,20 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
       setError(err.message || "Errore aggiornamento tema");
     } finally {
       setSavingTheme(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleToggleAiKey = async (id) => {
+    setSavingAiKey(prev => ({ ...prev, [id]: true }));
+    setError("");
+    try {
+      const result = await toggleAiKey(id);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, aiKeyEnabled: result.aiKeyEnabled } : u));
+      notify(`API Key ${result.aiKeyEnabled ? "abilitata" : "disabilitata"}`);
+    } catch (err) {
+      setError(err.message || "Errore toggle API Key");
+    } finally {
+      setSavingAiKey(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -593,6 +609,21 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
                       Permessi
                     </button>
                   )}
+                  <button
+                    disabled={!!savingAiKey[u.id]}
+                    onClick={() => handleToggleAiKey(u.id)}
+                    style={{
+                      ...actionStyle,
+                      background: u.aiKeyEnabled ? "#f0fdf4" : "#fafafa",
+                      color:      u.aiKeyEnabled ? "#15803d" : "#64748b",
+                      borderColor: u.aiKeyEnabled ? "#86efac" : "#cbd5e1",
+                      opacity: savingAiKey[u.id] ? 0.6 : 1,
+                      fontWeight: 600,
+                    }}
+                    title={u.aiKeyEnabled ? "API Key abilitata — clicca per disabilitare" : "API Key disabilitata — clicca per abilitare"}
+                  >
+                    API Key: {u.aiKeyEnabled ? "Sì" : "No"}
+                  </button>
                   <button
                     onClick={() => setEditModal({ id: u.id, username: u.username, fullName: u.fullName || "", email: u.email || "" })}
                     style={{ ...actionStyle, background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}
