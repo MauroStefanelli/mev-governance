@@ -1,5 +1,36 @@
 import React, { useState } from "react";
 
+// Nomi femminili italiani comuni per determinare il genere dal nome
+const NOMI_FEMMINILI = new Set([
+  "alba","alessandra","alessia","alice","alicia","alina","allegra","amanda","ambra","amelia",
+  "angela","angelica","anna","annalisa","antonella","asia","aurora","azzurra",
+  "barbara","beatrice","benedetta","bianca","brenda",
+  "camilla","carla","carlotta","carmen","carolina","cecilia","chiara","cinzia","claudia","costanza","cristina",
+  "daniela","debora","deborah","diana","diletta","dina","dolores","domitilla",
+  "elena","eleonora","elisa","elisabetta","elsa","emanuela","emma","erica","erika",
+  "federica","fiamma","fiammetta","filomena","flavia","flora","floriana","francesca",
+  "gabriella","gemma","giada","gina","giorgia","giovanna","giuditta","giulia","giuliana","giuseppina","gloria","grazia","graziella",
+  "ida","ilaria","ines","irene","irma","isabella",
+  "jessica","jolanda",
+  "katia","katiuscia",
+  "laura","lea","letizia","lidia","liliana","lisa","luca","lucia","luisa","luna",
+  "mara","margherita","maria","marianna","marina","marta","martina","matilde","melissa","michela","milena","mirella","monica",
+  "nadia","natalia","nicoletta","nina","noemi","nora",
+  "olimpia","oriana",
+  "paola","patrizia","perla","pina",
+  "rachele","raffaella","ramona","rebecca","renata","rita","roberta","rosa","rosanna","rosaria","rossana","rossella",
+  "sabrina","samantha","sara","serena","silvia","simona","sofia","sonia","stefania","stella","susanna",
+  "tania","tatiana","teresa","tiziana",
+  "valentina","valeria","vanessa","veronica","virginia","vittoria",
+  "ylenia","yvonne",
+  "zaira","zoe",
+]);
+
+const getGreeting = (fullName, username) => {
+  const firstName = (fullName?.split(" ")[0] || username || "").toLowerCase().trim();
+  return NOMI_FEMMINILI.has(firstName) ? "Benvenuta" : "Benvenuto";
+};
+
 // ── Definizione pagine con icone SVG dedicate ─────────────────────────────────
 const PAGE_DEFS = [
   {
@@ -309,25 +340,25 @@ export default function HomePage({
         </header>
 
         {/* ── Hero welcome ── */}
-        <div style={{ marginBottom: "clamp(28px,4vw,48px)" }}>
-          <div style={{ fontSize: "clamp(28px,4vw,42px)", fontWeight: 800, letterSpacing: "-1px", lineHeight: 1.15, color: "#f8fafc" }}>
-            Benvenuto, {fullName?.split(" ")[0] || username}
+        <div style={{ marginBottom: "clamp(28px,4vw,48px)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ fontSize: "clamp(26px,3.5vw,38px)", fontWeight: 800, letterSpacing: "-1px", lineHeight: 1.15, color: "#f8fafc" }}>
+            {getGreeting(fullName, username)}, {fullName?.split(" ")[0] || username}
           </div>
-          <p style={{ margin: "10px 0 0", color: "rgba(148,163,184,0.85)", fontSize: "clamp(14px,1.5vw,16px)", maxWidth: 560 }}>
-            Seleziona una sezione per iniziare. Hai accesso a {visibleCards.length} {visibleCards.length === 1 ? "area" : "aree"} della piattaforma.
-          </p>
           {lastAlign && (
-            <p style={{ margin: "8px 0 0", color: "rgba(100,116,139,0.8)", fontSize: 12 }}>
-              Ultimo aggiornamento dati: {new Date(lastAlign).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-            </p>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <span style={{ fontSize: 12, color: "rgba(148,163,184,0.7)", fontWeight: 500 }}>Ultimo aggiornamento dati</span>
+              <div style={{ fontSize: 13, color: "rgba(203,213,225,0.9)", fontWeight: 600, marginTop: 2 }}>
+                {new Date(lastAlign).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
           )}
         </div>
 
         {/* ── Griglia card ── */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))",
-          gap: "clamp(12px,2vw,20px)",
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
+          gap: "clamp(10px,1.5vw,16px)",
         }}>
           {visibleCards.map(card => {
             const isHovered = hover === card.id;
@@ -341,8 +372,8 @@ export default function HomePage({
                   position: "relative", overflow: "hidden",
                   display: "flex", flexDirection: "column", alignItems: "flex-start",
                   gap: 0, textAlign: "left",
-                  padding: "clamp(20px,2.5vw,28px)",
-                  borderRadius: 18,
+                  padding: "clamp(14px,2vw,20px)",
+                  borderRadius: 16,
                   border: `1px solid ${isHovered ? card.accent + "55" : "rgba(255,255,255,0.08)"}`,
                   background: isHovered
                     ? `linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)`
@@ -352,15 +383,15 @@ export default function HomePage({
                   fontFamily: "inherit",
                   color: "#e2e8f0",
                   boxShadow: isHovered
-                    ? `0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px ${card.accent}33, inset 0 1px 0 rgba(255,255,255,0.08)`
-                    : "0 2px 12px rgba(0,0,0,0.2)",
+                    ? `0 6px 24px rgba(0,0,0,0.3), 0 0 0 1px ${card.accent}33, inset 0 1px 0 rgba(255,255,255,0.08)`
+                    : "0 2px 8px rgba(0,0,0,0.2)",
                   transform: isHovered ? "translateY(-3px)" : "translateY(0)",
                   transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
                 }}
               >
                 {/* Glow decorativo in alto a destra */}
                 <div aria-hidden="true" style={{
-                  position: "absolute", top: -30, right: -30, width: 100, height: 100,
+                  position: "absolute", top: -24, right: -24, width: 80, height: 80,
                   borderRadius: "50%",
                   background: `radial-gradient(circle, ${card.accent}18 0%, transparent 70%)`,
                   transition: "opacity 0.2s",
@@ -370,7 +401,7 @@ export default function HomePage({
                 {/* Linea accento in cima */}
                 <div style={{
                   position: "absolute", top: 0, left: 0, right: 0, height: 2,
-                  borderRadius: "18px 18px 0 0",
+                  borderRadius: "16px 16px 0 0",
                   background: `linear-gradient(90deg, ${card.accent}, ${card.accentDark})`,
                   opacity: isHovered ? 1 : 0.4,
                   transition: "opacity 0.2s",
@@ -379,34 +410,34 @@ export default function HomePage({
                 {/* Icona */}
                 <div style={{
                   display: "grid", placeItems: "center",
-                  width: 56, height: 56, borderRadius: 14,
+                  width: 44, height: 44, borderRadius: 12,
                   background: `linear-gradient(135deg, ${card.accent}28, ${card.accentDark}18)`,
                   border: `1px solid ${card.accent}33`,
                   color: card.accent,
-                  marginBottom: 16,
+                  marginBottom: 12,
                   flexShrink: 0,
                   transition: "transform 0.2s",
                   transform: isHovered ? "scale(1.08)" : "scale(1)",
                 }}>
-                  {card.icon}
+                  {React.cloneElement(card.icon, { width: 22, height: 22 })}
                 </div>
 
                 {/* Testo */}
-                <div style={{ fontWeight: 700, fontSize: "clamp(15px,1.3vw,17px)", color: "#f1f5f9", marginBottom: 6, letterSpacing: "-0.2px" }}>
+                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: "#f1f5f9", marginBottom: 4, letterSpacing: "-0.2px" }}>
                   {card.label}
                 </div>
-                <div style={{ fontSize: "clamp(12px,1vw,13px)", color: "rgba(148,163,184,0.75)", lineHeight: 1.5, flex: 1 }}>
+                <div style={{ fontSize: "clamp(11px,0.85vw,12px)", color: "rgba(148,163,184,0.75)", lineHeight: 1.5, flex: 1 }}>
                   {card.description}
                 </div>
 
                 {/* Freccia */}
                 <div style={{
-                  marginTop: 18, alignSelf: "flex-end",
-                  width: 28, height: 28, borderRadius: "50%",
+                  marginTop: 12, alignSelf: "flex-end",
+                  width: 24, height: 24, borderRadius: "50%",
                   border: `1px solid ${card.accent}44`,
                   background: `${card.accent}15`,
                   display: "grid", placeItems: "center",
-                  color: card.accent, fontSize: 14,
+                  color: card.accent, fontSize: 12,
                   transition: "transform 0.2s, background 0.2s",
                   transform: isHovered ? "translateX(3px)" : "translateX(0)",
                 }}>

@@ -596,25 +596,40 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
-    // GET /api/auth/me — profilo self (include configurazione AI)
-    // ============================================================
-    [HttpGet("me")]
-    [Authorize]
-    public async Task<IActionResult> GetMe()
-    {
-        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
-        var user = await _db.Users.FindAsync(userId);
-        if (user == null) return NotFound();
-        return Ok(new {
-            user.Id, user.Username, user.FullName, user.Email, user.Role,
-            hasAiKey  = !string.IsNullOrEmpty(user.AiApiKey),
-            aiEndpoint = user.AiEndpoint,
-            aiModel    = user.AiModel,
-            aiStyle    = user.AiStyle,
-            aiAuthMode = user.AiAuthMode
-        });
-    }
+     // GET /api/auth/me — profilo self (include configurazione AI)
+     // ============================================================
+     [HttpGet("me")]
+     [Authorize]
+     public async Task<IActionResult> GetMe()
+     {
+         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+         if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+         var user = await _db.Users.FindAsync(userId);
+         if (user == null) return NotFound();
+
+         // Leggi Theme via query raw (NotMapped)
+         string theme = "light";
+         try {
+             var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+             var conn = _db.Database.GetDbConnection();
+             if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+             using var cmd = conn.CreateCommand();
+             cmd.CommandText = $"SELECT \"Theme\" FROM \"{sch}\".\"Users\" WHERE \"Id\" = @id";
+             var p = cmd.CreateParameter(); p.ParameterName = "@id"; p.Value = userId; cmd.Parameters.Add(p);
+             var raw = cmd.ExecuteScalar();
+             if (raw != null && raw != DBNull.Value) theme = raw.ToString()!;
+         } catch { /* colonna non ancora presente */ }
+
+         return Ok(new {
+             user.Id, user.Username, user.FullName, user.Email, user.Role,
+             hasAiKey  = !string.IsNullOrEmpty(user.AiApiKey),
+             aiEndpoint = user.AiEndpoint,
+             aiModel    = user.AiModel,
+             aiStyle    = user.AiStyle,
+             aiAuthMode = user.AiAuthMode,
+             theme
+         });
+     }
 
     // ============================================================
     // EDITOR LOGINS

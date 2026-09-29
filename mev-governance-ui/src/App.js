@@ -130,6 +130,11 @@ function App() {
       if (savedJwt && !isExpired(savedJwt)) {
         // JWT ancora valido: ripristina sessione direttamente
         restoreSession(savedJwt);
+        // Aggiorna tema dal server (potrebbe essere cambiato da un admin)
+        try {
+          const prof = await getMyProfile();
+          if (prof?.theme) { setUserTheme(prof.theme); localStorage.setItem("userTheme", prof.theme); }
+        } catch { /* non blocca il bootstrap */ }
       } else if (savedRefresh) {
         // JWT scaduto ma refresh disponibile: prova a rinnovare
         try {
@@ -520,7 +525,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_50</span>
+            }}>DEV_Rel_51</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
