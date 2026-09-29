@@ -456,6 +456,16 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PRE-PATCH] UserRoles verificata.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH UserRoles ERROR] {ex.Message}"); }
+
+        // Blocco separato: colonna Theme (isolato per resistere a errori nel blocco principale)
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""Theme"" TEXT NULL DEFAULT 'light';");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] Colonna Theme verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Theme ERROR] {ex.Message}"); }
     }
 
     try
