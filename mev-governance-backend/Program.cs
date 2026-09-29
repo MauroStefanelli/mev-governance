@@ -429,6 +429,11 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""AppSettings""        ADD COLUMN IF NOT EXISTS ""LastAlignBatchId"" TEXT          NULL;
                 ALTER TABLE ""{sch}"".""MevItems""           ADD COLUMN IF NOT EXISTS ""LastAlignBatchId"" TEXT          NULL;
                 ALTER TABLE ""{sch}"".""MevItems""           ADD COLUMN IF NOT EXISTS ""NoteCap""          TEXT          NULL;
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserRoles"" (
+                    ""Id""     SERIAL PRIMARY KEY,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""Role""   TEXT NOT NULL DEFAULT ''
+                );
             ");
 #pragma warning restore EF1002
             Console.WriteLine("[PRE-PATCH] Tutte le tabelle verificate.");

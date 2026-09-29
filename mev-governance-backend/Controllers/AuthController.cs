@@ -352,8 +352,8 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[SET-USER-ROLES] Warning: {ex.Message}");
-            return StatusCode(500, new { message = "Tabella UserRoles non disponibile nel DB corrente. Il ruolo aggiuntivo non è stato salvato." });
+            Console.Error.WriteLine($"[SET-USER-ROLES] Error: {ex.Message}\n{ex.InnerException?.Message}");
+            return StatusCode(500, new { message = $"Errore salvataggio ruoli: {ex.Message}" });
         }
 
         return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
@@ -388,6 +388,30 @@ public class AuthController : ControllerBase
             user.Id,
             user.Username
         });
+    }
+
+    // PUT /api/auth/users/{id} — modifica dati utente (username, fullName, email)
+    [HttpPut("users/{id}")]
+    [Authorize]
+    public IActionResult UpdateUser(int id, [FromBody] UpdateUserRequest request)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+
+        if (!string.IsNullOrWhiteSpace(request.Username) && request.Username != user.Username)
+        {
+            if (_db.Users.Any(u => u.Username == request.Username && u.Id != id))
+                return BadRequest("Username già in uso");
+            user.Username = request.Username.Trim();
+        }
+        if (request.FullName != null) user.FullName = request.FullName.Trim();
+        if (request.Email != null) user.Email = request.Email.Trim();
+
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.FullName, user.Email, user.Role });
     }
 
     // ============================================================
@@ -729,3 +753,4 @@ public record ResetPasswordRequest(string NewPassword);
 public record SaveAiKeyRequest(string? ApiKey);
 public record SaveAiSettingsRequest(string? ApiKey, string? Endpoint, string? Model, string? Style, string? AuthMode);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);
+public record UpdateUserRequest(string? Username, string? FullName, string? Email);

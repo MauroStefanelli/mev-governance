@@ -443,6 +443,20 @@ export const resetAll = async () => {
   return response.json();
 };
 
+// Modifica dati anagrafici utente (username, fullName, email)
+export const updateUser = async (id, data) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const updateUserRole = async (id, role) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/role`, {
     method: "PUT",

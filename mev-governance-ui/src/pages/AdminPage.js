@@ -9,6 +9,7 @@ import {
   deleteUser, 
   getUserAccessLog,
   updateUserRole,
+  updateUser,
   setUserRoles,
   resetAll,
   getClientPages,
@@ -47,6 +48,8 @@ function AdminPage() {
   const [savingRole, setSavingRole] = useState({}); // { [userId]: true/false }
   const [resetting, setResetting] = useState(false);
   const [permessiModal, setPermessiModal] = useState(null); // { user }
+  const [editModal, setEditModal] = useState(null); // { id, username, fullName, email }
+  const [editSaving, setEditSaving] = useState(false);
 
   const formatDateTime = (iso) => {
 
@@ -192,6 +195,26 @@ function AdminPage() {
       setAccessLogModal(null);
     } finally {
       setAccessLogLoading(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editModal) return;
+    setEditSaving(true);
+    setError("");
+    try {
+      const result = await updateUser(editModal.id, {
+        username: editModal.username,
+        fullName: editModal.fullName,
+        email: editModal.email,
+      });
+      setUsers((prev) => prev.map((u) => u.id === editModal.id ? { ...u, username: result.username, fullName: result.fullName, email: result.email } : u));
+      setEditModal(null);
+      notify("Utente aggiornato");
+    } catch (err) {
+      setError(err.message || "Errore salvataggio utente");
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -416,6 +439,13 @@ function AdminPage() {
                     </button>
                   )}
                   <button
+                    onClick={() => setEditModal({ id: u.id, username: u.username, fullName: u.fullName || "", email: u.email || "" })}
+                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#0d6efd", color: "white", border: "none", borderRadius: "4px" }}
+                    title="Modifica dati utente"
+                  >
+                    Modifica
+                  </button>
+                  <button
                     onClick={() => handleDelete(u.id, u.username)}
                     style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#dc3545", color: "white", border: "none", borderRadius: "4px" }}
                   >
@@ -575,6 +605,47 @@ function AdminPage() {
           user={permessiModal.user}
           onClose={() => setPermessiModal(null)}
         />
+      )}
+
+      {/* ── Modale Modifica Utente ── */}
+      {editModal && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditModal(null); }}
+        >
+          <div style={{ background: "white", borderRadius: "12px", padding: "28px 32px", width: "440px", maxWidth: "95vw", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h4 style={{ margin: 0, color: "#1a73e8" }}>Modifica Utente</h4>
+              <button onClick={() => setEditModal(null)} style={{ border: "none", background: "none", fontSize: "18px", cursor: "pointer", color: "#888" }}>×</button>
+            </div>
+            {[
+              { label: "Username", key: "username" },
+              { label: "Nome Completo", key: "fullName" },
+              { label: "Email", key: "email" },
+            ].map(({ label, key }) => (
+              <div key={key} style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "12px", marginBottom: "4px", fontWeight: 600, color: "#555" }}>{label}</label>
+                <input
+                  type="text"
+                  value={editModal[key]}
+                  onChange={(e) => setEditModal((p) => ({ ...p, [key]: e.target.value }))}
+                  style={{ width: "100%", padding: "7px 10px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }}
+                />
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" }}>
+              <button
+                onClick={() => setEditModal(null)}
+                style={{ padding: "7px 18px", borderRadius: "6px", border: "1px solid #ccc", background: "#f1f3f4", cursor: "pointer", fontSize: "13px" }}
+              >Annulla</button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={editSaving}
+                style={{ padding: "7px 20px", borderRadius: "6px", border: "none", background: "#1a73e8", color: "white", cursor: editSaving ? "wait" : "pointer", fontSize: "13px", fontWeight: 600 }}
+              >{editSaving ? "Salvataggio..." : "Salva"}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
