@@ -457,6 +457,20 @@ export const updateUser = async (id, data) => {
   return response.json();
 };
 
+// Imposta tema UI utente (solo SuperAdmin)
+export const setUserTheme = async (id, theme) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/theme`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ theme })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const updateUserRole = async (id, role) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/role`, {
     method: "PUT",

@@ -11,6 +11,7 @@ import {
   updateUserRole,
   updateUser,
   setUserRoles,
+  setUserTheme,
   resetAll,
   getClientPages,
   setClientPages,
@@ -154,7 +155,7 @@ function EyeIcon({ visible }) {
   );
 }
 
-function AdminPage() {
+function AdminPage({ currentRole }) {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ username: "", fullName: "", email: "", password: "", role: "Editor" });
   const [newPasswords, setNewPasswords] = useState({});
@@ -169,6 +170,7 @@ function AdminPage() {
   const [permessiModal, setPermessiModal] = useState(null); // { user }
   const [editModal, setEditModal] = useState(null); // { id, username, fullName, email }
   const [editSaving, setEditSaving] = useState(false);
+  const [savingTheme, setSavingTheme] = useState({}); // { [userId]: true/false }
 
   const formatDateTime = (iso) => {
 
@@ -314,6 +316,20 @@ function AdminPage() {
       setAccessLogModal(null);
     } finally {
       setAccessLogLoading(false);
+    }
+  };
+
+  const handleSetTheme = async (id, theme) => {
+    setSavingTheme(prev => ({ ...prev, [id]: true }));
+    setError("");
+    try {
+      const result = await setUserTheme(id, theme);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, theme: result.theme } : u));
+      notify(`Tema aggiornato: ${result.theme === "dark" ? "Scuro" : "Chiaro"}`);
+    } catch (err) {
+      setError(err.message || "Errore aggiornamento tema");
+    } finally {
+      setSavingTheme(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -582,6 +598,22 @@ function AdminPage() {
                   >
                     Modifica
                   </button>
+                  {currentRole === "SuperAdmin" && (
+                    <button
+                      disabled={!!savingTheme[u.id]}
+                      onClick={() => handleSetTheme(u.id, u.theme === "dark" ? "light" : "dark")}
+                      style={{
+                        ...actionStyle,
+                        background: u.theme === "dark" ? "#1e293b" : "#f8fafc",
+                        color:      u.theme === "dark" ? "#e2e8f0" : "#475569",
+                        borderColor: u.theme === "dark" ? "#334155" : "#cbd5e1",
+                        opacity: savingTheme[u.id] ? 0.6 : 1,
+                      }}
+                      title={u.theme === "dark" ? "Tema: Scuro — clicca per impostare Chiaro" : "Tema: Chiaro — clicca per impostare Scuro"}
+                    >
+                      {u.theme === "dark" ? "🌙 Scuro" : "☀️ Chiaro"}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(u.id, u.username)}
                     style={{ ...actionStyle, background: "#fff1f2", color: "#be123c", borderColor: "#fecdd3" }}

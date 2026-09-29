@@ -53,6 +53,7 @@ function App() {
   const [aiAuthMode, setAiAuthMode] = useState("bearer");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
+  const [userTheme, setUserTheme]   = useState(() => localStorage.getItem("userTheme") || "light");
 
   // Ambienti
   const [ambienti, setAmbienti]         = useState(() => {
@@ -237,6 +238,11 @@ function App() {
     setRole(data.role);
     setRoles(allRoles);
 
+    // Tema utente restituito dal login
+    const loginTheme = data.theme || "light";
+    setUserTheme(loginTheme);
+    localStorage.setItem("userTheme", loginTheme);
+
     const ambientiList = data.ambienti || [];
     const activeId = data.ambienteId || 0;
     setAmbienti(ambientiList);
@@ -413,7 +419,14 @@ function App() {
   if (!token) return <LoginPage onLogin={handleLogin} />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f9fa" }}>
+    <div style={{
+      minHeight: "100vh",
+      background: userTheme === "dark"
+        ? "linear-gradient(135deg, #0a1628 0%, #0f2347 50%, #1a3a6b 100%)"
+        : "#f8f9fa",
+      color: userTheme === "dark" ? "#e2e8f0" : undefined,
+      transition: "background 0.4s ease",
+    }}>
       {/* ── Toast globale ── */}
       {globalToast && (
         <div style={{
@@ -460,6 +473,7 @@ function App() {
           }}
           clientPages={clientPages}
           lastAlign={lastAlign}
+          userTheme={userTheme}
         />
       )}
 
@@ -477,16 +491,18 @@ function App() {
             onClick={() => setPage("home")}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "6px 14px", borderRadius: 7,
-              border: "1px solid rgba(255,255,255,0.18)",
-              background: "rgba(255,255,255,0.08)", color: "#e2e8f0",
-              cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+              padding: "8px 20px", borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.28)",
+              background: "rgba(255,255,255,0.13)", color: "#ffffff",
+              cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: 700,
+              letterSpacing: "0.01em",
               transition: "background 0.15s",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
             }}
-            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
-            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.22)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.13)"}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>
               <polyline points="9 21 9 12 15 12 15 21"/>
             </svg>
@@ -502,7 +518,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_49</span>
+            }}>DEV_Rel_50</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -791,7 +807,7 @@ function App() {
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage />}
+        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} />}
         {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
         {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}

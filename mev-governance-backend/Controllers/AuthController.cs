@@ -70,7 +70,8 @@ public class AuthController : ControllerBase
             role = user.Role,
             roles,
             ambienti,
-            ambienteId = defaultAmbienteId
+            ambienteId = defaultAmbienteId,
+            theme = user.Theme
         });
     }
 
@@ -252,7 +253,8 @@ public class AuthController : ControllerBase
             u.IsActive,
             u.SendEmail,
             u.LastLogin,
-            u.LastLogout
+            u.LastLogout,
+            theme = _db.Users.Where(x => x.Id == u.Id).Select(x => x.Theme).FirstOrDefault() ?? "light"
         }).ToList();
 
         return Ok(result);
@@ -440,6 +442,21 @@ public class AuthController : ControllerBase
         user.SendEmail = !user.SendEmail;
         _db.SaveChanges();
         return Ok(new { user.Id, user.Username, user.SendEmail });
+    }
+
+    // PUT /api/auth/users/{id}/theme — imposta tema UI (solo SuperAdmin)
+    [HttpPut("users/{id}/theme")]
+    [Authorize]
+    public IActionResult SetUserTheme(int id, [FromBody] SetThemeRequest request)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        var valid = new[] { "light", "dark" };
+        user.Theme = valid.Contains(request.Theme) ? request.Theme : "light";
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.Theme });
     }
 
     // ============================================================
@@ -782,3 +799,4 @@ public record SaveAiKeyRequest(string? ApiKey);
 public record SaveAiSettingsRequest(string? ApiKey, string? Endpoint, string? Model, string? Style, string? AuthMode);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);
 public record UpdateUserRequest(string? Username, string? FullName, string? Email);
+public record SetThemeRequest(string Theme);

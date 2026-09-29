@@ -33,4 +33,7 @@ public class AppUser
     public string? AiModel    { get; set; }   // es. gpt-4o, gpt-5.5
     public string? AiStyle    { get; set; }   // "responses" | "chat"
     public string? AiAuthMode { get; set; }   // "bearer" | "api-key"
+
+    // Tema UI: "light" (default) | "dark"
+    public string Theme { get; set; } = "light";
 }
