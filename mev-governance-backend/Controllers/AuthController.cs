@@ -238,7 +238,9 @@ public class AuthController : ControllerBase
                 u.IsActive,
                 u.SendEmail,
                 u.LastLogin,
-                u.LastLogout
+                u.LastLogout,
+                u.AiKeyEnabled,
+                u.AiApiKey
             })
             .ToList();
 
