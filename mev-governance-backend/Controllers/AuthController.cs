@@ -75,6 +75,7 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
+            id = user.Id,
             token,
             refreshToken,
             username = user.Username,

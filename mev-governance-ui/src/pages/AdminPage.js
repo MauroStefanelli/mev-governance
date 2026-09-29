@@ -155,7 +155,7 @@ function EyeIcon({ visible }) {
   );
 }
 
-function AdminPage({ currentRole }) {
+function AdminPage({ currentRole, currentUserId, onThemeChange }) {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ username: "", fullName: "", email: "", password: "", role: "Editor" });
   const [newPasswords, setNewPasswords] = useState({});
@@ -326,6 +326,8 @@ function AdminPage({ currentRole }) {
       const result = await setUserTheme(id, theme);
       setUsers(prev => prev.map(u => u.id === id ? { ...u, theme: result.theme } : u));
       notify(`Tema aggiornato: ${result.theme === "dark" ? "Scuro" : "Chiaro"}`);
+      // Se si sta cambiando il tema dell'utente attualmente loggato, aggiorna l'app in tempo reale
+      if (id === currentUserId && onThemeChange) onThemeChange(result.theme);
     } catch (err) {
       setError(err.message || "Errore aggiornamento tema");
     } finally {

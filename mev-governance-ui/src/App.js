@@ -22,6 +22,7 @@ function App() {
   const [token, setToken]       = useState("");
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
+  const [userId, setUserId]     = useState(() => parseInt(localStorage.getItem("userId") || "0", 10));
   const [role, setRole]         = useState("");
   const [roles, setRoles]       = useState(() => {
     try { return JSON.parse(localStorage.getItem("roles") || "[]"); } catch { return []; }
@@ -237,6 +238,7 @@ function App() {
     setFullName(data.fullName);
     setRole(data.role);
     setRoles(allRoles);
+    if (data.id) { setUserId(data.id); localStorage.setItem("userId", String(data.id)); }
 
     // Tema utente restituito dal login
     const loginTheme = data.theme || "light";
@@ -807,7 +809,7 @@ function App() {
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} />}
+        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); localStorage.setItem("userTheme", theme); }} />}
         {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
         {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
