@@ -61,6 +61,18 @@ public class AuthController : ControllerBase
 
         _db.SaveChanges();
 
+        // Leggi Theme via query raw (colonna NotMapped, aggiunta via ALTER TABLE al boot)
+        string userTheme = "light";
+        try {
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"SELECT \"Theme\" FROM \"{_db.Model.FindEntityType(typeof(AppUser))!.GetSchema()}\".\"Users\" WHERE \"Id\" = @id";
+            var p = cmd.CreateParameter(); p.ParameterName = "@id"; p.Value = user.Id; cmd.Parameters.Add(p);
+            var raw = cmd.ExecuteScalar();
+            if (raw != null && raw != DBNull.Value) userTheme = raw.ToString()!;
+        } catch { /* colonna non ancora presente: default light */ }
+
         return Ok(new
         {
             token,
@@ -71,7 +83,7 @@ public class AuthController : ControllerBase
             roles,
             ambienti,
             ambienteId = defaultAmbienteId,
-            theme = user.Theme ?? "light"
+            theme = userTheme
         });
     }
 
@@ -242,6 +254,25 @@ public class AuthController : ControllerBase
             Console.Error.WriteLine($"[USER-ROLES] GetUsers warning: {ex.Message}");
         }
 
+        // Leggi Theme via query raw per tutti gli utenti (NotMapped, colonna aggiunta via ALTER TABLE)
+        var themes = new Dictionary<int, string>();
+        try
+        {
+            var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"SELECT \"Id\", \"Theme\" FROM \"{sch}\".\"Users\"";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                int uid = reader.GetInt32(0);
+                string th = reader.IsDBNull(1) ? "light" : (reader.GetString(1) ?? "light");
+                themes[uid] = th;
+            }
+        }
+        catch { /* colonna non ancora presente */ }
+
         var result = users.Select(u => new
         {
             u.Id,
@@ -254,7 +285,7 @@ public class AuthController : ControllerBase
             u.SendEmail,
             u.LastLogin,
             u.LastLogout,
-            theme = _db.Users.Where(x => x.Id == u.Id).Select(x => x.Theme).FirstOrDefault() ?? "light"
+            theme = themes.TryGetValue(u.Id, out var t) ? t : "light"
         }).ToList();
 
         return Ok(result);
@@ -451,12 +482,26 @@ public class AuthController : ControllerBase
     {
         if (!User.IsInRole("SuperAdmin"))
             return Forbid();
-        var user = _db.Users.FirstOrDefault(u => u.Id == id);
-        if (user == null) return NotFound("Utente non trovato");
+        if (_db.Users.FirstOrDefault(u => u.Id == id) == null)
+            return NotFound("Utente non trovato");
         var valid = new[] { "light", "dark" };
-        user.Theme = valid.Contains(request.Theme) ? request.Theme : "light";
-        _db.SaveChanges();
-        return Ok(new { user.Id, user.Username, Theme = user.Theme ?? "light" });
+        var newTheme = valid.Contains(request.Theme) ? request.Theme : "light";
+        try
+        {
+            var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"UPDATE \"{sch}\".\"Users\" SET \"Theme\" = @theme WHERE \"Id\" = @id";
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@theme"; p1.Value = newTheme; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@id";    p2.Value = id;       cmd.Parameters.Add(p2);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Errore aggiornamento tema: {ex.Message}");
+        }
+        return Ok(new { Id = id, Theme = newTheme });
     }
 
     // ============================================================

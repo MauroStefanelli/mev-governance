@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MevGovernanceBackend.Models;
 
@@ -35,5 +36,7 @@ public class AppUser
     public string? AiAuthMode { get; set; }   // "bearer" | "api-key"
 
     // Tema UI: "light" (default) | "dark"
+    // NotMapped: la colonna viene aggiunta via ALTER TABLE al boot; EF non la include nella SELECT standard
+    [NotMapped]
     public string? Theme { get; set; } = "light";
 }
