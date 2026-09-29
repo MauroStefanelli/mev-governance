@@ -216,8 +216,67 @@ export default function HomePage({
   onNavigate, onLogout, onOpenProfile,
   clientPages = null,
   lastAlign,
+  userTheme = "light",
 }) {
   const [hover, setHover] = useState(null);
+  const isDark = userTheme === "dark";
+
+  // Token colore tema
+  const T = isDark ? {
+    bg:           "linear-gradient(160deg, #0a1628 0%, #0f2347 40%, #0d1f3c 70%, #061224 100%)",
+    text:         "#e2e8f0",
+    textMuted:    "rgba(148,163,184,0.85)",
+    textFaint:    "rgba(100,116,139,0.7)",
+    cardBg:       "rgba(255,255,255,0.04)",
+    cardBgHover:  "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
+    cardBorder:   "rgba(255,255,255,0.08)",
+    inputBg:      "rgba(255,255,255,0.08)",
+    inputBorder:  "rgba(255,255,255,0.15)",
+    inputColor:   "#e2e8f0",
+    btnBg:        "rgba(255,255,255,0.08)",
+    btnBorder:    "rgba(255,255,255,0.15)",
+    btnColor:     "#e2e8f0",
+    btnHoverBg:   "rgba(255,255,255,0.14)",
+    logoutBg:     "rgba(239,68,68,0.08)",
+    logoutBorder: "rgba(239,68,68,0.3)",
+    logoutColor:  "#fca5a5",
+    logoutHover:  "rgba(239,68,68,0.16)",
+    avatarBg:     "rgba(59,130,246,0.35)",
+    avatarBorder: "rgba(59,130,246,0.5)",
+    titleColor:   "#f8fafc",
+    glowBg1:      "radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)",
+    glowBg2:      "radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)",
+    footerBorder: "rgba(255,255,255,0.06)",
+    optionBg:     "#0f2347",
+    optionColor:  "#e2e8f0",
+  } : {
+    bg:           "#f0f4f8",
+    text:         "#1e293b",
+    textMuted:    "rgba(51,65,85,0.85)",
+    textFaint:    "rgba(100,116,139,0.8)",
+    cardBg:       "#ffffff",
+    cardBgHover:  "linear-gradient(135deg, #f8faff 0%, #f1f5ff 100%)",
+    cardBorder:   "rgba(203,213,225,0.8)",
+    inputBg:      "#ffffff",
+    inputBorder:  "rgba(148,163,184,0.5)",
+    inputColor:   "#1e293b",
+    btnBg:        "#ffffff",
+    btnBorder:    "rgba(148,163,184,0.5)",
+    btnColor:     "#334155",
+    btnHoverBg:   "#f1f5f9",
+    logoutBg:     "#fff1f2",
+    logoutBorder: "rgba(239,68,68,0.3)",
+    logoutColor:  "#be123c",
+    logoutHover:  "#ffe4e6",
+    avatarBg:     "rgba(59,130,246,0.15)",
+    avatarBorder: "rgba(59,130,246,0.4)",
+    titleColor:   "#0f172a",
+    glowBg1:      "none",
+    glowBg2:      "none",
+    footerBorder: "rgba(0,0,0,0.08)",
+    optionBg:     "#ffffff",
+    optionColor:  "#1e293b",
+  };
 
   const hasRole = (...wanted) => {
     const myRoles = roles.length > 0 ? roles : (role ? [role] : []);
@@ -239,18 +298,20 @@ export default function HomePage({
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(160deg, #0a1628 0%, #0f2347 40%, #0d1f3c 70%, #061224 100%)",
+      background: T.bg,
       fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      color: "#e2e8f0",
+      color: T.text,
       overflowX: "hidden",
+      transition: "background 0.3s ease",
     }}>
 
-      {/* ── Sfondo decorativo ── */}
-      <div aria-hidden="true" style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
-        <div style={{ position: "absolute", top: "-180px", right: "-120px", width: 520, height: 520, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", bottom: "-120px", left: "-80px", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", top: "40%", left: "30%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.05) 0%, transparent 70%)" }} />
-      </div>
+      {/* ── Sfondo decorativo (solo dark) ── */}
+      {isDark && (
+        <div aria-hidden="true" style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
+          <div style={{ position: "absolute", top: "-180px", right: "-120px", width: 520, height: 520, borderRadius: "50%", background: T.glowBg1 }} />
+          <div style={{ position: "absolute", bottom: "-120px", left: "-80px", width: 400, height: 400, borderRadius: "50%", background: T.glowBg2 }} />
+        </div>
+      )}
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1280, margin: "0 auto", padding: "clamp(20px,4vw,48px) clamp(16px,4vw,48px)" }}>
 
@@ -259,12 +320,12 @@ export default function HomePage({
 
           {/* Logo + titolo */}
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <img src="/logo_poste.svg" alt="Poste Italiane" style={{ height: 44, width: "auto", filter: "brightness(0) invert(1) opacity(0.9)" }} />
+            <img src="/logo_poste.svg" alt="Poste Italiane" style={{ height: 44, width: "auto", filter: isDark ? "brightness(0) invert(1) opacity(0.9)" : "none" }} />
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px", color: "#f1f5f9", lineHeight: 1.2 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px", color: T.titleColor, lineHeight: 1.2 }}>
                 MEV Governance
               </div>
-              <div style={{ fontSize: 11, color: "rgba(148,163,184,0.8)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: T.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>
                 {ambienteAttivo?.descrizione || ambienteAttivo?.codiceContratto || "Piattaforma di gestione"}
               </div>
             </div>
@@ -279,20 +340,20 @@ export default function HomePage({
                 value={ambienteId}
                 onChange={e => onSwitchAmbiente(parseInt(e.target.value, 10))}
                 style={{
-                  padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)",
-                  background: "rgba(255,255,255,0.08)", color: "#e2e8f0", fontSize: 13,
+                  padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.inputBorder}`,
+                  background: T.inputBg, color: T.inputColor, fontSize: 13,
                   fontFamily: "inherit", cursor: "pointer", outline: "none",
                 }}
               >
                 {ambienti.map(a => (
-                  <option key={a.id} value={a.id} style={{ background: "#0f2347", color: "#e2e8f0" }}>
+                  <option key={a.id} value={a.id} style={{ background: T.optionBg, color: T.optionColor }}>
                     {a.codiceContratto}{a.descrizione ? ` — ${a.descrizione}` : ""}
                   </option>
                 ))}
               </select>
             )}
             {ambienti.length === 1 && (
-              <span style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: 600 }}>
+              <span style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.btnBorder}`, background: T.btnBg, color: T.btnColor, fontSize: 13, fontWeight: 600 }}>
                 {ambienti[0].codiceContratto}
               </span>
             )}
@@ -304,20 +365,20 @@ export default function HomePage({
               style={{
                 display: "flex", alignItems: "center", gap: 8,
                 padding: "8px 14px", borderRadius: 8,
-                border: "1px solid rgba(255,255,255,0.15)",
-                background: "rgba(255,255,255,0.08)", color: "#e2e8f0",
+                border: `1px solid ${T.btnBorder}`,
+                background: T.btnBg, color: T.btnColor,
                 cursor: "pointer", fontFamily: "inherit", fontSize: 13,
                 transition: "background 0.15s",
               }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.14)"}
-              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+              onMouseEnter={e => e.currentTarget.style.background = T.btnHoverBg}
+              onMouseLeave={e => e.currentTarget.style.background = T.btnBg}
             >
-              <span style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(59,130,246,0.35)", border: "1px solid rgba(59,130,246,0.5)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", background: T.avatarBg, border: `1px solid ${T.avatarBorder}`, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                 {initials}
               </span>
               <span style={{ lineHeight: 1.2 }}>
                 <span style={{ display: "block", fontWeight: 600 }}>{fullName || username}</span>
-                <span style={{ display: "block", fontSize: 10, color: "rgba(148,163,184,0.8)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{role}</span>
+                <span style={{ display: "block", fontSize: 10, color: T.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{role}</span>
               </span>
             </button>
 
@@ -326,13 +387,13 @@ export default function HomePage({
               onClick={onLogout}
               style={{
                 padding: "8px 16px", borderRadius: 8,
-                border: "1px solid rgba(239,68,68,0.3)",
-                background: "rgba(239,68,68,0.08)", color: "#fca5a5",
+                border: `1px solid ${T.logoutBorder}`,
+                background: T.logoutBg, color: T.logoutColor,
                 cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500,
                 transition: "background 0.15s",
               }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.16)"}
-              onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.08)"}
+              onMouseEnter={e => e.currentTarget.style.background = T.logoutHover}
+              onMouseLeave={e => e.currentTarget.style.background = T.logoutBg}
             >
               Esci
             </button>
@@ -341,13 +402,13 @@ export default function HomePage({
 
         {/* ── Hero welcome ── */}
         <div style={{ marginBottom: "clamp(28px,4vw,48px)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ fontSize: "clamp(26px,3.5vw,38px)", fontWeight: 800, letterSpacing: "-1px", lineHeight: 1.15, color: "#f8fafc" }}>
+          <div style={{ fontSize: "clamp(26px,3.5vw,38px)", fontWeight: 800, letterSpacing: "-1px", lineHeight: 1.15, color: T.titleColor }}>
             {getGreeting(fullName, username)}, {fullName?.split(" ")[0] || username}
           </div>
           {lastAlign && (
             <div style={{ textAlign: "right", flexShrink: 0 }}>
-              <span style={{ fontSize: 12, color: "rgba(148,163,184,0.7)", fontWeight: 500 }}>Ultimo aggiornamento dati</span>
-              <div style={{ fontSize: 13, color: "rgba(203,213,225,0.9)", fontWeight: 600, marginTop: 2 }}>
+              <span style={{ fontSize: 12, color: T.textFaint, fontWeight: 500 }}>Ultimo aggiornamento dati</span>
+              <div style={{ fontSize: 13, color: T.textMuted, fontWeight: 600, marginTop: 2 }}>
                 {new Date(lastAlign).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
@@ -374,30 +435,19 @@ export default function HomePage({
                   gap: 0, textAlign: "left",
                   padding: "clamp(14px,2vw,20px)",
                   borderRadius: 16,
-                  border: `1px solid ${isHovered ? card.accent + "55" : "rgba(255,255,255,0.08)"}`,
-                  background: isHovered
-                    ? `linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)`
-                    : "rgba(255,255,255,0.04)",
-                  backdropFilter: "blur(12px)",
+                  border: `1px solid ${isHovered ? card.accent + "55" : T.cardBorder}`,
+                  background: isHovered ? T.cardBgHover : T.cardBg,
+                  backdropFilter: isDark ? "blur(12px)" : "none",
                   cursor: "pointer",
                   fontFamily: "inherit",
-                  color: "#e2e8f0",
+                  color: T.text,
                   boxShadow: isHovered
-                    ? `0 6px 24px rgba(0,0,0,0.3), 0 0 0 1px ${card.accent}33, inset 0 1px 0 rgba(255,255,255,0.08)`
-                    : "0 2px 8px rgba(0,0,0,0.2)",
+                    ? `0 6px 24px rgba(0,0,0,${isDark ? "0.3" : "0.1"}), 0 0 0 1px ${card.accent}33`
+                    : `0 2px 8px rgba(0,0,0,${isDark ? "0.2" : "0.06"})`,
                   transform: isHovered ? "translateY(-3px)" : "translateY(0)",
                   transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
                 }}
               >
-                {/* Glow decorativo in alto a destra */}
-                <div aria-hidden="true" style={{
-                  position: "absolute", top: -24, right: -24, width: 80, height: 80,
-                  borderRadius: "50%",
-                  background: `radial-gradient(circle, ${card.accent}18 0%, transparent 70%)`,
-                  transition: "opacity 0.2s",
-                  opacity: isHovered ? 1 : 0.5,
-                }} />
-
                 {/* Linea accento in cima */}
                 <div style={{
                   position: "absolute", top: 0, left: 0, right: 0, height: 2,
@@ -414,8 +464,7 @@ export default function HomePage({
                   background: `linear-gradient(135deg, ${card.accent}28, ${card.accentDark}18)`,
                   border: `1px solid ${card.accent}33`,
                   color: card.accent,
-                  marginBottom: 12,
-                  flexShrink: 0,
+                  marginBottom: 12, flexShrink: 0,
                   transition: "transform 0.2s",
                   transform: isHovered ? "scale(1.08)" : "scale(1)",
                 }}>
@@ -423,10 +472,10 @@ export default function HomePage({
                 </div>
 
                 {/* Testo */}
-                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: "#f1f5f9", marginBottom: 4, letterSpacing: "-0.2px" }}>
+                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: T.titleColor, marginBottom: 4, letterSpacing: "-0.2px" }}>
                   {card.label}
                 </div>
-                <div style={{ fontSize: "clamp(11px,0.85vw,12px)", color: "rgba(148,163,184,0.75)", lineHeight: 1.5, flex: 1 }}>
+                <div style={{ fontSize: "clamp(11px,0.85vw,12px)", color: T.textMuted, lineHeight: 1.5, flex: 1 }}>
                   {card.description}
                 </div>
 
@@ -438,7 +487,7 @@ export default function HomePage({
                   background: `${card.accent}15`,
                   display: "grid", placeItems: "center",
                   color: card.accent, fontSize: 12,
-                  transition: "transform 0.2s, background 0.2s",
+                  transition: "transform 0.2s",
                   transform: isHovered ? "translateX(3px)" : "translateX(0)",
                 }}>
                   →
@@ -449,9 +498,9 @@ export default function HomePage({
         </div>
 
         {/* ── Footer ── */}
-        <footer style={{ marginTop: "clamp(40px,6vw,72px)", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <span style={{ fontSize: 12, color: "rgba(100,116,139,0.6)" }}>MEV Governance · Capgemini</span>
-          <span style={{ fontSize: 11, color: "rgba(100,116,139,0.4)", letterSpacing: "0.05em" }}>{role}</span>
+        <footer style={{ marginTop: "clamp(40px,6vw,72px)", borderTop: `1px solid ${T.footerBorder}`, paddingTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <span style={{ fontSize: 12, color: T.textFaint }}>MEV Governance · Capgemini</span>
+          <span style={{ fontSize: 11, color: T.textFaint, letterSpacing: "0.05em" }}>{role}</span>
         </footer>
       </div>
     </div>
