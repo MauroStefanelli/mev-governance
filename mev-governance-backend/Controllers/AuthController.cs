@@ -310,7 +310,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult GetUserRolesEndpoint(int id)
     {
-        if (!User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
@@ -328,7 +328,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult SetUserRolesEndpoint(int id, [FromBody] SetRolesRequest request)
     {
-        if (!User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
