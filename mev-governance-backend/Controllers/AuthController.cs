@@ -414,6 +414,34 @@ public class AuthController : ControllerBase
         return Ok(new { user.Id, user.Username, user.FullName, user.Email, user.Role });
     }
 
+    // PUT /api/auth/users/{id}/toggle — attiva/disattiva utente
+    [HttpPut("users/{id}/toggle")]
+    [Authorize]
+    public IActionResult ToggleUser(int id)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        user.IsActive = !user.IsActive;
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.IsActive });
+    }
+
+    // PUT /api/auth/users/{id}/toggleemail — abilita/disabilita invio email
+    [HttpPut("users/{id}/toggleemail")]
+    [Authorize]
+    public IActionResult ToggleEmailUser(int id)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        user.SendEmail = !user.SendEmail;
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.SendEmail });
+    }
+
     // ============================================================
     // PUT /api/auth/me/password — cambio password self-service
     // ============================================================

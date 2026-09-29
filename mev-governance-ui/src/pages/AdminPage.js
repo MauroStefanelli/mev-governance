@@ -45,57 +45,97 @@ const actionStyle = {
 
 const adminStyles = `
   .mev-admin, .mev-admin * { box-sizing: border-box; }
-  .mev-admin { min-width: 0; }
+  .mev-admin { min-width: 0; -webkit-font-smoothing: antialiased; }
   .mev-admin button, .mev-admin input, .mev-admin select { font-family: inherit; }
   .mev-admin button, .mev-admin input, .mev-admin select {
-    transition: background-color .16s ease, box-shadow .16s ease, border-color .16s ease;
+    transition: background-color .18s ease, box-shadow .18s ease, border-color .18s ease, transform .18s ease;
   }
-  .mev-admin button:not(:disabled):hover { filter: brightness(.96); box-shadow: 0 2px 6px rgba(15,23,42,.10); }
+  .mev-admin button:not(:disabled):hover { filter: brightness(.97); box-shadow: 0 4px 10px rgba(15,23,42,.10); transform: translateY(-1px); }
+  .mev-admin button:not(:disabled):active { transform: translateY(0); }
   .mev-admin button:disabled, .mev-admin select:disabled { opacity: .6; }
   .mev-admin input:focus-visible, .mev-admin select:focus-visible, .mev-admin button:focus-visible {
-    outline: 3px solid #60a5fa; outline-offset: 3px;
-    box-shadow: 0 0 0 5px rgba(59,130,246,.12);
+    outline: 2px solid #3b82f6; outline-offset: 3px; box-shadow: 0 0 0 5px #3b82f615;
   }
-  .mev-admin input::placeholder { color: #8390a3; }
-  .mev-admin input[type="checkbox"] {
-    width: 15px; height: 15px; margin: 0; flex-shrink: 0;
-    accent-color: #2563eb; cursor: pointer;
-  }
+  .mev-admin input::placeholder { color: #94a0b2; }
+  .mev-admin input[type="checkbox"] { width: 15px; height: 15px; margin: 0; flex-shrink: 0; accent-color: #4f46e5; cursor: pointer; }
   .mev-admin select option { background: #fff; color: #243247; }
-  .mev-admin-create > div { flex: 1 1 160px; min-width: 0; }
-  .mev-admin-create input, .mev-admin-create select { width: 100% !important; min-width: 0; min-height: 40px; }
-  .mev-admin-table-wrap {
-    width: 100%; overflow-x: auto; border: 1px solid #e0e6ef; border-radius: 16px;
-    background: #fff; box-shadow: 0 4px 24px rgba(30,50,80,.04);
-  }
+  .mev-admin-hero { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; overflow: hidden; padding: 32px 36px; margin-bottom: 28px; border-radius: 22px; background: #15243b; color: #fff; box-shadow: 0 12px 28px #14233a12; }
+  .mev-admin-hero::after { content: ""; position: absolute; width: 300px; height: 300px; border: 1px solid #ffffff0d; border-radius: 50%; top: -120px; right: -40px; pointer-events: none; }
+  .mev-admin-eyebrow { display: flex; align-items: center; gap: 9px; color: #aabbd4; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+  .mev-admin-eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: #7daaff; box-shadow: 0 0 0 4px #7daaff15; }
+  .mev-admin-hero h3 { margin: 10px 0 6px; font-size: clamp(26px, 3vw, 34px); line-height: 1.2; letter-spacing: -1px; font-weight: 700; }
+  .mev-admin-hero p { margin: 0; font-size: 13px; color: #afbed3; }
+  .mev-admin-hero-icon { display: grid; place-items: center; width: 76px; height: 76px; flex-shrink: 0; border: 1px solid #ffffff18; border-radius: 22px; background: #ffffff06; color: #b4cfff; }
+  .mev-admin-create-card { background: #fff !important; padding: 0 !important; border: 1px solid #e1e7f0 !important; border-radius: 18px !important; box-shadow: 0 4px 18px #23385504 !important; }
+  .mev-admin-section-heading { display: flex; align-items: center; gap: 13px; padding: 22px 26px; }
+  .mev-admin-section-icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background: #edf3ff; color: #3569d4; font-size: 25px; font-weight: 400; }
+  .mev-admin-section-heading h4, .mev-admin-directory-heading h4 { margin: 0; font-size: 16px; letter-spacing: -.3px; color: #1c2c44; font-weight: 700; }
+  .mev-admin-section-heading p, .mev-admin-directory-heading p { margin: 4px 0 0; font-size: 12px; color: #7b879a; }
+  .mev-admin-create { padding: 22px 26px 26px; background: #f9fbfe; border-top: 1px solid #edf0f6; border-radius: 0 0 18px 18px; }
+  .mev-admin-create > div { flex: 1 1 150px; min-width: 0; }
+  .mev-admin-create input, .mev-admin-create select { width: 100% !important; min-width: 0; min-height: 42px; border-color: #dfe5ee !important; border-radius: 10px !important; box-shadow: 0 2px 3px #16274403; }
+  .mev-admin-create > button { min-height: 42px !important; padding-inline: 24px !important; }
+  .mev-admin-directory { border: 1px solid #e1e7f0; border-radius: 18px; background: #fff; box-shadow: 0 4px 18px #23385504; overflow: hidden; }
+  .mev-admin-directory-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 26px; }
+  .mev-admin-section-tag { padding: 6px 10px; border-radius: 6px; background: #f2f5fa; color: #708099; font-size: 9px; font-weight: 700; letter-spacing: .09em; white-space: nowrap; }
+  .mev-admin-table-wrap { width: 100%; overflow-x: auto; background: #fff; scrollbar-width: thin; scrollbar-color: #c5cfde #f4f6fa; }
   .mev-admin-users th, .mev-admin-users td { border: 0; text-align: left; }
-  .mev-admin-users th {
-    padding: 15px 12px; background: #edf2f8; color: #526079;
-    font-size: 11px; font-weight: 700; letter-spacing: .025em;
-    border-bottom: 1px solid #dce4ef;
-  }
-  .mev-admin-users td { padding: 18px 12px; vertical-align: top; border-bottom: 1px solid #e8edf4; overflow-wrap: anywhere; }
+  .mev-admin-users th { padding: 13px 16px; background: #f4f7fb; color: #77849a; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-block: 1px solid #e9eef5; }
+  .mev-admin-users td { padding: 22px 16px; vertical-align: top; border-bottom: 1px solid #edf1f6; overflow-wrap: anywhere; }
   .mev-admin-users tbody tr:nth-child(odd) { background: #fff; }
-  .mev-admin-users tbody tr:nth-child(even) { background: #f8fafd; }
-  .mev-admin-users tbody tr:hover { background: #eef4ff; }
-  .mev-admin-users tbody tr { transition: background-color .16s ease; }
+  .mev-admin-users tbody tr:nth-child(even) { background: #fafbfe; }
+  .mev-admin-users tbody tr:hover { background: #f0f5ff; }
+  .mev-admin-users tbody tr { transition: background-color .18s ease; }
   .mev-admin-users tbody tr:last-child td { border-bottom: 0; }
-  .mev-admin-users th:nth-child(1) { width: 120px; }
-  .mev-admin-users th:nth-child(2) { width: 140px; }
-  .mev-admin-users th:nth-child(3) { width: 185px; }
-  .mev-admin-users th:nth-child(4) { width: 210px; }
-  .mev-admin-users th:nth-child(5) { width: 95px; text-align: center; }
-  .mev-admin-users th:nth-child(6) { width: 90px; }
-  .mev-admin-users th:nth-child(7) { width: 260px; }
-  .mev-admin-users th:nth-child(8) { width: 250px; }
-  .mev-admin-users th:nth-child(9), .mev-admin-users th:nth-child(10) { width: 165px; }
-  .mev-admin-users td:nth-child(9), .mev-admin-users td:nth-child(10) { font-variant-numeric: tabular-nums; }
-  @media (max-width: 600px) {
+  .mev-admin-users th:nth-child(1) { width: 250px; }
+  .mev-admin-users th:nth-child(2) { width: 200px; }
+  .mev-admin-users th:nth-child(3) { width: 95px; text-align: center; }
+  .mev-admin-users th:nth-child(4) { width: 85px; }
+  .mev-admin-users th:nth-child(5) { width: 200px; }
+  .mev-admin-users th:nth-child(6) { width: 205px; }
+  .mev-admin-users th:nth-child(7) { width: 185px; }
+  .mev-admin-users th:first-child { padding-left: 26px; }
+  .mev-admin-users td:first-child { padding-left: 26px; }
+  .mev-admin-person-mark { float: left; display: grid; place-items: center; width: 34px; height: 38px; border-radius: 11px; margin-right: 11px; color: #657d9f; background: #eaf0f8; border: 1px solid #e0e8f2; }
+  .mev-admin-identity > div:last-child { overflow: hidden; }
+  .mev-admin-identity strong { display: block; color: #263b58; font-size: 13px; font-weight: 700; margin: 0 0 3px; }
+  .mev-admin-fullname { font-size: 12px; color: #64748b; }
+  .mev-admin-email { font-size: 11px; color: #8390a5; margin-top: 7px; }
+  .mev-admin-extra-roles { gap: 5px !important; }
+  .mev-admin-extra-roles label { font-size: 10px; border-color: #e3e8f1 !important; border-radius: 6px !important; padding: 4px 6px !important; }
+  .mev-admin-extra-roles label:has(input:checked) { background: #eef2ff !important; border-color: #c7d2fe !important; color: #4338ca; }
+  .mev-admin-extra-roles input { width: 12px !important; height: 12px !important; }
+  .mev-admin-password { flex-wrap: wrap; }
+  .mev-admin-password input { flex: 1 1 115px; width: 115px !important; min-height: 36px; }
+  .mev-admin-password > button:last-child { flex-basis: 100%; margin-top: 2px; background: #f1f5fc !important; border-color: #dde6f5 !important; color: #48648f !important; border-radius: 8px !important; }
+  .mev-admin-actions { display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px !important; }
+  .mev-admin-actions button { width: 100%; font-size: 10px !important; min-height: 30px !important; padding: 5px 8px !important; border-radius: 7px !important; }
+  .mev-admin-actions button[title="Modifica dati utente"] { grid-column: 1; grid-row: 1; }
+  .mev-admin-activity { color: #61718a; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .mev-admin-activity > span { display: block; font-size: 8px; letter-spacing: .07em; font-weight: 700; color: #94a0b2; margin-bottom: 3px; }
+  .mev-admin-activity > div + span { margin-top: 12px; }
+  .mev-admin-danger { margin-top: 24px !important; border-radius: 16px !important; background: #fffafa !important; border-color: #f0d9dc !important; padding: 22px 26px !important; }
+  .mev-admin-danger > div { flex: 1 1 460px; }
+  .mev-admin-danger > div > div:first-child { text-transform: none !important; font-size: 14px !important; letter-spacing: -.2px !important; margin-bottom: 6px !important; }
+  .mev-admin-danger > button { border-color: #edb9be !important; border-width: 1px !important; border-radius: 9px !important; min-height: 40px; }
+  .mev-admin-overlay > div { border-radius: 22px !important; border-color: #e5eaf2 !important; box-shadow: 0 32px 100px #09132540 !important; }
+  .mev-admin-overlay h4 { color: #1d2f4b !important; font-size: 21px; letter-spacing: -.5px; }
+  .mev-admin-overlay input[type="text"] { min-height: 44px; background: #fafbfd !important; border-color: #dde4ee !important; }
+  .mev-admin-overlay button { min-height: 36px; }
+  .mev-admin-overlay label:has(input:checked) { box-shadow: 0 2px 6px #4f46e50a; }
+  @media (max-width: 640px) {
+    .mev-admin-hero { padding: 26px 22px; border-radius: 17px; }
+    .mev-admin-hero-icon { display: none; }
+    .mev-admin-section-heading, .mev-admin-directory-heading { padding: 20px; }
+    .mev-admin-section-tag { display: none; }
+    .mev-admin-create { padding: 20px; }
     .mev-admin-create > div { flex-basis: 100%; }
     .mev-admin-create > button { width: 100%; }
+    .mev-admin-danger > button { width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
     .mev-admin *, .mev-admin-users tbody tr { transition: none !important; }
+    .mev-admin button:not(:disabled):hover { transform: none; }
   }
 `;
 
@@ -326,9 +366,21 @@ function AdminPage() {
   };
 
   return (
-    <div className="mev-admin" style={{ padding: "clamp(16px, 3vw, 36px)", maxWidth: "1920px", margin: "0 auto", background: "#f5f7fb", color: "#243247", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", minHeight: "100%", lineHeight: 1.5 }}>
+    <div className="mev-admin" style={{ padding: "clamp(16px, 3vw, 36px)", maxWidth: "1920px", margin: "0 auto", background: "#f4f6fa", color: "#243247", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", minHeight: "100%", lineHeight: 1.5 }}>
       <style>{adminStyles}</style>
-      <h3 style={{ margin: "0 0 24px", fontSize: "26px", letterSpacing: "-0.7px", fontWeight: 750, color: "#17243b" }}>Gestione Utenti</h3>
+      <header className="mev-admin-hero">
+        <div>
+          <div className="mev-admin-eyebrow"><span /> AMMINISTRAZIONE</div>
+          <h3>Gestione Utenti</h3>
+          <p>Persone, ruoli e accessi. Tutto sotto controllo.</p>
+        </div>
+        <div className="mev-admin-hero-icon" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            <circle cx="9" cy="7" r="4" />
+          </svg>
+        </div>
+      </header>
 
       {error && (
         <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderLeft: "4px solid #e11d48", color: "#9f1239", padding: "14px 18px", borderRadius: "12px", marginBottom: "16px", fontSize: "14px", fontWeight: 500, overflowWrap: "anywhere" }}>
@@ -342,8 +394,11 @@ function AdminPage() {
       )}
 
       {/* Form nuovo utente */}
-      <div style={{ background: "#f8faff", border: "1px solid #dce5f2", borderRadius: "18px", padding: "24px", marginBottom: "24px", boxShadow: "0 4px 20px rgba(30, 50, 80, 0.03)" }}>
-        <h4 style={{ margin: "0 0 20px", fontSize: "17px", color: "#17243b" }}>Nuovo Utente</h4>
+      <div className="mev-admin-create-card" style={{ background: "#f8faff", border: "1px solid #dce5f2", borderRadius: "18px", padding: "24px", marginBottom: "24px", boxShadow: "0 4px 20px rgba(30, 50, 80, 0.03)" }}>
+        <div className="mev-admin-section-heading">
+          <span className="mev-admin-section-icon" aria-hidden="true">＋</span>
+          <div><h4>Nuovo Utente</h4><p>Crea un account e assegna il ruolo di accesso.</p></div>
+        </div>
         <form className="mev-admin-create" onSubmit={handleCreate} style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
           {[
             { label: "Username", key: "username", required: true },
@@ -400,28 +455,30 @@ function AdminPage() {
       </div>
 
       {/* Tabella utenti */}
+      <section className="mev-admin-directory">
+      <div className="mev-admin-directory-heading"><div><h4>Elenco utenti</h4><p>Gestisci profili, autorizzazioni e attività degli account.</p></div><span className="mev-admin-section-tag">GESTIONE ACCESSI</span></div>
       <div className="mev-admin-table-wrap">
-      <table className="mev-admin-users" border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", border: "none", tableLayout: "fixed", minWidth: "1720px" }}>
+      <table className="mev-admin-users" border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", border: "none", tableLayout: "fixed", minWidth: "1220px" }}>
         <thead style={{ background: "#f0f0f0" }}>
           <tr>
-            <th>Username</th>
-            <th>Nome Cognome</th>
-            <th>Email</th>
+            <th>Utente</th>
             <th>Ruolo</th>
             <th>Stato</th>
             <th style={{ textAlign: "center" }}>Invia Email</th>
             <th>Modifica Password</th>
             <th>Azioni</th>
-            <th style={{ whiteSpace: "nowrap" }}>Ultimo Accesso</th>
-            <th style={{ whiteSpace: "nowrap" }}>Ultima Uscita</th>
+            <th style={{ whiteSpace: "nowrap" }}>Ultima attività</th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id} style={{ color: u.isActive ? "inherit" : "#758197" }}>
-              <td><strong>{u.username}</strong></td>
-              <td>{u.fullName}</td>
-              <td>{u.email}</td>
+              <td className="mev-admin-identity">
+                <div className="mev-admin-person-mark" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="8" r="3.5" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></svg>
+                </div>
+                <div><strong>{u.username}</strong><div className="mev-admin-fullname">{u.fullName}</div><div className="mev-admin-email">{u.email}</div></div>
+              </td>
               <td>
                 <select
                   value={u.role}
@@ -441,7 +498,7 @@ function AdminPage() {
                   <option value="SuperAdmin">SuperAdmin</option>
                   <option value="Developer">Developer</option>
                 </select>
-                <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "11px", color: "#526079" }}>
+                <div className="mev-admin-extra-roles" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "11px", color: "#526079" }}>
                   {["Developer", "Admin", "Editor", "Client"].filter(r => r !== u.role).map(r => (
                     <label key={r} style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", padding: "4px 7px", borderRadius: "7px", border: "1px solid #dce3ec", background: "#fff", fontWeight: 500 }}>
                       <input
@@ -478,7 +535,7 @@ function AdminPage() {
                 </button>
               </td>
               <td>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <div className="mev-admin-password" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                   <input
                     type={showRowPassword[u.id] ? "text" : "password"}
                     placeholder="Nuova password"
@@ -495,7 +552,7 @@ function AdminPage() {
                 </div>
               </td>
               <td style={{ textAlign: "center" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", justifyContent: "flex-start" }}>
+                <div className="mev-admin-actions" style={{ display: "flex", flexWrap: "wrap", gap: "7px", justifyContent: "flex-start" }}>
                   <button
                     onClick={() => handleToggle(u.id)}
                     style={{ ...actionStyle, background: u.isActive ? "#fef9c3" : "#dcfce7", color: u.isActive ? "#854d0e" : "#166534", borderColor: u.isActive ? "#fde68a" : "#bbf7d0" }}
@@ -533,20 +590,21 @@ function AdminPage() {
                   </button>
                 </div>
               </td>
-              <td style={{ fontSize: "12px", whiteSpace: "nowrap", color: "#555" }}>
-                {formatDateTime(u.lastLogin)}
-              </td>
-              <td style={{ fontSize: "12px", whiteSpace: "nowrap", color: "#555" }}>
-                {formatDateTime(u.lastLogout)}
+              <td className="mev-admin-activity">
+                <span>ULTIMO ACCESSO</span>
+                <div>{formatDateTime(u.lastLogin)}</div>
+                <span>ULTIMA USCITA</span>
+                <div>{formatDateTime(u.lastLogout)}</div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+      </section>
 
       {/* ── Reset dati ── */}
-      <div style={{
+      <div className="mev-admin-danger" style={{
         marginTop: "32px",
         border: "1px solid #fecaca",
         borderRadius: "10px",
@@ -593,7 +651,7 @@ function AdminPage() {
 
       {/* ── Modale storico accessi ── */}
       {accessLogModal && (
-        <div style={{
+        <div className="mev-admin-overlay" style={{
           position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)",
           zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
         }}
@@ -693,6 +751,7 @@ function AdminPage() {
       {/* ── Modale Modifica Utente ── */}
       {editModal && (
         <div
+          className="mev-admin-overlay"
           style={{ position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={(e) => { if (e.target === e.currentTarget) setEditModal(null); }}
         >
@@ -794,7 +853,7 @@ function PermessiClientModal({ user, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="mev-admin-overlay" style={{ position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: "#fff", borderRadius: "20px", border: "1px solid #e2e8f0", padding: "clamp(20px, 4vw, 32px)", width: "540px", maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(15,23,42,0.24)" }}>
         <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px", color: "#1a1a1a" }}>
           Permessi — {user.fullName || user.username}

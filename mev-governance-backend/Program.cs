@@ -439,6 +439,22 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PRE-PATCH] Tutte le tabelle verificate.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH ERROR] {ex.Message}"); }
+
+        // Blocco separato: garantisce UserRoles anche se il blocco principale ha avuto errori
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserRoles"" (
+                    ""Id""     SERIAL PRIMARY KEY,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""Role""   TEXT NOT NULL DEFAULT ''
+                );
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] UserRoles verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH UserRoles ERROR] {ex.Message}"); }
     }
 
     try
