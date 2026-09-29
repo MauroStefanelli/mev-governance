@@ -312,6 +312,16 @@ export const saveMyAiKey = async (apiKey) => {
   return response.json();
 };
 
+export const setMyTheme = async (theme) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/theme`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ theme })
+  });
+  if (!response.ok) throw new Error("Errore aggiornamento tema");
+  return response.json();
+};
+
 export const saveMyAiSettings = async ({ apiKey, endpoint, model, style, authMode }) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/aisettings`, {
     method: "PUT",

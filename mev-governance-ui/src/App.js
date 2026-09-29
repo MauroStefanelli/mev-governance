@@ -12,7 +12,7 @@ import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
 import HomePage from "./pages/HomePage";
-import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -57,6 +57,7 @@ function App() {
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
   // Tema: inizializzato sempre "light" — aggiornato dal server al login o al bootstrap
   const [userTheme, setUserTheme]   = useState("light");
+  const [themeSaving, setThemeSaving] = useState(false);
 
   // Ambienti
   const [ambienti, setAmbienti]         = useState(() => {
@@ -541,7 +542,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_53</span>
+            }}>DEV_Rel_54</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -615,6 +616,43 @@ function App() {
 
             {pwdModalTab === "password" && (
               <>
+                {/* ── Selettore tema ── */}
+                <div style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid #eef2f5" }}>
+                  <div style={{ fontSize: 12, color: "#555", fontWeight: 600, marginBottom: 10 }}>Tema interfaccia</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {[
+                      { val: "light", icon: "☀️", label: "Chiaro" },
+                      { val: "dark",  icon: "🌙", label: "Scuro"  },
+                    ].map(({ val, icon, label }) => (
+                      <button
+                        key={val}
+                        disabled={themeSaving}
+                        onClick={async () => {
+                          if (userTheme === val) return;
+                          setThemeSaving(true);
+                          try {
+                            await setMyTheme(val);
+                            setUserTheme(val);
+                          } catch { /* ignora */ }
+                          finally { setThemeSaving(false); }
+                        }}
+                        style={{
+                          flex: 1, padding: "10px 0", borderRadius: 8, cursor: themeSaving ? "wait" : "pointer",
+                          fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                          border: userTheme === val ? "2px solid #102a47" : "1px solid #dadce0",
+                          background: userTheme === val ? "#102a47" : "#f8f9fa",
+                          color: userTheme === val ? "#fff" : "#555",
+                          transition: "all 0.15s",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        }}
+                      >
+                        <span>{icon}</span> {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Cambia password ── */}
                 {[
                   { label: "Password attuale", val: pwdOld, set: setPwdOld },
                   { label: "Nuova password",   val: pwdNew, set: setPwdNew },

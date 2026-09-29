@@ -650,6 +650,33 @@ public class AuthController : ControllerBase
          });
      }
 
+     // PUT /api/auth/me/theme — imposta il proprio tema UI (self-service)
+     [HttpPut("me/theme")]
+     [Authorize]
+     public IActionResult SetMyTheme([FromBody] SetThemeRequest request)
+     {
+         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+         if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+         var valid = new[] { "light", "dark" };
+         var newTheme = valid.Contains(request.Theme) ? request.Theme : "light";
+         try
+         {
+             var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+             var conn = _db.Database.GetDbConnection();
+             if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+             using var cmd = conn.CreateCommand();
+             cmd.CommandText = $"UPDATE \"{sch}\".\"Users\" SET \"Theme\" = @theme WHERE \"Id\" = @id";
+             var p1 = cmd.CreateParameter(); p1.ParameterName = "@theme"; p1.Value = newTheme; cmd.Parameters.Add(p1);
+             var p2 = cmd.CreateParameter(); p2.ParameterName = "@id";    p2.Value = userId;   cmd.Parameters.Add(p2);
+             cmd.ExecuteNonQuery();
+         }
+         catch (Exception ex)
+         {
+             return StatusCode(500, $"Errore aggiornamento tema: {ex.Message}");
+         }
+         return Ok(new { theme = newTheme });
+     }
+
     // ============================================================
     // EDITOR LOGINS
     // ============================================================
