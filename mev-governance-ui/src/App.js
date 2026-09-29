@@ -522,7 +522,19 @@ function App() {
 
           {/* Centro: logo + titolo + badge versione + ambiente */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
-            <img src="/logo_poste.svg" alt="Poste" style={{ height: 30, width: "auto", display: "block", filter: "brightness(0) invert(1)", opacity: 0.9 }} />
+            <img
+              src="/logo_poste.svg"
+              alt="Poste Italiane"
+              style={{
+                display: "block",
+                width: 38,
+                height: 38,
+                flexShrink: 0,
+                objectFit: "contain",
+                borderRadius: 8,
+                backgroundColor: "#fefefd",
+              }}
+            />
             <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 700, fontSize: 14 }}>MEV Governance</span>
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
