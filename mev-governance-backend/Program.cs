@@ -417,7 +417,7 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiModel""                 TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiStyle""                 TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiAuthMode""              TEXT           NULL;
-                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""Theme""                   TEXT           NOT NULL DEFAULT 'light';
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""Theme""                   TEXT           NULL DEFAULT 'light';
                 ALTER TABLE ""{sch}"".""Contratti""          ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""BuoniConsegna""      ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;

@@ -71,7 +71,7 @@ public class AuthController : ControllerBase
             roles,
             ambienti,
             ambienteId = defaultAmbienteId,
-            theme = user.Theme
+            theme = user.Theme ?? "light"
         });
     }
 
@@ -456,7 +456,7 @@ public class AuthController : ControllerBase
         var valid = new[] { "light", "dark" };
         user.Theme = valid.Contains(request.Theme) ? request.Theme : "light";
         _db.SaveChanges();
-        return Ok(new { user.Id, user.Username, user.Theme });
+        return Ok(new { user.Id, user.Username, Theme = user.Theme ?? "light" });
     }
 
     // ============================================================

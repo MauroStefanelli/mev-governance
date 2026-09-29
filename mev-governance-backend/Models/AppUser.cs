@@ -35,5 +35,5 @@ public class AppUser
     public string? AiAuthMode { get; set; }   // "bearer" | "api-key"
 
     // Tema UI: "light" (default) | "dark"
-    public string Theme { get; set; } = "light";
+    public string? Theme { get; set; } = "light";
 }
