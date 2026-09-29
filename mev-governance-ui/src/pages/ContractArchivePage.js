@@ -635,6 +635,13 @@ export default function ContractArchivePage({ ambienti = [] }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleShowSummaryLot = (contract, lotId) => {
+    setSumCon(contract);
+    setSumLot(lotId);
+    setView('summary');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleImport = async (e) => {
     e.preventDefault();
     const count = Math.max(1, Math.min(6, ncLots));
@@ -924,6 +931,18 @@ export default function ContractArchivePage({ ambienti = [] }) {
                             <span style={{ ...S.lotStatus, marginRight: 'auto', color: isActive ? '#166534' : '#52657d', background: isActive ? '#e8f6ef' : '#edf0f4' }}>
                               {isActive ? 'Attivo' : 'Disattivato'}
                             </span>
+                            {(() => {
+                              const lotSum = CONTRACT_SUMMARIES[c.contractId]?.lots?.[l.lotId];
+                              const hasSummary = lotSum && Array.isArray(lotSum.tow) && lotSum.tow.length > 0;
+                              return (
+                                <button
+                                  style={{ ...S.btnGhost, ...S.btnCompact, ...(hasSummary ? {} : { opacity: 0.5 }) }}
+                                  title={hasSummary ? `Apri sintesi Lotto ${l.lotId}` : 'Nessuna sintesi disponibile per questo lotto'}
+                                  onClick={() => handleShowSummaryLot(c, l.lotId)}>
+                                  Sintesi
+                                </button>
+                              );
+                            })()}
                             <button
                               style={{ ...S.btnGhost, ...S.btnCompact }}
                               disabled={!!togglingLot[key]}
@@ -991,12 +1010,6 @@ export default function ContractArchivePage({ ambienti = [] }) {
                         disabled={active.length === 0}
                         onClick={() => setExpanded(isExpanded ? null : c.contractId)}>
                         {isExpanded ? 'Chiudi' : 'Usa contratto'}
-                      </button>
-                      <button
-                        style={{ ...S.btnGhost, ...(visible.length === 0 ? S.btnDisabled : {}) }}
-                        disabled={visible.length === 0}
-                        onClick={() => handleShowSummary(c)}>
-                        Sintesi contratto
                       </button>
                       {!c.builtin && (
                         <button style={{ ...S.btnGhost, color: '#a81832', borderColor: '#f1b9c0' }} onClick={() => handleDeleteContract(c.contractId)}>
