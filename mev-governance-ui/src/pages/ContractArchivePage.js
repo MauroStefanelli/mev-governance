@@ -274,16 +274,18 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
         <button style={S.btnGhost} onClick={onBack}>← Torna ai contratti</button>
       </div>
 
-      {/* Tab lotti */}
-      <div aria-label="Selezione lotto" style={S.lotTabs}>
-        {visibleLots.map(l => (
-          <button aria-pressed={l.lotId === lotId} key={l.lotId}
-            style={{ ...S.lotTab, ...(l.lotId === lotId ? S.lotTabActive : {}) }}
-            onClick={() => onLotChange(l.lotId)}>
-            Lotto {l.lotId}
-          </button>
-        ))}
-      </div>
+      {/* Tab lotti — visibili solo se il contratto ha più di un lotto */}
+      {visibleLots.length > 1 && (
+        <div aria-label="Selezione lotto" style={S.lotTabs}>
+          {visibleLots.map(l => (
+            <button aria-pressed={l.lotId === lotId} key={l.lotId}
+              style={{ ...S.lotTab, ...(l.lotId === lotId ? S.lotTabActive : {}) }}
+              onClick={() => onLotChange(l.lotId)}>
+              Lotto {l.lotId}
+            </button>
+          ))}
+        </div>
+      )}
 
       {lotSummary && common ? (
         <div>

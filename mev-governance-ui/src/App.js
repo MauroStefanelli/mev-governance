@@ -11,6 +11,7 @@ import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
+import HomePage from "./pages/HomePage";
 import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
@@ -27,7 +28,7 @@ function App() {
   });
   // true finché non abbiamo verificato se la sessione salvata è ancora valida
   const [bootstrapping, setBootstrapping] = useState(true);
-  const [page, setPage]             = useState("mev");
+  const [page, setPage]             = useState("home");
   const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
   const [filteredRows, setFilteredRows] = useState([]);
   const [lastAlign, setLastAlign]   = useState(null);
@@ -163,7 +164,7 @@ function App() {
     const handleAuthExpired = () => {
       ["jwt", "refreshToken", "XUSER", "fullName", "role", "roles", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
       setToken(""); setUsername(""); setFullName(""); setRole(""); setRoles([]);
-      setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
+      setRows([]); setFilteredRows([]); setPage("home"); setLastAlign(null);
       setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
       showToast("Sessione scaduta. Effettua di nuovo il login.", "warn", 8000);
     };
@@ -243,7 +244,7 @@ function App() {
     localStorage.setItem("ambienti",   JSON.stringify(ambientiList));
     localStorage.setItem("ambienteId", String(activeId));
 
-    setPage("mev");
+    setPage("home");
 
     // Per utenti Client: carica le pagine permesse
     if (data.role === "Client") {
@@ -282,7 +283,7 @@ function App() {
     // Pulisce TUTTO il localStorage relativo alla sessione, compreso refreshToken
     ["jwt", "refreshToken", "XUSER", "fullName", "role", "roles", "ambienti", "ambienteId"].forEach((k) => localStorage.removeItem(k));
     setToken(""); setUsername(""); setFullName(""); setRole(""); setRoles([]);
-    setRows([]); setFilteredRows([]); setPage("mev"); setLastAlign(null);
+    setRows([]); setFilteredRows([]); setPage("home"); setLastAlign(null);
     setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
   };
 
@@ -432,438 +433,115 @@ function App() {
           }}>×</button>
         </div>
       )}
-      <header style={{
-        background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
-        padding: "0 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        height: "56px", position: "sticky", top: 0, zIndex: 100,
-      }}>
-        {/* Logo + titolo + descrizione ambiente */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <img
-            src="/logo_poste.svg"
-            alt="Poste Italiane"
-            style={{ height: "40px", width: "auto" }}
-          />
-          <span style={{ color: "white", fontWeight: 700, fontSize: "17px", letterSpacing: "0.3px" }}>
-            MEV Governance
-          </span>
-          <span style={{
-            fontSize: "10px", fontWeight: 700, letterSpacing: "0.8px",
-            background: "rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.9)",
-            border: "1px solid rgba(255,255,255,0.35)", borderRadius: "4px",
-            padding: "2px 7px", marginLeft: "2px", textTransform: "uppercase",
-          }}>
-            DEV_Rel_48
-          </span>
 
-          {/* Selettore Contratto — sempre visibile accanto al titolo */}
-          {ambienti.length === 1 && (
+      {/* ── HOME PAGE ── */}
+      {page === "home" && (
+        <HomePage
+          username={username}
+          fullName={fullName}
+          role={role}
+          roles={roles}
+          ambienti={ambienti}
+          ambienteId={ambienteId}
+          onSwitchAmbiente={handleSwitchAmbiente}
+          onNavigate={setPage}
+          onLogout={handleLogout}
+          onOpenProfile={() => {
+            setShowPwdModal(true); setPwdModalTab("password");
+            setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError("");
+            setAiKeyVal(""); setAiKeyMsg("");
+            getMyProfile().then(p => {
+              setAiKeyHas(!!p?.hasAiKey);
+              setAiEndpoint(p?.aiEndpoint || "");
+              setAiModel(p?.aiModel || "");
+              setAiStyle(p?.aiStyle || "chat");
+              setAiAuthMode(p?.aiAuthMode || "bearer");
+            }).catch(() => {});
+          }}
+          clientPages={clientPages}
+          lastAlign={lastAlign}
+        />
+      )}
+
+      {/* ── BARRA HOME (visibile su tutte le pagine tranne home) ── */}
+      {page !== "home" && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12, padding: "0 clamp(12px,3vw,28px)", height: 48,
+          background: "linear-gradient(135deg, #0a1628 0%, #0f2347 100%)",
+          position: "sticky", top: 0, zIndex: 100,
+          boxShadow: "0 1px 8px rgba(0,0,0,0.25)",
+        }}>
+          {/* Tasto Home */}
+          <button
+            onClick={() => setPage("home")}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "6px 14px", borderRadius: 7,
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "rgba(255,255,255,0.08)", color: "#e2e8f0",
+              cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>
+              <polyline points="9 21 9 12 15 12 15 21"/>
+            </svg>
+            Home
+          </button>
+
+          {/* Centro: logo + titolo + badge versione + ambiente */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
+            <img src="/logo_poste.svg" alt="" aria-hidden="true" style={{ height: 28, width: "auto", filter: "brightness(0) invert(1) opacity(0.7)" }} />
+            <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 700, fontSize: 14 }}>MEV Governance</span>
             <span style={{
-              color: "rgba(255,255,255,0.9)", fontSize: "13px", fontWeight: 600,
-              borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px",
-              background: "rgba(255,255,255,0.12)", padding: "4px 10px",
-              borderRadius: "6px", border: "1px solid rgba(255,255,255,0.25)",
-            }}>
-              {ambienti[0].codiceContratto}
-            </span>
-          )}
-          {ambienti.length > 1 && (
-            <div style={{ position: "relative", marginLeft: "4px" }}>
-              <button
-                onClick={() => setShowAmbienteMenu(!showAmbienteMenu)}
-                disabled={switchingAmbiente}
-                style={{
-                  background: "rgba(255,255,255,0.15)",
-                  color: "white",
-                  border: "1px solid rgba(255,255,255,0.4)",
-                  cursor: switchingAmbiente ? "wait" : "pointer",
-                  padding: "4px 10px",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  display: "flex", alignItems: "center", gap: "6px",
-                }}
-              >
-                <span style={{ fontSize: "10px", opacity: 0.7 }}>Contratto</span>
-                <span>
-                  {switchingAmbiente
-                    ? "..."
-                    : ambienti.find(a => a.id === ambienteId)?.codiceContratto || ambienteId}
-                </span>
-                <span style={{ fontSize: "10px" }}>{showAmbienteMenu ? "▲" : "▼"}</span>
-              </button>
-              {showAmbienteMenu && (
-                <div style={{
-                  position: "absolute", top: "34px", left: 0,
-                  background: "white",
-                  borderRadius: "8px", minWidth: "240px",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
-                  border: "1px solid #dadce0",
-                }}>
-                  <div style={{ padding: "8px 12px", fontSize: "11px", color: "#888", borderBottom: "1px solid #f1f3f4" }}>
-                    Cambia contratto
-                  </div>
-                  {ambienti.map(a => (
-                    <div
-                      key={a.id}
-                      onClick={() => handleSwitchAmbiente(a.id)}
-                      style={{
-                        padding: "10px 14px",
-                        cursor: a.id === ambienteId ? "default" : "pointer",
-                        background: a.id === ambienteId ? "#e8f0fe" : "transparent",
-                        borderBottom: "1px solid #f1f3f4",
-                        transition: "background 0.15s",
-                      }}
-                      onMouseEnter={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "#f1f3f4"; }}
-                      onMouseLeave={e => { if (a.id !== ambienteId) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      <div style={{ fontSize: "13px", fontWeight: 600, color: a.id === ambienteId ? "#1a73e8" : "#333" }}>
-                        {a.codiceContratto}
-                        {a.id === ambienteId && <span style={{ marginLeft: 6, fontSize: "11px", color: "#1a73e8" }}>▶ attivo</span>}
-                      </div>
-                      {a.descrizione && (
-                        <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{a.descrizione}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Descrizione ambiente — modificabile da Admin/SuperAdmin con click */}
-          {descrizioneAttiva && !editingDesc && (
-            <span
-              title={["Admin","SuperAdmin"].includes(role) ? "Clicca per modificare il nome del progetto" : ""}
-              onClick={() => {
-                if (["Admin","SuperAdmin"].includes(role)) {
-                  setDescValue(descrizioneAttiva);
-                  setEditingDesc(true);
-                }
-              }}
-              style={{
-                color: "rgba(255,255,255,0.85)", fontSize: "13px", fontWeight: 500,
-                borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px",
-                cursor: ["Admin","SuperAdmin"].includes(role) ? "pointer" : "default",
-                maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}
-            >
-              {descrizioneAttiva}
-              {["Admin","SuperAdmin"].includes(role) && (
-                <span style={{ marginLeft: 5, fontSize: "11px", opacity: 0.6 }}>✏️</span>
-              )}
-            </span>
-          )}
-          {editingDesc && (
-            <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
-              <input
-                autoFocus
-                value={descValue}
-                onChange={e => setDescValue(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleSaveDesc(); if (e.key === "Escape") setEditingDesc(false); }}
-                style={{
-                  padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.5)",
-                  background: "rgba(255,255,255,0.15)", color: "white", fontSize: "13px",
-                  width: "220px", outline: "none",
-                }}
-              />
-              <button onClick={handleSaveDesc} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 4, color: "white", cursor: "pointer", padding: "3px 8px", fontSize: "12px" }}>✓</button>
-              <button onClick={() => setEditingDesc(false)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: "14px" }}>✕</button>
-            </span>
-          )}
-
-          {lastAlign && (
-            <span style={{
-              color: "rgba(255,255,255,0.65)", fontSize: "12px", fontWeight: 400,
-              borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "12px", marginLeft: "4px"
-            }}>
-              Aggiornato: {new Date(lastAlign).toLocaleString("it-IT", {
-                day: "2-digit", month: "2-digit", year: "numeric",
-                hour: "2-digit", minute: "2-digit"
-              })}
-            </span>
-          )}
-        </div>
-
-        {/* Nav */}
-        <nav style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          {navItems.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setPage(id)}
-              style={{
-                background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
-                color: "white",
-                border: page === id ? "1px solid rgba(255,255,255,0.4)" : "1px solid transparent",
-                cursor: "pointer",
-                padding: "6px 16px",
-                borderRadius: "6px",
-                fontSize: "13px",
-                fontWeight: page === id ? 600 : 400,
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-              onMouseLeave={(e) => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
-            >
-              {label}
-            </button>
-          ))}
-
-          {hasRole("Admin") && !hasRole("SuperAdmin") && (
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setShowAdminMenu(!showAdminMenu)}
-                style={{
-                  background:
-                    ["tools", "admin", "dbconfig", "consumotow", "configuratore"].includes(page)
-                      ? "rgba(255,255,255,0.22)"
-                      : "transparent",
-                  color: "white",
-                  border: "1px solid transparent",
-                  cursor: "pointer",
-                  padding: "6px 16px",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                }}
-              >
-                Admin {showAdminMenu ? "▲" : "▼"}
-              </button>
-
-          {showAdminMenu && (
-                <div style={{
-                  position: "absolute", top: "38px", right: 0,
-                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
-                  borderRadius: "8px", minWidth: "180px",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                }}>
-                  {[
-                    { id: "tools",      label: "Gestione Ordini" },
-                    { id: "admin",      label: "Utenti" },
-                    { id: "consumotow", label: "Contratti" },
-                    { id: "dbconfig",   label: "App Config" },
-                    ...(hasRole("Developer") ? [{ id: "configuratore", label: "Configuratore Offerta" }] : []),
-                  ].map(({ id, label }) => (
-                    <div
-                      key={id}
-                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
-                      style={{
-                        padding: "8px 16px",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontWeight: page === id ? 600 : 400,
-                        color: "white",
-                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
-                        borderBottom: "1px solid rgba(255,255,255,0.1)",
-                        transition: "background 0.15s",
-                      }}
-                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {hasRole("SuperAdmin") && (
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setShowAdminMenu(!showAdminMenu)}
-                style={{
-                  background: ["tools", "admin", "dbconfig", "consumotow", "superadmin", "configuratore"].includes(page)
-                    ? "rgba(255,255,255,0.22)" : "transparent",
-                  color: "white",
-                  border: "1px solid transparent",
-                  cursor: "pointer",
-                  padding: "6px 16px",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                }}
-              >
-                Admin {showAdminMenu ? "▲" : "▼"}
-              </button>
-              {showAdminMenu && (
-                <div style={{
-                  position: "absolute", top: "38px", right: 0,
-                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
-                  borderRadius: "8px", minWidth: "180px",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                }}>
-                  {[
-                    { id: "superadmin",   label: "Gestione Contratti" },
-                    { id: "consumotow",   label: "Gestione Contratti" },
-                    { id: "configuratore",label: "Configuratore Offerta" },
-                    { id: "tools",        label: "Caricamento Ordini" },
-                    { id: "admin",        label: "Utenti" },
-                    { id: "dbconfig",     label: "Configurazione" },
-                  ].map(({ id, label }) => (
-                    <div
-                      key={id}
-                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
-                      style={{
-                        padding: "8px 16px",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontWeight: page === id ? 600 : 400,
-                        color: "white",
-                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
-                        borderBottom: "1px solid rgba(255,255,255,0.1)",
-                        transition: "background 0.15s",
-                      }}
-                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Menu Configuratore per Developer puro (senza Admin/SuperAdmin) */}
-          {hasRole("Developer") && !hasRole("Admin") && !hasRole("SuperAdmin") && (
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setShowAdminMenu(!showAdminMenu)}
-                style={{
-                  background: ["configuratore"].includes(page) ? "rgba(255,255,255,0.22)" : "transparent",
-                  color: "white",
-                  border: "1px solid transparent",
-                  cursor: "pointer",
-                  padding: "6px 16px",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                }}
-              >
-                Developer {showAdminMenu ? "▲" : "▼"}
-              </button>
-              {showAdminMenu && (
-                <div style={{
-                  position: "absolute", top: "38px", right: 0,
-                  background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
-                  borderRadius: "8px", minWidth: "180px",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                }}>
-                  {[
-                    { id: "configuratore", label: "Configuratore Offerta" },
-                  ].map(({ id, label }) => (
-                    <div
-                      key={id}
-                      onClick={() => { setPage(id); setShowAdminMenu(false); }}
-                      style={{
-                        padding: "8px 16px",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontWeight: page === id ? 600 : 400,
-                        color: "white",
-                        background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
-                        borderBottom: "1px solid rgba(255,255,255,0.1)",
-                        transition: "background 0.15s",
-                      }}
-                      onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                      onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Menu pagine extra per Client */}
-          {role === "Client" && clientPages !== null && (() => {
-            const extraPages = [
-              { id: "tools",      label: "Gestione Ordini" },
-              { id: "consumotow", label: "TOW Contratti" },
-              { id: "superadmin", label: "Gestione Contratti" },
-            ].filter(p => clientPages.includes(p.id));
-            if (extraPages.length === 0) return null;
-            return (
-              <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => setShowAdminMenu(!showAdminMenu)}
-                  style={{
-                    background: extraPages.some(p => p.id === page) ? "rgba(255,255,255,0.22)" : "transparent",
-                    color: "white", border: "1px solid transparent", cursor: "pointer",
-                    padding: "6px 16px", borderRadius: "6px", fontSize: "13px",
-                  }}
-                >
-                  Altro {showAdminMenu ? "▲" : "▼"}
-                </button>
-                {showAdminMenu && (
-                  <div style={{
-                    position: "absolute", top: "38px", right: 0,
-                    background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
-                    borderRadius: "8px", minWidth: "180px",
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.2)", overflow: "hidden", zIndex: 1000,
-                    border: "1px solid rgba(255,255,255,0.2)",
-                  }}>
-                    {extraPages.map(({ id, label }) => (
-                      <div key={id} onClick={() => { setPage(id); setShowAdminMenu(false); }}
-                        style={{ padding: "8px 16px", cursor: "pointer", fontSize: "13px",
-                          fontWeight: page === id ? 600 : 400, color: "white",
-                          background: page === id ? "rgba(255,255,255,0.22)" : "transparent",
-                          borderBottom: "1px solid rgba(255,255,255,0.1)",
-                        }}
-                        onMouseEnter={e => { if (page !== id) e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-                        onMouseLeave={e => { if (page !== id) e.currentTarget.style.background = "transparent"; }}
-                      >
-                        {label}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </nav>
-
-        {/* Utente + cambio password + logout */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ color: "white", fontSize: "13px", fontWeight: 600 }}>{fullName || username}</div>
-            <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "11px" }}>{role}</div>
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+              background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
+              border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
+              padding: "2px 6px", textTransform: "uppercase",
+            }}>DEV_Rel_49</span>
+            {ambienteAttivo && (
+              <span style={{
+                fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
+                borderLeft: "1px solid rgba(255,255,255,0.2)", paddingLeft: 10,
+              }}>
+                {ambienteAttivo.codiceContratto}
+                {ambienteAttivo.descrizione && ` · ${ambienteAttivo.descrizione}`}
+              </span>
+            )}
           </div>
-          <button
-            onClick={async () => {
-              setShowPwdModal(true); setPwdModalTab("password");
-              setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError("");
-              setAiKeyVal(""); setAiKeyMsg("");
-              try {
-                const p = await getMyProfile();
-                setAiKeyHas(!!p?.hasAiKey);
-                setAiEndpoint(p?.aiEndpoint || "");
-                setAiModel(p?.aiModel || "");
-                setAiStyle(p?.aiStyle || "chat");
-                setAiAuthMode(p?.aiAuthMode || "bearer");
-              } catch {}
-            }}
-            title="Profilo: cambio password / API Key AI"
-            style={{
-              background: "rgba(255,255,255,0.12)", color: "white",
-              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-              padding: "6px 10px", borderRadius: "6px", fontSize: "14px",
-            }}
-          >🔑</button>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "rgba(255,255,255,0.12)", color: "white",
-              border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
-              padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: 500,
-            }}
-          >Esci</button>
+
+          {/* Destra: utente + profilo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {lastAlign && (
+              <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, display: "none" /* nascosto su mobile */ }}>
+                {new Date(lastAlign).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <span style={{ color: "rgba(255,255,255,0.65)", fontSize: 12 }}>{fullName || username}</span>
+            <button
+              onClick={async () => {
+                setShowPwdModal(true); setPwdModalTab("password");
+                setPwdOld(""); setPwdNew(""); setPwdNew2(""); setPwdError("");
+                setAiKeyVal(""); setAiKeyMsg("");
+                try {
+                  const p = await getMyProfile();
+                  setAiKeyHas(!!p?.hasAiKey);
+                  setAiEndpoint(p?.aiEndpoint || "");
+                  setAiModel(p?.aiModel || "");
+                  setAiStyle(p?.aiStyle || "chat");
+                  setAiAuthMode(p?.aiAuthMode || "bearer");
+                } catch {}
+              }}
+              title="Profilo"
+              style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.18)", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontSize: 13 }}
+            >🔑</button>
+          </div>
         </div>
-      </header>
+      )}
 
       {/* ── Modale profilo: cambio password + API Key AI ── */}
       {showPwdModal && (
@@ -1106,6 +784,7 @@ function App() {
         </div>
       )}
 
+      {page !== "home" && (
       <main style={{ padding: "0" }}>
         {page === "mev"               && <MevPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
         {page === "mevcap"            && <MevCapPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
@@ -1119,6 +798,7 @@ function App() {
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
         {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} />}
       </main>
+      )}
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}
       {editorAlerts.length > 0 && (
