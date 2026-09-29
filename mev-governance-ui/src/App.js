@@ -54,7 +54,8 @@ function App() {
   const [aiAuthMode, setAiAuthMode] = useState("bearer");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
-  const [userTheme, setUserTheme]   = useState(() => localStorage.getItem("userTheme") || "light");
+  // Tema: inizializzato sempre "light" — aggiornato dal server al login o al bootstrap
+  const [userTheme, setUserTheme]   = useState("light");
 
   // Ambienti
   const [ambienti, setAmbienti]         = useState(() => {
@@ -85,6 +86,9 @@ function App() {
   // ── Bootstrap: verifica sessione salvata al mount ───────────────────────────
   useEffect(() => {
     const bootstrap = async () => {
+      // Pulizia legacy: rimuovi userTheme dal localStorage (ora è sempre dal server)
+      localStorage.removeItem("userTheme");
+
       const savedJwt     = localStorage.getItem("jwt");
       const savedRefresh = localStorage.getItem("refreshToken");
 
@@ -133,7 +137,7 @@ function App() {
         // Aggiorna tema dal server (potrebbe essere cambiato da un admin)
         try {
           const prof = await getMyProfile();
-          if (prof?.theme) { setUserTheme(prof.theme); localStorage.setItem("userTheme", prof.theme); }
+          if (prof?.theme) { setUserTheme(prof.theme); }
         } catch { /* non blocca il bootstrap */ }
       } else if (savedRefresh) {
         // JWT scaduto ma refresh disponibile: prova a rinnovare
@@ -248,7 +252,6 @@ function App() {
     // Tema utente restituito dal login
     const loginTheme = data.theme || "light";
     setUserTheme(loginTheme);
-    localStorage.setItem("userTheme", loginTheme);
 
     const ambientiList = data.ambienti || [];
     const activeId = data.ambienteId || 0;
@@ -814,7 +817,7 @@ function App() {
         {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && <ChartPage rows={filteredRows} />}
         {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); localStorage.setItem("userTheme", theme); }} />}
+        {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); }} />}
         {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
         {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
