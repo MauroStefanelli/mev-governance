@@ -20,6 +20,85 @@ import {
 } from "../services/mevService";
 
 
+const roleColors = {
+  Admin: { background: "#fff7ed", color: "#c2410c" },
+  Editor: { background: "#eff6ff", color: "#1d4ed8" },
+  Client: { background: "#faf5ff", color: "#7e22ce" },
+  SuperAdmin: { background: "#fef2f2", color: "#b91c1c" },
+  Developer: { background: "#f0fdf4", color: "#15803d" },
+};
+
+const actionStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "32px",
+  padding: "6px 11px",
+  fontSize: "11px",
+  fontWeight: 650,
+  lineHeight: 1.4,
+  cursor: "pointer",
+  border: "1px solid transparent",
+  borderRadius: "999px",
+  whiteSpace: "nowrap",
+};
+
+const adminStyles = `
+  .mev-admin, .mev-admin * { box-sizing: border-box; }
+  .mev-admin { min-width: 0; }
+  .mev-admin button, .mev-admin input, .mev-admin select { font-family: inherit; }
+  .mev-admin button, .mev-admin input, .mev-admin select {
+    transition: background-color .16s ease, box-shadow .16s ease, border-color .16s ease;
+  }
+  .mev-admin button:not(:disabled):hover { filter: brightness(.96); box-shadow: 0 2px 6px rgba(15,23,42,.10); }
+  .mev-admin button:disabled, .mev-admin select:disabled { opacity: .6; }
+  .mev-admin input:focus-visible, .mev-admin select:focus-visible, .mev-admin button:focus-visible {
+    outline: 3px solid #60a5fa; outline-offset: 3px;
+    box-shadow: 0 0 0 5px rgba(59,130,246,.12);
+  }
+  .mev-admin input::placeholder { color: #8390a3; }
+  .mev-admin input[type="checkbox"] {
+    width: 15px; height: 15px; margin: 0; flex-shrink: 0;
+    accent-color: #2563eb; cursor: pointer;
+  }
+  .mev-admin select option { background: #fff; color: #243247; }
+  .mev-admin-create > div { flex: 1 1 160px; min-width: 0; }
+  .mev-admin-create input, .mev-admin-create select { width: 100% !important; min-width: 0; min-height: 40px; }
+  .mev-admin-table-wrap {
+    width: 100%; overflow-x: auto; border: 1px solid #e0e6ef; border-radius: 16px;
+    background: #fff; box-shadow: 0 4px 24px rgba(30,50,80,.04);
+  }
+  .mev-admin-users th, .mev-admin-users td { border: 0; text-align: left; }
+  .mev-admin-users th {
+    padding: 15px 12px; background: #edf2f8; color: #526079;
+    font-size: 11px; font-weight: 700; letter-spacing: .025em;
+    border-bottom: 1px solid #dce4ef;
+  }
+  .mev-admin-users td { padding: 18px 12px; vertical-align: top; border-bottom: 1px solid #e8edf4; overflow-wrap: anywhere; }
+  .mev-admin-users tbody tr:nth-child(odd) { background: #fff; }
+  .mev-admin-users tbody tr:nth-child(even) { background: #f8fafd; }
+  .mev-admin-users tbody tr:hover { background: #eef4ff; }
+  .mev-admin-users tbody tr { transition: background-color .16s ease; }
+  .mev-admin-users tbody tr:last-child td { border-bottom: 0; }
+  .mev-admin-users th:nth-child(1) { width: 120px; }
+  .mev-admin-users th:nth-child(2) { width: 140px; }
+  .mev-admin-users th:nth-child(3) { width: 185px; }
+  .mev-admin-users th:nth-child(4) { width: 210px; }
+  .mev-admin-users th:nth-child(5) { width: 95px; text-align: center; }
+  .mev-admin-users th:nth-child(6) { width: 90px; }
+  .mev-admin-users th:nth-child(7) { width: 260px; }
+  .mev-admin-users th:nth-child(8) { width: 250px; }
+  .mev-admin-users th:nth-child(9), .mev-admin-users th:nth-child(10) { width: 165px; }
+  .mev-admin-users td:nth-child(9), .mev-admin-users td:nth-child(10) { font-variant-numeric: tabular-nums; }
+  @media (max-width: 600px) {
+    .mev-admin-create > div { flex-basis: 100%; }
+    .mev-admin-create > button { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mev-admin *, .mev-admin-users tbody tr { transition: none !important; }
+  }
+`;
+
 function EyeIcon({ visible }) {
   return visible ? (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -242,56 +321,57 @@ function AdminPage() {
 
   const btnStyle = {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    padding: "4px 6px", border: "1px solid #ccc", borderRadius: "4px",
-    background: "#f8f9fa", cursor: "pointer", color: "#555"
+    padding: "8px", minWidth: "36px", minHeight: "36px", border: "1px solid #dbe3ee", borderRadius: "10px",
+    background: "#fff", cursor: "pointer", color: "#526079", flexShrink: 0
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "960px" }}>
-      <h3>Gestione Utenti</h3>
+    <div className="mev-admin" style={{ padding: "clamp(16px, 3vw, 36px)", maxWidth: "1920px", margin: "0 auto", background: "#f5f7fb", color: "#243247", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", minHeight: "100%", lineHeight: 1.5 }}>
+      <style>{adminStyles}</style>
+      <h3 style={{ margin: "0 0 24px", fontSize: "26px", letterSpacing: "-0.7px", fontWeight: 750, color: "#17243b" }}>Gestione Utenti</h3>
 
       {error && (
-        <div style={{ background: "#fff0f0", border: "1px solid #ffcccc", color: "#cc0000", padding: "8px 12px", borderRadius: "4px", marginBottom: "12px", fontSize: "13px" }}>
+        <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderLeft: "4px solid #e11d48", color: "#9f1239", padding: "14px 18px", borderRadius: "12px", marginBottom: "16px", fontSize: "14px", fontWeight: 500, overflowWrap: "anywhere" }}>
           {error} <button onClick={() => setError("")} style={{ float: "right", border: "none", background: "none", cursor: "pointer", fontWeight: "bold" }}>×</button>
         </div>
       )}
       {success && (
-        <div style={{ background: "#d4edda", border: "1px solid #c3e6cb", color: "#155724", padding: "8px 12px", borderRadius: "4px", marginBottom: "12px", fontSize: "13px" }}>
+        <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderLeft: "4px solid #059669", color: "#065f46", padding: "14px 18px", borderRadius: "12px", marginBottom: "16px", fontSize: "14px", fontWeight: 500 }}>
           {success}
         </div>
       )}
 
       {/* Form nuovo utente */}
-      <div style={{ background: "#f8f9fa", border: "1px solid #ddd", borderRadius: "6px", padding: "20px", marginBottom: "24px" }}>
-        <h4 style={{ marginTop: 0 }}>Nuovo Utente</h4>
-        <form onSubmit={handleCreate} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+      <div style={{ background: "#f8faff", border: "1px solid #dce5f2", borderRadius: "18px", padding: "24px", marginBottom: "24px", boxShadow: "0 4px 20px rgba(30, 50, 80, 0.03)" }}>
+        <h4 style={{ margin: "0 0 20px", fontSize: "17px", color: "#17243b" }}>Nuovo Utente</h4>
+        <form className="mev-admin-create" onSubmit={handleCreate} style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
           {[
             { label: "Username", key: "username", required: true },
             { label: "Nome Completo", key: "fullName", required: true },
             { label: "Email", key: "email" },
           ].map(({ label, key, required }) => (
             <div key={key}>
-              <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>{label}</label>
+              <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#526079" }}>{label}</label>
               <input
                 type="text"
                 value={form[key]}
                 onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
                 required={required}
-                style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", width: "160px" }}
+                style={{ padding: "10px 12px", border: "1px solid #cfd9e6", borderRadius: "9px", fontSize: "13px", background: "#fff", color: "#243247", width: "160px" }}
               />
             </div>
           ))}
 
           {/* Campo password con toggle visibilità */}
           <div>
-            <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Password</label>
+            <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#526079" }}>Password</label>
             <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
               <input
                 type={showFormPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                 required
-                style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", width: "150px" }}
+                style={{ padding: "10px 12px", border: "1px solid #cfd9e6", borderRadius: "9px", fontSize: "13px", background: "#fff", color: "#243247", width: "150px" }}
               />
               <button type="button" onClick={() => setShowFormPassword((v) => !v)} style={btnStyle} title={showFormPassword ? "Nascondi" : "Mostra"}>
                 <EyeIcon visible={showFormPassword} />
@@ -300,11 +380,11 @@ function AdminPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Ruolo</label>
+            <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#526079" }}>Ruolo</label>
             <select
               value={form.role}
               onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
-              style={{ padding: "6px 8px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "13px", width: "120px" }}
+              style={{ padding: "10px 12px", border: "1px solid #cfd9e6", borderRadius: "9px", fontSize: "13px", background: "#fff", color: "#243247", width: "120px" }}
             >
               <option value="Editor">Editor</option>
               <option value="Admin">Admin</option>
@@ -313,14 +393,15 @@ function AdminPage() {
               <option value="SuperAdmin">SuperAdmin</option>
             </select>
           </div>
-          <button type="submit" style={{ padding: "6px 16px", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
+          <button type="submit" style={{ padding: "10px 22px", minHeight: "40px", background: "#2563eb", color: "white", border: "1px solid #2563eb", borderRadius: "10px", cursor: "pointer", fontWeight: 600, boxShadow: "0 3px 8px rgba(37,99,235,0.16)" }}>
             Aggiungi
           </button>
         </form>
       </div>
 
       {/* Tabella utenti */}
-      <table border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      <div className="mev-admin-table-wrap">
+      <table className="mev-admin-users" border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", border: "none", tableLayout: "fixed", minWidth: "1720px" }}>
         <thead style={{ background: "#f0f0f0" }}>
           <tr>
             <th>Username</th>
@@ -337,7 +418,7 @@ function AdminPage() {
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id} style={{ background: u.isActive ? "white" : "#f8f8f8", color: u.isActive ? "inherit" : "#999" }}>
+            <tr key={u.id} style={{ color: u.isActive ? "inherit" : "#758197" }}>
               <td><strong>{u.username}</strong></td>
               <td>{u.fullName}</td>
               <td>{u.email}</td>
@@ -347,10 +428,9 @@ function AdminPage() {
                   disabled={savingRole[u.id]}
                   onChange={(e) => handleChangeRole(u.id, e.target.value)}
                   style={{
-                    padding: "3px 6px", border: "1px solid #ccc", borderRadius: "4px",
+                    padding: "7px 10px", border: "1px solid currentColor", borderRadius: "999px", maxWidth: "100%",
                     fontSize: "12px", cursor: savingRole[u.id] ? "wait" : "pointer",
-                    background: u.role === "Admin" ? "#fff3cd" : u.role === "Client" ? "#eff6ff" : "#f8f9fa",
-                    color: u.role === "Admin" ? "#856404" : u.role === "Client" ? "#1a73e8" : "#333",
+                    ...roleColors[u.role],
                     fontWeight: 600,
                     opacity: savingRole[u.id] ? 0.6 : 1,
                   }}
@@ -361,9 +441,9 @@ function AdminPage() {
                   <option value="SuperAdmin">SuperAdmin</option>
                   <option value="Developer">Developer</option>
                 </select>
-                <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "8px", fontSize: "11px", color: "#444" }}>
+                <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "11px", color: "#526079" }}>
                   {["Developer", "Admin", "Editor", "Client"].filter(r => r !== u.role).map(r => (
-                    <label key={r} style={{ display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}>
+                    <label key={r} style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", padding: "4px 7px", borderRadius: "7px", border: "1px solid #dce3ec", background: "#fff", fontWeight: 500 }}>
                       <input
                         type="checkbox"
                         checked={(u.roles || []).includes(r)}
@@ -376,9 +456,9 @@ function AdminPage() {
               </td>
               <td style={{ textAlign: "center" }}>
                 <span style={{
-                  padding: "2px 8px", borderRadius: "12px", fontSize: "12px",
-                  background: u.isActive ? "#d4edda" : "#f8d7da",
-                  color: u.isActive ? "#155724" : "#721c24"
+                  display: "inline-flex", padding: "5px 9px", borderRadius: "999px", fontSize: "11px", fontWeight: 650,
+                  background: u.isActive ? "#dcfce7" : "#fee2e2",
+                  color: u.isActive ? "#166534" : "#991b1b"
                 }}>
                   {u.isActive ? "Attivo" : "Disattivo"}
                 </span>
@@ -388,9 +468,9 @@ function AdminPage() {
                   onClick={() => handleToggleEmail(u.id)}
                   title={u.sendEmail ? "Clicca per disabilitare l'invio email" : "Clicca per abilitare l'invio email"}
                   style={{
-                    padding: "3px 12px", fontSize: "12px", cursor: "pointer", border: "none", borderRadius: "4px",
-                    background: u.sendEmail ? "#d4edda" : "#f8d7da",
-                    color: u.sendEmail ? "#155724" : "#721c24",
+                    padding: "6px 14px", fontSize: "12px", cursor: "pointer", border: "1px solid transparent", borderRadius: "999px",
+                    background: u.sendEmail ? "#dcfce7" : "#fee2e2",
+                    color: u.sendEmail ? "#166534" : "#991b1b",
                     fontWeight: 600
                   }}
                 >
@@ -404,27 +484,27 @@ function AdminPage() {
                     placeholder="Nuova password"
                     value={newPasswords[u.id] || ""}
                     onChange={(e) => setNewPasswords((p) => ({ ...p, [u.id]: e.target.value }))}
-                    style={{ padding: "4px 6px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "12px", width: "130px" }}
+                    style={{ padding: "9px 10px", border: "1px solid #cfd9e6", borderRadius: "9px", fontSize: "12px", width: "130px", minWidth: 0, background: "#fff", color: "#243247" }}
                   />
                   <button type="button" onClick={() => toggleRowPassword(u.id)} style={btnStyle} title={showRowPassword[u.id] ? "Nascondi" : "Mostra"}>
                     <EyeIcon visible={showRowPassword[u.id]} />
                   </button>
-                  <button onClick={() => handleResetPassword(u.id)} style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}>
+                  <button onClick={() => handleResetPassword(u.id)} style={{ ...actionStyle, background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}>
                     Salva
                   </button>
                 </div>
               </td>
               <td style={{ textAlign: "center" }}>
-                <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", justifyContent: "flex-start" }}>
                   <button
                     onClick={() => handleToggle(u.id)}
-                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: u.isActive ? "#ffc107" : "#28a745", color: u.isActive ? "#000" : "#fff", border: "none", borderRadius: "4px" }}
+                    style={{ ...actionStyle, background: u.isActive ? "#fef9c3" : "#dcfce7", color: u.isActive ? "#854d0e" : "#166534", borderColor: u.isActive ? "#fde68a" : "#bbf7d0" }}
                   >
                     {u.isActive ? "Disattiva" : "Attiva"}
                   </button>
                   <button
                     onClick={() => handleOpenAccessLog(u)}
-                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#1a73e8", color: "white", border: "none", borderRadius: "4px" }}
+                    style={{ ...actionStyle, background: "#f1f5f9", color: "#475569", borderColor: "#dbe3ed" }}
                     title="Storico accessi"
                   >
                     Storico
@@ -432,7 +512,7 @@ function AdminPage() {
                   {u.role === "Client" && (
                     <button
                       onClick={() => setPermessiModal({ user: u })}
-                      style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#7c3aed", color: "white", border: "none", borderRadius: "4px" }}
+                      style={{ ...actionStyle, background: "#f3e8ff", color: "#7e22ce", borderColor: "#e9d5ff" }}
                       title="Gestisci permessi pagine e contratti"
                     >
                       Permessi
@@ -440,14 +520,14 @@ function AdminPage() {
                   )}
                   <button
                     onClick={() => setEditModal({ id: u.id, username: u.username, fullName: u.fullName || "", email: u.email || "" })}
-                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#0d6efd", color: "white", border: "none", borderRadius: "4px" }}
+                    style={{ ...actionStyle, background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}
                     title="Modifica dati utente"
                   >
                     Modifica
                   </button>
                   <button
                     onClick={() => handleDelete(u.id, u.username)}
-                    style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer", background: "#dc3545", color: "white", border: "none", borderRadius: "4px" }}
+                    style={{ ...actionStyle, background: "#fff1f2", color: "#be123c", borderColor: "#fecdd3" }}
                   >
                     Elimina
                   </button>
@@ -463,14 +543,16 @@ function AdminPage() {
           ))}
         </tbody>
       </table>
+      </div>
 
       {/* ── Reset dati ── */}
       <div style={{
         marginTop: "32px",
-        border: "1.5px solid #fecaca",
+        border: "1px solid #fecaca",
         borderRadius: "10px",
-        padding: "16px 20px",
-        background: "#fff",
+        padding: "22px 24px",
+        background: "#fffafa",
+        flexWrap: "wrap",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -481,6 +563,7 @@ function AdminPage() {
             Reset dati
           </div>
           <div style={{ fontSize: "12px", color: "#64748b", lineHeight: 1.5 }}>
+            <strong style={{ color: "#b91c1c" }}>Attenzione: operazione irreversibile.</strong>{" "}
             Elimina tutte le righe <strong>MEV</strong> e tutti i dati <strong>ConsumoTow</strong> (contratti + TOW) per questo ambiente e azzera i contatori ID.
             RTI &amp; SUBCO, Ordini e Verbali non vengono toccati.
           </div>
@@ -511,15 +594,15 @@ function AdminPage() {
       {/* ── Modale storico accessi ── */}
       {accessLogModal && (
         <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)",
           zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
         }}
           onClick={(e) => { if (e.target === e.currentTarget) setAccessLogModal(null); }}
         >
           <div style={{
-            background: "white", borderRadius: "12px", padding: "24px 28px",
+            background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", padding: "24px 28px",
             width: "600px", maxWidth: "95vw", maxHeight: "80vh",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column",
+            boxShadow: "0 24px 80px rgba(15,23,42,0.24)", display: "flex", flexDirection: "column",
           }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
@@ -592,7 +675,7 @@ function AdminPage() {
             <div style={{ marginTop: "16px", textAlign: "right" }}>
               <button
                 onClick={() => setAccessLogModal(null)}
-                style={{ padding: "8px 20px", borderRadius: "6px", border: "1px solid #dadce0", background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}
+                style={{ padding: "10px 20px", borderRadius: "10px", border: "1px solid #dadce0", background: "#f1f3f4", color: "#444", cursor: "pointer", fontSize: "13px" }}
               >Chiudi</button>
             </div>
           </div>
@@ -610,10 +693,10 @@ function AdminPage() {
       {/* ── Modale Modifica Utente ── */}
       {editModal && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{ position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={(e) => { if (e.target === e.currentTarget) setEditModal(null); }}
         >
-          <div style={{ background: "white", borderRadius: "12px", padding: "28px 32px", width: "440px", maxWidth: "95vw", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+          <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", padding: "clamp(20px, 4vw, 32px)", width: "460px", maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(15,23,42,0.24)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h4 style={{ margin: 0, color: "#1a73e8" }}>Modifica Utente</h4>
               <button onClick={() => setEditModal(null)} style={{ border: "none", background: "none", fontSize: "18px", cursor: "pointer", color: "#888" }}>×</button>
@@ -624,24 +707,24 @@ function AdminPage() {
               { label: "Email", key: "email" },
             ].map(({ label, key }) => (
               <div key={key} style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "12px", marginBottom: "4px", fontWeight: 600, color: "#555" }}>{label}</label>
+                <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#526079", fontWeight: 600, color: "#555" }}>{label}</label>
                 <input
                   type="text"
                   value={editModal[key]}
                   onChange={(e) => setEditModal((p) => ({ ...p, [key]: e.target.value }))}
-                  style={{ width: "100%", padding: "7px 10px", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "11px 13px", border: "1px solid #cfd9e6", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", color: "#243247", background: "#fff" }}
                 />
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e8edf4" }}>
               <button
                 onClick={() => setEditModal(null)}
-                style={{ padding: "7px 18px", borderRadius: "6px", border: "1px solid #ccc", background: "#f1f3f4", cursor: "pointer", fontSize: "13px" }}
+                style={{ padding: "10px 18px", borderRadius: "10px", border: "1px solid #ccc", background: "#f1f3f4", cursor: "pointer", fontSize: "13px" }}
               >Annulla</button>
               <button
                 onClick={handleSaveEdit}
                 disabled={editSaving}
-                style={{ padding: "7px 20px", borderRadius: "6px", border: "none", background: "#1a73e8", color: "white", cursor: editSaving ? "wait" : "pointer", fontSize: "13px", fontWeight: 600 }}
+                style={{ padding: "10px 22px", borderRadius: "10px", border: "none", background: "#1a73e8", color: "white", cursor: editSaving ? "wait" : "pointer", fontSize: "13px", fontWeight: 600 }}
               >{editSaving ? "Salvataggio..." : "Salva"}</button>
             </div>
           </div>
@@ -711,8 +794,8 @@ function PermessiClientModal({ user, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: "12px", padding: "28px 32px", width: "480px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+    <div style={{ position: "fixed", inset: 0, padding: "20px", overflowY: "auto", backdropFilter: "blur(5px)", background: "rgba(15,23,42,0.52)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: "20px", border: "1px solid #e2e8f0", padding: "clamp(20px, 4vw, 32px)", width: "540px", maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(15,23,42,0.24)" }}>
         <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px", color: "#1a1a1a" }}>
           Permessi — {user.fullName || user.username}
         </div>
@@ -728,7 +811,7 @@ function PermessiClientModal({ user, onClose }) {
               <label key={p.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer",
                 background: pages.includes(p.id) ? "#eff6ff" : "#f8f9fa",
                 border: `1px solid ${pages.includes(p.id) ? "#93c5fd" : "#e2e8f0"}`,
-                borderRadius: "6px", padding: "5px 10px", userSelect: "none" }}>
+                borderRadius: "9px", padding: "9px 12px", userSelect: "none" }}>
                 <input type="checkbox" checked={pages.includes(p.id)} onChange={() => togglePage(p.id)} />
                 {p.label}
               </label>
@@ -748,7 +831,7 @@ function PermessiClientModal({ user, onClose }) {
                   <label key={nome} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer",
                     background: isContrattoChecked(nome) ? "#f0fdf4" : "#f8f9fa",
                     border: `1px solid ${isContrattoChecked(nome) ? "#86efac" : "#e2e8f0"}`,
-                    borderRadius: "6px", padding: "5px 10px", userSelect: "none" }}>
+                    borderRadius: "9px", padding: "9px 12px", userSelect: "none" }}>
                     <input type="checkbox" checked={isContrattoChecked(nome)} onChange={() => toggleContratto(nome)} />
                     {nome}
                   </label>
@@ -758,8 +841,8 @@ function PermessiClientModal({ user, onClose }) {
         </div>
 
         <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: "6px", border: "1px solid #dadce0", background: "#f1f3f4", cursor: "pointer", fontSize: "13px" }}>Annulla</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: "6px", border: "none", background: saving ? "#a78bfa" : "#7c3aed", color: "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 600 }}>
+          <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: "10px", border: "1px solid #dadce0", background: "#f1f3f4", cursor: "pointer", fontSize: "13px" }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: saving ? "#a78bfa" : "#7c3aed", color: "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 600 }}>
             {saving ? "Salvataggio..." : "Salva Permessi"}
           </button>
         </div>
