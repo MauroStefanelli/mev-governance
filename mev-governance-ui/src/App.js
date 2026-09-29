@@ -435,7 +435,6 @@ function App() {
       background: userTheme === "dark"
         ? "linear-gradient(135deg, #0a1628 0%, #0f2347 50%, #1a3a6b 100%)"
         : "#f8f9fa",
-      color: userTheme === "dark" ? "#e2e8f0" : undefined,
       transition: "background 0.4s ease",
     }}>
       {/* ── Toast globale ── */}
@@ -523,14 +522,14 @@ function App() {
 
           {/* Centro: logo + titolo + badge versione + ambiente */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
-            <img src="/logo_poste.svg" alt="" aria-hidden="true" style={{ height: 28, width: "auto", filter: "brightness(0) invert(1) opacity(0.7)" }} />
+            <img src="/logo_poste.svg" alt="Poste" style={{ height: 30, width: "auto", display: "block", filter: "brightness(0) invert(1)", opacity: 0.9 }} />
             <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 700, fontSize: 14 }}>MEV Governance</span>
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_51</span>
+            }}>DEV_Rel_53</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -814,6 +813,7 @@ function App() {
       )}
 
       {page !== "home" && (
+      <div style={{ background: "#ffffff", color: "#1a1a1a", minHeight: "calc(100vh - 48px)" }}>
       <main style={{ padding: "0" }}>
         {page === "mev"               && <MevPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
         {page === "mevcap"            && <MevCapPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
@@ -827,6 +827,7 @@ function App() {
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
         {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} />}
       </main>
+      </div>
       )}
 
       {/* ── Popup notifiche accesso Editor (solo Admin) ── */}
