@@ -210,9 +210,12 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
-    // SuperAdmin ha tutti i permessi di Admin, più i propri
-    options.AddPolicy("AdminOrSuper", policy =>
-        policy.RequireRole("Admin", "SuperAdmin"));
+     // SuperAdmin ha tutti i permessi di Admin, più i propri
+     options.AddPolicy("AdminOrSuper", policy =>
+         policy.RequireRole("Admin", "SuperAdmin"));
+     // Qualsiasi utente autenticato (per endpoint di sola lettura)
+     options.AddPolicy("AnyAuthenticated", policy =>
+         policy.RequireAuthenticatedUser());
 });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -414,6 +417,7 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiModel""                 TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiStyle""                 TEXT           NULL;
                 ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""AiAuthMode""              TEXT           NULL;
+                ALTER TABLE ""{sch}"".""Users""    ADD COLUMN IF NOT EXISTS ""Theme""                   TEXT           NULL DEFAULT 'light';
                 ALTER TABLE ""{sch}"".""Contratti""          ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""BuoniConsegna""      ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
                 ALTER TABLE ""{sch}"".""ConsumoTow""         ADD COLUMN IF NOT EXISTS ""AmbienteId""     INTEGER        NOT NULL DEFAULT 0;
@@ -426,11 +430,52 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""AppSettings""        ADD COLUMN IF NOT EXISTS ""LastAlignBatchId"" TEXT          NULL;
                 ALTER TABLE ""{sch}"".""MevItems""           ADD COLUMN IF NOT EXISTS ""LastAlignBatchId"" TEXT          NULL;
                 ALTER TABLE ""{sch}"".""MevItems""           ADD COLUMN IF NOT EXISTS ""NoteCap""          TEXT          NULL;
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserRoles"" (
+                    ""Id""     SERIAL PRIMARY KEY,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""Role""   TEXT NOT NULL DEFAULT ''
+                );
             ");
 #pragma warning restore EF1002
             Console.WriteLine("[PRE-PATCH] Tutte le tabelle verificate.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH ERROR] {ex.Message}"); }
+
+        // Blocco separato: garantisce UserRoles anche se il blocco principale ha avuto errori
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""UserRoles"" (
+                    ""Id""     SERIAL PRIMARY KEY,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""Role""   TEXT NOT NULL DEFAULT ''
+                );
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] UserRoles verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH UserRoles ERROR] {ex.Message}"); }
+
+        // Blocco separato: colonna Theme (isolato per resistere a errori nel blocco principale)
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""Theme"" TEXT NULL DEFAULT 'light';");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] Colonna Theme verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Theme ERROR] {ex.Message}"); }
+
+        // Blocco separato: colonna AiKeyEnabled
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}"".""Users"" ADD COLUMN IF NOT EXISTS ""AiKeyEnabled"" BOOLEAN NOT NULL DEFAULT false;");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] Colonna AiKeyEnabled verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AiKeyEnabled ERROR] {ex.Message}"); }
     }
 
     try

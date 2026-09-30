@@ -78,7 +78,7 @@ public class AiService
         req.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
         using var resp = await client.SendAsync(req, cts.Token);
         var bodyText = await resp.Content.ReadAsStringAsync(cts.Token);
 

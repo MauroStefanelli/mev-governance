@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MevGovernanceBackend.Models;
 
@@ -33,4 +34,11 @@ public class AppUser
     public string? AiModel    { get; set; }   // es. gpt-4o, gpt-5.5
     public string? AiStyle    { get; set; }   // "responses" | "chat"
     public string? AiAuthMode { get; set; }   // "bearer" | "api-key"
+    // Se true, l'utente vede e può configurare la propria API key nel profilo
+    public bool    AiKeyEnabled { get; set; } = false;
+
+    // Tema UI: "light" (default) | "dark"
+    // NotMapped: la colonna viene aggiunta via ALTER TABLE al boot; EF non la include nella SELECT standard
+    [NotMapped]
+    public string? Theme { get; set; } = "light";
 }

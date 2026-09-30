@@ -61,8 +61,21 @@ public class AuthController : ControllerBase
 
         _db.SaveChanges();
 
+        // Leggi Theme via query raw (colonna NotMapped, aggiunta via ALTER TABLE al boot)
+        string userTheme = "light";
+        try {
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"SELECT \"Theme\" FROM \"{_db.Model.FindEntityType(typeof(AppUser))!.GetSchema()}\".\"Users\" WHERE \"Id\" = @id";
+            var p = cmd.CreateParameter(); p.ParameterName = "@id"; p.Value = user.Id; cmd.Parameters.Add(p);
+            var raw = cmd.ExecuteScalar();
+            if (raw != null && raw != DBNull.Value) userTheme = raw.ToString()!;
+        } catch { /* colonna non ancora presente: default light */ }
+
         return Ok(new
         {
+            id = user.Id,
             token,
             refreshToken,
             username = user.Username,
@@ -70,7 +83,8 @@ public class AuthController : ControllerBase
             role = user.Role,
             roles,
             ambienti,
-            ambienteId = defaultAmbienteId
+            ambienteId = defaultAmbienteId,
+            theme = userTheme
         });
     }
 
@@ -224,7 +238,9 @@ public class AuthController : ControllerBase
                 u.IsActive,
                 u.SendEmail,
                 u.LastLogin,
-                u.LastLogout
+                u.LastLogout,
+                u.AiKeyEnabled,
+                u.AiApiKey
             })
             .ToList();
 
@@ -241,6 +257,25 @@ public class AuthController : ControllerBase
             Console.Error.WriteLine($"[USER-ROLES] GetUsers warning: {ex.Message}");
         }
 
+        // Leggi Theme via query raw per tutti gli utenti (NotMapped, colonna aggiunta via ALTER TABLE)
+        var themes = new Dictionary<int, string>();
+        try
+        {
+            var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"SELECT \"Id\", \"Theme\" FROM \"{sch}\".\"Users\"";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                int uid = reader.GetInt32(0);
+                string th = reader.IsDBNull(1) ? "light" : (reader.GetString(1) ?? "light");
+                themes[uid] = th;
+            }
+        }
+        catch { /* colonna non ancora presente */ }
+
         var result = users.Select(u => new
         {
             u.Id,
@@ -252,7 +287,10 @@ public class AuthController : ControllerBase
             u.IsActive,
             u.SendEmail,
             u.LastLogin,
-            u.LastLogout
+            u.LastLogout,
+            theme = themes.TryGetValue(u.Id, out var t) ? t : "light",
+            u.AiKeyEnabled,
+            hasAiKey = !string.IsNullOrEmpty(u.AiApiKey)
         }).ToList();
 
         return Ok(result);
@@ -310,7 +348,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult GetUserRolesEndpoint(int id)
     {
-        if (!User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
@@ -328,7 +366,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public IActionResult SetUserRolesEndpoint(int id, [FromBody] SetRolesRequest request)
     {
-        if (!User.IsInRole("SuperAdmin"))
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
@@ -352,8 +390,8 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[SET-USER-ROLES] Warning: {ex.Message}");
-            return StatusCode(500, new { message = "Tabella UserRoles non disponibile nel DB corrente. Il ruolo aggiuntivo non è stato salvato." });
+            Console.Error.WriteLine($"[SET-USER-ROLES] Error: {ex.Message}\n{ex.InnerException?.Message}");
+            return StatusCode(500, new { message = $"Errore salvataggio ruoli: {ex.Message}" });
         }
 
         return Ok(new { id = user.Id, username = user.Username, role = user.Role, roles = GetUserRoles(user.Id) });
@@ -388,6 +426,101 @@ public class AuthController : ControllerBase
             user.Id,
             user.Username
         });
+    }
+
+    // PUT /api/auth/users/{id} — modifica dati utente (username, fullName, email)
+    [HttpPut("users/{id}")]
+    [Authorize]
+    public IActionResult UpdateUser(int id, [FromBody] UpdateUserRequest request)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+
+        if (!string.IsNullOrWhiteSpace(request.Username) && request.Username != user.Username)
+        {
+            if (_db.Users.Any(u => u.Username == request.Username && u.Id != id))
+                return BadRequest("Username già in uso");
+            user.Username = request.Username.Trim();
+        }
+        if (request.FullName != null) user.FullName = request.FullName.Trim();
+        if (request.Email != null) user.Email = request.Email.Trim();
+
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.FullName, user.Email, user.Role });
+    }
+
+    // PUT /api/auth/users/{id}/toggle — attiva/disattiva utente
+    [HttpPut("users/{id}/toggle")]
+    [Authorize]
+    public IActionResult ToggleUser(int id)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        user.IsActive = !user.IsActive;
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.IsActive });
+    }
+
+    // PUT /api/auth/users/{id}/toggleemail — abilita/disabilita invio email
+    [HttpPut("users/{id}/toggleemail")]
+    [Authorize]
+    public IActionResult ToggleEmailUser(int id)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        user.SendEmail = !user.SendEmail;
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.SendEmail });
+    }
+
+    // PUT /api/auth/users/{id}/theme — imposta tema UI (solo SuperAdmin)
+    [HttpPut("users/{id}/theme")]
+    [Authorize]
+    public IActionResult SetUserTheme(int id, [FromBody] SetThemeRequest request)
+    {
+        if (!User.IsInRole("SuperAdmin"))
+            return Forbid();
+        if (_db.Users.FirstOrDefault(u => u.Id == id) == null)
+            return NotFound("Utente non trovato");
+        var valid = new[] { "light", "dark" };
+        var newTheme = valid.Contains(request.Theme) ? request.Theme : "light";
+        try
+        {
+            var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+            var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"UPDATE \"{sch}\".\"Users\" SET \"Theme\" = @theme WHERE \"Id\" = @id";
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@theme"; p1.Value = newTheme; cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@id";    p2.Value = id;       cmd.Parameters.Add(p2);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Errore aggiornamento tema: {ex.Message}");
+        }
+        return Ok(new { Id = id, Theme = newTheme });
+    }
+
+    // PUT /api/auth/users/{id}/toggleaikey — abilita/disabilita accesso API key (Admin+SuperAdmin)
+    [HttpPut("users/{id}/toggleaikey")]
+    [Authorize]
+    public IActionResult ToggleAiKey(int id)
+    {
+        if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
+            return Forbid();
+        var user = _db.Users.FirstOrDefault(u => u.Id == id);
+        if (user == null) return NotFound("Utente non trovato");
+        user.AiKeyEnabled = !user.AiKeyEnabled;
+        _db.SaveChanges();
+        return Ok(new { user.Id, user.Username, user.AiKeyEnabled });
     }
 
     // ============================================================
@@ -481,25 +614,68 @@ public class AuthController : ControllerBase
     }
 
     // ============================================================
-    // GET /api/auth/me — profilo self (include configurazione AI)
-    // ============================================================
-    [HttpGet("me")]
-    [Authorize]
-    public async Task<IActionResult> GetMe()
-    {
-        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
-        var user = await _db.Users.FindAsync(userId);
-        if (user == null) return NotFound();
-        return Ok(new {
-            user.Id, user.Username, user.FullName, user.Email, user.Role,
-            hasAiKey  = !string.IsNullOrEmpty(user.AiApiKey),
-            aiEndpoint = user.AiEndpoint,
-            aiModel    = user.AiModel,
-            aiStyle    = user.AiStyle,
-            aiAuthMode = user.AiAuthMode
-        });
-    }
+     // GET /api/auth/me — profilo self (include configurazione AI)
+     // ============================================================
+     [HttpGet("me")]
+     [Authorize]
+     public async Task<IActionResult> GetMe()
+     {
+         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+         if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+         var user = await _db.Users.FindAsync(userId);
+         if (user == null) return NotFound();
+
+         // Leggi Theme via query raw (NotMapped)
+         string theme = "light";
+         try {
+             var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+             var conn = _db.Database.GetDbConnection();
+             if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+             using var cmd = conn.CreateCommand();
+             cmd.CommandText = $"SELECT \"Theme\" FROM \"{sch}\".\"Users\" WHERE \"Id\" = @id";
+             var p = cmd.CreateParameter(); p.ParameterName = "@id"; p.Value = userId; cmd.Parameters.Add(p);
+             var raw = cmd.ExecuteScalar();
+             if (raw != null && raw != DBNull.Value) theme = raw.ToString()!;
+         } catch { /* colonna non ancora presente */ }
+
+         return Ok(new {
+             user.Id, user.Username, user.FullName, user.Email, user.Role,
+             hasAiKey      = !string.IsNullOrEmpty(user.AiApiKey),
+             aiKeyEnabled  = user.AiKeyEnabled,
+             aiEndpoint    = user.AiEndpoint,
+             aiModel       = user.AiModel,
+             aiStyle       = user.AiStyle,
+             aiAuthMode    = user.AiAuthMode,
+             theme
+         });
+     }
+
+     // PUT /api/auth/me/theme — imposta il proprio tema UI (self-service)
+     [HttpPut("me/theme")]
+     [Authorize]
+     public IActionResult SetMyTheme([FromBody] SetThemeRequest request)
+     {
+         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+         if (!int.TryParse(idClaim, out var userId)) return Unauthorized();
+         var valid = new[] { "light", "dark" };
+         var newTheme = valid.Contains(request.Theme) ? request.Theme : "light";
+         try
+         {
+             var sch = _db.Model.FindEntityType(typeof(AppUser))!.GetSchema() ?? "dev";
+             var conn = _db.Database.GetDbConnection();
+             if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+             using var cmd = conn.CreateCommand();
+             cmd.CommandText = $"UPDATE \"{sch}\".\"Users\" SET \"Theme\" = @theme WHERE \"Id\" = @id";
+             var p1 = cmd.CreateParameter(); p1.ParameterName = "@theme"; p1.Value = newTheme; cmd.Parameters.Add(p1);
+             var p2 = cmd.CreateParameter(); p2.ParameterName = "@id";    p2.Value = userId;   cmd.Parameters.Add(p2);
+             cmd.ExecuteNonQuery();
+         }
+         catch (Exception ex)
+         {
+             return StatusCode(500, $"Errore aggiornamento tema: {ex.Message}");
+         }
+         return Ok(new { theme = newTheme });
+     }
 
     // ============================================================
     // EDITOR LOGINS
@@ -729,3 +905,5 @@ public record ResetPasswordRequest(string NewPassword);
 public record SaveAiKeyRequest(string? ApiKey);
 public record SaveAiSettingsRequest(string? ApiKey, string? Endpoint, string? Model, string? Style, string? AuthMode);
 public record AmbienteDto(int Id, string CodiceContratto, string Descrizione);
+public record UpdateUserRequest(string? Username, string? FullName, string? Email);
+public record SetThemeRequest(string Theme);

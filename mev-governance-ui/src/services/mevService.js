@@ -312,6 +312,16 @@ export const saveMyAiKey = async (apiKey) => {
   return response.json();
 };
 
+export const setMyTheme = async (theme) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/theme`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ theme })
+  });
+  if (!response.ok) throw new Error("Errore aggiornamento tema");
+  return response.json();
+};
+
 export const saveMyAiSettings = async ({ apiKey, endpoint, model, style, authMode }) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/me/aisettings`, {
     method: "PUT",
@@ -396,6 +406,15 @@ export const toggleEmailUser = async (id) => {
   return response.json();
 };
 
+export const toggleAiKey = async (id) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/toggleaikey`, {
+    method: "PUT",
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error("Errore toggle API key utente");
+  return response.json();
+};
+
 export const resetPassword = async (id, newPassword) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/password`, {
     method: "PUT",
@@ -436,6 +455,34 @@ export const resetAll = async () => {
     headers: authHeaders(),
   });
   if (response.status === 401) throw new Error("401");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+// Modifica dati anagrafici utente (username, fullName, email)
+export const updateUser = async (id, data) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
+// Imposta tema UI utente (solo SuperAdmin)
+export const setUserTheme = async (id, theme) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/users/${id}/theme`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ theme })
+  });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -698,13 +745,11 @@ export const analyzeInitiativeWithAi = async (context) => {
     headers: authHeaders(),
     body: JSON.stringify(context)
   });
-  if (!response.ok) {
-    const text = await response.text();
-    let detail = text;
-    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
-    throw new Error(detail);
-  }
-  return response.json();
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`Risposta non valida dal server (HTTP ${response.status}): ${text.slice(0, 200)}`); }
+  if (!response.ok) throw new Error(data?.message || `Errore HTTP ${response.status}`);
+  return data;
 };
 
 export const analyzeDevelopmentWithAi = async (context) => {
@@ -713,13 +758,11 @@ export const analyzeDevelopmentWithAi = async (context) => {
     headers: authHeaders(),
     body: JSON.stringify(context)
   });
-  if (!response.ok) {
-    const text = await response.text();
-    let detail = text;
-    try { detail = JSON.parse(text).message || text; } catch { /* keep raw */ }
-    throw new Error(detail);
-  }
-  return response.json();
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`Risposta non valida dal server (HTTP ${response.status}): ${text.slice(0, 200)}`); }
+  if (!response.ok) throw new Error(data?.message || `Errore HTTP ${response.status}`);
+  return data;
 };
 
 export const getUserAccessLogSafe = async (username) => {
@@ -846,8 +889,10 @@ export const getTowImpatto = async () => {
     headers: authHeaders()
   });
   if (response.status === 401) throw new Error("401");
-  if (!response.ok) return {};
-  return response.json();
+  if (!response.ok) { console.error("[TOW] HTTP", response.status); return {}; }
+  const text = await response.text();
+  console.log("[TOW] raw response:", text.slice(0, 200));
+  try { return JSON.parse(text); } catch(e) { console.error("[TOW] JSON parse error:", e); return {}; }
 };
 
 export const setTowImpatto = async (data) => {
