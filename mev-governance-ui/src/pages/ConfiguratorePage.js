@@ -728,7 +728,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
         })),
         lot,
-        contractId: initiativeContractId,   // chiave in towPercentages (per contratto/ambiente)
+        contractId: initiativeContractId,
+        archiveContractId: selectedContractId,
+        tow5Share,
         towPercentages,
         tow,
         discount,
@@ -737,7 +739,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         priceMode,
         builtin: !!activeContract?.builtin,
       }),
-    [items, lot, initiativeContractId, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
+    [items, lot, initiativeContractId, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -1793,10 +1795,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               <label style={styles.label}>Contingenza (%) <input style={styles.input} type="number" step="0.01" value={contingency} onChange={(e) => setContingency(Number(e.target.value) || 0)} /></label>
             </div>
             <div style={{ marginTop: 10 }}>
-              <strong>TOW02.5: </strong>{euro.format(calculation.tow5)}
-              <span style={{ fontSize: 12, color: '#52657d', marginLeft: 8 }}>({tow5Share}% del catalogo)</span>
+              <strong>Base TOW automatici: </strong>{euro.format(calculation.allocationBase)}
               <span style={{ fontSize: 12, color: '#52657d', marginLeft: 8 }}>
-                → base allocazione: {euro.format(calculation.allocationBase)} (× {calculation.towMultiplier?.toFixed(5)})
+                (catalogo × {calculation.towMultiplier?.toFixed(5)})
               </span>
             </div>
           </div>

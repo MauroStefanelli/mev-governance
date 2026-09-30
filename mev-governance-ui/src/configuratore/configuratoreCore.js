@@ -282,14 +282,17 @@ export function defaultPrice(it, { catalog, priceMode, builtin }) {
 
 export const itemPrice = (it, ctx) => it.unit ?? defaultPrice(it, ctx);
 
-export function calc({ items, lot, contractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin }) {
+export function calc({ items, lot, contractId, archiveContractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin }) {
   const ctx = { catalog, priceMode, builtin };
   const cat = items.reduce((a, it) => a + itemPrice(it, ctx) * it.qty, 0);
-  // Formula: tow5 = cat × (tow5Share/100)  →  base = tow5 × multiplier  →  TOW02.N = base × pct%
-  // Il moltiplicatore è fisso da capitolato per contratti noti, altrimenti 1.
-  const tow5 = cat * (tow5Share / 100);
-  const towMultiplier = contractTowMultiplier(contractId, lot) ?? 1;
-  const allocationBase = tow5 * towMultiplier;
+  // Formula TOW automatici (TOW02.1, 02.3, 02.4):
+  //   base = cat × multiplier  (es. cat × 1.53716 per poste-tet-2025 lotto 2)
+  //   TOW02.N = base × pct%
+  // Il moltiplicatore è fisso da capitolato; tow5Share descrive la quota catalogo
+  // sul totale offerta ma non entra nel calcolo dei TOW automatici.
+  const tow5 = cat * (tow5Share / 100);   // informativo — usato nell'UI
+  const towMultiplier = contractTowMultiplier(archiveContractId ?? contractId, lot) ?? 1;
+  const allocationBase = cat * towMultiplier;
   const prefix = `TOW0${lot}.`;
   const pct = towPercentages?.[contractId]?.[lot] || { 1: 0, 3: 0, 4: 0 };
   const autoTow = {};
