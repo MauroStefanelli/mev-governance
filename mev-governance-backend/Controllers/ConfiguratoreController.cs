@@ -52,7 +52,7 @@ public class ConfiguratoreController : ControllerBase
     {
         var rawSchema = (_config["DB_SCHEMA"] ?? "").Trim().ToLower();
         var sch = rawSchema.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(rawSchema, @"^[a-zA-Z0-9_]+$")
-            ? rawSchema : "dev";
+            ? rawSchema : "public";
         // Se DB_CONNECTION_STRING manca, prova le variabili che Render/Supabase espongono.
         var cs = _config["DB_CONNECTION_STRING"] ?? "";
         if (string.IsNullOrWhiteSpace(cs))

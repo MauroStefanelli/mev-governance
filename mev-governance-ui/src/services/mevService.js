@@ -599,11 +599,10 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
     form.append(`priceFile_${l.lotId}`, l.priceFile);
   });
 
-  // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto per FormData
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };
@@ -626,10 +625,9 @@ export const uploadConfiguratoreContractLot = async ({ contractId, contractName,
   form.append(`catalogFile_${lotId}`, catalogFile);
   form.append(`priceFile_${lotId}`, priceFile);
 
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };

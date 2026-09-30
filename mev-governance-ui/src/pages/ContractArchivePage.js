@@ -838,7 +838,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                   <article key={c.contractId} style={S.contractCard}>
                     {/* Intestazione */}
                     <div>
-                      <p style={S.eyebrow}>{c.builtin ? 'Configurazione iniziale' : 'Configurazione locale'}</p>
+                      <p style={S.eyebrow}>{c.builtin ? 'Contratto di sistema' : 'Contratto personalizzato'}</p>
                       <h2 style={{ ...S.h2, marginTop: 6, fontSize: 21, lineHeight: 1.3, letterSpacing: '-0.3px' }}>{c.name || c.contractId}</h2>
                       <p style={{ ...S.muted, fontSize: 12 }}>Capitolato · {c.rulesFile || 'Non indicato'}</p>
                       <p style={{ ...S.muted, marginTop: 10 }}>{visible.length} lotti · {active.length} attivi</p>
@@ -963,7 +963,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                     </div>
 
                     {/* Aggiornamento file per lotto (collassabile) */}
-                    {!c.builtin && visible.map(l => {
+                    {visible.map(l => {
                       const key = c.contractId + '|' + l.lotId;
                       const up = lotUpload[key] || {};
                       return (
