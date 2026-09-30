@@ -19,3 +19,8 @@ bcrypt-test/obj/
 
 # ── Deploy artifacts ──────────────────────────
 *.tar.gz
+
+# ── Documenti e tool locali (non codice sorgente) ─
+Contratti/
+Tool Offerte/
+ToolOfferte/
