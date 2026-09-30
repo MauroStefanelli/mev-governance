@@ -68,12 +68,13 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [archiveRecords, setArchiveRecords] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
   const [showDescModal, setShowDescModal] = useState(false);
-  const [releaseList, setReleaseList] = useState([]); // release del contratto selezionato
-  const [towImpattoDb, setTowImpattoDb] = useState({}); // { "BASE": { "TOW01.1": 30, ... }, "QDO": {...} }
-  const [towImpattoSrc, setTowImpattoSrc] = useState(""); // contratto sorgente % impatto scelto dall'utente
+  const [releaseList, setReleaseList] = useState([]);
+  const [towImpattoDb, setTowImpattoDb] = useState({});
+  const [towImpattoSrc, setTowImpattoSrc] = useState("");
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
   const [mappedLoading, setMappedLoading] = useState(false);
+  const [expandedOfferGroups, setExpandedOfferGroups] = useState(new Set()); // gruppi aperti in step 3
 
   // ── Sviluppo ──
   const [implementationFiles, setImplementationFiles] = useState([]);
@@ -1894,9 +1895,24 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
           {/* Riga offerta */}
           <div style={styles.card}>
-            <h3 style={{ margin: "0 0 10px" }}>Voci di catalogo</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+              <h3 style={{ margin: 0 }}>Voci di catalogo</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={{ ...btnStyles.ghost, fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => {
+                    const groups = {};
+                    items.forEach(it => { const g = it.interventionId || "—"; if (!groups[g]) groups[g] = true; });
+                    setExpandedOfferGroups(new Set(Object.keys(groups)));
+                  }}>
+                  Espandi tutti
+                </button>
+                <button style={{ ...btnStyles.ghost, fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => setExpandedOfferGroups(new Set())}>
+                  Chiudi tutti
+                </button>
+              </div>
+            </div>
             {(() => {
-              // Raggruppa items per interventionId
               const groups = {};
               items.forEach(it => {
                 const gid = it.interventionId || "—";
@@ -1904,60 +1920,75 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                 groups[gid].push(it);
               });
               return Object.entries(groups).map(([gid, gitems]) => {
+                const isOpen = expandedOfferGroups.has(gid);
                 const groupTotal = gitems.reduce((s, it) => {
                   const u = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
                   return s + u * it.qty;
                 }, 0);
                 return (
-                  <details key={gid} open style={{ marginBottom: 8, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
-                    <summary style={{ padding: "9px 14px", background: "#f8fafc", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between", listStyle: "none" }}>
-                      <span>ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span> <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span></span>
+                  <div key={gid} style={{ marginBottom: 6, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+                    <div
+                      onClick={() => setExpandedOfferGroups(prev => {
+                        const next = new Set(prev);
+                        isOpen ? next.delete(gid) : next.add(gid);
+                        return next;
+                      })}
+                      style={{ padding: "9px 14px", background: "#f8fafc", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between", alignItems: "center", userSelect: "none" }}>
+                      <span>
+                        <span style={{ fontSize: 11, color: "#64748b", marginRight: 8 }}>{isOpen ? "▼" : "▶"}</span>
+                        ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span>
+                        <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span>
+                      </span>
                       <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
-                    </summary>
-                    <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
-                      <thead>
-                        <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>ID Catalogo / componente</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Prezzo unitario</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Totale</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Note</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gitems.map((it) => {
-                          const cc = catalog.find((x) => x.id === it.id);
-                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
-                          return (
-                            <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
-                              <td style={{ padding: "10px 12px" }}>
-                                <strong>ID {it.id}</strong>
-                                <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
-                              </td>
-                              <td style={{ padding: "10px 12px" }}>
-                                <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
-                                  <option>REALIZZAZIONE</option><option>MODIFICA</option>
-                                </select>
-                              </td>
-                              <td style={{ padding: "10px 12px" }}>
-                                <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
-                                  {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
-                                </select>
-                              </td>
-                              <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
-                              <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
-                              <td style={{ padding: "10px 12px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
-                              <td style={{ padding: "10px 12px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
-                              <td style={{ padding: "10px 12px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                    </div>
+                    {isOpen && (
+                      <div style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
+                        <table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
+                          <thead>
+                            <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>ID Catalogo / componente</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Prezzo unitario</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Totale</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Note</th>
+                              <th></th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table></div>
-                  </details>
+                          </thead>
+                          <tbody>
+                            {gitems.map((it) => {
+                              const cc = catalog.find((x) => x.id === it.id);
+                              const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                              return (
+                                <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "10px 12px" }}>
+                                    <strong>ID {it.id}</strong>
+                                    <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
+                                  </td>
+                                  <td style={{ padding: "10px 12px" }}>
+                                    <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
+                                      <option>REALIZZAZIONE</option><option>MODIFICA</option>
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "10px 12px" }}>
+                                    <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
+                                      {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
+                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
+                                  <td style={{ padding: "10px 12px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
+                                  <td style={{ padding: "10px 12px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
+                                  <td style={{ padding: "10px 12px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 );
               });
             })()}
