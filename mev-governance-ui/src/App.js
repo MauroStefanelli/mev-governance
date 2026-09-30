@@ -542,7 +542,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_54</span>
+            }}>DEV_Rel_55</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",

@@ -1006,25 +1006,13 @@ public class ContrattoController : BaseController
                         .Sum(m => qtaSelector(m) ?? 0);
                 }
 
-                // OrdinatiRda: per TOW a tariffa usa proporzione (OrdinatoBdo × qtaTow/TowTotale).
-                // Per TOW a importo diretto (ValoreUnitario=0) usa OrdinatoBdo direttamente
-                // (il campo è già l'importo totale ordinato per la riga, non da ripartire).
-                decimal ordinati;
-                if (valUnitario > 0)
-                {
-                    ordinati = mevContratto
-                        .Where(m => (qtaSelector(m) ?? 0) > 0
-                                 && (m.TowTotale ?? 0) > 0
-                                 && m.OrdinatoBdo > 0)
-                        .Sum(m => m.OrdinatoBdo * ((qtaSelector(m) ?? 0) / (m.TowTotale ?? 1)));
-                }
-                else
-                {
-                    // TOW diretto: OrdinatoBdo è già l'importo ordinato per questo TOW
-                    ordinati = mevContratto
-                        .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
-                        .Sum(m => m.OrdinatoBdo);
-                }
+                // OrdinatiRda: somma diretta di OrdinatoBdo per tutte le righe MEV
+                // che hanno questo TOW attivo (qtaSelector > 0), senza ripartizione proporzionale.
+                // Questo allinea il valore con quello mostrato nella pagina "Ordini di consegna"
+                // che usa c.Ordinato (dall'Excel) come totale per contratto.
+                decimal ordinati = mevContratto
+                    .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
+                    .Sum(m => m.OrdinatoBdo);
 
                 // TowApprovati = SUM delle quantità TOW delle righe MEV con Stato="Approvato"
                 decimal towApprovati = mevContratto
