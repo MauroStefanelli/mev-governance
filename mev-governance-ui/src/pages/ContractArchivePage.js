@@ -600,8 +600,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const handleUploadLotFiles = async (contract, lot) => {
     const key = contract.contractId + '|' + lot.lotId;
     const up = lotUpload[key] || {};
-    if (!up.priceFile) {
-      setMsg({ type: 'error', text: 'Lotto ' + lot.lotId + ': il Listino TOW è obbligatorio.' });
+    if (!up.priceFile && !up.catalogFile && !up.rulesFile) {
+      setMsg({ type: 'error', text: 'Lotto ' + lot.lotId + ': carica almeno un file (catalogo, listino TOW o capitolato).' });
       return;
     }
     setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], uploading: true } }));
@@ -614,7 +614,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
         lotName: lot.name,
         tow5Share: up.tow5Share ?? lot.tow5Share ?? 65,
         catalogFile: up.catalogFile || null,
-        priceFile: up.priceFile,
+        priceFile: up.priceFile || null,
+        rulesFile: up.rulesFile || null,
       });
       const warn = result.warnings?.length ? ' Avvisi: ' + result.warnings.join('; ') : '';
       setMsg({ type: warn ? 'error' : 'ok', text: result.message + warn });
@@ -788,11 +789,11 @@ export default function ContractArchivePage({ ambienti = [] }) {
                       )}
                     </label>
                     <label style={S.labelStyle}>
-                      Listino TOW / economico
-                      <input required type="file"
+                      Listino TOW / economico <span style={{ color: '#52657d', fontWeight: 400 }}>(opzionale)</span>
+                      <input type="file"
                         accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         onChange={e => setNcLotFiles(p => ({ ...p, [id]: { ...p[id], priceFile: e.target.files[0] || null } }))}
-                        style={{ ...S.inputStyle, borderColor: ncLotFiles[id]?.priceFile ? '#bac8da' : '#f1b9c0' }} />
+                        style={{ ...S.inputStyle, borderColor: '#bac8da' }} />
                       {ncLotFiles[id]?.priceFile && (
                         <span style={{ fontSize: 11, color: '#1a73e8', display: 'block', marginTop: 2 }}>
                           {ncLotFiles[id].priceFile.name}
@@ -812,7 +813,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
             </div>
 
             <div style={S.hint}>
-              <strong>File economico:</strong> usa un Excel contenente il listino TOW. Il catalogo PDF deve avere ID, ambito, nome componente, complessità e prezzi.
+              <strong>Prezzi TOW:</strong> se non carichi un listino separato, i prezzi vengono estratti automaticamente dal capitolato tecnico caricato sopra (i valori TOW si trovano tipicamente verso la fine del documento). Puoi comunque caricare un Excel o PDF separato per sovrascriverli. Il catalogo PDF deve avere ID, ambito, nome componente, complessità e prezzi.
             </div>
             <div style={S.panelActions}>
               <button type="submit" style={{ ...S.btnPrimary, ...((ncSaving || !ncName.trim()) ? S.btnDisabled : {}) }} disabled={ncSaving || !ncName.trim()}>
@@ -973,12 +974,20 @@ export default function ContractArchivePage({ ambienti = [] }) {
                           </summary>
                           <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 8, alignItems: 'end', paddingBottom: 8 }}>
                             <label style={{ ...S.labelStyle, fontSize: 12 }}>
-                              Listino TOW (obbligatorio) <span style={{ color: '#b00020' }}>*</span>
+                              Listino TOW <span style={{ color: '#52657d', fontWeight: 400 }}>(opzionale)</span>
                               <input type="file"
                                 accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], priceFile: e.target.files[0] || null } }))}
-                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4, borderColor: up.priceFile ? '#bac8da' : '#f1b9c0' }} />
+                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4, borderColor: '#bac8da' }} />
                               {up.priceFile && <span style={{ fontSize: 10, color: '#1a73e8' }}>{up.priceFile.name}</span>}
+                              {!up.priceFile && <span style={{ fontSize: 10, color: '#52657d' }}>Se omesso, i prezzi TOW vengono riletti dal capitolato</span>}
+                            </label>
+                            <label style={{ ...S.labelStyle, fontSize: 12 }}>
+                              Capitolato PDF <span style={{ color: '#52657d', fontWeight: 400 }}>(per rileggere i TOW)</span>
+                              <input type="file" accept=".pdf,application/pdf"
+                                onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], rulesFile: e.target.files[0] || null } }))}
+                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4 }} />
+                              {up.rulesFile && <span style={{ fontSize: 10, color: '#1a73e8' }}>{up.rulesFile.name}</span>}
                             </label>
                             <label style={{ ...S.labelStyle, fontSize: 12 }}>
                               Catalogo PDF (opzionale)
@@ -996,8 +1005,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
                             </label>
                             <button
                               onClick={() => handleUploadLotFiles(c, l)}
-                              disabled={up.uploading || !up.priceFile}
-                              style={{ ...S.btnPrimary, ...S.btnCompact, opacity: (!up.priceFile || up.uploading) ? 0.6 : 1, alignSelf: 'end' }}>
+                              disabled={up.uploading || (!up.priceFile && !up.catalogFile && !up.rulesFile)}
+                              style={{ ...S.btnPrimary, ...S.btnCompact, opacity: ((!up.priceFile && !up.catalogFile && !up.rulesFile) || up.uploading) ? 0.6 : 1, alignSelf: 'end' }}>
                               {up.uploading ? 'Analisi...' : 'Analizza e salva'}
                             </button>
                           </div>

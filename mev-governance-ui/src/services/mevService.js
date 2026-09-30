@@ -617,13 +617,14 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
  * Carica/aggiorna i file PDF/Excel di un singolo lotto esistente.
  * Riusa l'endpoint /import passando solo quel lotto (sovrascrive il lotto nel DB senza toccare gli altri).
  */
-export const uploadConfiguratoreContractLot = async ({ contractId, contractName, lotId, lotName, tow5Share, catalogFile, priceFile }) => {
+export const uploadConfiguratoreContractLot = async ({ contractId, contractName, lotId, lotName, tow5Share, catalogFile, priceFile, rulesFile }) => {
   const form = new FormData();
   form.append("contractId", contractId);
   form.append("name", contractName);
   form.append("lotsJson", JSON.stringify([{ lotId, name: lotName, tow5Share: tow5Share ?? 65 }]));
-  form.append(`catalogFile_${lotId}`, catalogFile);
-  form.append(`priceFile_${lotId}`, priceFile);
+  if (catalogFile) form.append(`catalogFile_${lotId}`, catalogFile);
+  if (priceFile)   form.append(`priceFile_${lotId}`, priceFile);
+  if (rulesFile)   form.append("rulesFile", rulesFile);
 
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
     method: "POST",

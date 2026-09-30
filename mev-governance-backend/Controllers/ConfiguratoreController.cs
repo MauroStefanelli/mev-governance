@@ -275,15 +275,12 @@ public class ConfiguratoreController : ControllerBase
 
             var catalogFile = form.Files.GetFile($"catalogFile_{lotId}");
             var priceFile   = form.Files.GetFile($"priceFile_{lotId}");
-
-            if (priceFile == null)
-            {
-                errors.Add($"Lotto {lotId}: file listino TOW mancante");
-                continue;
-            }
+            // Se non è stato caricato un listino separato, usa il capitolato (rulesFile)
+            // come sorgente dei prezzi TOW — i valori si trovano in esso (es. pag. 66).
+            var towSourceFile = priceFile ?? rfFile;
 
             List<CatalogEntry> catalog = new();
-            Dictionary<string, double> towPrices;
+            Dictionary<string, double> towPrices = new();
 
             // Il catalogo PDF è opzionale — può essere caricato in un secondo momento
             if (catalogFile != null)
@@ -301,25 +298,33 @@ public class ConfiguratoreController : ControllerBase
                 }
             }
 
-            try
+            if (towSourceFile != null)
             {
-                await using var priceStream = priceFile.OpenReadStream();
-                var isExcel = priceFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
-                towPrices = isExcel
-                    ? ContractParserService.ParseTowPriceExcel(priceStream, lotNum)
-                    : ContractParserService.ParseTowPricePdf(priceStream, lotNum);
+                try
+                {
+                    await using var priceStream = towSourceFile.OpenReadStream();
+                    var isExcel = towSourceFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+                    towPrices = isExcel
+                        ? ContractParserService.ParseTowPriceExcel(priceStream, lotNum)
+                        : ContractParserService.ParseTowPricePdf(priceStream, lotNum);
+                    if (towPrices.Count == 0)
+                        errors.Add($"Lotto {lotId}: nessun prezzo TOW trovato in '{towSourceFile.FileName}'");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Lotto {lotId} listino: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+            else
             {
-                errors.Add($"Lotto {lotId} listino: {ex.Message}");
-                towPrices = new Dictionary<string, double>();
+                errors.Add($"Lotto {lotId}: nessun file disponibile per i prezzi TOW (carica un listino o il capitolato)");
             }
 
             var lotPayload = new Dictionary<string, object?>
             {
                 ["name"]        = meta.Name ?? $"Lotto {lotId}",
                 ["catalogFile"] = catalogFile?.FileName ?? "",
-                ["priceFile"]   = priceFile.FileName,
+                ["priceFile"]   = towSourceFile?.FileName ?? "",
                 ["tow5Share"]   = meta.Tow5Share ?? 65,
                 ["active"]      = true,
                 ["codiceContratto"] = "",
