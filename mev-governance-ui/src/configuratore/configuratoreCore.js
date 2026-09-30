@@ -285,12 +285,11 @@ export const itemPrice = (it, ctx) => it.unit ?? defaultPrice(it, ctx);
 export function calc({ items, lot, contractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin }) {
   const ctx = { catalog, priceMode, builtin };
   const cat = items.reduce((a, it) => a + itemPrice(it, ctx) * it.qty, 0);
-  // Il moltiplicatore per la base di allocazione TOW automatici (TOW02.1, 02.3, 02.4)
-  // è un valore fisso del capitolato per ogni contratto/lotto.
-  // Per poste-tet-2025 lotto 2: 1.53716 (da capitolato, pag. 66).
-  // Per tutti gli altri contratti: 1 / (tow5Share/100) calcolato dinamicamente.
-  const towMultiplier = contractTowMultiplier(contractId, lot) ?? (100 / tow5Share);
-  const allocationBase = cat * towMultiplier;
+  // Formula: tow5 = cat × (tow5Share/100)  →  base = tow5 × multiplier  →  TOW02.N = base × pct%
+  // Il moltiplicatore è fisso da capitolato per contratti noti, altrimenti 1.
+  const tow5 = cat * (tow5Share / 100);
+  const towMultiplier = contractTowMultiplier(contractId, lot) ?? 1;
+  const allocationBase = tow5 * towMultiplier;
   const prefix = `TOW0${lot}.`;
   const pct = towPercentages?.[contractId]?.[lot] || { 1: 0, 3: 0, 4: 0 };
   const autoTow = {};
@@ -304,7 +303,7 @@ export function calc({ items, lot, contractId, tow5Share = 65, towPercentages, t
   const base = cat + oth;
   const disc = base * (Number(discount) || 0) / 100;
   const cont = (base - disc) * (Number(contingency) || 0) / 100;
-  return { cat, tow5Share, towMultiplier, allocationBase, autoTow, autoTotal, manualTotal, oth, base, disc, cont, total: base - disc + cont };
+  return { cat, tow5, tow5Share, towMultiplier, allocationBase, autoTow, autoTotal, manualTotal, oth, base, disc, cont, total: base - disc + cont };
 }
 
 export function towPrices() {
