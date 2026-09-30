@@ -36,7 +36,7 @@ const PAGE_DEFS = [
   {
     id: "mev",
     label: "MEV",
-    description: "Monitoraggio e gestione delle righe MEV per l'ambiente attivo.",
+    description: "Monitoraggio e gestione MEV.",
     accent: "#3b82f6",
     accentDark: "#1d4ed8",
     roles: ["Admin","SuperAdmin","Editor","Developer"],
@@ -51,7 +51,7 @@ const PAGE_DEFS = [
   {
     id: "mevcap",
     label: "MEV-CAP",
-    description: "Vista MEV con filtri specifici per capitolo e categoria.",
+    description: "Gestione MEV.",
     accent: "#6366f1",
     accentDark: "#4338ca",
     roles: ["Admin","SuperAdmin","Editor","Developer"],
@@ -82,7 +82,7 @@ const PAGE_DEFS = [
   {
     id: "contratti_interni",
     label: "Ordini",
-    description: "Gestione degli ordini interni e buoni di consegna.",
+    description: "Gestione degli ordini e buoni di consegna.",
     accent: "#f59e0b",
     accentDark: "#d97706",
     roles: ["Admin","SuperAdmin","Editor","Developer"],
@@ -98,7 +98,7 @@ const PAGE_DEFS = [
   {
     id: "chart",
     label: "Grafici",
-    description: "Dashboard visiva con KPI, trend e distribuzione dei dati MEV.",
+    description: "Release, Applicativo e Anno.",
     accent: "#8b5cf6",
     accentDark: "#7c3aed",
     roles: ["Admin","SuperAdmin","Editor","Developer"],
@@ -113,7 +113,7 @@ const PAGE_DEFS = [
   {
     id: "tools",
     label: "Gestione Ordini",
-    description: "Caricamento e gestione avanzata degli ordini e delle forniture.",
+    description: "Caricamento e gestione degli ordini e delle forniture.",
     accent: "#64748b",
     accentDark: "#475569",
     roles: ["Admin","SuperAdmin"],
