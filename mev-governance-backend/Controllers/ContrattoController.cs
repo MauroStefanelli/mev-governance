@@ -931,6 +931,13 @@ public class ContrattoController : BaseController
             .Where(m => m.AmbienteId == ambienteId)
             .ToList();
 
+        // Leggi i Contratti per usare Contratto.Ordinato come fonte per OrdinatiRda
+        var contrattoDB = _db.Contratti
+            .AsNoTracking()
+            .Where(c => c.AmbienteId == ambienteId)
+            .ToList()
+            .ToDictionary(c => c.TipoContratto.Trim().ToUpperInvariant(), c => c.Ordinato);
+
         // ── DIAGNOSTICA ──────────────────────────────────────────────────────
         Console.WriteLine($"[TOW RECALC] Ambiente={ambienteId} | MevItems totali={mevItems.Count}");
         var statoCounts = mevItems.GroupBy(m => m.Stato ?? "(null)").Select(g => $"{g.Key}={g.Count()}");
@@ -1006,13 +1013,17 @@ public class ContrattoController : BaseController
                         .Sum(m => qtaSelector(m) ?? 0);
                 }
 
-                // OrdinatiRda: somma diretta di OrdinatoBdo per tutte le righe MEV
-                // che hanno questo TOW attivo (qtaSelector > 0), senza ripartizione proporzionale.
-                // Questo allinea il valore con quello mostrato nella pagina "Ordini di consegna"
-                // che usa c.Ordinato (dall'Excel) come totale per contratto.
-                decimal ordinati = mevContratto
-                    .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
-                    .Sum(m => m.OrdinatoBdo);
+                // OrdinatiRda: usa Contratto.Ordinato (fonte primaria = Excel Contratti,
+                // allineata con le pagine "Ordini" e "Gestione Ordini") e lo ripartisce
+                // tra i TOW proporzionalmente al loro ValoreTotale sul totale del contratto.
+                decimal ordinati = 0;
+                var contrattoKey = contratto.Trim().ToUpperInvariant();
+                if (contrattoDB.TryGetValue(contrattoKey, out var totaleOrdinato) && totaleOrdinato > 0)
+                {
+                    decimal totaleValoreTowContratto = towsContratto.Sum(t => t.ValoreTotale);
+                    if (totaleValoreTowContratto > 0)
+                        ordinati = totaleOrdinato * (towRow.ValoreTotale / totaleValoreTowContratto);
+                }
 
                 // TowApprovati = SUM delle quantità TOW delle righe MEV con Stato="Approvato"
                 decimal towApprovati = mevContratto
