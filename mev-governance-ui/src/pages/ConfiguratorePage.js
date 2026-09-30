@@ -1793,7 +1793,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               <label style={styles.label}>Contingenza (%) <input style={styles.input} type="number" step="0.01" value={contingency} onChange={(e) => setContingency(Number(e.target.value) || 0)} /></label>
             </div>
             <div style={{ marginTop: 10 }}>
-              <strong>Base allocazione TOW .5: </strong>{euro.format(calculation.allocationBase)} ({tow5Share}%)
+              <strong>Base allocazione TOW automatici: </strong>{euro.format(calculation.allocationBase)}
+              <span style={{ fontSize: 12, color: '#52657d', marginLeft: 8 }}>
+                (TOW02.5 × {calculation.towMultiplier?.toFixed(5) ?? '—'})
+              </span>
             </div>
           </div>
 
