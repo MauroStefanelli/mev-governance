@@ -126,27 +126,46 @@ const excelDateToISO = (v) => {
 const normHeader = (h) =>
   String(h || "").replace(/^\uFEFF/, "").trim().toLowerCase().replace(/\s+/g, " ");
 
-// Legge file Excel e restituisce { matched: [{mevId, goTo, fields}], unmatched: [goTo string] }
-const parseExcelToProgress = (file, mevRows) =>
+// Legge file Excel, cerca il foglio con nome = releaseName, restituisce { matched, unmatched, sheetUsed }
+const parseExcelToProgress = (file, mevRows, releaseName) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-        if (raw.length < 2) { resolve({ matched: [], unmatched: [] }); return; }
 
-        // Trova riga header (prima riga con "GOTO" o "GoTo" o "goto")
+        // Cerca lo sheet il cui nome corrisponde alla release (case-insensitive, trim)
+        const releaseNorm = (releaseName || "").trim().toLowerCase();
+        const sheetName =
+          wb.SheetNames.find(n => n.trim().toLowerCase() === releaseNorm) ||
+          wb.SheetNames.find(n => n.trim().toLowerCase().includes(releaseNorm)) ||
+          null;
+
+        if (!sheetName) {
+          const available = wb.SheetNames.join(", ");
+          reject(new Error(
+            `Foglio "${releaseName}" non trovato nel file.\nFogli disponibili: ${available}`
+          ));
+          return;
+        }
+
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (raw.length < 2) { resolve({ matched: [], unmatched: [], sheetUsed: sheetName }); return; }
+
+        // Trova riga header (prima delle prime 5 righe che contiene "goto")
         let headerRowIdx = 0;
         for (let i = 0; i < Math.min(5, raw.length); i++) {
           if (raw[i].some(c => normHeader(c) === "goto")) { headerRowIdx = i; break; }
         }
         const headers = raw[headerRowIdx].map(normHeader);
         const gotoIdx = headers.indexOf("goto");
-        if (gotoIdx === -1) { reject(new Error('Colonna "GOTO" non trovata nel file Excel.')); return; }
+        if (gotoIdx === -1) {
+          reject(new Error(`Colonna "GOTO" non trovata nel foglio "${sheetName}".`));
+          return;
+        }
 
-        // Costruisce mappa goTo → mevId
+        // Costruisce mappa goTo → mevId (solo righe della release corrente)
         const goToMap = {};
         mevRows.forEach(r => {
           if (r.goTo) goToMap[String(r.goTo).trim().toUpperCase()] = String(r.id);
@@ -170,7 +189,6 @@ const parseExcelToProgress = (file, mevRows) =>
             const raw_val = row[idx];
             if (raw_val == null || raw_val === "") return;
             if (mapping.type === "percent") {
-              // Accetta sia 75 sia 0.75 (percentuale come decimale)
               let n = Number(raw_val);
               if (isNaN(n)) return;
               if (n > 0 && n <= 1) n = Math.round(n * 100); // 0.75 → 75
@@ -186,7 +204,7 @@ const parseExcelToProgress = (file, mevRows) =>
           matched.push({ mevId, goTo: goToRaw, fields });
         }
 
-        resolve({ matched, unmatched: [...unmatchedSet] });
+        resolve({ matched, unmatched: [...unmatchedSet], sheetUsed: sheetName });
       } catch (err) {
         reject(err);
       }
@@ -375,20 +393,20 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (filteredRows.length === 0) {
-      setMsg({ type: "err", text: "Seleziona prima una release con attività visibili." });
+    if (!selectedRelease) {
+      setMsg({ type: "err", text: "Seleziona prima una release." });
       return;
     }
     setImporting(true);
     try {
-      const result = await parseExcelToProgress(file, filteredRows);
+      const result = await parseExcelToProgress(file, filteredRows, selectedRelease);
       setImportPreview(result);
     } catch (err) {
-      setMsg({ type: "err", text: "Errore import: " + (err.message || "file non valido") });
+      setMsg({ type: "err", text: err.message || "File non valido." });
     } finally {
       setImporting(false);
     }
-  }, [filteredRows]);
+  }, [filteredRows, selectedRelease]);
 
   // Applica i dati importati al progressData
   const applyImport = useCallback(() => {
@@ -678,7 +696,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
               Anteprima Import Excel
             </h2>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: C.muted }}>
-              Controlla i dati prima di applicarli. Le modifiche non vengono salvate automaticamente.
+              Foglio letto: <strong style={{ color: C.accent }}>{importPreview.sheetUsed}</strong> · Controlla i dati prima di applicarli. Le modifiche non vengono salvate automaticamente.
             </p>
 
             {/* Riepilogo */}
