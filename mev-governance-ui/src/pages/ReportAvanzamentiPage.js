@@ -126,7 +126,15 @@ const excelDateToISO = (v) => {
 const normHeader = (h) =>
   String(h || "").replace(/^\uFEFF/, "").trim().toLowerCase().replace(/\s+/g, " ");
 
+// ── Normalizzazione per match testuale (rimuove punteggiatura, spazi multipli) ─
+const normText = (s) =>
+  String(s || "").trim().toLowerCase()
+    .replace(/[()[\]{}<>\/\\'",.;:!?#@€$%&*+=|~`^]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 // Legge file Excel, cerca il foglio con nome = releaseName, restituisce { matched, unmatched, sheetUsed }
+// Il match usa: GoTo (esatto) → Titolo ≈ descrizione (fuzzy) → Sistemi ≈ applicativo (fuzzy)
 const parseExcelToProgress = (file, mevRows, releaseName) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -159,28 +167,100 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
           if (raw[i].some(c => normHeader(c) === "goto")) { headerRowIdx = i; break; }
         }
         const headers = raw[headerRowIdx].map(normHeader);
-        const gotoIdx = headers.indexOf("goto");
+        const gotoIdx   = headers.indexOf("goto");
+        const titoloIdx = headers.findIndex(h => h === "titolo" || h === "titolo / descr." || h === "titolo/descr." || h === "titolo descrizione");
+        const sistemiIdx = headers.findIndex(h => h === "sistemi" || h === "sistema" || h === "sistema / applicazione" || h === "sistemi/applicazione");
+
         if (gotoIdx === -1) {
           reject(new Error(`Colonna "GOTO" non trovata nel foglio "${sheetName}".`));
           return;
         }
 
-        // Costruisce mappa goTo → mevId (solo righe della release corrente)
+        // ── Indici di ricerca sul dataset MEV ────────────────────────────────
+        // goToMap: match esatto GoTo → mevId
         const goToMap = {};
         mevRows.forEach(r => {
           if (r.goTo) goToMap[String(r.goTo).trim().toUpperCase()] = String(r.id);
         });
 
+        // titoloMap: normText(descrizione) → mevId  (per match su TITOLO)
+        const titoloMap = {};
+        mevRows.forEach(r => {
+          const k = normText(r.descrizione || r.goTo || "");
+          if (k) titoloMap[k] = String(r.id);
+        });
+
+        // sistemiMap: normText(applicativo) → [mevId, ...]  (1 applicativo → N GoTo)
+        const sistemiMap = {};
+        mevRows.forEach(r => {
+          const k = normText(r.applicativo || "");
+          if (k) {
+            if (!sistemiMap[k]) sistemiMap[k] = [];
+            sistemiMap[k].push(String(r.id));
+          }
+        });
+
+        // ── Risolve mevId per una riga Excel ─────────────────────────────────
+        // Strategia: GoTo esatto → Titolo fuzzy → Sistemi+GoTo incrociato
+        const resolveMevId = (goToRaw, titoloRaw, sistemiRaw) => {
+          // 1) GoTo esatto
+          const goToKey = goToRaw.toUpperCase();
+          if (goToMap[goToKey]) return { id: goToMap[goToKey], method: "goto" };
+
+          // 2) Titolo: confronto normalizzato
+          if (titoloRaw) {
+            const tk = normText(titoloRaw);
+            // Match esatto normalizzato
+            if (titoloMap[tk]) return { id: titoloMap[tk], method: "titolo-esatto" };
+            // Match parziale: il titolo MEV è contenuto nel titolo Excel o viceversa (min 10 char)
+            const entries = Object.entries(titoloMap);
+            for (const [k, id] of entries) {
+              if (k.length >= 10 && (tk.includes(k) || k.includes(tk)))
+                return { id, method: "titolo-parziale" };
+            }
+          }
+
+          // 3) Sistemi + GoTo parziale incrociato
+          // Se il campo SISTEMI coincide con r.applicativo E il GoTo Excel è contenuto in r.goTo
+          if (sistemiRaw) {
+            const sk = normText(sistemiRaw);
+            const candidateIds = sistemiMap[sk] || [];
+            if (candidateIds.length === 1) return { id: candidateIds[0], method: "sistemi-unico" };
+            // Più candidati → tiebreak con GoTo parziale
+            if (candidateIds.length > 1 && goToRaw) {
+              const gn = normText(goToRaw);
+              const hit = mevRows.find(r =>
+                candidateIds.includes(String(r.id)) &&
+                (normText(r.goTo).includes(gn) || gn.includes(normText(r.goTo)))
+              );
+              if (hit) return { id: String(hit.id), method: "sistemi+goto" };
+            }
+          }
+
+          return null;
+        };
+
         const matched = [];
         const unmatchedSet = new Set();
+        const usedMevIds = new Set(); // evita duplicati
 
         for (let i = headerRowIdx + 1; i < raw.length; i++) {
           const row = raw[i];
-          const goToRaw = String(row[gotoIdx] || "").trim();
-          if (!goToRaw) continue;
-          const goToKey = goToRaw.toUpperCase();
-          const mevId = goToMap[goToKey];
-          if (!mevId) { unmatchedSet.add(goToRaw); continue; }
+          const goToRaw   = String(row[gotoIdx]    || "").trim();
+          const titoloRaw = titoloIdx >= 0  ? String(row[titoloIdx]  || "").trim() : "";
+          const sistemiRaw = sistemiIdx >= 0 ? String(row[sistemiIdx] || "").trim() : "";
+
+          // Salta righe completamente vuote
+          if (!goToRaw && !titoloRaw && !sistemiRaw) continue;
+
+          const resolved = resolveMevId(goToRaw, titoloRaw, sistemiRaw);
+
+          if (!resolved || usedMevIds.has(resolved.id)) {
+            if (goToRaw) unmatchedSet.add(goToRaw);
+            else if (titoloRaw) unmatchedSet.add(titoloRaw);
+            continue;
+          }
+          usedMevIds.add(resolved.id);
 
           const fields = {};
           headers.forEach((h, idx) => {
@@ -201,7 +281,7 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
             }
           });
 
-          matched.push({ mevId, goTo: goToRaw, fields });
+          matched.push({ mevId: resolved.id, goTo: goToRaw || titoloRaw, method: resolved.method, fields });
         }
 
         resolve({ matched, unmatched: [...unmatchedSet], sheetUsed: sheetName });
@@ -723,11 +803,17 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
                   Righe da importare {importPreview.matched.length > 10 ? `(prime 10 di ${importPreview.matched.length})` : ""}
                 </div>
                 <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
-                  {importPreview.matched.slice(0, 10).map(({ goTo, fields }) => (
+                  {importPreview.matched.slice(0, 10).map(({ goTo, method, fields }) => (
                     <div key={goTo} style={{ display: "flex", alignItems: "flex-start", gap: 10,
                       padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
                       background: C.surface, fontSize: 12 }}>
                       <span style={{ fontWeight: 700, color: C.accent, minWidth: 80 }}>{goTo}</span>
+                      <span style={{ fontSize: 10, color: "#fff", background:
+                        method === "goto" ? C.accent :
+                        method?.startsWith("titolo") ? "#7C3AED" : "#0891b2",
+                        borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center" }}>
+                        {method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
+                      </span>
                       <span style={{ color: C.muted, fontSize: 11, lineHeight: 1.5 }}>
                         {Object.entries(fields).map(([k, v]) => {
                           const f = EDITABLE_FIELDS.find(ef => ef.key === k);
