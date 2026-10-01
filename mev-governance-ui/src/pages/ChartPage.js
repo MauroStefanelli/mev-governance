@@ -96,7 +96,10 @@ function KpiCard({ title, value, description, accent, symbol }) {
 export default function ChartPage({ rows = [] }) {
   const [activeTab, setActiveTab] = useState("release");
   const [sort, setSort] = useState("name");
-  const safeRows = useMemo(() => Array.isArray(rows) ? rows.filter((row) => row && typeof row === "object") : [], [rows]);
+  const safeRows = useMemo(() =>
+    Array.isArray(rows)
+      ? rows.filter((row) => row && typeof row === "object" && row.stato && String(row.stato).trim() !== "")
+      : [], [rows]);
   const kpis = useMemo(() => safeRows.reduce((result, row) => {
     // Approved uses the supply amount, consistently with the chart measure.
     if (normalize(row.stato) === "approvato") result.approved += amount(row.importoExcel);

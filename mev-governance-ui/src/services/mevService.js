@@ -1251,3 +1251,23 @@ export const getMyContratti = async () => {
   if (!r.ok) return [];
   return r.json();
 };
+
+// ── Report Avanzamenti ────────────────────────────────────────────────────────
+export const getReleaseProgress = async (contractId, release) => {
+  const qs = new URLSearchParams({ contractId, ...(release ? { release } : {}) }).toString();
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/release-progress?${qs}`, { headers: authHeaders() });
+  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (!r.ok) throw new Error("Errore lettura avanzamenti");
+  return r.json();
+};
+
+export const putReleaseProgress = async (contractId, release, payload) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/release-progress`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ contractId, release, payload }),
+  });
+  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  return r.json();
+};

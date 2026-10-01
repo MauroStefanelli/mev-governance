@@ -1,0 +1,466 @@
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { getMevList, getReleaseSchedules, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
+
+// ── Palette ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:       "#F4F6FA",
+  surface:  "#FFFFFF",
+  border:   "#E3E8EF",
+  accent:   "#1A6EBD",
+  accentLt: "#EAF2FB",
+  success:  "#166534",
+  successLt:"#DCFCE7",
+  warn:     "#92400E",
+  warnLt:   "#FEF3C7",
+  danger:   "#991B1B",
+  dangerLt: "#FEE2E2",
+  muted:    "#64748B",
+  text:     "#0F172A",
+  head:     "#1E3A5F",
+};
+
+const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const fmtPct = (v) => v != null && v !== "" ? `${v}%` : "—";
+const fmtDate = (v) => v || "—";
+
+// ── Stato colori ─────────────────────────────────────────────────────────────
+const statoStyle = (s) => {
+  const k = (s || "").trim().toLowerCase();
+  if (k === "approvato")   return { background: C.successLt, color: C.success, border: `1px solid #86EFAC` };
+  if (k === "in corso")    return { background: C.accentLt,  color: C.accent,  border: `1px solid #93C5FD` };
+  if (k === "sospeso")     return { background: C.warnLt,    color: C.warn,    border: `1px solid #FCD34D` };
+  if (k === "annullato")   return { background: C.dangerLt,  color: C.danger,  border: `1px solid #FCA5A5` };
+  return { background: "#F1F5F9", color: C.muted, border: `1px solid #CBD5E1` };
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const parseSoc = (v) => {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter(Boolean);
+  try { const p = JSON.parse(v); if (Array.isArray(p)) return p.filter(Boolean); } catch {}
+  return String(v).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+};
+
+const resolveMandataria = (capVal, ietVal, rtiRows = []) => {
+  const byId = (id) => { const f = rtiRows.find(r => Number(r._id || r.id) === Number(id)); return f?.societa || null; };
+  const fromCap = (() => {
+    if (!capVal) return [];
+    if (String(capVal).trim().toLowerCase() === "x") { const s = byId(1); return s ? [s] : ["Capgemini Italia S.p.A."]; }
+    return parseSoc(capVal);
+  })();
+  const fromIet = (() => {
+    if (!ietVal) return [];
+    if (String(ietVal).trim().toLowerCase() === "x") { const s = byId(2); return s ? [s] : ["I&T"]; }
+    return parseSoc(ietVal);
+  })();
+  return [...new Set([...fromCap, ...fromIet])];
+};
+
+// ── Campi editabili ───────────────────────────────────────────────────────────
+const EDITABLE_FIELDS = [
+  { key: "requisito",           label: "Requisito",            type: "percent" },
+  { key: "analisiProgettazione",label: "Analisi Prog.",        type: "percent" },
+  { key: "sviluppo",            label: "Sviluppo",             type: "percent" },
+  { key: "dataAggiornamento",   label: "Data Aggiorn.",        type: "date"    },
+  { key: "dataDeployCollaudo",  label: "Deploy Collaudo",      type: "date"    },
+  { key: "deadlineDueDate",     label: "Deadline / Due Date",  type: "date"    },
+  { key: "hld",                 label: "HLD",                  type: "date"    },
+  { key: "afu",                 label: "AFU",                  type: "date"    },
+  { key: "icd",                 label: "ICD",                  type: "date"    },
+  { key: "manualeUtente",       label: "Manuale Utente",       type: "date"    },
+  { key: "rnManInst",           label: "RN/Man Inst",          type: "date"    },
+  { key: "unitTest",            label: "Unit Test",            type: "date"    },
+  { key: "note",                label: "Note",                 type: "text"    },
+];
+
+// ── Componente cella editabile ────────────────────────────────────────────────
+function EditCell({ value, type, onChange, saving }) {
+  if (type === "percent") return (
+    <input type="number" min={0} max={100} step={1}
+      value={value ?? ""}
+      onChange={e => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+      disabled={saving}
+      style={{ width: 64, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
+        fontSize: 12, textAlign: "center", background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
+  );
+  if (type === "date") return (
+    <input type="date"
+      value={value ?? ""}
+      onChange={e => onChange(e.target.value)}
+      disabled={saving}
+      style={{ width: 130, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
+        fontSize: 12, background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
+  );
+  return (
+    <textarea value={value ?? ""} onChange={e => onChange(e.target.value)} disabled={saving} rows={2}
+      style={{ width: 180, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
+        fontSize: 12, resize: "vertical", background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
+  );
+}
+
+// ── KPI card ──────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, accent }) {
+  return (
+    <div style={{ background: C.surface, borderRadius: 14, padding: "18px 24px",
+      border: `1px solid ${C.border}`, flex: "1 1 180px", minWidth: 0,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: accent || C.accent,
+        textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, color: C.text,
+        fontVariantNumeric: "tabular-nums", letterSpacing: "-0.5px" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+// ── Barra avanzamento ─────────────────────────────────────────────────────────
+function ProgressBar({ value, color = C.accent }) {
+  const pct = Math.min(100, Math.max(0, Number(value) || 0));
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ flex: 1, height: 6, background: "#E2E8F0", borderRadius: 99, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .3s" }} />
+      </div>
+      <span style={{ fontSize: 11, color: C.muted, minWidth: 30, textAlign: "right" }}>{pct}%</span>
+    </div>
+  );
+}
+
+// ── Pagina principale ─────────────────────────────────────────────────────────
+export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
+  const [mevRows, setMevRows]           = useState([]);
+  const [releases, setReleases]         = useState([]);
+  const [selectedRelease, setSelectedRelease] = useState("");
+  const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
+  const [dirty, setDirty]               = useState({});  // { mevId: true }
+  const [saving, setSaving]             = useState({});   // { mevId: true }
+  const [savedOk, setSavedOk]           = useState({});
+  const [rtiRows, setRtiRows]           = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [loadingProg, setLoadingProg]   = useState(false);
+  const [globalSaving, setGlobalSaving] = useState(false);
+  const [msg, setMsg]                   = useState(null); // { type: "ok"|"err", text }
+
+  // Contratto corrente — prende il primo contratto associato all'ambiente
+  const contractId = "poste-tet-2025"; // TODO: renderlo dinamico se servono più contratti
+
+  // Carica MEV + release + RTI al mount
+  useEffect(() => {
+    Promise.all([
+      getMevList().catch(() => []),
+      getReleaseSchedules(contractId).catch(() => ({ records: [] })),
+      getRtiSocieta().catch(() => []),
+    ]).then(([mev, relData, rti]) => {
+      setMevRows(mev || []);
+      const rel = (relData.records || []).map(r => r.title || "").filter(Boolean).sort();
+      setReleases(rel);
+      setRtiRows(rti || []);
+      if (rel.length > 0) setSelectedRelease(rel[0]);
+    }).catch(e => {
+      if (e?.status === 401) onUnauthorized?.();
+    }).finally(() => setLoading(false));
+  }, [ambienteId]); // eslint-disable-line
+
+  // Carica progressData quando cambia la release selezionata
+  useEffect(() => {
+    if (!selectedRelease) { setProgressData({}); return; }
+    setLoadingProg(true);
+    getReleaseProgress(contractId, selectedRelease)
+      .then(records => {
+        const found = records?.[0];
+        const payload = found?.payload || found?.Payload || {};
+        // payload.rows = { [mevId]: { ...campi } }
+        setProgressData(payload.rows || {});
+        setDirty({});
+      })
+      .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
+      .finally(() => setLoadingProg(false));
+  }, [selectedRelease]); // eslint-disable-line
+
+  // Filtra righe MEV per la release selezionata
+  const filteredRows = useMemo(() => {
+    if (!selectedRelease) return mevRows;
+    return mevRows.filter(r =>
+      (r.releaseExcel || "").trim() === selectedRelease ||
+      (r.pRelease || "").trim() === selectedRelease
+    );
+  }, [mevRows, selectedRelease]);
+
+  // KPI
+  const kpis = useMemo(() => ({
+    total: filteredRows.length,
+    approvati: filteredRows.filter(r => (r.stato || "").trim().toLowerCase() === "approvato").length,
+    importo: filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0),
+  }), [filteredRows]);
+
+  // Update campo singolo
+  const handleFieldChange = useCallback((mevId, field, value) => {
+    setProgressData(prev => ({
+      ...prev,
+      [mevId]: { ...(prev[mevId] || {}), [field]: value }
+    }));
+    setDirty(prev => ({ ...prev, [mevId]: true }));
+  }, []);
+
+  // Salva riga singola
+  const saveRow = useCallback(async (mevId) => {
+    setSaving(prev => ({ ...prev, [mevId]: true }));
+    try {
+      // Ricostruisce payload completo con tutte le righe
+      const allRows = { ...progressData, [mevId]: progressData[mevId] || {} };
+      await putReleaseProgress(contractId, selectedRelease, { rows: allRows });
+      setDirty(prev => { const n = { ...prev }; delete n[mevId]; return n; });
+      setSavedOk(prev => ({ ...prev, [mevId]: true }));
+      setTimeout(() => setSavedOk(prev => { const n = { ...prev }; delete n[mevId]; return n; }), 2000);
+    } catch {
+      setMsg({ type: "err", text: "Errore salvataggio riga " + mevId });
+    } finally {
+      setSaving(prev => { const n = { ...prev }; delete n[mevId]; return n; });
+    }
+  }, [progressData, selectedRelease, contractId]);
+
+  // Salva tutto
+  const saveAll = useCallback(async () => {
+    if (!selectedRelease) return;
+    setGlobalSaving(true);
+    try {
+      await putReleaseProgress(contractId, selectedRelease, { rows: progressData });
+      setDirty({});
+      setMsg({ type: "ok", text: "Tutti gli avanzamenti salvati." });
+      setTimeout(() => setMsg(null), 3000);
+    } catch {
+      setMsg({ type: "err", text: "Errore salvataggio globale." });
+    } finally {
+      setGlobalSaving(false);
+    }
+  }, [progressData, selectedRelease, contractId]);
+
+  const hasDirty = Object.keys(dirty).length > 0;
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: C.muted, fontSize: 15 }}>
+      Caricamento dati…
+    </div>
+  );
+
+  return (
+    <div style={{ background: C.bg, minHeight: "100vh", padding: "28px 24px 60px" }}>
+
+      {/* ── Intestazione ── */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: C.head, letterSpacing: "-0.4px" }}>
+          Report Avanzamenti Attività
+        </h1>
+        <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>
+          Monitora lo stato di avanzamento delle attività per release. I dati MEV sono in sola lettura; i campi di avanzamento sono modificabili.
+        </p>
+      </div>
+
+      {/* ── Selezione release + Salva tutto ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface,
+          border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 16px",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.muted }}>Release</span>
+          {releases.length > 0 ? (
+            <select
+              value={selectedRelease}
+              onChange={e => setSelectedRelease(e.target.value)}
+              style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px",
+                fontSize: 14, fontWeight: 700, color: C.accent, background: C.accentLt,
+                cursor: "pointer", outline: "none", minWidth: 160 }}>
+              <option value="">— Tutte le release —</option>
+              {releases.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          ) : (
+            <input value={selectedRelease} onChange={e => setSelectedRelease(e.target.value)}
+              placeholder="Es. R2025-04"
+              style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px",
+                fontSize: 14, outline: "none", minWidth: 160 }} />
+          )}
+          {loadingProg && <span style={{ fontSize: 11, color: C.muted }}>…</span>}
+        </div>
+
+        {hasDirty && (
+          <button onClick={saveAll} disabled={globalSaving}
+            style={{ padding: "10px 22px", background: C.accent, color: "#fff", border: "none",
+              borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(26,110,189,0.25)", opacity: globalSaving ? 0.7 : 1 }}>
+            {globalSaving ? "Salvataggio…" : `Salva tutto (${Object.keys(dirty).length} modif.)`}
+          </button>
+        )}
+
+        {msg && (
+          <div style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+            background: msg.type === "ok" ? C.successLt : C.dangerLt,
+            color: msg.type === "ok" ? C.success : C.danger,
+            border: `1px solid ${msg.type === "ok" ? "#86EFAC" : "#FCA5A5"}` }}>
+            {msg.text}
+          </div>
+        )}
+      </div>
+
+      {/* ── KPI bar ── */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+        <KpiCard label="GoTo in release" value={kpis.total} sub="attività filtrate" accent={C.accent} />
+        <KpiCard label="Approvati" value={kpis.approvati}
+          sub={`${kpis.total ? Math.round(kpis.approvati / kpis.total * 100) : 0}% del totale`}
+          accent={C.success} />
+        <KpiCard label="Importo Fornitura" value={euro.format(kpis.importo)}
+          sub="righe filtrate" accent="#7C3AED" />
+      </div>
+
+      {/* ── Tabella ── */}
+      {filteredRows.length === 0 ? (
+        <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`,
+          padding: "60px 24px", textAlign: "center", color: C.muted }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Nessuna attività per questa release</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Seleziona una release diversa o verifica i dati MEV.</div>
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto", borderRadius: 14,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.07)", border: `1px solid ${C.border}` }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: C.surface }}>
+            <thead>
+              <tr style={{ background: C.head, color: "#fff", position: "sticky", top: 0, zIndex: 5 }}>
+                {/* Colonne MEV read-only */}
+                {[
+                  ["GoTo",               "80px"],
+                  ["Titolo / Descr.",     "220px"],
+                  ["Sistemi",            "110px"],
+                  ["PM Poste",           "110px"],
+                  ["PM CAP",             "110px"],
+                  ["Stato",               "90px"],
+                  ["Importo",             "110px"],
+                  ["Mandataria/Mandante","160px"],
+                ].map(([lbl, w]) => (
+                  <th key={lbl} style={{ padding: "12px 14px", textAlign: "left", whiteSpace: "nowrap",
+                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: w, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
+                    {lbl}
+                  </th>
+                ))}
+                {/* Separatore */}
+                <th style={{ padding: "12px 6px", background: "#152C4A", minWidth: 4, borderRight: "2px solid #4A90C4" }}></th>
+                {/* Colonne editabili */}
+                {EDITABLE_FIELDS.map(f => (
+                  <th key={f.key} style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap",
+                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: f.type === "text" ? "200px" : f.type === "date" ? "140px" : "90px",
+                    background: "#1E4976", borderRight: `1px solid rgba(255,255,255,0.1)` }}>
+                    {f.label}
+                    {f.type === "percent" && <span style={{ fontWeight: 400, opacity: 0.7 }}> %</span>}
+                  </th>
+                ))}
+                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 80 }}>Salva</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((r, idx) => {
+                const mevId = String(r.id);
+                const prog = progressData[mevId] || {};
+                const isDirty = !!dirty[mevId];
+                const isSaving = !!saving[mevId];
+                const isOk = !!savedOk[mevId];
+                const mandataria = resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ") || "—";
+                const bg = isDirty ? "#FFFBEB" : idx % 2 === 0 ? C.surface : "#F8FAFC";
+                const reqPct = Number(prog.requisito) || 0;
+                const analPct = Number(prog.analisiProgettazione) || 0;
+                const svlPct = Number(prog.sviluppo) || 0;
+
+                return (
+                  <tr key={mevId} style={{ background: bg, transition: "background .15s",
+                    borderBottom: `1px solid ${C.border}` }}>
+                    {/* GoTo */}
+                    <td style={{ padding: "12px 14px", fontWeight: 700, color: C.accent, whiteSpace: "nowrap" }}>
+                      {r.goTo || "—"}
+                    </td>
+                    {/* Titolo */}
+                    <td style={{ padding: "12px 14px", maxWidth: 220 }}>
+                      <div style={{ fontWeight: 600, color: C.text, lineHeight: 1.4,
+                        overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {r.descrizione || r.goTo || "—"}
+                      </div>
+                    </td>
+                    {/* Sistemi */}
+                    <td style={{ padding: "12px 14px", color: C.muted, whiteSpace: "nowrap" }}>
+                      {r.applicativo || "—"}
+                    </td>
+                    {/* PM Poste */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>{r.pmPoste || "—"}</td>
+                    {/* PM CAP */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>{r.pmCap || "—"}</td>
+                    {/* Stato */}
+                    <td style={{ padding: "12px 14px" }}>
+                      {r.stato ? (
+                        <span style={{ ...statoStyle(r.stato), borderRadius: 20,
+                          padding: "3px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          {r.stato}
+                        </span>
+                      ) : <span style={{ color: C.muted }}>—</span>}
+                    </td>
+                    {/* Importo */}
+                    <td style={{ padding: "12px 14px", fontWeight: 600, whiteSpace: "nowrap",
+                      color: r.importoExcel ? C.text : C.muted }}>
+                      {r.importoExcel ? euro.format(r.importoExcel) : "—"}
+                    </td>
+                    {/* Mandataria */}
+                    <td style={{ padding: "12px 14px", maxWidth: 160, color: C.muted, fontSize: 11 }}>
+                      {mandataria}
+                    </td>
+                    {/* Separatore */}
+                    <td style={{ padding: 0, borderRight: "2px solid #4A90C4", background: "#EBF4FF" }}></td>
+
+                    {/* Campi editabili */}
+                    {EDITABLE_FIELDS.map(f => (
+                      <td key={f.key} style={{ padding: "8px 10px", verticalAlign: "middle" }}>
+                        {f.type === "percent" ? (
+                          <div>
+                            <EditCell value={prog[f.key]} type={f.type}
+                              onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                            <ProgressBar value={prog[f.key]}
+                              color={f.key === "requisito" ? "#7C3AED" : f.key === "analisiProgettazione" ? C.accent : C.success} />
+                          </div>
+                        ) : (
+                          <EditCell value={prog[f.key]} type={f.type}
+                            onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                        )}
+                      </td>
+                    ))}
+
+                    {/* Bottone salva riga */}
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                      {isOk ? (
+                        <span style={{ fontSize: 18, color: C.success }}>✓</span>
+                      ) : (
+                        <button onClick={() => saveRow(mevId)}
+                          disabled={!isDirty || isSaving}
+                          style={{ padding: "6px 14px", background: isDirty ? C.accent : "#E2E8F0",
+                            color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
+                            fontWeight: 700, fontSize: 12, cursor: isDirty ? "pointer" : "default",
+                            opacity: isSaving ? 0.6 : 1, transition: "all .15s", whiteSpace: "nowrap" }}>
+                          {isSaving ? "…" : "Salva"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Legenda avanzamento ── */}
+      {filteredRows.length > 0 && (
+        <div style={{ marginTop: 20, display: "flex", gap: 24, flexWrap: "wrap", fontSize: 11, color: C.muted }}>
+          <span><span style={{ color: "#7C3AED", fontWeight: 700 }}>■</span> Requisito</span>
+          <span><span style={{ color: C.accent, fontWeight: 700 }}>■</span> Analisi / Progett.</span>
+          <span><span style={{ color: C.success, fontWeight: 700 }}>■</span> Sviluppo</span>
+          <span style={{ marginLeft: "auto" }}>
+            {hasDirty ? `${Object.keys(dirty).length} righe con modifiche non salvate` : "Tutti i dati sono sincronizzati"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

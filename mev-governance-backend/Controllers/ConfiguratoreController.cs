@@ -663,8 +663,56 @@ public class ConfiguratoreController : ControllerBase
     }
 
     // ============================================================
-    // Helper query generica
+    // GET  /api/configuratore/release-progress?contractId=&release=
+    // PUT  /api/configuratore/release-progress
+    // Body PUT: { contractId, release, rows: [ { mevId, ...campi } ] }
+    // Dati di avanzamento attività per release — entity_type 'release_progress'
+    // record_key = "{contractId}|{release}|release-progress"
     // ============================================================
+    [HttpGet("release-progress")]
+    public async Task<IActionResult> GetReleaseProgress([FromQuery] string? contractId, [FromQuery] string? release)
+    {
+        if (!CanAccessRecords()) return Forbid();
+        var (sch, cs) = GetDbTarget();
+        try
+        {
+            var conditions = new List<string> { $@"""entity_type"" = 'release_progress'" };
+            var ps = new List<NpgsqlParameter>();
+            if (!string.IsNullOrWhiteSpace(contractId))
+            { conditions.Add($@"""contract_id"" = @cid"); ps.Add(new("cid", contractId)); }
+            if (!string.IsNullOrWhiteSpace(release))
+            { conditions.Add($@"""title"" = @rel"); ps.Add(new("rel", release)); }
+            var sql = $@"SELECT ""record_key"",""contract_id"",""title"",""payload"" FROM ""{sch}"".""PC_DataRecords"" WHERE {string.Join(" AND ", conditions)} ORDER BY ""title""";
+            var records = await QueryAsync(cs, sql, ps, sch);
+            return Ok(records);
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Errore lettura avanzamenti", error = ex.Message }); }
+    }
+
+    [HttpPut("release-progress")]
+    public async Task<IActionResult> UpsertReleaseProgress([FromBody] ReleaseProgressRequest req)
+    {
+        if (!CanAccessRecords()) return Forbid();
+        if (string.IsNullOrWhiteSpace(req.ContractId) || string.IsNullOrWhiteSpace(req.Release))
+            return BadRequest("contractId e release sono obbligatori");
+        var (sch, cs) = GetDbTarget();
+        var rk = $"{req.ContractId}|{req.Release}|release-progress";
+        var payload = req.Payload.HasValue ? req.Payload.Value.GetRawText() : "{}";
+        var sql = $@"INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"",""entity_type"",""contract_id"",""lot_id"",""title"",""payload"")
+            VALUES (@rk,'release_progress',@cid,'',@rel,@pl::jsonb)
+            ON CONFLICT (""record_key"") DO UPDATE SET ""payload""=EXCLUDED.""payload"",""updated_at""=now()";
+        try
+        {
+            await ExecuteAsync(cs, sql, new List<NpgsqlParameter>
+            {
+                new("rk", rk), new("cid", req.ContractId), new("rel", req.Release), new("pl", payload)
+            });
+            return Ok(new { message = "Avanzamento salvato", release = req.Release });
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Errore salvataggio avanzamento", error = ex.Message }); }
+    }
+
+
     private async Task<List<Dictionary<string, object?>>> QueryAsync(string cs, string sql, List<NpgsqlParameter> ps, string schema)
     {
         var result = new List<Dictionary<string, object?>>();
@@ -875,3 +923,9 @@ public class BuiltinLotData
     public System.Text.Json.JsonElement? Catalog   { get; set; }
     public System.Text.Json.JsonElement? TowPrices { get; set; }
 }
+
+public record ReleaseProgressRequest(
+    [property: JsonPropertyName("contractId")] string ContractId,
+    [property: JsonPropertyName("release")]    string Release,
+    [property: JsonPropertyName("payload")]    System.Text.Json.JsonElement? Payload
+);

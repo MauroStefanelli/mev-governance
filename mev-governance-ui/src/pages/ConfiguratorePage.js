@@ -1293,21 +1293,34 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                    }
                  </select>
                </label>
-               <label style={styles.label}>Release
-                 {releaseList.length > 0 ? (
-                   <select style={styles.input}
-                     value={initiative.release}
-                     onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
-                     <option value="">— nessuna —</option>
-                     <option value="Da pianificare">Da pianificare</option>
-                     {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
-                   </select>
-                 ) : (
-                   <input style={styles.input} value={initiative.release}
-                     placeholder="es. R2025-04 (opzionale)"
-                     onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
-                 )}
-               </label>
+                <label style={styles.label}>Release
+                  {releaseList.length > 0 ? (
+                    <>
+                      <select style={styles.input}
+                        value={releaseList.includes(initiative.release) || initiative.release === "" || initiative.release === "Da pianificare" || initiative.release === "TBD" ? initiative.release : "__altro__"}
+                        onChange={(e) => {
+                          if (e.target.value !== "__altro__") setInitiative((i) => ({ ...i, release: e.target.value }));
+                          else setInitiative((i) => ({ ...i, release: "" }));
+                        }}>
+                        <option value="">— nessuna —</option>
+                        <option value="Da pianificare">Da pianificare</option>
+                        <option value="TBD">TBD (To Be Defined)</option>
+                        {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
+                        <option value="__altro__">Altro (testo libero)…</option>
+                      </select>
+                      {(!releaseList.includes(initiative.release) && initiative.release !== "" && initiative.release !== "Da pianificare" && initiative.release !== "TBD") && (
+                        <input style={{ ...styles.input, marginTop: 4 }}
+                          value={initiative.release}
+                          placeholder="Inserisci release (es. TBD, R2025-09…)"
+                          onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                      )}
+                    </>
+                  ) : (
+                    <input style={styles.input} value={initiative.release}
+                      placeholder="es. R2025-04 oppure TBD (opzionale)"
+                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                  )}
+                </label>
               <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
                 <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
               </label>
