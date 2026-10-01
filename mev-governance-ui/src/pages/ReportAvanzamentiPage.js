@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { getMevList, getReleaseSchedules, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
 
@@ -265,7 +265,6 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   // Import Excel
   const [importPreview, setImportPreview] = useState(null); // { matched, unmatched } | null
   const [importing, setImporting]         = useState(false);
-  const fileInputRef = useRef(null);
 
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
@@ -371,21 +370,25 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   }, [progressData, selectedRelease, contractId]);
 
   // Import Excel: parsing e anteprima
+  // Usa filteredRows (GoTo della release selezionata) come sorgente per il join
   const handleImportFile = useCallback(async (e) => {
     const file = e.target.files?.[0];
-    if (!fileInputRef.current) fileInputRef.current = e.target;
     e.target.value = "";
     if (!file) return;
+    if (filteredRows.length === 0) {
+      setMsg({ type: "err", text: "Seleziona prima una release con attività visibili." });
+      return;
+    }
     setImporting(true);
     try {
-      const result = await parseExcelToProgress(file, mevRows);
+      const result = await parseExcelToProgress(file, filteredRows);
       setImportPreview(result);
     } catch (err) {
       setMsg({ type: "err", text: "Errore import: " + (err.message || "file non valido") });
     } finally {
       setImporting(false);
     }
-  }, [mevRows]);
+  }, [filteredRows]);
 
   // Applica i dati importati al progressData
   const applyImport = useCallback(() => {

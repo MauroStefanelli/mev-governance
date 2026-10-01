@@ -524,6 +524,14 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
   // ── Step 2: analyze (port da analyze r.328) ──
   const analyze = async () => {
+    // Se ci sono interventi importati dal workbook, usa runGapAnalysis
+    // per ottenere il raggruppamento per ID_INTERVENTO (come in "Mostra dettaglio importato")
+    if (importedInterventions.length > 0) {
+      await runGapAnalysis(importedInterventions, items);
+      setStep(2);
+      return;
+    }
+    // Senza interventi importati: analisi testuale generica (suggestions senza interventionId)
     const source = [initiative.title, initiative.system, initiative.description, applicationsText(applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]))].join(" ").toLowerCase();
     if (source.replace(/\s/g, "").length < 20) {
       toast("Inserisci una descrizione più dettagliata");
@@ -1361,7 +1369,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <button style={btnStyles.primary} onClick={analyze}>Analizza e suggerisci</button>
+              <button style={btnStyles.primary} onClick={analyze}>
+                {importedInterventions.length > 0 ? `Analizza integrazioni (${importedInterventions.length} interventi)` : "Analizza e suggerisci"}
+              </button>
               <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
             </div>
           </div>
