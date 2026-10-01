@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import * as XLSX from "xlsx";
 import { getMevList, getReleaseSchedules, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -58,20 +59,141 @@ const resolveMandataria = (capVal, ietVal, rtiRows = []) => {
 
 // ── Campi editabili ───────────────────────────────────────────────────────────
 const EDITABLE_FIELDS = [
-  { key: "requisito",           label: "Requisito",            type: "percent" },
-  { key: "analisiProgettazione",label: "Analisi Prog.",        type: "percent" },
-  { key: "sviluppo",            label: "Sviluppo",             type: "percent" },
-  { key: "dataAggiornamento",   label: "Data Aggiorn.",        type: "date"    },
-  { key: "dataDeployCollaudo",  label: "Deploy Collaudo",      type: "date"    },
-  { key: "deadlineDueDate",     label: "Deadline / Due Date",  type: "date"    },
-  { key: "hld",                 label: "HLD",                  type: "date"    },
-  { key: "afu",                 label: "AFU",                  type: "date"    },
-  { key: "icd",                 label: "ICD",                  type: "date"    },
-  { key: "manualeUtente",       label: "Manuale Utente",       type: "date"    },
-  { key: "rnManInst",           label: "RN/Man Inst",          type: "date"    },
-  { key: "unitTest",            label: "Unit Test",            type: "date"    },
-  { key: "note",                label: "Note",                 type: "text"    },
+  { key: "requisito",           label: "Requisito",              type: "percent" },
+  { key: "analisiProgettazione",label: "Analisi Prog.",          type: "percent" },
+  { key: "sviluppo",            label: "Sviluppo",               type: "percent" },
+  { key: "dataAggiornamento",   label: "Data Aggiorn.",          type: "date"    },
+  { key: "drop1DeployCollaudo", label: "1° Drop Deploy Coll.",   type: "date"    },
+  { key: "drop2DeployCollaudo", label: "2° Drop Deploy Coll.",   type: "date"    },
+  { key: "drop3DeployCollaudo", label: "3° Drop Deploy Coll.",   type: "date"    },
+  { key: "dataT0",              label: "Data T0",                type: "date"    },
+  { key: "elapsedSviluppo",     label: "Elapsed Sviluppo",       type: "text"    },
+  { key: "deadlineDueDate",     label: "Deadline / Due Date",    type: "date"    },
+  { key: "hld",                 label: "HLD",                    type: "date"    },
+  { key: "afu",                 label: "AFU",                    type: "date"    },
+  { key: "icd",                 label: "ICD",                    type: "date"    },
+  { key: "manualeUtente",       label: "Manuale Utente",         type: "date"    },
+  { key: "rnManInst",           label: "RN/Man Inst",            type: "date"    },
+  { key: "unitTest",            label: "Unit Test",              type: "date"    },
+  { key: "note",                label: "Note",                   type: "text"    },
 ];
+
+// ── Mapping colonne Excel → chiavi modello ────────────────────────────────────
+// La chiave è il nome colonna normalizzato (lowercase, spazi collassati)
+const EXCEL_COL_MAP = {
+  "requisito":                  { key: "requisito",            type: "percent" },
+  "analisi progettazione":      { key: "analisiProgettazione", type: "percent" },
+  "analisi\nprogettazione":     { key: "analisiProgettazione", type: "percent" },
+  "sviluppo":                   { key: "sviluppo",             type: "percent" },
+  "data aggiornamento":         { key: "dataAggiornamento",    type: "date"    },
+  "1° drop deploy collaudo":    { key: "drop1DeployCollaudo",  type: "date"    },
+  "2° drop deploy collaudo":    { key: "drop2DeployCollaudo",  type: "date"    },
+  "3° drop deploy collaudo":    { key: "drop3DeployCollaudo",  type: "date"    },
+  "data t0":                    { key: "dataT0",               type: "date"    },
+  "elapsed sviluppo":           { key: "elapsedSviluppo",      type: "text"    },
+  "dead line due date":         { key: "deadlineDueDate",      type: "date"    },
+  "deadline due date":          { key: "deadlineDueDate",      type: "date"    },
+  "hld":                        { key: "hld",                  type: "date"    },
+  "afu":                        { key: "afu",                  type: "date"    },
+  "icd":                        { key: "icd",                  type: "date"    },
+  "manuale utente":             { key: "manualeUtente",        type: "date"    },
+  "rn/man inst":                { key: "rnManInst",            type: "date"    },
+  "unit test":                  { key: "unitTest",             type: "date"    },
+  "note":                       { key: "note",                 type: "text"    },
+};
+
+// Converte serial Excel o stringa data in "YYYY-MM-DD" (o stringa vuota)
+const excelDateToISO = (v) => {
+  if (v == null || v === "") return "";
+  // Già stringa ISO o formato IT gg/mm/aaaa
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const itMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (itMatch) return `${itMatch[3]}-${itMatch[2].padStart(2,"0")}-${itMatch[1].padStart(2,"0")}`;
+    return "";
+  }
+  // Numero seriale Excel
+  if (typeof v === "number") {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (!d) return "";
+    return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
+  }
+  return "";
+};
+
+// Normalizza header: lowercase, rimuove BOM/spazi laterali, collassa spazi interni
+const normHeader = (h) =>
+  String(h || "").replace(/^\uFEFF/, "").trim().toLowerCase().replace(/\s+/g, " ");
+
+// Legge file Excel e restituisce { matched: [{mevId, goTo, fields}], unmatched: [goTo string] }
+const parseExcelToProgress = (file, mevRows) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (raw.length < 2) { resolve({ matched: [], unmatched: [] }); return; }
+
+        // Trova riga header (prima riga con "GOTO" o "GoTo" o "goto")
+        let headerRowIdx = 0;
+        for (let i = 0; i < Math.min(5, raw.length); i++) {
+          if (raw[i].some(c => normHeader(c) === "goto")) { headerRowIdx = i; break; }
+        }
+        const headers = raw[headerRowIdx].map(normHeader);
+        const gotoIdx = headers.indexOf("goto");
+        if (gotoIdx === -1) { reject(new Error('Colonna "GOTO" non trovata nel file Excel.')); return; }
+
+        // Costruisce mappa goTo → mevId
+        const goToMap = {};
+        mevRows.forEach(r => {
+          if (r.goTo) goToMap[String(r.goTo).trim().toUpperCase()] = String(r.id);
+        });
+
+        const matched = [];
+        const unmatchedSet = new Set();
+
+        for (let i = headerRowIdx + 1; i < raw.length; i++) {
+          const row = raw[i];
+          const goToRaw = String(row[gotoIdx] || "").trim();
+          if (!goToRaw) continue;
+          const goToKey = goToRaw.toUpperCase();
+          const mevId = goToMap[goToKey];
+          if (!mevId) { unmatchedSet.add(goToRaw); continue; }
+
+          const fields = {};
+          headers.forEach((h, idx) => {
+            const mapping = EXCEL_COL_MAP[h];
+            if (!mapping) return;
+            const raw_val = row[idx];
+            if (raw_val == null || raw_val === "") return;
+            if (mapping.type === "percent") {
+              // Accetta sia 75 sia 0.75 (percentuale come decimale)
+              let n = Number(raw_val);
+              if (isNaN(n)) return;
+              if (n > 0 && n <= 1) n = Math.round(n * 100); // 0.75 → 75
+              fields[mapping.key] = Math.min(100, Math.max(0, Math.round(n)));
+            } else if (mapping.type === "date") {
+              const iso = excelDateToISO(raw_val);
+              if (iso) fields[mapping.key] = iso;
+            } else {
+              fields[mapping.key] = String(raw_val).trim();
+            }
+          });
+
+          matched.push({ mevId, goTo: goToRaw, fields });
+        }
+
+        resolve({ matched, unmatched: [...unmatchedSet] });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error("Errore lettura file."));
+    reader.readAsArrayBuffer(file);
+  });
 
 // ── Componente cella editabile ────────────────────────────────────────────────
 function EditCell({ value, type, onChange, saving }) {
@@ -140,6 +262,10 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [loadingProg, setLoadingProg]   = useState(false);
   const [globalSaving, setGlobalSaving] = useState(false);
   const [msg, setMsg]                   = useState(null); // { type: "ok"|"err", text }
+  // Import Excel
+  const [importPreview, setImportPreview] = useState(null); // { matched, unmatched } | null
+  const [importing, setImporting]         = useState(false);
+  const fileInputRef = useRef(null);
 
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
@@ -244,6 +370,43 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     }
   }, [progressData, selectedRelease, contractId]);
 
+  // Import Excel: parsing e anteprima
+  const handleImportFile = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) fileInputRef.current = e.target;
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await parseExcelToProgress(file, mevRows);
+      setImportPreview(result);
+    } catch (err) {
+      setMsg({ type: "err", text: "Errore import: " + (err.message || "file non valido") });
+    } finally {
+      setImporting(false);
+    }
+  }, [mevRows]);
+
+  // Applica i dati importati al progressData
+  const applyImport = useCallback(() => {
+    if (!importPreview) return;
+    setProgressData(prev => {
+      const next = { ...prev };
+      importPreview.matched.forEach(({ mevId, fields }) => {
+        next[mevId] = { ...(next[mevId] || {}), ...fields };
+      });
+      return next;
+    });
+    setDirty(prev => {
+      const next = { ...prev };
+      importPreview.matched.forEach(({ mevId }) => { next[mevId] = true; });
+      return next;
+    });
+    setMsg({ type: "ok", text: `Importate ${importPreview.matched.length} righe. Ricorda di salvare.` });
+    setTimeout(() => setMsg(null), 4000);
+    setImportPreview(null);
+  }, [importPreview]);
+
   const hasDirty = Object.keys(dirty).length > 0;
 
   if (loading) return (
@@ -297,6 +460,25 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
               boxShadow: "0 2px 8px rgba(26,110,189,0.25)", opacity: globalSaving ? 0.7 : 1 }}>
             {globalSaving ? "Salvataggio…" : `Salva tutto (${Object.keys(dirty).length} modif.)`}
           </button>
+        )}
+
+        {/* ── Importa da Excel ── */}
+        {selectedRelease && (
+          <>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 18px", background: "#F0FDF4", border: `1px solid #86EFAC`,
+              borderRadius: 10, fontWeight: 700, fontSize: 13, color: C.success,
+              cursor: importing ? "wait" : "pointer", opacity: importing ? 0.7 : 1,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.05)", whiteSpace: "nowrap" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              {importing ? "Lettura…" : "Importa da Excel"}
+              <input type="file" accept=".xlsx,.xls,.xlsm" style={{ display: "none" }}
+                onChange={handleImportFile} />
+            </label>
+          </>
         )}
 
         {msg && (
@@ -477,6 +659,97 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
           <span style={{ marginLeft: "auto" }}>
             {hasDirty ? `${Object.keys(dirty).length} righe con modifiche non salvate` : "Tutti i dati sono sincronizzati"}
           </span>
+        </div>
+      )}
+
+      {/* ── Modal preview import ── */}
+      {importPreview && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={() => setImportPreview(null)}>
+          <div style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+            width: "100%", maxWidth: 560, maxHeight: "80vh", overflowY: "auto", padding: "28px 28px 24px" }}
+            onClick={e => e.stopPropagation()}>
+
+            <h2 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 800, color: C.head }}>
+              Anteprima Import Excel
+            </h2>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: C.muted }}>
+              Controlla i dati prima di applicarli. Le modifiche non vengono salvate automaticamente.
+            </p>
+
+            {/* Riepilogo */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 120, background: C.successLt, border: `1px solid #86EFAC`,
+                borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.success }}>{importPreview.matched.length}</div>
+                <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginTop: 2 }}>GoTo trovati</div>
+              </div>
+              {importPreview.unmatched.length > 0 && (
+                <div style={{ flex: 1, minWidth: 120, background: C.warnLt, border: `1px solid #FCD34D`,
+                  borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: C.warn }}>{importPreview.unmatched.length}</div>
+                  <div style={{ fontSize: 11, color: C.warn, fontWeight: 600, marginTop: 2 }}>GoTo non trovati</div>
+                </div>
+              )}
+            </div>
+
+            {/* Lista matched (prime 10) */}
+            {importPreview.matched.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, marginBottom: 6,
+                  textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                  Righe da importare {importPreview.matched.length > 10 ? `(prime 10 di ${importPreview.matched.length})` : ""}
+                </div>
+                <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+                  {importPreview.matched.slice(0, 10).map(({ goTo, fields }) => (
+                    <div key={goTo} style={{ display: "flex", alignItems: "flex-start", gap: 10,
+                      padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
+                      background: C.surface, fontSize: 12 }}>
+                      <span style={{ fontWeight: 700, color: C.accent, minWidth: 80 }}>{goTo}</span>
+                      <span style={{ color: C.muted, fontSize: 11, lineHeight: 1.5 }}>
+                        {Object.entries(fields).map(([k, v]) => {
+                          const f = EDITABLE_FIELDS.find(ef => ef.key === k);
+                          return `${f ? f.label : k}: ${v}`;
+                        }).join(" · ")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Lista unmatched */}
+            {importPreview.unmatched.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.warn, marginBottom: 6,
+                  textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                  GoTo non presenti in questa release (verranno ignorati)
+                </div>
+                <div style={{ background: C.warnLt, border: `1px solid #FCD34D`, borderRadius: 8,
+                  padding: "10px 14px", fontSize: 12, color: C.warn, lineHeight: 1.8 }}>
+                  {importPreview.unmatched.slice(0, 20).join(", ")}
+                  {importPreview.unmatched.length > 20 && ` … e altri ${importPreview.unmatched.length - 20}`}
+                </div>
+              </div>
+            )}
+
+            {/* Azioni */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setImportPreview(null)}
+                style={{ padding: "10px 20px", background: "#F1F5F9", color: C.muted,
+                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                Annulla
+              </button>
+              <button onClick={applyImport} disabled={importPreview.matched.length === 0}
+                style={{ padding: "10px 24px", background: importPreview.matched.length > 0 ? C.success : "#E2E8F0",
+                  color: importPreview.matched.length > 0 ? "#fff" : C.muted,
+                  border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                  cursor: importPreview.matched.length > 0 ? "pointer" : "default" }}>
+                Applica {importPreview.matched.length} righe
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
