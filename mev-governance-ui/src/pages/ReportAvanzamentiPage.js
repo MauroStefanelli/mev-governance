@@ -57,33 +57,42 @@ const resolveMandataria = (capVal, ietVal, rtiRows = []) => {
   return [...new Set([...fromCap, ...fromIet])];
 };
 
-// ── Campi editabili ───────────────────────────────────────────────────────────
+// ── Campi editabili in tabella (sempre visibili) ──────────────────────────────
 const EDITABLE_FIELDS = [
-  { key: "requisito",           label: "Requisito",              type: "percent" },
-  { key: "analisiProgettazione",label: "Analisi Prog.",          type: "percent" },
-  { key: "sviluppo",            label: "Sviluppo",               type: "percent" },
-  { key: "dataAggiornamento",   label: "Data Aggiorn.",          type: "date"    },
-  { key: "drop1DeployCollaudo", label: "1° Drop Deploy Coll.",   type: "date"    },
-  { key: "drop2DeployCollaudo", label: "2° Drop Deploy Coll.",   type: "date"    },
-  { key: "drop3DeployCollaudo", label: "3° Drop Deploy Coll.",   type: "date"    },
-  { key: "dataT0",              label: "Data T0",                type: "date"    },
-  { key: "elapsedSviluppo",     label: "Elapsed Sviluppo",       type: "text"    },
-  { key: "deadlineDueDate",     label: "Deadline / Due Date",    type: "date"    },
-  { key: "hld",                 label: "HLD",                    type: "date"    },
-  { key: "afu",                 label: "AFU",                    type: "date"    },
-  { key: "icd",                 label: "ICD",                    type: "date"    },
-  { key: "manualeUtente",       label: "Manuale Utente",         type: "date"    },
-  { key: "rnManInst",           label: "RN/Man Inst",            type: "date"    },
-  { key: "unitTest",            label: "Unit Test",              type: "date"    },
-  { key: "note",                label: "Note",                   type: "text"    },
+  { key: "requisito",           label: "Requisito",       type: "percent" },
+  { key: "analisi",             label: "Analisi",         type: "percent" },
+  { key: "progettazione",       label: "Progettazione",   type: "percent" },
+  { key: "sviluppo",            label: "Sviluppo",        type: "percent" },
+  { key: "dataAggiornamento",   label: "Data Aggiorn.",   type: "date"    },
+  { key: "hld",                 label: "HLD",             type: "date"    },
+  { key: "afu",                 label: "AFU",             type: "date"    },
+  { key: "icd",                 label: "ICD",             type: "date"    },
+  { key: "manualeUtente",       label: "Manuale Utente",  type: "date"    },
+  { key: "rnManInst",           label: "RN/Man Inst",     type: "date"    },
+  { key: "unitTest",            label: "Unit Test",       type: "date"    },
+  { key: "note",                label: "Note",            type: "text"    },
+];
+
+// ── Campi nel popup dettaglio (al click riga) ─────────────────────────────────
+const DETAIL_FIELDS = [
+  { key: "drop1DeployCollaudo", label: "1° Drop Deploy Collaudo",  type: "date" },
+  { key: "drop2DeployCollaudo", label: "2° Drop Deploy Collaudo",  type: "date" },
+  { key: "drop3DeployCollaudo", label: "3° Drop Deploy Collaudo",  type: "date" },
+  { key: "dataT0",              label: "Data T0",                  type: "date" },
+  { key: "elapsedSviluppo",     label: "Elapsed Sviluppo",         type: "text" },
+  { key: "deadlineDueDate",     label: "Deadline / Due Date",      type: "date" },
 ];
 
 // ── Mapping colonne Excel → chiavi modello ────────────────────────────────────
-// La chiave è il nome colonna normalizzato (lowercase, spazi collassati)
 const EXCEL_COL_MAP = {
   "requisito":                  { key: "requisito",            type: "percent" },
-  "analisi progettazione":      { key: "analisiProgettazione", type: "percent" },
-  "analisi\nprogettazione":     { key: "analisiProgettazione", type: "percent" },
+  // Analisi — tutti i possibili nomi colonna
+  "analisi":                    { key: "analisi",              type: "percent" },
+  "analisi progettazione":      { key: "analisi",              type: "percent" },
+  "analisi\nprogettazione":     { key: "analisi",              type: "percent" },
+  "analisi/progettazione":      { key: "analisi",              type: "percent" },
+  // Progettazione separata
+  "progettazione":              { key: "progettazione",        type: "percent" },
   "sviluppo":                   { key: "sviluppo",             type: "percent" },
   "data aggiornamento":         { key: "dataAggiornamento",    type: "date"    },
   "1° drop deploy collaudo":    { key: "drop1DeployCollaudo",  type: "date"    },
@@ -167,9 +176,16 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
           if (raw[i].some(c => normHeader(c) === "goto")) { headerRowIdx = i; break; }
         }
         const headers = raw[headerRowIdx].map(normHeader);
-        const gotoIdx   = headers.indexOf("goto");
-        const titoloIdx = headers.findIndex(h => h === "titolo" || h === "titolo / descr." || h === "titolo/descr." || h === "titolo descrizione");
-        const sistemiIdx = headers.findIndex(h => h === "sistemi" || h === "sistema" || h === "sistema / applicazione" || h === "sistemi/applicazione");
+        const gotoIdx    = headers.indexOf("goto");
+        const titoloIdx  = headers.findIndex(h =>
+          h === "titolo" || h === "titolo / descr." || h === "titolo/descr." ||
+          h === "titolo descrizione" || h === "titolo/descrizione" || h === "titolo / descrizione"
+        );
+        const sistemiIdx = headers.findIndex(h =>
+          h === "sistemi" || h === "sistema" ||
+          h === "sistema / applicazione" || h === "sistemi/applicazione" ||
+          h === "applicativo"
+        );
 
         if (gotoIdx === -1) {
           reject(new Error(`Colonna "GOTO" non trovata nel foglio "${sheetName}".`));
@@ -361,8 +377,10 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [globalSaving, setGlobalSaving] = useState(false);
   const [msg, setMsg]                   = useState(null); // { type: "ok"|"err", text }
   // Import Excel
-  const [importPreview, setImportPreview] = useState(null); // { matched, unmatched } | null
+  const [importPreview, setImportPreview] = useState(null);
   const [importing, setImporting]         = useState(false);
+  // Popup dettaglio riga
+  const [detailRow, setDetailRow]         = useState(null); // { mevId, r } | null
 
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
@@ -404,16 +422,19 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   }, [selectedRelease]); // eslint-disable-line
 
   // Filtra righe MEV per la release selezionata
-  // Esclude righe con stato "Eliminato" o vuoto (stringa vuota / null / undefined)
+  // Esclude: stato "Eliminato"/vuoto; sistemi RECUPERO, Collaudo, Presidio
   const filteredRows = useMemo(() => {
-    if (!selectedRelease) return []; // Nessuna release selezionata → nessuna riga
-    const STATI_ESCLUSI = new Set(["eliminato"]);
+    if (!selectedRelease) return [];
+    const STATI_ESCLUSI   = new Set(["eliminato"]);
+    const SISTEMI_ESCLUSI = new Set(["recupero", "collaudo", "presidio"]);
     return mevRows.filter(r => {
-      const stato = (r.stato || "").trim().toLowerCase();
-      if (!stato || STATI_ESCLUSI.has(stato)) return false;
+      const stato    = (r.stato      || "").trim().toLowerCase();
+      const sistema  = (r.applicativo|| "").trim().toLowerCase();
+      if (!stato || STATI_ESCLUSI.has(stato))        return false;
+      if (SISTEMI_ESCLUSI.has(sistema))              return false;
       return (
         (r.releaseExcel || "").trim() === selectedRelease ||
-        (r.pRelease || "").trim() === selectedRelease
+        (r.pRelease     || "").trim() === selectedRelease
       );
     });
   }, [mevRows, selectedRelease]);
@@ -627,20 +648,25 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
               <tr style={{ background: C.head, color: "#fff", position: "sticky", top: 0, zIndex: 5 }}>
                 {/* Colonne MEV read-only */}
                 {[
-                  ["GoTo",               "80px"],
-                  ["Titolo / Descr.",     "220px"],
-                  ["Sistemi",            "110px"],
-                  ["PM Poste",           "110px"],
-                  ["PM CAP",             "110px"],
-                  ["Stato",               "90px"],
-                  ["Importo",             "110px"],
-                  ["Mandataria/Mandante","160px"],
-                ].map(([lbl, w]) => (
-                  <th key={lbl} style={{ padding: "12px 14px", textAlign: "left", whiteSpace: "nowrap",
-                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: w, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
-                    {lbl}
-                  </th>
-                ))}
+                   ["GoTo",               "80px"],
+                   ["Titolo / Descr.",     "220px"],
+                   ["Sistemi",            "110px"],
+                   ["PM Poste",           "110px"],
+                   ["PM CAP",             "110px"],
+                   ["Stato",               "90px"],
+                   ["Importo",             "110px"],
+                   ["Mandataria/Mandante","160px"],
+                 ].map(([lbl, w]) => (
+                   <th key={lbl} style={{ padding: "12px 14px", textAlign: "left", whiteSpace: "nowrap",
+                     fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: w, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
+                     {lbl}
+                   </th>
+                 ))}
+                 {/* Colonna dettaglio popup */}
+                 <th style={{ padding: "12px 10px", textAlign: "center", fontSize: 11,
+                   fontWeight: 700, minWidth: 44, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
+                   Det.
+                 </th>
                 {/* Separatore */}
                 <th style={{ padding: "12px 6px", background: "#152C4A", minWidth: 4, borderRight: "2px solid #4A90C4" }}></th>
                 {/* Colonne editabili */}
@@ -657,16 +683,19 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
             </thead>
             <tbody>
               {filteredRows.map((r, idx) => {
-                const mevId = String(r.id);
-                const prog = progressData[mevId] || {};
-                const isDirty = !!dirty[mevId];
+                const mevId    = String(r.id);
+                const prog     = progressData[mevId] || {};
+                const isDirty  = !!dirty[mevId];
                 const isSaving = !!saving[mevId];
-                const isOk = !!savedOk[mevId];
+                const isOk     = !!savedOk[mevId];
                 const mandataria = resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ") || "—";
                 const bg = isDirty ? "#FFFBEB" : idx % 2 === 0 ? C.surface : "#F8FAFC";
-                const reqPct = Number(prog.requisito) || 0;
-                const analPct = Number(prog.analisiProgettazione) || 0;
-                const svlPct = Number(prog.sviluppo) || 0;
+                const PERCENT_COLORS = {
+                  requisito:     "#7C3AED",
+                  analisi:       "#1A6EBD",
+                  progettazione: "#0891B2",
+                  sviluppo:      "#166534",
+                };
 
                 return (
                   <tr key={mevId} style={{ background: bg, transition: "background .15s",
@@ -708,10 +737,21 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
                     <td style={{ padding: "12px 14px", maxWidth: 160, color: C.muted, fontSize: 11 }}>
                       {mandataria}
                     </td>
+                    {/* Dettaglio — icona click popup */}
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                      <button
+                        onClick={() => setDetailRow({ mevId, r })}
+                        title="Apri dettaglio date e deploy"
+                        style={{ background: "#EBF4FF", border: `1px solid #93C5FD`, borderRadius: 7,
+                          padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.accent,
+                          lineHeight: 1 }}>
+                        ⋯
+                      </button>
+                    </td>
                     {/* Separatore */}
                     <td style={{ padding: 0, borderRight: "2px solid #4A90C4", background: "#EBF4FF" }}></td>
 
-                    {/* Campi editabili */}
+                    {/* Campi editabili in tabella */}
                     {EDITABLE_FIELDS.map(f => (
                       <td key={f.key} style={{ padding: "8px 10px", verticalAlign: "middle" }}>
                         {f.type === "percent" ? (
@@ -719,7 +759,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
                             <EditCell value={prog[f.key]} type={f.type}
                               onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
                             <ProgressBar value={prog[f.key]}
-                              color={f.key === "requisito" ? "#7C3AED" : f.key === "analisiProgettazione" ? C.accent : C.success} />
+                              color={PERCENT_COLORS[f.key] || C.accent} />
                           </div>
                         ) : (
                           <EditCell value={prog[f.key]} type={f.type}
@@ -755,13 +795,74 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
       {filteredRows.length > 0 && (
         <div style={{ marginTop: 20, display: "flex", gap: 24, flexWrap: "wrap", fontSize: 11, color: C.muted }}>
           <span><span style={{ color: "#7C3AED", fontWeight: 700 }}>■</span> Requisito</span>
-          <span><span style={{ color: C.accent, fontWeight: 700 }}>■</span> Analisi / Progett.</span>
+          <span><span style={{ color: C.accent, fontWeight: 700 }}>■</span> Analisi</span>
+          <span><span style={{ color: "#0891B2", fontWeight: 700 }}>■</span> Progettazione</span>
           <span><span style={{ color: C.success, fontWeight: 700 }}>■</span> Sviluppo</span>
           <span style={{ marginLeft: "auto" }}>
             {hasDirty ? `${Object.keys(dirty).length} righe con modifiche non salvate` : "Tutti i dati sono sincronizzati"}
           </span>
         </div>
       )}
+
+      {/* ── Modal dettaglio riga ── */}
+      {detailRow && (() => {
+        const { mevId, r } = detailRow;
+        const prog     = progressData[mevId] || {};
+        const isSaving = !!saving[mevId];
+        const isDirty  = !!dirty[mevId];
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+            onClick={() => setDetailRow(null)}>
+            <div style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+              width: "100%", maxWidth: 520, padding: "28px 28px 24px" }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Intestazione */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, color: C.muted, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                  Dettaglio date e deploy
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.head }}>
+                  {r.goTo} — {r.descrizione || ""}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.applicativo}</div>
+              </div>
+
+              {/* Campi dettaglio */}
+              <div style={{ display: "grid", gap: 14 }}>
+                {DETAIL_FIELDS.map(f => (
+                  <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text,
+                      minWidth: 200, flexShrink: 0 }}>{f.label}</label>
+                    <EditCell value={prog[f.key]} type={f.type}
+                      onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Azioni */}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
+                <button onClick={() => setDetailRow(null)}
+                  style={{ padding: "9px 20px", background: "#F1F5F9", color: C.muted,
+                    border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Chiudi
+                </button>
+                <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
+                  disabled={!isDirty || isSaving}
+                  style={{ padding: "9px 22px",
+                    background: isDirty ? C.accent : "#E2E8F0",
+                    color: isDirty ? "#fff" : C.muted,
+                    border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                    cursor: isDirty ? "pointer" : "default", opacity: isSaving ? 0.6 : 1 }}>
+                  {isSaving ? "Salvataggio…" : "Salva"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Modal preview import ── */}
       {importPreview && (
