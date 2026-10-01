@@ -767,12 +767,14 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [initiativeContractId]);
 
   // Carica le release del contratto selezionato per il campo Release in Step 1
+  // Le release_calendar sono salvate con contract_id = ambienteId (es. "1"), non selectedContractId
   useEffect(() => {
-    if (!selectedContractId) return;
-    getReleaseSchedules(selectedContractId)
-      .then(d => setReleaseList((d.records || []).map(r => r.title || "")))
+    const cid = ambienteId ? String(ambienteId) : selectedContractId;
+    if (!cid) return;
+    getReleaseSchedules(cid)
+      .then(d => setReleaseList((d.records || []).map(r => r.title || "").filter(Boolean).sort()))
       .catch(() => setReleaseList([]));
-  }, [selectedContractId]);
+  }, [ambienteId, selectedContractId]); // eslint-disable-line
 
   const deleteArchiveRecord = async (id) => {
     if (!window.confirm("Eliminare definitivamente questa iniziativa memorizzata?")) return;

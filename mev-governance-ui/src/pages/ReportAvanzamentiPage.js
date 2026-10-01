@@ -141,21 +141,24 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [globalSaving, setGlobalSaving] = useState(false);
   const [msg, setMsg]                   = useState(null); // { type: "ok"|"err", text }
 
-  // Contratto corrente — prende il primo contratto associato all'ambiente
-  const contractId = "poste-tet-2025"; // TODO: renderlo dinamico se servono più contratti
+  // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
+  const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
+  // Il contractId per release_progress rimane "poste-tet-2025" (chiave archivio)
+  const contractId = "poste-tet-2025";
 
   // Carica MEV + release + RTI al mount
   useEffect(() => {
     Promise.all([
       getMevList().catch(() => []),
-      getReleaseSchedules(contractId).catch(() => ({ records: [] })),
+      getReleaseSchedules(releaseContractId).catch(() => ({ records: [] })),
       getRtiSocieta().catch(() => []),
     ]).then(([mev, relData, rti]) => {
       setMevRows(mev || []);
       const rel = (relData.records || []).map(r => r.title || "").filter(Boolean).sort();
       setReleases(rel);
       setRtiRows(rti || []);
-      if (rel.length > 0) setSelectedRelease(rel[0]);
+      // Non preselezionare: l'utente deve scegliere esplicitamente
+      setSelectedRelease("");
     }).catch(e => {
       if (e?.status === 401) onUnauthorized?.();
     }).finally(() => setLoading(false));
@@ -178,12 +181,18 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   }, [selectedRelease]); // eslint-disable-line
 
   // Filtra righe MEV per la release selezionata
+  // Esclude righe con stato "Eliminato" o vuoto (stringa vuota / null / undefined)
   const filteredRows = useMemo(() => {
-    if (!selectedRelease) return mevRows;
-    return mevRows.filter(r =>
-      (r.releaseExcel || "").trim() === selectedRelease ||
-      (r.pRelease || "").trim() === selectedRelease
-    );
+    if (!selectedRelease) return []; // Nessuna release selezionata → nessuna riga
+    const STATI_ESCLUSI = new Set(["eliminato"]);
+    return mevRows.filter(r => {
+      const stato = (r.stato || "").trim().toLowerCase();
+      if (!stato || STATI_ESCLUSI.has(stato)) return false;
+      return (
+        (r.releaseExcel || "").trim() === selectedRelease ||
+        (r.pRelease || "").trim() === selectedRelease
+      );
+    });
   }, [mevRows, selectedRelease]);
 
   // KPI
@@ -300,7 +309,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
         )}
       </div>
 
-      {/* ── KPI bar ── */}
+      {/* ── KPI bar — visibile solo con release selezionata ── */}
+      {selectedRelease && (
       <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
         <KpiCard label="GoTo in release" value={kpis.total} sub="attività filtrate" accent={C.accent} />
         <KpiCard label="Approvati" value={kpis.approvati}
@@ -309,14 +319,22 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
         <KpiCard label="Importo Fornitura" value={euro.format(kpis.importo)}
           sub="righe filtrate" accent="#7C3AED" />
       </div>
+      )}
 
       {/* ── Tabella ── */}
-      {filteredRows.length === 0 ? (
+      {!selectedRelease ? (
+        <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`,
+          padding: "60px 24px", textAlign: "center", color: C.muted }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Seleziona una release</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Scegli una release dal menu a tendina per visualizzare le attività.</div>
+        </div>
+      ) : filteredRows.length === 0 ? (
         <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`,
           padding: "60px 24px", textAlign: "center", color: C.muted }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Nessuna attività per questa release</div>
-          <div style={{ fontSize: 13, marginTop: 6 }}>Seleziona una release diversa o verifica i dati MEV.</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Le righe con stato "Eliminato" o vuoto sono escluse. Verifica i dati MEV.</div>
         </div>
       ) : (
         <div style={{ overflowX: "auto", borderRadius: 14,
