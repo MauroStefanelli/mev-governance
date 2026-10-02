@@ -1063,35 +1063,41 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         techProfile: profile,
         task: "application_profile",
         instruction: `Analizza l'applicativo "${targetApp.name}" (codice ${targetApp.code || "N/A"}).
-Sulla base del codice sorgente e del profilo tecnico rilevato, produci:
-1. Lista interventi tipici necessari per evoluzioni/manutenzioni (ID_INTERVENTO, titolo, descrizione breve, categorie catalogo suggerite)
-2. Mappatura precisa con le voci del catalogo (catalogId, tipo MODIFICA/REALIZZAZIONE, complessità tipica)
-3. Dipendenze critiche e punti di attenzione per le iniziative
-Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [...], risks: [...], techSummary: "..." }`,
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura esatta (nessun testo fuori dal JSON):
+{
+  "interventionTypes": [ { "id": "IT-001", "title": "...", "description": "...", "catalogCategories": ["..."] } ],
+  "catalogMappings": [ { "catalogId": 239, "name": "...", "type": "MODIFICA", "complexity": "Medio", "rationale": "..." } ],
+  "risks": [ "descrizione rischio 1", "..." ],
+  "techSummary": "sintesi tecnica breve dell'applicativo in 2-3 frasi"
+}
+Basa la risposta sul profilo tecnico e sugli snippet di codice forniti nel contesto.`,
       };
 
       let aiEnrichment = null;
       try {
         const aiData = await analyzeInitiativeWithAi(aiCtx);
-        // L'AI può restituire il profilo in vari posti: analysis, direttamente nella root, o come stringa JSON
+        // L'AI può restituire il profilo in formati diversi — normalizziamo tutto
         const raw = aiData?.analysis || aiData;
         if (raw && typeof raw === "object") {
-          // Valida che abbia almeno uno dei campi attesi
-          if (raw.interventionTypes || raw.catalogMappings || raw.risks || raw.techSummary) {
-            aiEnrichment = raw;
-          } else {
-            // Potrebbe essere wrappato un livello più in profondità
-            const inner = Object.values(raw).find(v => v && typeof v === "object" && (v.interventionTypes || v.catalogMappings));
-            if (inner) aiEnrichment = inner;
+          // Normalizza campi alternativi che l'AI usa talvolta
+          aiEnrichment = {
+            interventionTypes: raw.interventionTypes || raw.intervention_types || raw.tipiIntervento || [],
+            catalogMappings:   raw.catalogMappings   || raw.catalog_mappings   || raw.mappaturaCatalogo || [],
+            risks:             raw.risks             || raw.rischi             || [],
+            techSummary:       raw.techSummary       || raw.tech_summary       || raw.summary           || raw.sintesi || "",
+          };
+          // Se tutti i campi array sono vuoti e techSummary è vuoto → risposta inutile
+          if (!aiEnrichment.interventionTypes.length && !aiEnrichment.catalogMappings.length && !aiEnrichment.risks.length && !aiEnrichment.techSummary) {
+            console.warn("[AI App Profile] Risposta AI vuota dopo normalizzazione:", JSON.stringify(raw)?.slice(0, 300));
+            aiEnrichment = null;
+            toast(`Scheda tecnica di "${targetApp.name}" salvata — profilo AI vuoto`);
           }
         }
         if (!aiEnrichment) {
-          console.warn("[AI App Profile] Risposta AI non contiene profilo atteso:", JSON.stringify(aiData)?.slice(0, 300));
-          toast(`Scheda tecnica di "${targetApp.name}" salvata — profilo AI non riconosciuto (vedi console)`);
+          console.warn("[AI App Profile] Risposta AI non riconosciuta:", JSON.stringify(aiData)?.slice(0, 300));
         }
       } catch (aiErr) {
         console.warn("[AI App Profile] Errore chiamata AI:", aiErr.message);
-        // AI non disponibile: procediamo con sola scheda tecnica locale
         toast(`Scheda tecnica di "${targetApp.name}" salvata. AI non disponibile: ${aiErr.message}`);
       }
 
