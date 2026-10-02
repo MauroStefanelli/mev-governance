@@ -1152,19 +1152,27 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
       toast("Approva prima almeno un intervento");
       return;
     }
-    if (!implementationFiles.length) {
-      toast("Seleziona prima il repository di questa iniziativa");
+    if (!implementationFiles.length && !techProfile) {
+      toast("Seleziona prima un applicativo in 'Applicativi e tecnologie'");
       return;
     }
     setDevBusy(true);
     try {
       const systems = evaluationSystems({ initiative, systems: [initiative.system], importedInterventions });
       const applicationCodes = evaluationApplicationCodes({ applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]) });
-      const allPaths = [...implementationFiles].map((f) => f.webkitRelativePath || f.name);
-      const sourcePaths = [...implementationFiles]
-        .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
-        .map((f) => f.webkitRelativePath || f.name);
-      const folderName = (allPaths[0] || "").split("/")[0] || "repository";
+      // Se ci sono file fisici li uso, altrimenti uso i dati del profilo tecnico
+      const hasFiles = implementationFiles.length > 0;
+      const allPaths = hasFiles
+        ? [...implementationFiles].map((f) => f.webkitRelativePath || f.name)
+        : (techProfile?.filePaths || []);
+      const sourcePaths = hasFiles
+        ? [...implementationFiles]
+            .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
+            .map((f) => f.webkitRelativePath || f.name)
+        : (techProfile?.filePaths || []).filter((p) => sourceFileAllowed(p) && !ignoredSourcePath(p));
+      const folderName = hasFiles
+        ? ((allPaths[0] || "").split("/")[0] || "repository")
+        : (techProfile?.name || initiative.system || "repository");
       const request = {
         formatVersion: 3,
         generatedAt: new Date().toISOString(),
@@ -2607,8 +2615,8 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
       </main>
       {/* SVILUPPO INIZIATIVA */}
       <details style={{ ...styles.card, marginTop: 28, background: "#edf1f6" }}>
-        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#102a47" }}>Sviluppo iniziativa · richiesta di modifica codice</summary>
-        <h3 style={{ margin: 0 }}>Sviluppo iniziativa · richiesta di modifica codice</h3>
+        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#102a47" }}>Sviluppo iniziativa</summary>
+        <h3 style={{ margin: 0 }}>Richiesta di modifica codice</h3>
         <p style={styles.hint}>Autorizza gli interventi nello step Offerta/Revisione, collega il repository e genera il pacchetto di richiesta codice (ZIP) per lo strumento di sviluppo scelto.</p>
         <div style={{ ...styles.grid2, marginTop: 10 }}>
           <label style={styles.label}>
@@ -2632,9 +2640,17 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           Compilazione e test
           <textarea style={styles.textarea} rows={2} value={implementationTests} onChange={(e) => setImplementationTests(e.target.value)} placeholder="Comandi di build/test da eseguire (es. npm run build, dotnet test)…" />
         </label>
-        {implementationFiles.length > 0 && (
+        {implementationFiles.length > 0 ? (
           <p style={styles.hint}>
             {implementationFiles.filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name)).length} file sorgente presi in considerazione · quelli ignorati (node_modules, dist, build, vendor, bin/obj, minificati, lock) non vengono elencati.
+          </p>
+        ) : techProfile ? (
+          <p style={styles.hint}>
+            Repository: <strong>{techProfile.name || initiative.system}</strong> — profilo tecnico caricato dall'applicativo selezionato ({techProfile.totalFiles || 0} file totali, {techProfile.readFiles || 0} analizzati).
+          </p>
+        ) : (
+          <p style={{ ...styles.hint, color: "#b00020" }}>
+            Nessun applicativo selezionato — torna al passo 1 e seleziona un applicativo da "Applicativi e tecnologie".
           </p>
         )}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
