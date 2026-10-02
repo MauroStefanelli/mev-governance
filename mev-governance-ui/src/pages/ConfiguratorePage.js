@@ -1995,16 +1995,21 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 </div>
                 <button
                   style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
-                  onClick={() => setSuggestions(prev => [...prev, {
-                    id: p.catalogId,
-                    selected: true,
-                    type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
-                    complexity: p.complexity || "Medio",
-                    qty: Math.max(0.01, Number(p.quantity) || 1),
-                    score: Math.round((Number(p.confidence) || 0) * 10),
-                    reason: p.rationale || "",
-                    additionalInfo: "Aggiunto da secondo parere AI",
-                  }])}
+                  onClick={() => {
+                    // Usa l'id esatto dal catalogo (preserva il tipo numerico/stringa)
+                    const catalogEntry = catalog.find(c => String(c.id) === String(p.catalogId));
+                    if (!catalogEntry) return;
+                    setSuggestions(prev => [...prev, {
+                      id: catalogEntry.id,  // ← id con il tipo corretto (numero se il catalogo usa numeri)
+                      selected: true,
+                      type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
+                      complexity: p.complexity || "Medio",
+                      qty: Math.max(0.01, Number(p.quantity) || 1),
+                      score: Math.round((Number(p.confidence) || 0) * 10),
+                      reason: p.rationale || "",
+                      additionalInfo: "Aggiunto da secondo parere AI",
+                    }]);
+                  }}
                 >
                   + Aggiungi
                 </button>
@@ -2041,7 +2046,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         </summary>
         <div style={{ padding: "10px 14px", display: "grid", gap: 10 }}>
           {items.map((s, i) => {
-            const cc = catalog.find((x) => x.id === s.id);
+            const cc = catalog.find((x) => String(x.id) === String(s.id));
             if (!cc) return null;
             // CORRETTO: validComplexities(catalogEntry, typeString)
             const vals = validComplexities(cc, s.type);
@@ -2376,7 +2381,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                           </thead>
                           <tbody>
                             {gitems.map((it) => {
-                              const cc = catalog.find((x) => x.id === it.id);
+                              const cc = catalog.find((x) => String(x.id) === String(it.id));
                               const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
                               return (
                                 <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
@@ -2481,7 +2486,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                       </thead>
                       <tbody>
                         {gitems.map((it) => {
-                          const cc = catalog.find((x) => x.id === it.id);
+                          const cc = catalog.find((x) => String(x.id) === String(it.id));
                           const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
                           return (
                             <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
