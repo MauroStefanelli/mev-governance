@@ -426,6 +426,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
         economicNotes: economyNotes,
         savedAt: new Date().toISOString(),
         systems,
+        // Risultato del secondo parere AI (se presente, per non perderlo navigando)
+        aiProposals: aiProposals || null,
+        suggestions,
       },
     };
     try {
@@ -882,19 +885,22 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
 
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
-  const reworkInitiative = (record) => {
+   const reworkInitiative = (record) => {
     const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
     setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
     setLot(String(record.lot_id || payload.lot || lot));
     if (payload.initiative) setInitiative(payload.initiative);
     if (payload.importedInterventions) setImportedInterventions(payload.importedInterventions);
     if (payload.items) setItems(payload.items);
+    if (payload.suggestions) setSuggestions(payload.suggestions);
     if (payload.tow) setTow(payload.tow);
     if (payload.towPercentages) setTowPercentages(payload.towPercentages);
     if (payload.discount != null) setDiscount(payload.discount);
     if (payload.contingency != null) setContingency(payload.contingency);
     if (payload.economicNotes) setEconomyNotes(payload.economicNotes);
     if (payload.sourceWorkbookName) setSourceWorkbookName(payload.sourceWorkbookName);
+    // Ripristina il risultato del secondo parere AI (se presente nel payload)
+    setAiProposals(payload.aiProposals || null);
     // Memorizza la chiave del record esistente per sovrascrivere al salvataggio
     setEditingRecordKey(record.record_key || null);
     setStep(1);
@@ -1300,6 +1306,121 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}
         </button>
       </div>
+
+      {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
+      <div style={{ ...styles.card, marginTop: 20, marginBottom: 4 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, cursor: "pointer", userSelect: "none" }}
+          onClick={() => setShowApplicativi(v => !v)}
+        >
+          <h3 style={{ margin: 0 }}>
+            {showApplicativi ? "▾" : "▸"} Applicativi e tecnologie · Lotto {lot}
+            {!showApplicativi && applications.length > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 400, color: "#64748b", marginLeft: 8 }}>({applications.length} configurati)</span>
+            )}
+          </h3>
+          {showApplicativi && (
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+               <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
+               <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
+               {appSyncBusy && (
+                 <span style={{ fontSize: 11, color: "#1A6EBD", fontStyle: "italic" }}>⟳ Sincronizzazione DB…</span>
+               )}
+             </div>
+           )}
+        </div>
+        {showApplicativi && (
+        <>
+        {applications.length === 0 ? (
+          <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {applications
+              .filter((a) => !appNorm(applicationSearch) || appNorm([a.name, a.code, (a.systemAliases || []).join(" "), (a.ambiti || []).join(" ")].join(" ")).includes(appNorm(applicationSearch)))
+              .map((a, i) => {
+                const tag = (props, arr) =>
+                  (arr || []).length
+                    ? `${props}: ${[...arr].join(" · ")}`
+                    : "";
+                const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
+                return (
+                   <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
+                     <div style={{ minWidth: 0, flex: 1 }}>
+                       <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
+                       {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
+                       {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
+                       <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
+                       {a.codeLoadedAt && (
+                         <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
+                           ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
+                           {a.aiProfile && <span style={{ marginLeft: 6, color: "#1A6EBD" }}>· AI: {(a.aiProfile?.interventionTypes?.length || 0)} tipi intervento rilevati</span>}
+                         </div>
+                       )}
+                     </div>
+                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                       {canAiApp && (
+                         <button
+                           style={{ ...btnStyles.secondary,
+                             background: aiAppTarget === a.id ? "#FEF3C7" : a.aiProfile ? "#F0FDF4" : "#EFF6FF",
+                             borderColor: aiAppTarget === a.id ? "#FCD34D" : a.aiProfile ? "#86EFAC" : "#93C5FD",
+                             color: aiAppTarget === a.id ? "#92400E" : a.aiProfile ? "#166534" : "#1A6EBD",
+                             opacity: (aiAppBusy && aiAppTarget !== a.id) ? 0.4 : 1,
+                           }}
+                           disabled={aiAppBusy}
+                           title="Genera scheda AI: carica codice sorgente e documentazione per analisi intelligente"
+                           onClick={() => buildAiApplicationProfile(a)}>
+                           {aiAppTarget === a.id ? "⏳ Analisi AI…" : a.aiProfile ? "✓ Rigenera scheda AI" : "✨ Genera scheda AI"}
+                         </button>
+                       )}
+                       <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
+                       <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
+                     </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {applicationDraft && (
+          <div style={{ border: "1px solid #d7dce1", borderRadius: 8, padding: 12, marginTop: 12, background: "#fbfbfc" }}>
+            <h4 style={{ margin: "0 0 8px" }}>Modifica applicativo</h4>
+            <div style={styles.grid2}>
+              <label style={styles.label}>Nome applicativo<input style={styles.input} value={applicationDraft.name || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, name: e.target.value })} /></label>
+              <label style={styles.label}>Codice AP<input style={styles.input} value={applicationDraft.code || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, code: e.target.value.toUpperCase() })} placeholder="AP-00226" /></label>
+            </div>
+            <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+            <label style={styles.label}>Link al codice o repository
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
+                <input style={{ ...styles.input, marginTop: 0, flex: 1 }} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} placeholder="https://github.com/..." />
+                <button type="button" style={{ ...btnStyles.secondary, whiteSpace: "nowrap", padding: "8px 12px" }}
+                  onClick={() => {
+                    const inp = document.createElement("input");
+                    inp.type = "file"; inp.multiple = true;
+                    inp.setAttribute("webkitdirectory", ""); inp.setAttribute("directory", "");
+                    inp.onchange = () => {
+                      if (!inp.files.length) return;
+                      const rel = inp.files[0].webkitRelativePath || "";
+                      const folder = rel.split("/")[0] || "cartella";
+                      setApplicationDraft((d) => ({ ...d, codeUrl: folder + " (" + inp.files.length + " file)" }));
+                      toast("Cartella collegata: " + folder + " — " + inp.files.length + " file");
+                    };
+                    inp.click();
+                  }}>
+                  Seleziona cartella
+                </button>
+              </div>
+            </label>
+            <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+             <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+               <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
+               <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
+             </div>
+           </div>
+         )}
+         </>
+        )}
+       </div>
 
       {/* Stepper */}
       <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "24px 0", flexWrap: "wrap", alignItems: "stretch", padding: 10, background: "#fff", border: "1px solid #dce5ef", borderRadius: 16 }}>
@@ -2321,121 +2442,6 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           </div>
         </div>
       )}
-
-      {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
-      <div style={{ ...styles.card, marginTop: 28 }}>
-        <div
-          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, cursor: "pointer", userSelect: "none" }}
-          onClick={() => setShowApplicativi(v => !v)}
-        >
-          <h3 style={{ margin: 0 }}>
-            {showApplicativi ? "▾" : "▸"} Applicativi e tecnologie · Lotto {lot}
-            {!showApplicativi && applications.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 400, color: "#64748b", marginLeft: 8 }}>({applications.length} configurati)</span>
-            )}
-          </h3>
-          {showApplicativi && (
-             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-               <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
-               <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
-               {appSyncBusy && (
-                 <span style={{ fontSize: 11, color: "#1A6EBD", fontStyle: "italic" }}>⟳ Sincronizzazione DB…</span>
-               )}
-             </div>
-           )}
-        </div>
-        {showApplicativi && (
-        <>
-        {applications.length === 0 ? (
-          <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-            {applications
-              .filter((a) => !appNorm(applicationSearch) || appNorm([a.name, a.code, (a.systemAliases || []).join(" "), (a.ambiti || []).join(" ")].join(" ")).includes(appNorm(applicationSearch)))
-              .map((a, i) => {
-                const tag = (props, arr) =>
-                  (arr || []).length
-                    ? `${props}: ${[...arr].join(" · ")}`
-                    : "";
-                const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
-                return (
-                   <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
-                     <div style={{ minWidth: 0, flex: 1 }}>
-                       <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
-                       {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
-                       {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
-                       <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
-                       {a.codeLoadedAt && (
-                         <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
-                           ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
-                           {a.aiProfile && <span style={{ marginLeft: 6, color: "#1A6EBD" }}>· AI: {(a.aiProfile?.interventionTypes?.length || 0)} tipi intervento rilevati</span>}
-                         </div>
-                       )}
-                     </div>
-                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                       {canAiApp && (
-                         <button
-                           style={{ ...btnStyles.secondary,
-                             background: aiAppTarget === a.id ? "#FEF3C7" : a.aiProfile ? "#F0FDF4" : "#EFF6FF",
-                             borderColor: aiAppTarget === a.id ? "#FCD34D" : a.aiProfile ? "#86EFAC" : "#93C5FD",
-                             color: aiAppTarget === a.id ? "#92400E" : a.aiProfile ? "#166534" : "#1A6EBD",
-                             opacity: (aiAppBusy && aiAppTarget !== a.id) ? 0.4 : 1,
-                           }}
-                           disabled={aiAppBusy}
-                           title="Genera scheda AI: carica codice sorgente e documentazione per analisi intelligente"
-                           onClick={() => buildAiApplicationProfile(a)}>
-                           {aiAppTarget === a.id ? "⏳ Analisi AI…" : a.aiProfile ? "✓ Rigenera scheda AI" : "✨ Genera scheda AI"}
-                         </button>
-                       )}
-                       <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
-                       <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
-                     </div>
-                  </div>
-                );
-              })}
-          </div>
-        )}
-
-        {applicationDraft && (
-          <div style={{ border: "1px solid #d7dce1", borderRadius: 8, padding: 12, marginTop: 12, background: "#fbfbfc" }}>
-            <h4 style={{ margin: "0 0 8px" }}>Modifica applicativo</h4>
-            <div style={styles.grid2}>
-              <label style={styles.label}>Nome applicativo<input style={styles.input} value={applicationDraft.name || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, name: e.target.value })} /></label>
-              <label style={styles.label}>Codice AP<input style={styles.input} value={applicationDraft.code || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, code: e.target.value.toUpperCase() })} placeholder="AP-00226" /></label>
-            </div>
-            <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
-            <label style={styles.label}>Link al codice o repository
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
-                <input style={{ ...styles.input, marginTop: 0, flex: 1 }} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} placeholder="https://github.com/..." />
-                <button type="button" style={{ ...btnStyles.secondary, whiteSpace: "nowrap", padding: "8px 12px" }}
-                  onClick={() => {
-                    const inp = document.createElement("input");
-                    inp.type = "file"; inp.multiple = true;
-                    inp.setAttribute("webkitdirectory", ""); inp.setAttribute("directory", "");
-                    inp.onchange = () => {
-                      if (!inp.files.length) return;
-                      const rel = inp.files[0].webkitRelativePath || "";
-                      const folder = rel.split("/")[0] || "cartella";
-                      setApplicationDraft((d) => ({ ...d, codeUrl: folder + " (" + inp.files.length + " file)" }));
-                      toast("Cartella collegata: " + folder + " — " + inp.files.length + " file");
-                    };
-                    inp.click();
-                  }}>
-                  Seleziona cartella
-                </button>
-              </div>
-            </label>
-            <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
-             <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
-             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-               <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
-               <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
-             </div>
-           </div>
-         )}
-         </>
-        )}
-       </div>
 
       {/* SVILUPPO INIZIATIVA */}
       <div style={{ ...styles.card, marginTop: 28 }}>
