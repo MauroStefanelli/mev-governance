@@ -631,15 +631,15 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const readSourceSnippets = async () => {
     if (!implementationFiles.length) return [];
     const CODE_EXTS = /\.(js|jsx|ts|tsx|java|py|cs|go|rb|php|vue|html|css|xml|json|yaml|yml|md|sql)$/i;
-    const relevant = [...implementationFiles].filter(f => CODE_EXTS.test(f.name)).slice(0, 30);
-    const MAX_TOTAL = 40000; // ~40KB
+    const relevant = [...implementationFiles].filter(f => CODE_EXTS.test(f.name)).slice(0, 15);
+    const MAX_TOTAL = 15000; // ~15KB — sufficiente come campione per l'AI
     let total = 0;
     const snippets = [];
     for (const f of relevant) {
       if (total >= MAX_TOTAL) break;
       try {
         const text = await f.text();
-        const slice = text.slice(0, Math.min(3000, MAX_TOTAL - total));
+        const slice = text.slice(0, Math.min(1000, MAX_TOTAL - total));
         snippets.push({ file: f.webkitRelativePath || f.name, content: slice, truncated: text.length > slice.length });
         total += slice.length;
       } catch { /* skip unreadable */ }
@@ -1034,17 +1034,18 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         catalog
       );
 
-      // 3. Prepara snippet di codice per il contesto AI (max 40KB)
+      // 3. Prepara snippet di codice per il contesto AI (max 15KB, 15 file)
+      // Il profilo tecnico già estrae tutto — gli snippet servono solo come campione per l'AI
       const CODE_EXTS = /\.(js|jsx|ts|tsx|java|py|cs|go|rb|php|vue|html|css|xml|json|yaml|yml|md|sql)$/i;
-      const relevant = files.filter(f => CODE_EXTS.test(f.name)).slice(0, 30);
-      const MAX_TOTAL = 40000;
+      const relevant = files.filter(f => CODE_EXTS.test(f.name)).slice(0, 15);
+      const MAX_TOTAL = 15000;
       let total = 0;
       const snippets = [];
       for (const f of relevant) {
         if (total >= MAX_TOTAL) break;
         try {
           const text = await f.text();
-          const slice = text.slice(0, Math.min(3000, MAX_TOTAL - total));
+          const slice = text.slice(0, Math.min(1000, MAX_TOTAL - total));
           snippets.push({ file: f.webkitRelativePath || f.name, content: slice });
           total += slice.length;
         } catch {}
