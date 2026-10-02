@@ -37,11 +37,27 @@ public class AiService
         return string.IsNullOrWhiteSpace(v) ? fallback : v;
     }
 
+    /// <summary>
+    /// Normalizza il nome del modello: se contiene un prefisso provider (es.
+    /// "Capgemini-MyApiKey/gpt-4o" oppure "openai/gpt-4o-mini") restituisce
+    /// solo la parte dopo l'ultimo '/'.  I gateway Capgemini e OpenAI accettano
+    /// esclusivamente il nome breve del modello (es. "gpt-4o").
+    /// </summary>
+    private static string NormalizeModel(string model)
+    {
+        if (string.IsNullOrWhiteSpace(model)) return model;
+        var slash = model.LastIndexOf('/');
+        // Presenza di '/' che NON fa parte di una URL (modello tipo "org/model")
+        if (slash > 0 && !model.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            return model[(slash + 1)..].Trim();
+        return model.Trim();
+    }
+
     private AiSettings Settings(string? userApiKey = null, string? userEndpoint = null,
                                 string? userModel = null, string? userStyle = null, string? userAuthMode = null)
     {
         var endpoint = !string.IsNullOrWhiteSpace(userEndpoint) ? userEndpoint : Env("AI_ENDPOINT", "https://api.openai.com/v1/chat/completions");
-        var model    = !string.IsNullOrWhiteSpace(userModel)    ? userModel    : Env("AI_MODEL", "gpt-4o");
+        var model    = NormalizeModel(!string.IsNullOrWhiteSpace(userModel) ? userModel : Env("AI_MODEL", "gpt-4o"));
         var apiKey   = !string.IsNullOrWhiteSpace(userApiKey)   ? userApiKey   : Env("AI_API_KEY", "");
         var authMode = !string.IsNullOrWhiteSpace(userAuthMode) ? userAuthMode : Env("AI_AUTH_MODE", "bearer");
         var provider = Env("AI_PROVIDER", "openai");

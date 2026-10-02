@@ -544,7 +544,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_73</span>
+            }}>DEV_Rel_74</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -719,6 +719,11 @@ function App() {
                   <input type="text" value={aiModel} onChange={e => { setAiModel(e.target.value); setAiTestResult(null); }}
                     placeholder="es. gpt-4o"
                     style={{ width: "100%", padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, boxSizing: "border-box", fontFamily: "monospace" }} />
+                  {aiModel && aiModel.includes("/") && !aiModel.startsWith("http") && (
+                    <div style={{ fontSize: 11, color: "#b45309", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 4, padding: "4px 8px", marginTop: 4 }}>
+                      ⚠ Il modello contiene un prefisso provider (<code>{aiModel}</code>). Il backend usa automaticamente solo la parte dopo <code>/</code> → <strong>{aiModel.slice(aiModel.lastIndexOf("/") + 1)}</strong>. Puoi correggere il valore qui.
+                    </div>
+                  )}
                   <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>
                     Capgemini EU tipici: <code>gpt-4o</code> · <code>gpt-4o-mini</code> · <code>gpt-4-turbo</code><br/>
                     <strong>Nota:</strong> usa solo il nome del modello (es. <code>gpt-4o</code>), non il prefisso del profilo API.
