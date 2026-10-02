@@ -45,7 +45,7 @@ public class ConfiguratoreController : ControllerBase
         "initiative_evaluation", "release_calendar", "implementation_plan",
         "code_change_request", "implementation_report", "tow_percentages",
         "technical_analysis", "application", "contract", "contract_lot",
-        "setting", "other"
+        "shared_applications", "setting", "other"
     };
 
     private (string Schema, string ConStr) GetDbTarget()
