@@ -1076,8 +1076,11 @@ Basa la risposta sul profilo tecnico e sugli snippet di codice forniti nel conte
       let aiEnrichment = null;
       try {
         const aiData = await analyzeInitiativeWithAi(aiCtx);
+        console.log("[AI App Profile] aiData completo:", JSON.stringify(aiData));
         // L'AI può restituire il profilo in formati diversi — normalizziamo tutto
         const raw = aiData?.analysis || aiData;
+        console.log("[AI App Profile] raw:", JSON.stringify(raw)?.slice(0, 500));
+        console.log("[AI App Profile] tipo raw:", typeof raw, "keys:", raw && typeof raw === "object" ? Object.keys(raw) : "N/A");
         if (raw && typeof raw === "object") {
           // Normalizza campi alternativi che l'AI usa talvolta
           aiEnrichment = {
