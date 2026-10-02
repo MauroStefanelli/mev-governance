@@ -1056,21 +1056,32 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         contract: { id: selectedContractId, name: activeContract?.name || "" },
         lot,
         initiative: { title: targetApp.name, system: targetApp.name, description: targetApp.notes || "" },
-        catalog: catalog.map(c => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "" })),
+        // Catalogo ridotto: solo id + nome + ambito (niente descrizioni lunghe)
+        catalog: catalog.slice(0, 40).map(c => ({ id: c.id, name: c.nome, area: c.ambito })),
         excelInterventions: [],
         currentSuggestions: [],
         sourceSnippets: snippets,
-        techProfile: profile,
+        techProfile: {
+          // Manda solo i campi essenziali del profilo — niente filePaths o catalogSignals lunghi
+          technologies:   profile.technologies   || [],
+          frameworks:     profile.frameworks     || [],
+          databases:      profile.databases      || [],
+          integrations:   profile.integrations   || [],
+          interfaces:     profile.interfaces     || [],
+          infrastructure: profile.infrastructure || [],
+          testing:        profile.testing        || [],
+          totalFiles:     profile.totalFiles     || 0,
+          summary:        profile.summary        || "",
+        },
         task: "application_profile",
         instruction: `Analizza l'applicativo "${targetApp.name}" (codice ${targetApp.code || "N/A"}).
-Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura esatta (nessun testo fuori dal JSON):
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun testo fuori dal JSON):
 {
   "interventionTypes": [ { "id": "IT-001", "title": "...", "description": "...", "catalogCategories": ["..."] } ],
   "catalogMappings": [ { "catalogId": 239, "name": "...", "type": "MODIFICA", "complexity": "Medio", "rationale": "..." } ],
-  "risks": [ "descrizione rischio 1", "..." ],
-  "techSummary": "sintesi tecnica breve dell'applicativo in 2-3 frasi"
-}
-Basa la risposta sul profilo tecnico e sugli snippet di codice forniti nel contesto.`,
+  "risks": [ "rischio 1", "rischio 2" ],
+  "techSummary": "sintesi tecnica in 2-3 frasi"
+}`,
       };
 
       let aiEnrichment = null;
