@@ -688,12 +688,18 @@ export const deleteConfiguratoreRecord = async (id) => {
 // ── Applicativi condivisi (shared_applications) ──────────────────────────────
 // Salva/recupera la lista applicativi in DB così tutti i Developer/Admin del
 // contratto lavorano sullo stesso set (invece di localStorage locale).
+// Per il contratto builtin "poste-tet-2025" gli applicativi sono condivisi tra
+// tutti i lotti: si usa sempre lot_id="all" così non si perdono cambiando lotto.
+
+const sharedAppsLotKey = (contractId, lot) =>
+  contractId === "poste-tet-2025" ? "all" : String(lot);
 
 export const getSharedApplications = async (contractId, lot) => {
+  const lotKey = sharedAppsLotKey(contractId, lot);
   const params = new URLSearchParams({
     entity_type: "shared_applications",
     contract_id: String(contractId),
-    lot_id: String(lot),
+    lot_id: lotKey,
   });
   const response = await fetchWithRefresh(
     `${API_BASE_URL}/api/configuratore/records?${params}`,
@@ -709,12 +715,13 @@ export const getSharedApplications = async (contractId, lot) => {
 };
 
 export const putSharedApplications = async (contractId, lot, applications) => {
+  const lotKey = sharedAppsLotKey(contractId, lot);
   return upsertConfiguratoreRecord({
-    record_key:  `${contractId}|${lot}|shared_applications`,
+    record_key:  `${contractId}|${lotKey}|shared_applications`,
     entity_type: "shared_applications",
     contract_id: String(contractId),
-    lot_id:      String(lot),
-    title:       `Applicativi condivisi — contratto ${contractId} lotto ${lot}`,
+    lot_id:      lotKey,
+    title:       `Applicativi condivisi — contratto ${contractId}`,
     payload:     { applications, updatedAt: new Date().toISOString() },
   });
 };

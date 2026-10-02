@@ -134,8 +134,12 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
 
   useEffect(() => {
     // Prova prima dal DB (condiviso tra tutti i Developer/Admin del contratto),
-    // poi fallback a localStorage (backward compat) e infine a DEFAULT_APPLICATIONS.
+    // poi fallback a localStorage e infine a DEFAULT_APPLICATIONS.
+    // IMPORTANTE: non usare activeContract (async) per decidere builtin —
+    // usare selectedContractId === "poste-tet-2025" che è sincrono e affidabile.
     let alive = true;
+    const isBuiltin = selectedContractId === "poste-tet-2025";
+
     getSharedApplications(selectedContractId, lot)
       .then(dbApps => {
         if (!alive) return;
@@ -145,16 +149,28 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
           // Sincronizza anche localStorage per uso offline
           saveApplications(selectedContractId, lot, dbApps);
         } else {
-          // Fallback: localStorage o DEFAULT_APPLICATIONS
-          const local = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
-          setApplications(local);
+          // Fallback 1: localStorage con il lotto corrente
+          let local = applicationsFor(selectedContractId, lot, isBuiltin);
+          // Fallback 2: se vuoto e builtin, prova l'altro lotto (gli applicativi sono spesso
+          // condivisi tra lotto 1 e 2 per il contratto poste-tet-2025)
+          if (!local.length && isBuiltin) {
+            const otherLot = lot === "1" ? "2" : "1";
+            local = applicationsFor(selectedContractId, otherLot, true);
+          }
+          // Non sovrascrivere se abbiamo già dati in stato e il fallback è vuoto
+          setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : local);
           setApplicationDraft(null);
         }
       })
       .catch(() => {
         if (!alive) return;
-        const local = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
-        setApplications(local);
+        // Errore DB: usa localStorage/default senza sovrascrivere dati già presenti
+        let local = applicationsFor(selectedContractId, lot, isBuiltin);
+        if (!local.length && isBuiltin) {
+          const otherLot = lot === "1" ? "2" : "1";
+          local = applicationsFor(selectedContractId, otherLot, true);
+        }
+        setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : local);
         setApplicationDraft(null);
       });
     return () => { alive = false; };
