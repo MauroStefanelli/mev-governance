@@ -1889,48 +1889,37 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           <InitiativeBanner />
           <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, borderTop: "3px solid #6366f1" }}>
             <h3 style={{ margin: "0 0 8px" }}>Supporto AI alla valutazione</h3>
-            {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell’iniziativa. Potrai esaminare il riepilogo e scegliere le proposte da applicare.</p>}
+            {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell'iniziativa. Le proposte AI verranno mostrate direttamente in cima a ogni gruppo negli interventi.</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
               <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}
                 title="Invia l'iniziativa al modello AI: riceverai un sommario e proposte di voci di catalogo da aggiungere/escludere/modificare">
-                {aiBusy ? "Analisi AI in corso…" : "Secondo parere AI"}
+                {aiBusy ? "Analisi AI in corso…" : aiProposals ? "Aggiorna parere AI" : "Secondo parere AI"}
               </button>
+              {aiProposals && !aiBusy && (
+                <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
+                  ✓ {aiProposals.proposals.length} proposte AI attive · {aiProposals.model || "AI"}
+                </span>
+              )}
             </div>
             {aiBusy && (
               <div role="status" aria-live="polite" style={{ marginTop: 16, padding: "16px 18px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 12, color: "#92400e" }}>
                 <strong>Analisi AI in corso</strong> — il modello sta esaminando l'iniziativa, gli interventi e il catalogo.<br/>
-                <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span><br/>
-                <span style={{ color: "#555", marginTop: 4, display: "block" }}>Al termine vedrai un sommario testuale e una lista di proposte (voci di catalogo suggerite) che potrai applicare o ignorare.</span>
+                <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span>
               </div>
             )}
-            {aiProposals && (
-              <div style={{ ...styles.card, marginTop: 16, background: "#f5f7ff", borderColor: "#c7d2fe" }}>
-                <div role="status" style={{ fontWeight: 700, color: "#3730a3", marginBottom: 10 }}>{aiBusy ? "Risultato precedente · aggiornamento in corso" : "Analisi disponibile"} · {aiProposals.proposals.length} proposte</div>
-                {aiProposals.proposals.length === 0 && <p style={styles.hint}>Nessuna proposta da applicare. Consulta il riepilogo dell’analisi.</p>}
-                <div>
-                  <small>Secondo parere AI · {aiProposals.model || "AI"} — <em>rivedi le proposte e applica solo quelle corrette</em></small>
-                  <p style={{ margin: "6px 0", whiteSpace: "pre-wrap" }}>{aiProposals.analysis?.summary || "Analisi completata."}</p>
-                </div>
-                <div>
-                  {aiProposals.proposals.map((p, i) => {
-                    const cc = catalog.find((x) => String(x.id) === String(p.catalogId));
-                    return (
-                      <label key={i} style={{ display: "block", margin: "10px 0", padding: 14, borderRadius: 10, border: p.apply ? "1px solid #818cf8" : "1px solid #dce5ef", background: "#fff", cursor: "pointer", fontSize: 14 }}>
-                        <input type="checkbox" checked={p.apply} onChange={(e) => setAiProposals((prev) => ({ ...prev, proposals: prev.proposals.map((q, j) => (j === i ? { ...q, apply: e.target.checked } : q)) }))} />
-                        {" "}ID {p.catalogId} · {cc?.nome || "Voce catalogo"} — {p.rationale || ""}
-                        <div style={{ fontSize: 12, color: "#555" }}>
-                          {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1} · Confidenza {Math.round((Number(p.confidence) || 0) * 100)}%
-                        </div>
-                      </label>
-                    );
-                  })}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-                    <button style={btnStyles.primary} onClick={applyAiProposals} disabled={!aiProposals.proposals.length}>Applica proposte selezionate</button>
-                    <button style={btnStyles.secondary} onClick={() => setAiProposals(null)}>Chiudi</button>
-                  </div>
-                </div>
-              </div>
+            {aiProposals?.analysis?.summary && (
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontSize: 12, color: "#6366f1", fontWeight: 600 }}>Leggi il riepilogo AI</summary>
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "#374151", whiteSpace: "pre-wrap", background: "#f5f7ff", borderRadius: 6, padding: "10px 12px", border: "1px solid #c7d2fe" }}>
+                  {aiProposals.analysis.summary}
+                </p>
+                {aiProposals.analysis?.warnings?.length > 0 && (
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 11, color: "#92400e" }}>
+                    {aiProposals.analysis.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                )}
+              </details>
             )}
           </div>
 
@@ -1948,10 +1937,31 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push({ ...s, __gi: gi });
   });
+
+  // Proposte AI non ancora presenti come suggestions (da mostrare come banner)
+  // Una proposta è "nuova" se non esiste già un suggestion con lo stesso catalogId nel gruppo
+  const aiPending = (aiProposals?.proposals || []).filter(p =>
+    p.action !== "exclude" &&
+    catalog.some(c => String(c.id) === String(p.catalogId))
+  );
+
   return [...groups.entries()].map(([gid, items]) => {
     const inter = importedInterventions.find((x) => String(x.id) === String(gid));
     const isNoIntervention = gid === "__NOX__";
     const isManual = gid === "__MANUALE__";
+
+    // Proposte AI da mostrare in cima a questo gruppo:
+    // - nel gruppo __NOX__ (voci generali): tutte le proposte AI che non hanno già
+    //   un suggestion corrispondente in qualsiasi gruppo
+    // - in un gruppo specifico: proposte che matchano per interventionId
+    const groupAiProposals = isNoIntervention
+      ? aiPending.filter(p => {
+          const alreadyInSuggestions = suggestions.some(s => String(s.id) === String(p.catalogId));
+          return !alreadyInSuggestions;
+        })
+      : aiPending.filter(p => String(p.interventionId) === String(gid) &&
+          !items.some(s => String(s.id) === String(p.catalogId)));
+
     return (
       <details key={gid} open={isNoIntervention || isManual} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
         <summary style={{ cursor: "pointer", padding: "10px 14px", fontWeight: 700, fontSize: 13, background: "#f8f9fa", borderRadius: "8px 8px 0 0", listStyle: "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -1964,6 +1974,11 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 : <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {gid}</span>
             }
             <span style={{ marginLeft: 8, fontSize: 11, color: "#777", fontWeight: 400 }}>({items.length} voc{items.length === 1 ? "e" : "i"})</span>
+            {groupAiProposals.length > 0 && (
+              <span style={{ marginLeft: 8, fontSize: 11, color: "#6366f1", fontWeight: 700 }}>
+                · {groupAiProposals.length} proposta{groupAiProposals.length > 1 ? "e" : ""} AI
+              </span>
+            )}
             {inter?.titolo ? <span style={{ display: "block", color: "#222", fontWeight: 600, marginTop: 2 }}>{esc(inter.titolo)}</span> : null}
             {inter?.descrizione ? <span style={{ display: "block", color: "#555", fontWeight: 400, fontSize: 12, marginTop: 1 }}>{esc(inter.descrizione)}</span> : null}
           </span>
@@ -1972,6 +1987,61 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           </span>
         </summary>
         <div style={{ padding: "10px 14px", display: "grid", gap: 10 }}>
+
+          {/* ── PROPOSTE AI IN CIMA AL GRUPPO ── */}
+          {groupAiProposals.length > 0 && (
+            <div style={{ display: "grid", gap: 8, padding: "10px 12px", background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: 8, marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#5b21b6", marginBottom: 2 }}>
+                Proposte AI · {aiProposals.model || "AI"}
+              </div>
+              {groupAiProposals.map((p, pi) => {
+                const cc = catalog.find(c => String(c.id) === String(p.catalogId));
+                if (!cc) return null;
+                const conf = Math.round((Number(p.confidence) || 0) * 100);
+                return (
+                  <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
+                        ID {cc.id} · {esc(cc.ambito)}
+                        {conf > 0 && <span style={{ marginLeft: 8, background: conf >= 70 ? "#dcfce7" : "#fef9c3", color: conf >= 70 ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 5px", fontSize: 10 }}>Confidenza {conf}%</span>}
+                      </div>
+                      <strong style={{ fontSize: 13, display: "block", marginBottom: 3 }}>{esc(cc.nome)}</strong>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>
+                        {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1}
+                      </div>
+                      {p.rationale && (
+                        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#374151", background: "#ede9fe", borderRadius: 4, padding: "6px 8px", borderLeft: "3px solid #7c3aed" }}>
+                          {esc(p.rationale)}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
+                      onClick={() => setSuggestions(prev => {
+                        const exists = prev.some(s => String(s.id) === String(p.catalogId));
+                        if (exists) return prev.map(s => String(s.id) === String(p.catalogId) ? { ...s, selected: true, reason: [s.reason, p.rationale].filter(Boolean).join(" · ") } : s);
+                        return [...prev, {
+                          id: p.catalogId,
+                          selected: true,
+                          type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
+                          complexity: p.complexity || "Medio",
+                          qty: Math.max(0.01, Number(p.quantity) || 1),
+                          score: Math.round((Number(p.confidence) || 0) * 10),
+                          reason: p.rationale || "",
+                          additionalInfo: "Aggiunto da secondo parere AI",
+                          interventionId: gid === "__NOX__" ? undefined : gid,
+                        }];
+                      })}
+                    >
+                      + Aggiungi
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── SUGGESTIONS ESISTENTI ── */}
           {items.map((s, i) => {
             const cc = catalog.find((x) => x.id === s.id);
             if (!cc) return null;
