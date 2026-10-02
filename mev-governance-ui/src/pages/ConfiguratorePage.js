@@ -67,6 +67,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
   const [showDescModal, setShowDescModal] = useState(false);
@@ -83,6 +84,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [techProfile, setTechProfile] = useState(null);
   const [techProfileBusy, setTechProfileBusy] = useState(false);
   const [selectedAppId, setSelectedAppId] = useState("");
+  const [selectedAppIds, setSelectedAppIds] = useState([]);
   const [codeChangeTool, setCodeChangeTool] = useState("vscode");
   const [implementationBranch, setImplementationBranch] = useState("");
   const [implementationApprovalNotes, setImplementationApprovalNotes] = useState("");
@@ -440,6 +442,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         economicNotes: economyNotes,
         savedAt: new Date().toISOString(),
         systems,
+        selectedAppIds,
         // Risultato del secondo parere AI (se presente, per non perderlo navigando)
         aiProposals: aiProposals || null,
         suggestions,
@@ -479,6 +482,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setTechProfile(null);
     setImplementationFiles([]);
     setSelectedAppId("");
+    setSelectedAppIds([]);
+    setAnalyzeBusy(false);
     setImplementationBranch("");
     setImplementationApprovalNotes("");
     setImplementationTests("");
@@ -575,6 +580,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   // ── Step 2: analyze (port da analyze r.328) ──
   const analyze = async () => {
+    setAnalyzeBusy(true);
+    try {
     // Se ci sono interventi importati dal workbook, usa runGapAnalysis
     // per ottenere il raggruppamento per ID_INTERVENTO (come in "Mostra dettaglio importato")
     if (importedInterventions.length > 0) {
@@ -613,6 +620,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       }))
     );
     setStep(2);
+    } finally {
+      setAnalyzeBusy(false);
+    }
   };
 
   // ── AI: secondo parere (port da aiAnalysisContext + analyzeWithAi) ──
@@ -919,6 +929,14 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     if (payload.sourceWorkbookName) setSourceWorkbookName(payload.sourceWorkbookName);
     // Ripristina il risultato del secondo parere AI (se presente nel payload)
     setAiProposals(payload.aiProposals || null);
+    // Ripristina app selezionate e techProfile
+    if (payload.selectedAppIds?.length) {
+      setSelectedAppIds(payload.selectedAppIds);
+      setSelectedAppId(payload.selectedAppIds[0] || "");
+      // Ricarica techProfile dalla prima app selezionata
+      const firstApp = applications.find(a => String(a.id) === String(payload.selectedAppIds[0]));
+      if (firstApp?.techProfile) setTechProfile(firstApp.techProfile);
+    }
     // Memorizza la chiave del record esistente per sovrascrivere al salvataggio
     setEditingRecordKey(record.record_key || null);
     setStep(1);
@@ -1413,11 +1431,18 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                        <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
                        {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
                        {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
-                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
-                         {[...(a.languages || []), ...(a.databases || []), ...(a.operatingSystems || []), ...(a.extraTechnologies || [])].slice(0, 5).map((technology, ti) => <span key={ti} style={styles.badge}>{technology}</span>)}
-                         {!tags && <span style={styles.hint}>Nessuna tecnologia indicata</span>}
-                         <span style={{ ...styles.badge, background: a.aiProfile ? "#ecfdf3" : "#f1f3f6", color: a.aiProfile ? "#167347" : "#667085" }}>{a.aiProfile ? "✓ Scheda AI" : "○ Scheda AI assente"}</span>
-                       </div>
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+                          {[...(a.languages || []), ...(a.databases || []), ...(a.operatingSystems || []), ...(a.extraTechnologies || [])].slice(0, 5).map((technology, ti) => <span key={ti} style={styles.badge}>{technology}</span>)}
+                          {!tags && <span style={styles.hint}>Nessuna tecnologia indicata</span>}
+                          {a.techProfile
+                            ? <span style={{ ...styles.badge, background: "#ecfdf3", color: "#167347" }}>✓ Scheda tecnica</span>
+                            : null}
+                          {a.aiProfile
+                            ? <span style={{ ...styles.badge, background: "#ede9fe", color: "#5b21b6" }}>✓ Scheda AI</span>
+                            : a.techProfile
+                              ? <span style={{ ...styles.badge, background: "#f1f5f9", color: "#64748b" }}>○ Scheda AI non generata</span>
+                              : <span style={{ ...styles.badge, background: "#f1f3f6", color: "#667085" }}>○ Nessuna scheda</span>}
+                        </div>
                        {a.codeLoadedAt && (
                          <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
                            ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
@@ -1680,34 +1705,69 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
               </label>
               <label style={styles.label}>Sistema / applicazione
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  <input
-                    style={{ ...styles.input, flex: 1, background: "#f4f7fb", color: "#334155" }}
-                    value={initiative.system}
-                    readOnly
-                    title="Valorizzato dal file Excel importato"
-                    placeholder="(da file Excel)"
-                  />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {/* Valore da Excel — read-only */}
+                  {initiative.system && (
+                    <input
+                      style={{ ...styles.input, background: "#f4f7fb", color: "#334155" }}
+                      value={initiative.system}
+                      readOnly
+                      title="Valorizzato dal file Excel importato"
+                    />
+                  )}
+                  {/* App selezionate come badge rimovibili */}
+                  {selectedAppIds.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {selectedAppIds.map(aid => {
+                        const app = applications.find(a => String(a.id) === aid);
+                        if (!app) return null;
+                        return (
+                          <span key={aid} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 600 }}>
+                            {app.name}{app.code ? ` (${app.code})` : ""}
+                            <button
+                              type="button"
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#1d4ed8", fontWeight: 700, padding: 0, lineHeight: 1, fontSize: 13 }}
+                              onClick={() => {
+                                const next = selectedAppIds.filter(id => id !== aid);
+                                setSelectedAppIds(next);
+                                if (next.length === 0) { setTechProfile(null); setSelectedAppId(""); }
+                                else {
+                                  setSelectedAppId(next[0]);
+                                  const firstApp = applications.find(a => String(a.id) === next[0]);
+                                  if (firstApp?.techProfile) setTechProfile(firstApp.techProfile);
+                                }
+                              }}>×</button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Selettore multi — aggiunge senza sostituire */}
                   <select
-                    style={{ ...styles.input, flex: "1 1 160px", minWidth: 0 }}
-                    value={selectedAppId}
+                    style={{ ...styles.input }}
+                    value=""
                     onChange={(e) => {
                       const appId = e.target.value;
-                      setSelectedAppId(appId);
                       if (!appId) return;
+                      if (selectedAppIds.includes(appId)) return;
                       const app = applications.find((a) => String(a.id) === appId);
                       if (!app) return;
+                      const next = [...selectedAppIds, appId];
+                      setSelectedAppIds(next);
+                      setSelectedAppId(appId);
                       if (app.techProfile) setTechProfile(app.techProfile);
                       setImplementationFiles([]);
-                      toast(`Applicativo "${app.name}" selezionato — profilo tecnico caricato`);
+                      toast(`Applicativo "${app.name}" aggiunto`);
                     }}>
-                    <option value="">Seleziona App…</option>
-                    {applications.map((a) => (
-                      <option key={a.id} value={String(a.id)}>{a.name}{a.code ? ` (${a.code})` : ""}</option>
-                    ))}
-                  </select>
-                </div>
-              </label>
+                    <option value="">+ Aggiungi applicativo…</option>
+                    {applications
+                      .filter(a => !selectedAppIds.includes(String(a.id)))
+                      .map((a) => (
+                        <option key={a.id} value={String(a.id)}>{a.name}{a.code ? ` (${a.code})` : ""}</option>
+                      ))}
+                   </select>
+                 </div>
+               </label>
                <label style={styles.label}>Tipo contratto
                  <select style={styles.input}
                    value={initiative.contractType || ""}
@@ -1795,8 +1855,12 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
               )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <button style={btnStyles.primary} onClick={analyze}>
-                {importedInterventions.length > 0 ? `Analizza integrazioni (${importedInterventions.length} interventi)` : "Analizza e suggerisci"}
+              <button style={{ ...btnStyles.primary, opacity: analyzeBusy ? 0.7 : 1 }} onClick={analyze} disabled={analyzeBusy}>
+                {analyzeBusy
+                  ? "⟳ Analisi in corso…"
+                  : importedInterventions.length > 0
+                    ? `Analizza integrazioni (${importedInterventions.length} interventi)`
+                    : "Analizza e suggerisci"}
               </button>
               <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
             </div>
@@ -2121,7 +2185,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                     if (!catalogEntry) return;
                     // Assegna al gruppo dell'interventionId se presente, altrimenti nessun gruppo
                     const intId = p.interventionId && p.interventionId.trim() !== "" ? p.interventionId.trim() : undefined;
-                    setSuggestions(prev => [...prev, {
+                    const newSugg = {
                       id: catalogEntry.id,
                       selected: true,
                       type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
@@ -2131,7 +2195,13 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                       reason: p.rationale || "",
                       additionalInfo: "Proposta AI",
                       interventionId: intId,
-                    }]);
+                    };
+                    setSuggestions(prev => {
+                      const next = [...prev, newSugg];
+                      // Auto-salva in background per persistere la nuova suggestion
+                      setTimeout(() => persistInitiativeEvaluation(false), 0);
+                      return next;
+                    });
                   }}
                 >
                   + Aggiungi
