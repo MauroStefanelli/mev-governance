@@ -1438,79 +1438,6 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         )}
        </div>
 
-      {/* Stepper */}
-      <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "24px 0", flexWrap: "wrap", alignItems: "stretch", padding: 10, background: "#fff", border: "1px solid #dce5ef", borderRadius: 16 }}>
-        {STEPS.map((s, i) => (
-          <button aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
-            <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: step === i + 1 ? "#fff" : "#edf2f8", color: "#174ea6", marginRight: 8 }}>{i + 1}</span>{s}
-          </button>
-        ))}
-        <button
-          style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
-          onClick={async () => {
-            await persistInitiativeEvaluation(true);
-            resetInitiative();
-            setEditingRecordKey(null);
-            setStep(1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}>
-          Salva e Chiudi
-        </button>
-      </nav>
-
-      {error && (
-        <p role="alert" style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
-          {error}
-          <button style={{ marginLeft: 8, border: "none", background: "none", cursor: "pointer" }} onClick={() => setError("")}>✕</button>
-        </p>
-      )}
-
-      {/* Form contratto */}
-      {showContractForm && (
-        <form onSubmit={saveContract} style={{ ...styles.card, marginBottom: 20 }}>
-          <h3 style={{ margin: "0 0 12px" }}>Importa nuovo contratto</h3>
-          <label style={styles.label}>
-            Nome contratto
-            <input style={styles.input} value={contractForm.name} onChange={(e) => setContractForm((f) => ({ ...f, name: e.target.value }))} required />
-          </label>
-          <label style={styles.label}>
-            File regole (facoltativo)
-            <input style={styles.input} type="file" accept=".pdf,.doc,.docx" onChange={(e) => setContractForm((f) => ({ ...f, rulesFile: e.target.files[0] }))} />
-          </label>
-          {contractForm.lots.map((l, idx) => (
-            <div key={idx} style={{ ...styles.card, background: "#fafafa", marginTop: 10 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                <strong>Lotto {l.id}</strong>
-                <input style={{ ...styles.input, width: 180 }} placeholder="Nome lotto" value={l.name} onChange={(e) => updateContractLotField(idx, { name: e.target.value })} />
-                <label style={styles.label}>
-                  % TOW .5
-                  <input style={{ ...styles.input, width: 80 }} type="number" value={l.tow5Share} onChange={(e) => updateContractLotField(idx, { tow5Share: Number(e.target.value) })} />
-                </label>
-              </div>
-              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-                <label style={styles.label}>
-                  Catalogo PDF (obbligatorio)
-                  <input style={styles.input} type="file" accept=".pdf" onChange={(e) => updateContractLotField(idx, { catalogFile: e.target.files[0] })} />
-                </label>
-                <label style={styles.label}>
-                  Listino TOW (PDF o XLSX, obbligatorio)
-                  <input style={styles.input} type="file" accept=".pdf,.xlsx" onChange={(e) => updateContractLotField(idx, { priceFile: e.target.files[0] })} />
-                </label>
-              </div>
-              <button type="button" style={{ marginTop: 8, ...btnStyles.danger }} onClick={() => setContractForm((f) => ({ ...f, lots: f.lots.filter((_, i) => i !== idx) }))} disabled={contractForm.lots.length <= 1}>
-                Rimuovi lotto
-              </button>
-            </div>
-          ))}
-          <button type="button" style={{ margin: "10px 10px 0 0", ...btnStyles.secondary }} onClick={() => setContractForm((f) => ({ ...f, lots: [...f.lots, { id: String(f.lots.length + 1), name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] }))}>
-            + Aggiungi lotto
-          </button>
-          <button type="submit" style={{ marginTop: 10, ...btnStyles.primary }} disabled={saving}>
-            {saving ? "Elaborazione documenti…" : "Importa e salva contratto"}
-          </button>
-        </form>
-      )}
-
       {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
       <div style={{ ...styles.card, marginBottom: 16, padding: "14px 18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
@@ -1588,6 +1515,79 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         )}
       </div>
 
+       {/* Stepper */}
+       <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "24px 0", flexWrap: "wrap", alignItems: "stretch", padding: 10, background: "#fff", border: "1px solid #dce5ef", borderRadius: 16 }}>
+         {STEPS.map((s, i) => (
+           <button aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
+             <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: step === i + 1 ? "#fff" : "#edf2f8", color: "#174ea6", marginRight: 8 }}>{i + 1}</span>{s}
+           </button>
+         ))}
+         <button
+           style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
+           onClick={async () => {
+             await persistInitiativeEvaluation(true);
+             resetInitiative();
+             setEditingRecordKey(null);
+             setStep(1);
+             window.scrollTo({ top: 0, behavior: "smooth" });
+           }}>
+           Salva e Chiudi
+         </button>
+       </nav>
+
+      {error && (
+        <p role="alert" style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
+          {error}
+          <button style={{ marginLeft: 8, border: "none", background: "none", cursor: "pointer" }} onClick={() => setError("")}>✕</button>
+        </p>
+      )}
+
+      {/* Form contratto */}
+      {showContractForm && (
+        <form onSubmit={saveContract} style={{ ...styles.card, marginBottom: 20 }}>
+          <h3 style={{ margin: "0 0 12px" }}>Importa nuovo contratto</h3>
+          <label style={styles.label}>
+            Nome contratto
+            <input style={styles.input} value={contractForm.name} onChange={(e) => setContractForm((f) => ({ ...f, name: e.target.value }))} required />
+          </label>
+          <label style={styles.label}>
+            File regole (facoltativo)
+            <input style={styles.input} type="file" accept=".pdf,.doc,.docx" onChange={(e) => setContractForm((f) => ({ ...f, rulesFile: e.target.files[0] }))} />
+          </label>
+          {contractForm.lots.map((l, idx) => (
+            <div key={idx} style={{ ...styles.card, background: "#fafafa", marginTop: 10 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <strong>Lotto {l.id}</strong>
+                <input style={{ ...styles.input, width: 180 }} placeholder="Nome lotto" value={l.name} onChange={(e) => updateContractLotField(idx, { name: e.target.value })} />
+                <label style={styles.label}>
+                  % TOW .5
+                  <input style={{ ...styles.input, width: 80 }} type="number" value={l.tow5Share} onChange={(e) => updateContractLotField(idx, { tow5Share: Number(e.target.value) })} />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <label style={styles.label}>
+                  Catalogo PDF (obbligatorio)
+                  <input style={styles.input} type="file" accept=".pdf" onChange={(e) => updateContractLotField(idx, { catalogFile: e.target.files[0] })} />
+                </label>
+                <label style={styles.label}>
+                  Listino TOW (PDF o XLSX, obbligatorio)
+                  <input style={styles.input} type="file" accept=".pdf,.xlsx" onChange={(e) => updateContractLotField(idx, { priceFile: e.target.files[0] })} />
+                </label>
+              </div>
+              <button type="button" style={{ marginTop: 8, ...btnStyles.danger }} onClick={() => setContractForm((f) => ({ ...f, lots: f.lots.filter((_, i) => i !== idx) }))} disabled={contractForm.lots.length <= 1}>
+                Rimuovi lotto
+              </button>
+            </div>
+          ))}
+          <button type="button" style={{ margin: "10px 10px 0 0", ...btnStyles.secondary }} onClick={() => setContractForm((f) => ({ ...f, lots: [...f.lots, { id: String(f.lots.length + 1), name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] }))}>
+            + Aggiungi lotto
+          </button>
+          <button type="submit" style={{ marginTop: 10, ...btnStyles.primary }} disabled={saving}>
+            {saving ? "Elaborazione documenti…" : "Importa e salva contratto"}
+          </button>
+        </form>
+      )}
+
       {/* STEP 1: INIZIATIVA */}
       {step === 1 && (
         <div>
@@ -1619,7 +1619,32 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
               </label>
               <label style={styles.label}>Sistema / applicazione
-                <input style={styles.input} value={initiative.system} onChange={(e) => setInitiative((i) => ({ ...i, system: e.target.value }))} />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    style={{ ...styles.input, flex: 1, background: "#f4f7fb", color: "#334155" }}
+                    value={initiative.system}
+                    readOnly
+                    title="Valorizzato dal file Excel importato"
+                    placeholder="(da file Excel)"
+                  />
+                  <select
+                    style={{ ...styles.input, flex: "0 0 auto", minWidth: 160 }}
+                    value=""
+                    onChange={(e) => {
+                      const appId = e.target.value;
+                      if (!appId) return;
+                      const app = applications.find((a) => String(a.id) === appId);
+                      if (!app) return;
+                      if (app.techProfile) setTechProfile(app.techProfile);
+                      setImplementationFiles([]);
+                      toast(`Applicativo "${app.name}" selezionato — profilo tecnico caricato`);
+                    }}>
+                    <option value="">Seleziona App…</option>
+                    {applications.map((a) => (
+                      <option key={a.id} value={String(a.id)}>{a.name}{a.code ? ` (${a.code})` : ""}</option>
+                    ))}
+                  </select>
+                </div>
               </label>
                <label style={styles.label}>Tipo contratto
                  <select style={styles.input}
@@ -1715,19 +1740,21 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
             </div>
           </div>
 
-          {/* ── Codice sorgente: selettore + scheda tecnica ── */}
+          {/* ── Codice sorgente: scheda tecnica ── */}
           <div style={styles.card}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Codice sorgente</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Carica la cartella del repository per generare la scheda tecnica dell'applicativo</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Profilo tecnico generato dall'applicativo selezionato in "Applicativi e tecnologie"</div>
               </div>
-              <button
-                style={{ ...btnStyles.secondary, marginLeft: "auto" }}
-                disabled={techProfileBusy}
-                onClick={selectSourceFolder}>
-                {techProfileBusy ? "Analisi in corso…" : techProfile ? `↻ Rianalizza (${techProfile.totalFiles} file)` : "Seleziona cartella sorgente…"}
-              </button>
+              {techProfile && (
+                <button
+                  style={{ ...btnStyles.secondary, marginLeft: "auto" }}
+                  disabled={techProfileBusy}
+                  onClick={selectSourceFolder}>
+                  {techProfileBusy ? "Analisi in corso…" : `↻ Rianalizza (${techProfile.totalFiles} file)`}
+                </button>
+              )}
             </div>
 
             {techProfile && (() => {
@@ -2548,12 +2575,6 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           <label style={styles.label}>
             Branch suggerito
             <input style={styles.input} value={implementationBranch} onChange={(e) => setImplementationBranch(e.target.value)} placeholder="feature/<codice>" />
-          </label>
-          <label style={styles.label}>
-            Repository (cartella sorgente)
-            <button style={btnStyles.secondary} onClick={selectImplementationRepository}>
-              {implementationFiles.length ? `${implementationFiles.length} file selezionati` : "Scegli cartella…"}
-            </button>
           </label>
         </div>
         <label style={styles.label}>
