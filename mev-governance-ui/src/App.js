@@ -544,7 +544,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_71</span>
+            }}>DEV_Rel_72</span>
             {ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -878,7 +878,7 @@ function App() {
         {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
-        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} />}
+        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} />}
       </main>
       </div>
       )}

@@ -685,6 +685,40 @@ export const deleteConfiguratoreRecord = async (id) => {
   return response.json();
 };
 
+// ── Applicativi condivisi (shared_applications) ──────────────────────────────
+// Salva/recupera la lista applicativi in DB così tutti i Developer/Admin del
+// contratto lavorano sullo stesso set (invece di localStorage locale).
+
+export const getSharedApplications = async (contractId, lot) => {
+  const params = new URLSearchParams({
+    entity_type: "shared_applications",
+    contract_id: String(contractId),
+    lot_id: String(lot),
+  });
+  const response = await fetchWithRefresh(
+    `${API_BASE_URL}/api/configuratore/records?${params}`,
+    { headers: authHeaders() }
+  );
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) return null;
+  const data = await response.json();
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  if (!records.length) return null;
+  const payload = records[0].payload || records[0].Payload || {};
+  return Array.isArray(payload.applications) ? payload.applications : null;
+};
+
+export const putSharedApplications = async (contractId, lot, applications) => {
+  return upsertConfiguratoreRecord({
+    record_key:  `${contractId}|${lot}|shared_applications`,
+    entity_type: "shared_applications",
+    contract_id: String(contractId),
+    lot_id:      String(lot),
+    title:       `Applicativi condivisi — contratto ${contractId} lotto ${lot}`,
+    payload:     { applications, updatedAt: new Date().toISOString() },
+  });
+};
+
 // ── Release schedule per contratto ──────────────────────────────────────────
 export const getReleaseSchedules = async (contractId) => {
   const params = new URLSearchParams({ entity_type: "release_calendar", contract_id: contractId });

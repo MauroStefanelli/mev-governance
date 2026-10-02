@@ -8,6 +8,8 @@ import {
   analyzeInitiativeWithAi,
   getReleaseSchedules,
   getTowImpatto,
+  getSharedApplications,
+  putSharedApplications,
 } from "../services/mevService";
 import JSZip from "jszip";
 import {
@@ -41,7 +43,7 @@ import {
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
-function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
+function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
   const [lot, setLot] = useState("1");
@@ -90,7 +92,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [applicationSearch, setApplicationSearch] = useState("");
   const [applicationDraft, setApplicationDraft] = useState(null);
   const [applications, setApplications] = useState([]);
-  const [showApplicativi, setShowApplicativi] = useState(false); // collassato per default
+  const [showApplicativi, setShowApplicativi] = useState(false);
+  const [appSyncBusy, setAppSyncBusy] = useState(false);     // salvataggio DB applicativi
+  const [aiAppBusy, setAiAppBusy]     = useState(false);     // scheda AI per applicativo
+  const [aiAppTarget, setAiAppTarget] = useState(null);      // applicativo selezionato per scheda AI
+
+  // Utente con ruolo Admin E Developer → può generare schede AI applicativi
+  const myRoles = (roles && roles.length > 0) ? roles : (role ? [role] : []);
+  const isAdminDeveloper = myRoles.includes("Admin") && myRoles.includes("Developer");
+  // SuperAdmin ha sempre accesso completo
+  const canAiApp = isAdminDeveloper || myRoles.includes("SuperAdmin");
 
   const toastTimer = useRef(null);
   const toast = (m) => {
@@ -122,9 +133,31 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [codiceContratto]); // eslint-disable-line
 
   useEffect(() => {
-    const current = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
-    setApplications(current);
-    setApplicationDraft(null);
+    // Prova prima dal DB (condiviso tra tutti i Developer/Admin del contratto),
+    // poi fallback a localStorage (backward compat) e infine a DEFAULT_APPLICATIONS.
+    let alive = true;
+    getSharedApplications(selectedContractId, lot)
+      .then(dbApps => {
+        if (!alive) return;
+        if (dbApps && dbApps.length > 0) {
+          setApplications(dbApps);
+          setApplicationDraft(null);
+          // Sincronizza anche localStorage per uso offline
+          saveApplications(selectedContractId, lot, dbApps);
+        } else {
+          // Fallback: localStorage o DEFAULT_APPLICATIONS
+          const local = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
+          setApplications(local);
+          setApplicationDraft(null);
+        }
+      })
+      .catch(() => {
+        if (!alive) return;
+        const local = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
+        setApplications(local);
+        setApplicationDraft(null);
+      });
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContractId, lot]);
 
@@ -818,6 +851,20 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   };
 
   // ── Applicativi (port da addApplicationV39/saveApplication/delete r.159-160) ──
+
+  // Salva applicativi sia in localStorage (offline) sia in DB (condivisione)
+  const persistApplications = useCallback(async (contractId, lotId, apps) => {
+    saveApplications(contractId, lotId, apps); // localStorage immediato
+    setAppSyncBusy(true);
+    try {
+      await putSharedApplications(contractId, lotId, apps);
+    } catch {
+      toast("Attenzione: applicativi salvati solo in locale. Controlla la connessione.");
+    } finally {
+      setAppSyncBusy(false);
+    }
+  }, []); // eslint-disable-line
+
   const addApplicationV39 = () => {
     const name = window.prompt("Nome dell'applicativo (es. NPSO)");
     if (!name) return;
@@ -830,7 +877,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     const app = { id: "application-" + Date.now(), code: "", name: name.trim(), codeUrl: "", codeLoadedAt: null, systemAliases: [name.trim()], ambiti: [], components: [], operatingSystems: [], databases: [], languages: [], extraTechnologies: [], notes: "" };
     const next = [...applications, app];
     setApplications(next);
-    saveApplications(selectedContractId, lot, next);
+    persistApplications(selectedContractId, lot, next);
     setApplicationDraft(app);
     toast("Applicativo creato: associa ora codice AP e repository");
   };
@@ -842,7 +889,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     const next = [...applications];
     if (idx >= 0) next[idx] = applicationDraft; else next.push(applicationDraft);
     setApplications(next);
-    saveApplications(selectedContractId, lot, next);
+    persistApplications(selectedContractId, lot, next);
     setApplicationDraft(null);
     toast(`Applicativo ${applicationDraft.name} salvato${applicationDraft.code ? " con " + applicationDraft.code : ""}`);
   };
@@ -851,12 +898,115 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     if (!window.confirm(`Eliminare l'applicativo ${a.name}?`)) return;
     const next = applications.filter((x) => applicationIdentity(x) !== applicationIdentity(a));
     setApplications(next);
-    saveApplications(selectedContractId, lot, next);
+    persistApplications(selectedContractId, lot, next);
     setApplicationDraft(null);
     toast("Applicativo eliminato");
   };
 
   const safeAppUrl = (url) => { try { const u = new URL(url, window.location.origin); return (u.protocol === "http:" || u.protocol === "https:") ? u.href : ""; } catch { return ""; } };
+
+  // ── Feature 2: Genera scheda AI applicativo (solo Admin+Developer / SuperAdmin) ──
+  // Carica codice sorgente + documentazione dell'applicativo selezionato,
+  // chiama l'AI e aggiorna il profilo tecnico dell'applicativo in DB condiviso.
+  const buildAiApplicationProfile = useCallback(async (targetApp) => {
+    if (!targetApp) return;
+    setAiAppBusy(true);
+    setAiAppTarget(targetApp.id);
+    try {
+      // 1. Seleziona cartella sorgente
+      const files = await new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.setAttribute("webkitdirectory", "");
+        input.setAttribute("directory", "");
+        input.onchange = () => resolve(input.files.length ? [...input.files] : []);
+        input.oncancel = () => resolve([]);
+        input.click();
+      });
+      if (!files.length) { setAiAppBusy(false); setAiAppTarget(null); return; }
+
+      toast(`Analisi codice sorgente di ${targetApp.name} (${files.length} file)…`);
+
+      // 2. Costruisce scheda tecnica locale (buildTechnicalProfile)
+      const profile = await buildTechnicalProfile(
+        files,
+        {
+          name: targetApp.name,
+          applicationCode: targetApp.code || "",
+          repositoryUrl: targetApp.codeUrl || "",
+          systemAliases: targetApp.systemAliases || [targetApp.name],
+        },
+        catalog
+      );
+
+      // 3. Prepara snippet di codice per il contesto AI (max 40KB)
+      const CODE_EXTS = /\.(js|jsx|ts|tsx|java|py|cs|go|rb|php|vue|html|css|xml|json|yaml|yml|md|sql)$/i;
+      const relevant = files.filter(f => CODE_EXTS.test(f.name)).slice(0, 30);
+      const MAX_TOTAL = 40000;
+      let total = 0;
+      const snippets = [];
+      for (const f of relevant) {
+        if (total >= MAX_TOTAL) break;
+        try {
+          const text = await f.text();
+          const slice = text.slice(0, Math.min(3000, MAX_TOTAL - total));
+          snippets.push({ file: f.webkitRelativePath || f.name, content: slice });
+          total += slice.length;
+        } catch {}
+      }
+
+      // 4. Chiama AI per arricchire la scheda con contesto dominio/interventi
+      const aiCtx = {
+        contract: { id: selectedContractId, name: activeContract?.name || "" },
+        lot,
+        initiative: { title: targetApp.name, system: targetApp.name, description: targetApp.notes || "" },
+        catalog: catalog.map(c => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "" })),
+        excelInterventions: [],
+        currentSuggestions: [],
+        sourceSnippets: snippets,
+        techProfile: profile,
+        task: "application_profile",
+        instruction: `Analizza l'applicativo "${targetApp.name}" (codice ${targetApp.code || "N/A"}).
+Sulla base del codice sorgente e del profilo tecnico rilevato, produci:
+1. Lista interventi tipici necessari per evoluzioni/manutenzioni (ID_INTERVENTO, titolo, descrizione breve, categorie catalogo suggerite)
+2. Mappatura precisa con le voci del catalogo (catalogId, tipo MODIFICA/REALIZZAZIONE, complessità tipica)
+3. Dipendenze critiche e punti di attenzione per le iniziative
+Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [...], risks: [...], techSummary: "..." }`,
+      };
+
+      let aiEnrichment = null;
+      try {
+        const aiData = await analyzeInitiativeWithAi(aiCtx);
+        aiEnrichment = aiData?.analysis || null;
+      } catch {
+        // AI non disponibile: procediamo con sola scheda tecnica locale
+        toast("AI non disponibile: scheda salvata con sola analisi codice locale.");
+      }
+
+      // 5. Aggiorna l'applicativo con il profilo generato
+      const updatedApp = {
+        ...targetApp,
+        techProfile:   profile,
+        aiProfile:     aiEnrichment,
+        codeLoadedAt:  new Date().toISOString(),
+        languages:     profile.technologies?.length     ? profile.technologies     : targetApp.languages,
+        databases:     profile.databases?.length        ? profile.databases        : targetApp.databases,
+        extraTechnologies: profile.frameworks?.length   ? [...(profile.frameworks || []), ...(profile.integrations || [])] : targetApp.extraTechnologies,
+      };
+
+      const next = applications.map(a => a.id === targetApp.id ? updatedApp : a);
+      setApplications(next);
+      await persistApplications(selectedContractId, lot, next);
+
+      toast(`Scheda AI di "${targetApp.name}" generata e condivisa con il team.`);
+    } catch (err) {
+      toast("Errore generazione scheda AI: " + (err.message || String(err)));
+    } finally {
+      setAiAppBusy(false);
+      setAiAppTarget(null);
+    }
+  }, [applications, catalog, selectedContractId, lot, activeContract, persistApplications]); // eslint-disable-line
 
   // ── Analisi codice sorgente (scheda tecnica) ─────────────────────────────────
   const selectSourceFolder = () => {
@@ -2133,11 +2283,14 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
             )}
           </h3>
           {showApplicativi && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-              <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
-              <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
-            </div>
-          )}
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+               <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
+               <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
+               {appSyncBusy && (
+                 <span style={{ fontSize: 11, color: "#1A6EBD", fontStyle: "italic" }}>⟳ Sincronizzazione DB…</span>
+               )}
+             </div>
+           )}
         </div>
         {showApplicativi && (
         <>
@@ -2154,17 +2307,37 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                     : "";
                 const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
                 return (
-                  <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
-                    <div style={{ minWidth: 0 }}>
-                      <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
-                      {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
-                      {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
-                      <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
-                      <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
-                    </div>
+                   <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
+                     <div style={{ minWidth: 0, flex: 1 }}>
+                       <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
+                       {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
+                       {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
+                       <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
+                       {a.codeLoadedAt && (
+                         <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
+                           ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
+                           {a.aiProfile && <span style={{ marginLeft: 6, color: "#1A6EBD" }}>· AI: {(a.aiProfile?.interventionTypes?.length || 0)} tipi intervento rilevati</span>}
+                         </div>
+                       )}
+                     </div>
+                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                       {canAiApp && (
+                         <button
+                           style={{ ...btnStyles.secondary,
+                             background: aiAppTarget === a.id ? "#FEF3C7" : a.aiProfile ? "#F0FDF4" : "#EFF6FF",
+                             borderColor: aiAppTarget === a.id ? "#FCD34D" : a.aiProfile ? "#86EFAC" : "#93C5FD",
+                             color: aiAppTarget === a.id ? "#92400E" : a.aiProfile ? "#166534" : "#1A6EBD",
+                             opacity: (aiAppBusy && aiAppTarget !== a.id) ? 0.4 : 1,
+                           }}
+                           disabled={aiAppBusy}
+                           title="Genera scheda AI: carica codice sorgente e documentazione per analisi intelligente"
+                           onClick={() => buildAiApplicationProfile(a)}>
+                           {aiAppTarget === a.id ? "⏳ Analisi AI…" : a.aiProfile ? "✓ Rigenera scheda AI" : "✨ Genera scheda AI"}
+                         </button>
+                       )}
+                       <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
+                       <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
+                     </div>
                   </div>
                 );
               })}
