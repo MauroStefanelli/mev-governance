@@ -271,6 +271,8 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
   const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
+  // isBuiltin: sincrono, non dipende da activeContract (che può essere null durante il caricamento)
+  const isBuiltin = selectedContractId === "poste-tet-2025" || !!(activeContract?.builtin);
 
   // initiativeContractId: contract_id usato nel DB per le iniziative.
   // Usa il codiceContratto passato da App.js (es. "4490015980") — mai "poste-tet-2025".
@@ -833,7 +835,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
       calc({
         items: items.map((it) => ({
           ...it,
-          unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
+          unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }),
         })),
         lot,
         contractId: initiativeContractId,
@@ -845,7 +847,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
         contingency,
         catalog,
         priceMode,
-        builtin: !!activeContract?.builtin,
+        builtin: isBuiltin,
       }),
     [items, lot, initiativeContractId, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -1226,7 +1228,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
       sourceWorkbookName,
       initiative,
       importedInterventions,
-      items: items.map((it) => ({ ...it, unit: defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }) })),
+      items: items.map((it) => ({ ...it, unit: defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }) })),
       tow,
       discount,
       contingency,
@@ -1241,7 +1243,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
     const sep = ";";
     const header = ["ID Catalogo", "Tipo", "Complessità", "Quantità", "Prezzo unitario", "Importo", "Intervento", "Razionale"].join(sep);
     const rows = items.map((it) => {
-      const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+      const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
       return [it.id, it.type, it.complexity, it.qty, unit, unit * it.qty, it.interventionId || "", (it.reason || "").replace(/\n/g, " ")].join(sep);
     });
     downloadBlob(`offerta_${appNorm(initiative.code || "iniziativa")}.csv`, new Blob(["\uFEFF" + [header, ...rows].join("\n")], { type: "text/csv;charset=utf-8" }));
@@ -1977,6 +1979,11 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
                     ID {cc.id} · {esc(cc.ambito)}
+                    {p.interventionId && p.interventionId.trim() && (
+                      <span style={{ marginLeft: 8, background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>
+                        ID_INTERVENTO {p.interventionId}
+                      </span>
+                    )}
                     {conf > 0 && (
                       <span style={{ marginLeft: 8, background: conf >= 70 ? "#dcfce7" : "#fef9c3", color: conf >= 70 ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 5px", fontSize: 10 }}>
                         Confidenza {conf}%
@@ -1989,25 +1996,27 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                   </div>
                   {p.rationale && (
                     <p style={{ margin: "4px 0 0", fontSize: 12, color: "#374151", background: "#ede9fe", borderRadius: 4, padding: "6px 8px", borderLeft: "3px solid #7c3aed" }}>
-                      {esc(p.rationale)}
+                      {p.rationale}
                     </p>
                   )}
                 </div>
                 <button
                   style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
                   onClick={() => {
-                    // Usa l'id esatto dal catalogo (preserva il tipo numerico/stringa)
                     const catalogEntry = catalog.find(c => String(c.id) === String(p.catalogId));
                     if (!catalogEntry) return;
+                    // Assegna al gruppo dell'interventionId se presente, altrimenti nessun gruppo
+                    const intId = p.interventionId && p.interventionId.trim() !== "" ? p.interventionId.trim() : undefined;
                     setSuggestions(prev => [...prev, {
-                      id: catalogEntry.id,  // ← id con il tipo corretto (numero se il catalogo usa numeri)
+                      id: catalogEntry.id,
                       selected: true,
                       type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
                       complexity: p.complexity || "Medio",
                       qty: Math.max(0.01, Number(p.quantity) || 1),
                       score: Math.round((Number(p.confidence) || 0) * 10),
                       reason: p.rationale || "",
-                      additionalInfo: "Aggiunto da secondo parere AI",
+                      additionalInfo: "Proposta AI",
+                      interventionId: intId,
                     }]);
                   }}
                 >
@@ -2050,27 +2059,32 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
             if (!cc) return null;
             // CORRETTO: validComplexities(catalogEntry, typeString)
             const vals = validComplexities(cc, s.type);
-            const unitPrice = defaultPrice(s, { catalog, priceMode, builtin: !!activeContract?.builtin });
+            const unitPrice = defaultPrice(s, { catalog, priceMode, builtin: isBuiltin });
             const importoProposto = unitPrice * (s.qty || 1);
             return (
               <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd", display: "grid", gap: 8, background: s.selected ? "#f0f7ff" : "#fff" }}>
                 {/* Riga intestazione con checkbox */}
                 <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
                   <input type="checkbox" style={{ marginTop: 3, flex: "0 0 auto" }} checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>ID {cc.id} · {esc(cc.ambito)}</div>
-                    <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
-                    {cc.descrizione && (
-                      <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "10px 12px" }}>
-                        <span style={{ fontWeight: 600, color: "#102a47" }}>Voce catalogo: </span>{esc(cc.descrizione)}
-                      </p>
-                    )}
-                    {s.reason && (
-                      <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "10px 12px", borderLeft: "3px solid #1a73e8" }}>
-                        <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{esc(s.reason)}
-                      </p>
-                    )}
-                  </div>
+                   <div style={{ flex: 1 }}>
+                     <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>
+                       ID {cc.id} · {esc(cc.ambito)}
+                       {s.additionalInfo === "Proposta AI" && (
+                         <span style={{ marginLeft: 8, background: "#ede9fe", color: "#6d28d9", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>✦ AI</span>
+                       )}
+                     </div>
+                     <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
+                     {cc.descrizione && (
+                       <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "10px 12px" }}>
+                         <span style={{ fontWeight: 600, color: "#102a47" }}>Voce catalogo: </span>{esc(cc.descrizione)}
+                       </p>
+                     )}
+                     {s.reason && (
+                       <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "10px 12px", borderLeft: "3px solid #1a73e8" }}>
+                         <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{s.reason}
+                       </p>
+                     )}
+                   </div>
                 </label>
 
                 {/* Tabella prezzi S/M/C */}
@@ -2345,7 +2359,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
               return Object.entries(groups).map(([gid, gitems]) => {
                 const isOpen = expandedOfferGroups.has(gid);
                 const groupTotal = gitems.reduce((s, it) => {
-                  const u = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  const u = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                   return s + u * it.qty;
                 }, 0);
                 return (
@@ -2382,7 +2396,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                           <tbody>
                             {gitems.map((it) => {
                               const cc = catalog.find((x) => String(x.id) === String(it.id));
-                              const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                              const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                               return (
                                 <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
                                   <td style={{ padding: "10px 12px" }}>
@@ -2463,7 +2477,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
               });
               return Object.entries(groups).map(([gid, gitems]) => {
                 const groupTotal = gitems.reduce((s, it) => {
-                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                   return s + unit * it.qty;
                 }, 0);
                 return (
@@ -2487,7 +2501,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                       <tbody>
                         {gitems.map((it) => {
                           const cc = catalog.find((x) => String(x.id) === String(it.id));
-                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                           return (
                             <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.id}</td>

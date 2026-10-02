@@ -351,17 +351,18 @@ public class AiService
         {
             ["type"] = "object",
             ["additionalProperties"] = false,
-            ["required"] = new JsonArray { "catalogId", "action", "type", "complexity", "quantity", "rationale", "additionalInfo", "confidence" },
+            ["required"] = new JsonArray { "catalogId", "action", "type", "complexity", "quantity", "rationale", "additionalInfo", "confidence", "interventionId" },
             ["properties"] = new JsonObject
             {
-                ["catalogId"] = new JsonObject { ["type"] = "string" },
-                ["action"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray { "add", "update", "confirm", "exclude" } },
-                ["type"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray { "REALIZZAZIONE", "MODIFICA" } },
-                ["complexity"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray { "Semplice", "Medio", "Complesso" } },
-                ["quantity"] = new JsonObject { ["type"] = "number", ["minimum"] = 0 },
-                ["rationale"] = new JsonObject { ["type"] = "string" },
+                ["catalogId"]      = new JsonObject { ["type"] = "string" },
+                ["interventionId"] = new JsonObject { ["type"] = "string" },  // ID_INTERVENTO di riferimento, o "" se generico
+                ["action"]         = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray { "add", "update", "confirm", "exclude" } },
+                ["type"]           = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray { "REALIZZAZIONE", "MODIFICA" } },
+                ["complexity"]     = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray { "Semplice", "Medio", "Complesso" } },
+                ["quantity"]       = new JsonObject { ["type"] = "number", ["minimum"] = 0 },
+                ["rationale"]      = new JsonObject { ["type"] = "string" },
                 ["additionalInfo"] = new JsonObject { ["type"] = "string" },
-                ["confidence"] = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 1 }
+                ["confidence"]     = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 1 }
             }
         };
 
@@ -386,6 +387,9 @@ public class AiService
         "la coerenza tecnica delle proposte: verifica se le dipendenze tecnologiche, i pattern architetturali e " +
         "la complessità del codice confermano o contraddicono le stime proposte; segnala eventuali discrepanze nei warnings. " +
         "Proponi interventi necessari e sufficienti, senza inventare voci. " +
+        "Per ogni proposta, compila 'interventionId' con l'ID_INTERVENTO di riferimento dal campo 'excelInterventions' " +
+        "(es. \"regexp-001\") se la proposta è specifica per quell'intervento; lascia vuoto (\"\") se è generica. " +
+        "Nel campo 'rationale' NON ripetere l'interventionId: scrivi solo la motivazione tecnica in italiano, chiara e dettagliata. " +
         "Usa action add/update/confirm/exclude. Quantità positiva per gli interventi inclusi. " +
         "Spiega ogni razionale in italiano e segnala in warnings le informazioni mancanti. La decisione finale spetta all'utente.";
 
