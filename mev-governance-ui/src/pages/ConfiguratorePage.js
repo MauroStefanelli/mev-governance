@@ -64,7 +64,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
   const [contingency, setContingency] = useState(0);
   const [tow, setTow] = useState({});
   const [towPercentages, setTowPercentages] = useState({});
-  const [priceMode] = useState("historical");
+  const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
