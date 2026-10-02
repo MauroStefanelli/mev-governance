@@ -82,6 +82,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
   const [implementationFiles, setImplementationFiles] = useState([]);
   const [techProfile, setTechProfile] = useState(null);
   const [techProfileBusy, setTechProfileBusy] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState("");
   const [codeChangeTool, setCodeChangeTool] = useState("vscode");
   const [implementationBranch, setImplementationBranch] = useState("");
   const [implementationApprovalNotes, setImplementationApprovalNotes] = useState("");
@@ -477,6 +478,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
     // Scheda tecnica / sviluppo
     setTechProfile(null);
     setImplementationFiles([]);
+    setSelectedAppId("");
     setImplementationBranch("");
     setImplementationApprovalNotes("");
     setImplementationTests("");
@@ -1629,9 +1631,10 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                   />
                   <select
                     style={{ ...styles.input, flex: "0 0 auto", minWidth: 160 }}
-                    value=""
+                    value={selectedAppId}
                     onChange={(e) => {
                       const appId = e.target.value;
+                      setSelectedAppId(appId);
                       if (!appId) return;
                       const app = applications.find((a) => String(a.id) === appId);
                       if (!app) return;
@@ -1740,105 +1743,130 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
             </div>
           </div>
 
-          {/* ── Codice sorgente: scheda tecnica ── */}
+          {/* ── Codice sorgente: scheda tecnica collassabile ── */}
           <div style={styles.card}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Codice sorgente</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Profilo tecnico generato dall'applicativo selezionato in "Applicativi e tecnologie"</div>
+            {!techProfile ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Codice sorgente</div>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>— nessun profilo tecnico (seleziona un applicativo sopra)</span>
               </div>
-              {techProfile && (
-                <button
-                  style={{ ...btnStyles.secondary, marginLeft: "auto" }}
-                  disabled={techProfileBusy}
-                  onClick={selectSourceFolder}>
-                  {techProfileBusy ? "Analisi in corso…" : `↻ Rianalizza (${techProfile.totalFiles} file)`}
-                </button>
-              )}
-            </div>
-
-            {techProfile && (() => {
-              const TagList = ({ items }) => items?.length ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 6px", marginTop: 4 }}>
-                  {items.map((t) => (
-                    <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600 }}>{t}</span>
-                  ))}
-                </div>
-              ) : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>;
-
-              const Section = ({ title, items }) => items?.length ? (
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 12, color: "#475569", marginBottom: 2 }}>{title}</div>
-                  <TagList items={items} />
-                </div>
-              ) : null;
+            ) : (() => {
+              const langs   = techProfile.technologies   || [];
+              const ifaces  = techProfile.interfaces     || [];
+              const integr  = techProfile.integrations   || [];
+              const dbs     = techProfile.databases      || [];
+              const testing = techProfile.testing        || [];
+              const langStr = langs.slice(0, 5).join(", ") + (langs.length > 5 ? `, +${langs.length - 5} altri` : "");
+              const counts  = [
+                ifaces.length  ? `${ifaces.length} tipologi${ifaces.length === 1 ? "a" : "e"} di interfaccia` : null,
+                integr.length  ? `${integr.length} integrazioni` : null,
+                dbs.length     ? `${dbs.length} tecnologi${dbs.length === 1 ? "a" : "e"} dati` : null,
+                testing.length ? "test automatici rilevati" : null,
+              ].filter(Boolean).join("; ");
+              const appName = techProfile.name || initiative.system || "Applicativo";
+              const summary = `${appName}${langStr ? ` — basato principalmente su ${langStr}` : ""}${counts ? `. ${counts}` : ""}`;
 
               return (
-                <div style={{ marginTop: 16 }}>
-                  {/* Header scheda */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Scheda tecnica memorizzata</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "#102a47" }}>{techProfile.name} · {techProfile.applicationCode}</div>
-                      <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{techProfile.summary}</div>
-                    </div>
-                    <span style={{ background: "#dcfce7", color: "#16a34a", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>Disponibile per le stime</span>
-                  </div>
+                <details>
+                  <summary style={{ cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: 8, userSelect: "none" }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: "#102a47" }}>Codice sorgente</span>
+                    <span style={{ fontSize: 12, color: "#475569", flex: 1 }}>{summary}</span>
+                    <span style={{ fontSize: 11, color: "#1a73e8", flexShrink: 0 }}>▸ dettagli</span>
+                  </summary>
 
-                  {/* Metriche */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 8, marginBottom: 14 }}>
-                    {[
-                      ["File nella cartella",  techProfile.totalFiles],
-                      ["Sorgenti analizzati",  techProfile.readFiles],
-                      ["File di test",         techProfile.testFiles],
-                      ["Configurazioni",       techProfile.configFiles],
-                    ].map(([label, val]) => (
-                      <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "8px 10px", textAlign: "center" }}>
-                        <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: "#102a47" }}>{val}</div>
+                  <div style={{ marginTop: 14 }}>
+                    {/* Header scheda */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Scheda tecnica memorizzata</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "#102a47" }}>{techProfile.name} · {techProfile.applicationCode}</div>
+                        <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{techProfile.summary}</div>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Sezioni tecniche */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: "10px 16px", marginBottom: 12 }}>
-                    <Section title="Linguaggi"              items={techProfile.technologies} />
-                    <Section title="Framework e piattaforme" items={techProfile.frameworks} />
-                    <Section title="Dati e persistenza"     items={techProfile.databases} />
-                    <Section title="Integrazioni"           items={techProfile.integrations} />
-                    <Section title="Interfacce e processi"  items={techProfile.interfaces} />
-                    <Section title="Sicurezza"              items={techProfile.security} />
-                    <Section title="Test"                   items={techProfile.testing} />
-                    <Section title="Infrastruttura e build" items={techProfile.infrastructure} />
-                    <Section title="Componenti o moduli"    items={techProfile.components} />
-                  </div>
-
-                  {/* Segnali catalogo */}
-                  {techProfile.catalogSignals?.length > 0 && (
-                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "10px 12px", marginBottom: 10 }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: "#92400e", marginBottom: 6 }}>
-                        Indizi utili per il Catalogo del Lotto {lot}
-                      </div>
-                      <div style={{ fontSize: 11, lineHeight: 1.7, color: "#78350f" }}>
-                        {techProfile.catalogSignals.map((x) => (
-                          <span key={x.id} style={{ display: "block" }}>
-                            <strong>ID {x.id} · {x.name}</strong>{x.reason ? ` (${x.reason})` : ""}
-                          </span>
-                        ))}
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                        <span style={{ background: "#dcfce7", color: "#16a34a", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>Disponibile per le stime</span>
+                        <button
+                          style={{ ...btnStyles.secondary, fontSize: 12 }}
+                          disabled={techProfileBusy}
+                          onClick={selectSourceFolder}>
+                          {techProfileBusy ? "Analisi…" : `↻ Rianalizza (${techProfile.totalFiles} file)`}
+                        </button>
                       </div>
                     </div>
-                  )}
 
-                  {/* Rischi */}
-                  {techProfile.risks?.length > 0 && (
-                    <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "10px 12px" }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
-                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#881337" }}>
-                        {techProfile.risks.map((r, i) => <li key={i}>{r}</li>)}
-                      </ul>
+                    {/* Metriche */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 8, marginBottom: 14 }}>
+                      {[
+                        ["File nella cartella",  techProfile.totalFiles],
+                        ["Sorgenti analizzati",  techProfile.readFiles],
+                        ["File di test",         techProfile.testFiles],
+                        ["Configurazioni",       techProfile.configFiles],
+                      ].map(([label, val]) => (
+                        <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "8px 10px", textAlign: "center" }}>
+                          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: "#102a47" }}>{val}</div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </div>
+
+                    {/* Sezioni tecniche */}
+                    {(() => {
+                      const TagList = ({ items }) => items?.length ? (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 6px", marginTop: 4 }}>
+                          {items.map((t) => (
+                            <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600 }}>{t}</span>
+                          ))}
+                        </div>
+                      ) : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>;
+
+                      const Section = ({ title, items }) => items?.length ? (
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 12, color: "#475569", marginBottom: 2 }}>{title}</div>
+                          <TagList items={items} />
+                        </div>
+                      ) : null;
+
+                      return (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: "10px 16px", marginBottom: 12 }}>
+                          <Section title="Linguaggi"               items={techProfile.technologies} />
+                          <Section title="Framework e piattaforme" items={techProfile.frameworks} />
+                          <Section title="Dati e persistenza"      items={techProfile.databases} />
+                          <Section title="Integrazioni"            items={techProfile.integrations} />
+                          <Section title="Interfacce e processi"   items={techProfile.interfaces} />
+                          <Section title="Sicurezza"               items={techProfile.security} />
+                          <Section title="Test"                    items={techProfile.testing} />
+                          <Section title="Infrastruttura e build"  items={techProfile.infrastructure} />
+                          <Section title="Componenti o moduli"     items={techProfile.components} />
+                        </div>
+                      );
+                    })()}
+
+                    {/* Segnali catalogo */}
+                    {techProfile.catalogSignals?.length > 0 && (
+                      <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "10px 12px", marginBottom: 10 }}>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: "#92400e", marginBottom: 6 }}>
+                          Indizi utili per il Catalogo del Lotto {lot}
+                        </div>
+                        <div style={{ fontSize: 11, lineHeight: 1.7, color: "#78350f" }}>
+                          {techProfile.catalogSignals.map((x) => (
+                            <span key={x.id} style={{ display: "block" }}>
+                              <strong>ID {x.id} · {x.name}</strong>{x.reason ? ` (${x.reason})` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rischi */}
+                    {techProfile.risks?.length > 0 && (
+                      <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "10px 12px" }}>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
+                        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#881337" }}>
+                          {techProfile.risks.map((r, i) => <li key={i}>{r}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </details>
               );
             })()}
           </div>
