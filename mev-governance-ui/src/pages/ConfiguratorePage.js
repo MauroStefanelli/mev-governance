@@ -1189,12 +1189,37 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         approvalNotes: implementationApprovalNotes,
         branch: implementationBranch,
         approvedInterventions: selected,
+        excelInterventions: importedInterventions.map((x) => ({
+          id:          x.id,
+          title:       x.titolo || x.title || "",
+          sistema:     x.sistema || "",
+          componente:  x.componente || "",
+          description: x.descrizione || x.description || "",
+          activity:    x.attivita || x.activity || "",
+          tow5:        x.tow5 || 0,
+        })),
+        techProfile: techProfile || null,
         repository: { folderName, totalFiles: allPaths.length, sourceFiles: sourcePaths.length, filePaths: allPaths, sourceFilePaths: sourcePaths },
       };
       const zip = new JSZip();
       zip.file("README_MODIFICA_CODICE.md", codeChangePrompt(request));
       zip.file("richiesta_modifica_codice.json", JSON.stringify(request, null, 2));
-      zip.file("piano_sviluppo.md", implementationDocument({ record: { payload, lot_id: lot, contract_id: selectedContractId, title: initiative.title }, proposals: selected, branch: implementationBranch, approvalNotes: implementationApprovalNotes, tests: implementationTests }));
+      zip.file("piano_sviluppo.md", implementationDocument({
+        record: { payload, lot_id: lot, contract_id: selectedContractId, title: initiative.title },
+        proposals: selected,
+        branch: implementationBranch,
+        approvalNotes: implementationApprovalNotes,
+        tests: implementationTests,
+        excelInterventions: importedInterventions.map((x) => ({
+          id:          x.id,
+          title:       x.titolo || x.title || "",
+          sistema:     x.sistema || "",
+          componente:  x.componente || "",
+          description: x.descrizione || x.description || "",
+          activity:    x.attivita || x.activity || "",
+        })),
+        techProfile: techProfile || null,
+      }));
       zip.file("elenco_file_repository.txt", allPaths.join("\n"));
       zip.file("VERIFICA_SELEZIONE.txt", [
         `Codice iniziativa: ${initiative.code || ""}`,
@@ -1223,6 +1248,15 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
       branch: implementationBranch,
       approvalNotes: implementationApprovalNotes,
       tests: implementationTests,
+      excelInterventions: importedInterventions.map((x) => ({
+        id:          x.id,
+        title:       x.titolo || x.title || "",
+        sistema:     x.sistema || "",
+        componente:  x.componente || "",
+        description: x.descrizione || x.description || "",
+        activity:    x.attivita || x.activity || "",
+      })),
+      techProfile: techProfile || null,
     });
     downloadBlob(`piano_sviluppo_${code}.md`, new Blob([doc], { type: "text/markdown;charset=utf-8" }));
   };
