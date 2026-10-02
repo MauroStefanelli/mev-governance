@@ -43,7 +43,7 @@ import {
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
-function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
+export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
   const [lot, setLot] = useState("1");
@@ -1312,21 +1312,25 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
   };
 
   return (
-    <div style={{ padding: "clamp(12px, 3vw, 32px)", fontFamily: "inherit", background: "#f4f7fb", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1440, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
+    <div style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 28, paddingBottom: 24, borderBottom: "1px solid #dce3eb" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "clamp(22px, 3vw, 30px)", letterSpacing: "-0.7px", fontWeight: 750 }}>Configuratore Offerta TOW</h2>
-          <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            Contratto {initiativeContractId} · {catalog.length} voci di catalogo
-          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+            <span style={styles.badge}>Contratto {initiativeContractId}</span>
+            <span style={styles.badge}>Lotto {lot}</span>
+            <span style={styles.badge}>Catalogo · {catalog.length} voci</span>
+          </div>
         </div>
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}
         </button>
       </div>
 
+      <div style={styles.eyebrow}>Contesto di lavoro</div>
+      <section aria-label="Applicativi e archivio" style={{ background: "#edf1f6", padding: 12, borderRadius: 18, border: "1px solid #dce3eb", marginBottom: 28 }}>
       {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
-      <div style={{ ...styles.card, marginTop: 20, marginBottom: 4 }}>
+      <div style={{ ...styles.card, marginTop: 0, marginBottom: 10, padding: 18 }}>
         <div
           style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, cursor: "pointer", userSelect: "none" }}
           onClick={() => setShowApplicativi(v => !v)}
@@ -1352,7 +1356,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         {applications.length === 0 ? (
           <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
         ) : (
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 12, marginTop: 16 }}>
             {applications
               .filter((a) => !appNorm(applicationSearch) || appNorm([a.name, a.code, (a.systemAliases || []).join(" "), (a.ambiti || []).join(" ")].join(" ")).includes(appNorm(applicationSearch)))
               .map((a, i) => {
@@ -1362,12 +1366,16 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                     : "";
                 const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
                 return (
-                   <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
+                   <div key={applicationIdentity(a) + "-" + i} style={{ ...styles.suggestion, flexDirection: "column", gap: 12 }}>
                      <div style={{ minWidth: 0, flex: 1 }}>
                        <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
                        {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
                        {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
-                       <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
+                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+                         {[...(a.languages || []), ...(a.databases || []), ...(a.operatingSystems || []), ...(a.extraTechnologies || [])].slice(0, 5).map((technology, ti) => <span key={ti} style={styles.badge}>{technology}</span>)}
+                         {!tags && <span style={styles.hint}>Nessuna tecnologia indicata</span>}
+                         <span style={{ ...styles.badge, background: a.aiProfile ? "#ecfdf3" : "#f1f3f6", color: a.aiProfile ? "#167347" : "#667085" }}>{a.aiProfile ? "✓ Scheda AI" : "○ Scheda AI assente"}</span>
+                       </div>
                        {a.codeLoadedAt && (
                          <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
                            ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
@@ -1441,7 +1449,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
        </div>
 
       {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
-      <div style={{ ...styles.card, marginBottom: 16, padding: "14px 18px" }}>
+      <div style={{ ...styles.card, marginBottom: 0, padding: "16px 18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
@@ -1517,13 +1525,17 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         )}
       </div>
 
+       </section>
+       <div style={styles.eyebrow}>Preparazione offerta</div>
        {/* Stepper */}
-       <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "24px 0", flexWrap: "wrap", alignItems: "stretch", padding: 10, background: "#fff", border: "1px solid #dce5ef", borderRadius: 16 }}>
-         {STEPS.map((s, i) => (
-           <button aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
-             <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: step === i + 1 ? "#fff" : "#edf2f8", color: "#174ea6", marginRight: 8 }}>{i + 1}</span>{s}
+       <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "12px 0 20px", flexWrap: "wrap", alignItems: "stretch", padding: 12, background: "#fff", border: "1px solid #dce3eb", borderRadius: 14 }}>
+         {STEPS.map((s, i) => {
+           const complete = [Boolean((initiative.code || initiative.title) && initiative.system), suggestions.some((entry) => entry.selected) || items.length > 0, items.length > 0, false][i];
+           return (
+           <button aria-label={`${i + 1}. ${s}${complete ? ", dati presenti" : ""}`} aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
+             <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: complete && step !== i + 1 ? "#dcfce7" : step === i + 1 ? "#1a73e8" : "#edf2f8", color: complete && step !== i + 1 ? "#167347" : step === i + 1 ? "#fff" : "#64748b", marginRight: 8 }}>{complete && step !== i + 1 ? "✓" : i + 1}</span>{s}
            </button>
-         ))}
+         ); })}
          <button
            style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
            onClick={async () => {
@@ -1544,6 +1556,11 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         </p>
       )}
 
+      <main style={{ minWidth: 0 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
+        <p style={styles.hint}>{["Definisci il contesto dell’iniziativa e collega i dati del cliente.", "Valuta gli interventi e integra le proposte del catalogo.", "Componi la valorizzazione e verifica il totale dell’offerta.", "Verifica il riepilogo e prepara i documenti finali."][step - 1]}</p>
+      </div>
       {/* Form contratto */}
       {showContractForm && (
         <form onSubmit={saveContract} style={{ ...styles.card, marginBottom: 20 }}>
@@ -1621,7 +1638,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
               </label>
               <label style={styles.label}>Sistema / applicazione
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                   <input
                     style={{ ...styles.input, flex: 1, background: "#f4f7fb", color: "#334155" }}
                     value={initiative.system}
@@ -1630,7 +1647,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                     placeholder="(da file Excel)"
                   />
                   <select
-                    style={{ ...styles.input, flex: "0 0 auto", minWidth: 160 }}
+                    style={{ ...styles.input, flex: "1 1 160px", minWidth: 0 }}
                     value={selectedAppId}
                     onChange={(e) => {
                       const appId = e.target.value;
@@ -1744,10 +1761,10 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           </div>
 
           {/* ── Codice sorgente: scheda tecnica collassabile ── */}
-          <div style={styles.card}>
+          <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
             {!techProfile ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>Codice sorgente</div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>⌘ Codice sorgente</div>
                 <span style={{ fontSize: 12, color: "#94a3b8" }}>— nessun profilo tecnico (seleziona un applicativo sopra)</span>
               </div>
             ) : (() => {
@@ -1769,7 +1786,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
               return (
                 <details>
                   <summary style={{ cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: 8, userSelect: "none" }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: "#102a47" }}>Codice sorgente</span>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: "#102a47" }}>⌘ Codice sorgente</span>
                     <span style={{ fontSize: 12, color: "#475569", flex: 1 }}>{summary}</span>
                     <span style={{ fontSize: 11, color: "#1a73e8", flexShrink: 0 }}>▸ dettagli</span>
                   </summary>
@@ -1958,7 +1975,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
       {step === 2 && (
         <div>
           <InitiativeBanner />
-          <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, borderTop: "3px solid #6366f1" }}>
+          <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, background: "#f5f3ff", borderColor: "#ddd6fe", borderTop: "3px solid #6366f1" }}>
             <h3 style={{ margin: "0 0 8px" }}>Supporto AI alla valutazione</h3>
             {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell'iniziativa. Le proposte AI verranno mostrate direttamente in cima a ogni gruppo negli interventi.</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -2030,7 +2047,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
             if (!cc) return null;
             const conf = Math.round((Number(p.confidence) || 0) * 100);
             return (
-              <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 6 }}>
+              <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "16px", flexWrap: "wrap", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
                     ID {cc.id} · {esc(cc.ambito)}
@@ -2441,19 +2458,19 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                               <th style={{ padding: "10px 12px", fontSize: 12 }}>ID Catalogo / componente</th>
                               <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
                               <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
-                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
-                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Prezzo unitario</th>
-                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Totale</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Q.tà</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Prezzo unitario</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Totale</th>
                               <th style={{ padding: "10px 12px", fontSize: 12 }}>Note</th>
                               <th></th>
                             </tr>
                           </thead>
                           <tbody>
-                            {gitems.map((it) => {
+                            {gitems.map((it, rowIndex) => {
                               const cc = catalog.find((x) => String(x.id) === String(it.id));
                               const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                               return (
-                                <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                                <tr key={it.key} style={{ borderTop: "1px solid #e8edf3", background: rowIndex % 2 ? "#f8fafc" : "#fff" }}>
                                   <td style={{ padding: "10px 12px" }}>
                                     <strong>ID {it.id}</strong>
                                     <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
@@ -2468,9 +2485,9 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                                       {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
                                     </select>
                                   </td>
-                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
-                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
-                                  <td style={{ padding: "10px 12px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
+                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64, textAlign: "right" }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
+                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 110, textAlign: "right" }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
+                                  <td style={{ padding: "10px 12px", textAlign: "right", whiteSpace: "nowrap" }}><strong>{euro.format(unit * it.qty)}</strong></td>
                                   <td style={{ padding: "10px 12px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
                                   <td style={{ padding: "10px 12px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
                                 </tr>
@@ -2484,7 +2501,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 );
               });
             })()}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20, padding: 20, borderRadius: 12, background: "#102a47", color: "#fff", gap: 16, flexWrap: "wrap" }}>
               <strong>Totale catalogo: {euro.format(calculation.cat)}</strong>
               <strong>Altri TOW: {euro.format(calculation.oth)}</strong>
               <strong style={{ fontSize: 16 }}>Totale offerta: {euro.format(calculation.total)}</strong>
@@ -2548,17 +2565,17 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Voce</th>
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Q.tà</th>
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Razionale</th>
                           <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Importo</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {gitems.map((it) => {
+                        {gitems.map((it, rowIndex) => {
                           const cc = catalog.find((x) => String(x.id) === String(it.id));
                           const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                           return (
-                            <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                            <tr key={it.key} style={{ borderTop: "1px solid #e8edf3", background: rowIndex % 2 ? "#f8fafc" : "#fff" }}>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.id}</td>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</td>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.type}</td>
@@ -2587,8 +2604,10 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         </div>
       )}
 
+      </main>
       {/* SVILUPPO INIZIATIVA */}
-      <div style={{ ...styles.card, marginTop: 28 }}>
+      <details style={{ ...styles.card, marginTop: 28, background: "#edf1f6" }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#102a47" }}>Sviluppo iniziativa · richiesta di modifica codice</summary>
         <h3 style={{ margin: 0 }}>Sviluppo iniziativa · richiesta di modifica codice</h3>
         <p style={styles.hint}>Autorizza gli interventi nello step Offerta/Revisione, collega il repository e genera il pacchetto di richiesta codice (ZIP) per lo strumento di sviluppo scelto.</p>
         <div style={{ ...styles.grid2, marginTop: 10 }}>
@@ -2624,7 +2643,7 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           </button>
           <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
         </div>
-      </div>
+      </details>
 
       {toastMsg && (
         <div role="status" aria-live="polite" style={styles.toast}>
@@ -2636,18 +2655,20 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
 }
 
 const styles = {
-  card: { background: "#fff", border: "1px solid #dce5ef", borderRadius: 16, padding: "clamp(14px, 2vw, 24px)", marginBottom: 20, minWidth: 0, boxSizing: "border-box", boxShadow: "0 3px 14px rgba(24, 48, 78, 0.04)" },
-  input: { padding: "10px 12px", minHeight: 42, minWidth: 0, maxWidth: "100%", boxSizing: "border-box", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#172b4d", fontSize: 14, fontFamily: "inherit", marginTop: 5 },
+  eyebrow: { fontSize: 11, fontWeight: 700, letterSpacing: "1.3px", textTransform: "uppercase", color: "#64748b", marginBottom: 10 },
+  badge: { display: "inline-flex", alignItems: "center", padding: "3px 9px", borderRadius: 6, background: "#eef2f6", color: "#475569", fontSize: 11, fontWeight: 600 },
+  card: { background: "#fff", border: "1px solid #dce5ef", borderRadius: 12, padding: "clamp(16px, 2vw, 24px)", marginBottom: 20, minWidth: 0, boxSizing: "border-box", boxShadow: "0 1px 3px rgba(16,42,71,0.04)" },
+  input: { padding: "10px 12px", minHeight: 42, minWidth: 0, maxWidth: "100%", boxSizing: "border-box", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#172b4d", fontSize: 14, fontFamily: "inherit", marginTop: 5 },
   inputFile: { marginBottom: 8, maxWidth: "100%" },
-  textarea: { width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 9, border: "1px solid #bac8da", fontSize: 14, marginTop: 5, fontFamily: "inherit", lineHeight: 1.6, resize: "vertical", color: "#172b4d", background: "#fff" },
+  textarea: { width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 9, border: "1px solid #cbd5e1", fontSize: 14, marginTop: 5, fontFamily: "inherit", lineHeight: 1.6, resize: "vertical", color: "#172b4d", background: "#fff" },
   label: { display: "flex", flexDirection: "column", minWidth: 0, fontSize: 13, fontWeight: 500, color: "#40536d", gap: 4 },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 18 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: 20 },
   hint: { color: "#52657d", fontSize: 13, lineHeight: 1.6, marginTop: 6 },
   checkRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14 },
   suggestion: { border: "1px solid #dce5ef", borderRadius: 12, padding: 16, minWidth: 0, display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap", background: "#fafcff" },
-  step: { flex: "1 1 150px", textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#52657d", fontWeight: 600, fontSize: 14, cursor: "pointer" },
-  stepActive: { flex: "1 1 150px", textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #174ea6", background: "#174ea6", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 3px 8px rgba(23,78,166,.16)" },
-  lotBtn: { padding: "10px 14px", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#52657d", fontSize: 14, cursor: "pointer" },
+  step: { flex: "1 1 145px", textAlign: "left", padding: "12px", borderRadius: 8, border: "1px solid transparent", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" },
+  stepActive: { flex: "1 1 145px", textAlign: "left", padding: "12px", borderRadius: 8, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#102a47", fontWeight: 700, fontSize: 13, cursor: "pointer" },
+  lotBtn: { padding: "10px 14px", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#52657d", fontSize: 14, cursor: "pointer" },
   lotBtnActive: { padding: "10px 14px", borderRadius: 9, border: "1px solid #174ea6", background: "#eaf2ff", color: "#174ea6", fontWeight: 600, fontSize: 14, cursor: "pointer" },
   table: { width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 14, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" },
   thead: { background: "#edf2f8", color: "#40536d", textAlign: "left", fontSize: 12 },
@@ -2655,9 +2676,8 @@ const styles = {
 };
 
 const btnStyles = {
-  primary: { minHeight: 44, padding: "10px 16px", borderRadius: 9, border: "1px solid #174ea6", background: "#174ea6", color: "#fff", fontWeight: 600, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
-  secondary: { minHeight: 44, padding: "10px 16px", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
-  danger: { minHeight: 44, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  primary: { minHeight: 38, padding: "10px 16px", borderRadius: 9, border: "1px solid #174ea6", background: "#1a73e8", color: "#fff", fontWeight: 600, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  secondary: { minHeight: 38, padding: "10px 16px", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  danger: { minHeight: 38, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
 };
 
-export default ConfiguratorePage;
