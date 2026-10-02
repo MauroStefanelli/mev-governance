@@ -1938,29 +1938,73 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
     groups.get(k).push({ ...s, __gi: gi });
   });
 
-  // Proposte AI non ancora presenti come suggestions (da mostrare come banner)
-  // Una proposta è "nuova" se non esiste già un suggestion con lo stesso catalogId nel gruppo
+  // Proposte AI valide (voce esiste nel catalogo, non è "exclude")
   const aiPending = (aiProposals?.proposals || []).filter(p =>
     p.action !== "exclude" &&
-    catalog.some(c => String(c.id) === String(p.catalogId))
+    catalog.some(c => String(c.id) === String(p.catalogId)) &&
+    // non già aggiunta come suggestion
+    !suggestions.some(s => String(s.id) === String(p.catalogId))
   );
 
-  return [...groups.entries()].map(([gid, items]) => {
+  return (
+    <>
+      {/* ── BLOCCO PROPOSTE AI – sempre in cima, prima dei gruppi ── */}
+      {aiPending.length > 0 && (
+        <div style={{ display: "grid", gap: 8, padding: "12px 14px", background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: 8, marginTop: 12, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#5b21b6" }}>
+            Proposte AI · {aiProposals.model || "AI"} — aggiungi quelle pertinenti
+          </div>
+          {aiPending.map((p, pi) => {
+            const cc = catalog.find(c => String(c.id) === String(p.catalogId));
+            if (!cc) return null;
+            const conf = Math.round((Number(p.confidence) || 0) * 100);
+            return (
+              <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
+                    ID {cc.id} · {esc(cc.ambito)}
+                    {conf > 0 && (
+                      <span style={{ marginLeft: 8, background: conf >= 70 ? "#dcfce7" : "#fef9c3", color: conf >= 70 ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 5px", fontSize: 10 }}>
+                        Confidenza {conf}%
+                      </span>
+                    )}
+                  </div>
+                  <strong style={{ fontSize: 13, display: "block", marginBottom: 3 }}>{esc(cc.nome)}</strong>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>
+                    {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1}
+                  </div>
+                  {p.rationale && (
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#374151", background: "#ede9fe", borderRadius: 4, padding: "6px 8px", borderLeft: "3px solid #7c3aed" }}>
+                      {esc(p.rationale)}
+                    </p>
+                  )}
+                </div>
+                <button
+                  style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
+                  onClick={() => setSuggestions(prev => [...prev, {
+                    id: p.catalogId,
+                    selected: true,
+                    type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
+                    complexity: p.complexity || "Medio",
+                    qty: Math.max(0.01, Number(p.quantity) || 1),
+                    score: Math.round((Number(p.confidence) || 0) * 10),
+                    reason: p.rationale || "",
+                    additionalInfo: "Aggiunto da secondo parere AI",
+                  }])}
+                >
+                  + Aggiungi
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── GRUPPI ESISTENTI ── */}
+      {[...groups.entries()].map(([gid, items]) => {
     const inter = importedInterventions.find((x) => String(x.id) === String(gid));
     const isNoIntervention = gid === "__NOX__";
     const isManual = gid === "__MANUALE__";
-
-    // Proposte AI da mostrare in cima a questo gruppo:
-    // - nel gruppo __NOX__ (voci generali): tutte le proposte AI che non hanno già
-    //   un suggestion corrispondente in qualsiasi gruppo
-    // - in un gruppo specifico: proposte che matchano per interventionId
-    const groupAiProposals = isNoIntervention
-      ? aiPending.filter(p => {
-          const alreadyInSuggestions = suggestions.some(s => String(s.id) === String(p.catalogId));
-          return !alreadyInSuggestions;
-        })
-      : aiPending.filter(p => String(p.interventionId) === String(gid) &&
-          !items.some(s => String(s.id) === String(p.catalogId)));
 
     return (
       <details key={gid} open={isNoIntervention || isManual} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
@@ -1974,11 +2018,6 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
                 : <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {gid}</span>
             }
             <span style={{ marginLeft: 8, fontSize: 11, color: "#777", fontWeight: 400 }}>({items.length} voc{items.length === 1 ? "e" : "i"})</span>
-            {groupAiProposals.length > 0 && (
-              <span style={{ marginLeft: 8, fontSize: 11, color: "#6366f1", fontWeight: 700 }}>
-                · {groupAiProposals.length} proposta{groupAiProposals.length > 1 ? "e" : ""} AI
-              </span>
-            )}
             {inter?.titolo ? <span style={{ display: "block", color: "#222", fontWeight: 600, marginTop: 2 }}>{esc(inter.titolo)}</span> : null}
             {inter?.descrizione ? <span style={{ display: "block", color: "#555", fontWeight: 400, fontSize: 12, marginTop: 1 }}>{esc(inter.descrizione)}</span> : null}
           </span>
@@ -1987,61 +2026,6 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
           </span>
         </summary>
         <div style={{ padding: "10px 14px", display: "grid", gap: 10 }}>
-
-          {/* ── PROPOSTE AI IN CIMA AL GRUPPO ── */}
-          {groupAiProposals.length > 0 && (
-            <div style={{ display: "grid", gap: 8, padding: "10px 12px", background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: 8, marginBottom: 4 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#5b21b6", marginBottom: 2 }}>
-                Proposte AI · {aiProposals.model || "AI"}
-              </div>
-              {groupAiProposals.map((p, pi) => {
-                const cc = catalog.find(c => String(c.id) === String(p.catalogId));
-                if (!cc) return null;
-                const conf = Math.round((Number(p.confidence) || 0) * 100);
-                return (
-                  <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 6 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
-                        ID {cc.id} · {esc(cc.ambito)}
-                        {conf > 0 && <span style={{ marginLeft: 8, background: conf >= 70 ? "#dcfce7" : "#fef9c3", color: conf >= 70 ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 5px", fontSize: 10 }}>Confidenza {conf}%</span>}
-                      </div>
-                      <strong style={{ fontSize: 13, display: "block", marginBottom: 3 }}>{esc(cc.nome)}</strong>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>
-                        {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1}
-                      </div>
-                      {p.rationale && (
-                        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#374151", background: "#ede9fe", borderRadius: 4, padding: "6px 8px", borderLeft: "3px solid #7c3aed" }}>
-                          {esc(p.rationale)}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
-                      onClick={() => setSuggestions(prev => {
-                        const exists = prev.some(s => String(s.id) === String(p.catalogId));
-                        if (exists) return prev.map(s => String(s.id) === String(p.catalogId) ? { ...s, selected: true, reason: [s.reason, p.rationale].filter(Boolean).join(" · ") } : s);
-                        return [...prev, {
-                          id: p.catalogId,
-                          selected: true,
-                          type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
-                          complexity: p.complexity || "Medio",
-                          qty: Math.max(0.01, Number(p.quantity) || 1),
-                          score: Math.round((Number(p.confidence) || 0) * 10),
-                          reason: p.rationale || "",
-                          additionalInfo: "Aggiunto da secondo parere AI",
-                          interventionId: gid === "__NOX__" ? undefined : gid,
-                        }];
-                      })}
-                    >
-                      + Aggiungi
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ── SUGGESTIONS ESISTENTI ── */}
           {items.map((s, i) => {
             const cc = catalog.find((x) => x.id === s.id);
             if (!cc) return null;
@@ -2134,7 +2118,9 @@ Rispondi in JSON strutturato con: { interventionTypes: [...], catalogMappings: [
         </div>
       </details>
     );
-  });
+  })}
+    </>
+  );
 })()}
           </div>
 
