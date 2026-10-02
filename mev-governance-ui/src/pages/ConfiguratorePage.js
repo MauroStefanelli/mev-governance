@@ -133,49 +133,44 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
   }, [codiceContratto]); // eslint-disable-line
 
   useEffect(() => {
-    // Prova prima dal DB (condiviso tra tutti i Developer/Admin del contratto),
-    // poi fallback a localStorage e infine a DEFAULT_APPLICATIONS.
-    // IMPORTANTE: non usare activeContract (async) per decidere builtin —
-    // usare selectedContractId === "poste-tet-2025" che è sincrono e affidabile.
+    // Carica gli applicativi dal DB (condiviso) o localStorage.
+    // Per il contratto builtin "poste-tet-2025" gli applicativi sono indipendenti
+    // dal lotto attivo (lot_id="all" in DB) — il useEffect non dipende da `lot`.
     let alive = true;
     const isBuiltin = selectedContractId === "poste-tet-2025";
+    // Per il builtin usa sempre "all" come lotKey (indipendente dal lotto attivo)
+    const lotKey = isBuiltin ? "all" : lot;
 
-    getSharedApplications(selectedContractId, lot)
+    getSharedApplications(selectedContractId, lotKey)
       .then(dbApps => {
         if (!alive) return;
         if (dbApps && dbApps.length > 0) {
           setApplications(dbApps);
           setApplicationDraft(null);
-          // Sincronizza anche localStorage per uso offline
-          saveApplications(selectedContractId, lot, dbApps);
+          saveApplications(selectedContractId, lotKey, dbApps);
         } else {
-          // Fallback 1: localStorage con il lotto corrente
+          // Fallback: localStorage (prova lotto corrente, poi l'altro, poi DEFAULT)
           let local = applicationsFor(selectedContractId, lot, isBuiltin);
-          // Fallback 2: se vuoto e builtin, prova l'altro lotto (gli applicativi sono spesso
-          // condivisi tra lotto 1 e 2 per il contratto poste-tet-2025)
           if (!local.length && isBuiltin) {
-            const otherLot = lot === "1" ? "2" : "1";
-            local = applicationsFor(selectedContractId, otherLot, true);
+            local = applicationsFor(selectedContractId, lot === "1" ? "2" : "1", true);
           }
-          // Non sovrascrivere se abbiamo già dati in stato e il fallback è vuoto
-          setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : local);
+          // Non sovrascrivere mai se abbiamo già dati in stato e il fallback è vuoto/peggiore
+          setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : (local.length > 0 ? local : prev));
           setApplicationDraft(null);
         }
       })
       .catch(() => {
         if (!alive) return;
-        // Errore DB: usa localStorage/default senza sovrascrivere dati già presenti
         let local = applicationsFor(selectedContractId, lot, isBuiltin);
         if (!local.length && isBuiltin) {
-          const otherLot = lot === "1" ? "2" : "1";
-          local = applicationsFor(selectedContractId, otherLot, true);
+          local = applicationsFor(selectedContractId, lot === "1" ? "2" : "1", true);
         }
-        setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : local);
+        setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : (local.length > 0 ? local : prev));
         setApplicationDraft(null);
       });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedContractId, lot]);
+  }, [selectedContractId]); // ← NON dipende da `lot`: per il builtin gli applicativi sono condivisi tra lotti
 
   useEffect(() => {
     let alive = true;
@@ -903,7 +898,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
 
    const reworkInitiative = (record) => {
     const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
-    setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
+    // NON cambiare selectedContractId: è usato per caricare gli applicativi (sempre "poste-tet-2025").
+    // Il contract_id del record è solo per identificare l'iniziativa nel DB — già gestito da
+    // initiativeContractId (calcolato da codiceContratto/ambienteId) e da editingRecordKey.
+    // setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
     setLot(String(record.lot_id || payload.lot || lot));
     if (payload.initiative) setInitiative(payload.initiative);
     if (payload.importedInterventions) setImportedInterventions(payload.importedInterventions);
