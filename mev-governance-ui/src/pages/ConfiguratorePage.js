@@ -621,38 +621,90 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, 
 
   const buildAiContext = async () => {
     const sourceSnippets = await readSourceSnippets();
+
+    // ── Contesto applicativi: usa la lista corrente (dal DB, con schede AI) ──
+    // Cerca prima gli applicativi che matchano il sistema dell'iniziativa,
+    // poi include tutti se non trova match specifici.
+    const initSystem = appNorm(initiative.system || "");
+    const matchingApps = applications.filter(a =>
+      initSystem && (
+        appNorm(a.name).includes(initSystem) ||
+        initSystem.includes(appNorm(a.name)) ||
+        (a.systemAliases || []).some(alias => appNorm(alias).includes(initSystem) || initSystem.includes(appNorm(alias)))
+      )
+    );
+    const appsForContext = matchingApps.length > 0 ? matchingApps : applications;
+
+    const applicationContext = appsForContext.map(a => ({
+      code:            a.code || "",
+      name:            a.name,
+      systemAliases:   a.systemAliases || [],
+      technologies:    [
+        ...(a.languages         || []),
+        ...(a.databases         || []),
+        ...(a.extraTechnologies || []),
+        // Aggiungi dal profilo tecnico generato con AI se presente
+        ...(a.techProfile?.technologies  || []),
+        ...(a.techProfile?.frameworks    || []),
+        ...(a.techProfile?.databases     || []),
+        ...(a.techProfile?.integrations  || []),
+      ].filter((v, i, arr) => v && arr.indexOf(v) === i), // deduplica
+      notes:           a.notes || "",
+      codeUrl:         a.codeUrl || "",
+      codeLoadedAt:    a.codeLoadedAt || null,
+      // Scheda tecnica da analisi codice sorgente
+      techProfile:     a.techProfile ? {
+        technologies:  a.techProfile.technologies  || [],
+        frameworks:    a.techProfile.frameworks    || [],
+        databases:     a.techProfile.databases     || [],
+        integrations:  a.techProfile.integrations  || [],
+        security:      a.techProfile.security      || [],
+        infrastructure:a.techProfile.infrastructure|| [],
+        totalFiles:    a.techProfile.totalFiles    || 0,
+        readFiles:     a.techProfile.readFiles     || 0,
+      } : null,
+      // Scheda AI: tipi intervento tipici, mappature catalogo, rischi
+      aiProfile:       a.aiProfile ? {
+        interventionTypes: a.aiProfile.interventionTypes || [],
+        catalogMappings:   a.aiProfile.catalogMappings   || [],
+        risks:             a.aiProfile.risks             || [],
+        techSummary:       a.aiProfile.techSummary       || "",
+      } : null,
+    }));
+
     return {
       contract: { id: selectedContractId, name: activeContract?.name || "" },
       lot,
       initiative,
-      catalog: catalog.map((c) => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "", prices: c.prezzi || c.price || {} })),
+      catalog: catalog.map((c) => ({
+        id:          c.id,
+        name:        c.nome,
+        area:        c.ambito,
+        description: c.descrizione || "",
+        prices:      c.prezzi || c.price || {},
+      })),
       excelInterventions: importedInterventions.map((x) => ({
-        id: x.interventionId || x.id,
-        title: x.titolo || x.title || "",
+        id:          x.interventionId || x.id,
+        title:       x.titolo || x.title || "",
         description: x.descrizione || x.description || "",
-        activity: x.attivita || x.activity || "",
-        quantity: x.qty || x.quantity || 1,
-        catalogId: x.catalogId || x.idCatalogo || null,
-        notes: x.notes || "",
+        activity:    x.attivita || x.activity || "",
+        quantity:    x.qty || x.quantity || 1,
+        catalogId:   x.catalogId || x.idCatalogo || null,
+        notes:       x.notes || "",
       })),
       currentSuggestions: suggestions.map((s) => ({
-        catalogId: s.id,
-        selected: s.selected,
-        type: s.type,
-        complexity: s.complexity,
-        quantity: s.qty,
-        rationale: s.reason,
+        catalogId:      s.id,
+        selected:       s.selected,
+        type:           s.type,
+        complexity:     s.complexity,
+        quantity:       s.qty,
+        rationale:      s.reason,
         additionalInfo: s.additionalInfo || "",
-        notes: s.notes || "",
+        notes:          s.notes || "",
       })),
-      applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]).map((a) => ({
-        code: a.code,
-        name: a.name,
-        technologies: [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])],
-        notes: a.notes || "",
-        codeUrl: a.codeUrl || "",
-      })),
-      // Snippets del codice sorgente per verifica tecnica
+      // Applicativi con schede AI complete
+      applicationContext,
+      // Snippet codice sorgente per verifica tecnica
       sourceCode: sourceSnippets,
       priorEvaluations: [],
     };
