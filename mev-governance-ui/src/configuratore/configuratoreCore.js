@@ -274,9 +274,10 @@ export function scoreIntervention({ intervention, detailText, catalog, applicati
 // ============================================================
 
 export function defaultPrice(it, { catalog, priceMode, builtin }) {
-  const c = catalog.find((x) => x.id === it.id);
+  const c = catalog.find((x) => String(x.id) === String(it.id));
   const base = c?.prezzi?.[it.type]?.[it.complexity] ?? 0;
-  const hist = builtin ? APP_DATA.historical_offered_prices?.[`${it.id}|${it.type}|${it.complexity}`] : null;
+  const histKey = `${String(it.id)}|${it.type}|${it.complexity}`;
+  const hist = builtin ? APP_DATA.historical_offered_prices?.[histKey] : null;
   return priceMode === "historical" && hist != null ? hist : base;
 }
 
@@ -454,7 +455,7 @@ export async function parseInitiativeWorkbook(file, catalog) {
       }
       const driverName = String(read(r, "nomedriver") || "").trim();
       const catalogId = Number(read(r, "iddicatalogo", "idcatalogo")) || 0;
-      const component = catalog.find((x) => x.id === catalogId) || catalog.find((x) => appNorm(x.nome) === appNorm(driverName));
+      const component = catalog.find((x) => String(x.id) === String(catalogId)) || catalog.find((x) => appNorm(x.nome) === appNorm(driverName));
       if (!component) continue;
       const rawType = String(read(r, "tipointervento2", "tipointervento") || "MODIFICA").toUpperCase();
       const type = rawType.includes("REALIZZ") ? "REALIZZAZIONE" : "MODIFICA";
