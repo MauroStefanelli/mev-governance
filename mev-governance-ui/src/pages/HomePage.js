@@ -190,6 +190,23 @@ const PAGE_DEFS = [
     ),
   },
   {
+    id: "gara",
+    label: "Risposte di Gara",
+    description: "Analisi documenti di gara con AI: deliverable, proposta tecnico-economica e piano di risposta.",
+    accent: "#f59e0b",
+    accentDark: "#b45309",
+    roles: ["Bid Manager","SuperAdmin"],
+    clientPage: null,
+    badge: "AI",
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    ),
+  },
+  {
     id: "admin",
     label: "Gestione Utenti",
     description: "Amministrazione account, ruoli, permessi e accessi.",
@@ -489,8 +506,16 @@ export default function HomePage({
                 </div>
 
                 {/* Testo */}
-                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: T.titleColor, marginBottom: 4, letterSpacing: "-0.2px" }}>
+                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: T.titleColor, marginBottom: 4, letterSpacing: "-0.2px", display: "flex", alignItems: "center", gap: 6 }}>
                   {card.label}
+                  {card.badge && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+                      padding: "2px 6px", borderRadius: 4,
+                      background: `linear-gradient(135deg, ${card.accent}, ${card.accentDark})`,
+                      color: "#fff", lineHeight: 1.4,
+                    }}>{card.badge}</span>
+                  )}
                 </div>
                 <div style={{ fontSize: "clamp(11px,0.85vw,12px)", color: T.textMuted, lineHeight: 1.5, flex: 1 }}>
                   {card.description}

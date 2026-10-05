@@ -28,6 +28,7 @@ const roleColors = {
   Client: { background: "#faf5ff", color: "#7e22ce" },
   SuperAdmin: { background: "#fef2f2", color: "#b91c1c" },
   Developer: { background: "#f0fdf4", color: "#15803d" },
+  "Bid Manager": { background: "#fefce8", color: "#854d0e" },
 };
 
 const actionStyle = {
@@ -531,9 +532,10 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
                   <option value="Client">Client</option>
                   <option value="SuperAdmin">SuperAdmin</option>
                   <option value="Developer">Developer</option>
+                  <option value="Bid Manager">Bid Manager</option>
                 </select>
                 <div className="mev-admin-extra-roles" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "11px", color: "#526079" }}>
-                  {["Developer", "Admin", "Editor", "Client"].filter(r => r !== u.role).map(r => (
+                  {["Developer", "Admin", "Editor", "Client", "Bid Manager"].filter(r => r !== u.role).map(r => (
                     <label key={r} style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", padding: "4px 7px", borderRadius: "7px", border: "1px solid #dce3ec", background: "#fff", fontWeight: 500 }}>
                       <input
                         type="checkbox"

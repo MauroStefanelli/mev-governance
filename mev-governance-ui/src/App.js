@@ -11,6 +11,7 @@ import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
+import GarePage from "./pages/GarePage";
 import ReportAvanzamentiPage from "./pages/ReportAvanzamentiPage";
 import HomePage from "./pages/HomePage";
 import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
@@ -884,6 +885,7 @@ function App() {
         {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
         {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} />}
+        {page === "gara"              && hasRole("Bid Manager", "SuperAdmin") && <GarePage onUnauthorized={handleUnauthorized} />}
       </main>
       </div>
       )}

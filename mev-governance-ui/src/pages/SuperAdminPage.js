@@ -200,6 +200,7 @@ export default function SuperAdminPage() {
                 <option>Editor</option>
                 <option>Client</option>
                 <option>Developer</option>
+                <option>Bid Manager</option>
                 <option>SuperAdmin</option>
               </select>
             </div>
@@ -252,6 +253,7 @@ export default function SuperAdminPage() {
                               <option>Editor</option>
                               <option>Client</option>
                               <option>Developer</option>
+                              <option>Bid Manager</option>
                               <option>SuperAdmin</option>
                             </select>
                           ) : (
