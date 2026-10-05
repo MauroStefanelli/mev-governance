@@ -327,9 +327,9 @@ public class AuthController : ControllerBase
         if (!User.IsInRole("Admin") && !User.IsInRole("SuperAdmin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer", "Bid Manager" };
         if (!validRoles.Contains(request.Role))
-            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client, Developer");
+            return BadRequest("Ruolo non valido. Valori accettati: SuperAdmin, Admin, Editor, Client, Developer, Bid Manager");
 
         var user = _db.Users.FirstOrDefault(u => u.Id == id);
         if (user == null)
@@ -373,7 +373,7 @@ public class AuthController : ControllerBase
         if (user == null)
             return NotFound("Utente non trovato");
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer" };
+        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer", "Bid Manager" };
         var clean = (request.Roles ?? new List<string>())
             .Where(r => !string.IsNullOrWhiteSpace(r) && r != user.Role)
             .Where(r => validRoles.Contains(r))
