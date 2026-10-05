@@ -99,6 +99,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [appSyncBusy, setAppSyncBusy] = useState(false);     // salvataggio DB applicativi
   const [aiAppBusy, setAiAppBusy]     = useState(false);     // scheda AI per applicativo
   const [aiAppTarget, setAiAppTarget] = useState(null);      // applicativo selezionato per scheda AI
+  const [openAppSheet, setOpenAppSheet] = useState(null);    // { id, type: 'ai'|'tech' } — pannello scheda aperto
 
   // Utente con ruolo Admin E Developer → può generare schede AI applicativi
   const myRoles = (roles && roles.length > 0) ? roles : (role ? [role] : []);
@@ -1462,49 +1463,144 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                     ? `${props}: ${[...arr].join(" · ")}`
                     : "";
                 const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
+                const sheetKey = applicationIdentity(a);
+                const isTechOpen = openAppSheet?.id === sheetKey && openAppSheet?.type === "tech";
+                const isAiOpen   = openAppSheet?.id === sheetKey && openAppSheet?.type === "ai";
+                const toggleSheet = (type) => setOpenAppSheet(prev =>
+                  prev?.id === sheetKey && prev?.type === type ? null : { id: sheetKey, type }
+                );
+                const tp = a.techProfile || {};
+                const ai = a.aiProfile  || {};
                 return (
-                   <div key={applicationIdentity(a) + "-" + i} style={{ ...styles.suggestion, flexDirection: "column", gap: 12 }}>
-                     <div style={{ minWidth: 0, flex: 1 }}>
-                       <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
-                       {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
-                       {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
-                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
-                          {[...(a.languages || []), ...(a.databases || []), ...(a.operatingSystems || []), ...(a.extraTechnologies || [])].slice(0, 5).map((technology, ti) => <span key={ti} style={styles.badge}>{technology}</span>)}
-                          {!tags && <span style={styles.hint}>Nessuna tecnologia indicata</span>}
-                          {a.techProfile
-                            ? <span style={{ ...styles.badge, background: "#ecfdf3", color: "#167347" }}>✓ Scheda tecnica</span>
-                            : null}
-                          {a.aiProfile
-                            ? <span style={{ ...styles.badge, background: "#ede9fe", color: "#5b21b6" }}>✓ Scheda AI</span>
-                            : a.techProfile
-                              ? <span style={{ ...styles.badge, background: "#f1f5f9", color: "#64748b" }}>○ Scheda AI non generata</span>
-                              : <span style={{ ...styles.badge, background: "#f1f3f6", color: "#667085" }}>○ Nessuna scheda</span>}
+                  <div key={applicationIdentity(a) + "-" + i} style={{ ...styles.suggestion, flexDirection: "column", gap: 12 }}>
+                    {/* ── intestazione card ── */}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
+                      {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
+                      {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+                        {[...(a.languages || []), ...(a.databases || []), ...(a.operatingSystems || []), ...(a.extraTechnologies || [])].slice(0, 5).map((technology, ti) => <span key={ti} style={styles.badge}>{technology}</span>)}
+                        {!tags && <span style={styles.hint}>Nessuna tecnologia indicata</span>}
+                        {a.techProfile
+                          ? <span
+                              title="Clicca per vedere i dettagli della scheda tecnica"
+                              onClick={() => toggleSheet("tech")}
+                              style={{ ...styles.badge, background: isTechOpen ? "#bbf7d0" : "#ecfdf3", color: "#167347", cursor: "pointer", userSelect: "none", border: "1px solid #86efac" }}>
+                              {isTechOpen ? "▾" : "▸"} Scheda tecnica
+                            </span>
+                          : null}
+                        {a.aiProfile
+                          ? <span
+                              title="Clicca per vedere i dettagli della scheda AI"
+                              onClick={() => toggleSheet("ai")}
+                              style={{ ...styles.badge, background: isAiOpen ? "#ddd6fe" : "#ede9fe", color: "#5b21b6", cursor: "pointer", userSelect: "none", border: "1px solid #c4b5fd" }}>
+                              {isAiOpen ? "▾" : "▸"} Scheda AI
+                            </span>
+                          : a.techProfile
+                            ? <span style={{ ...styles.badge, background: "#f1f5f9", color: "#64748b" }}>○ Scheda AI non generata</span>
+                            : <span style={{ ...styles.badge, background: "#f1f3f6", color: "#667085" }}>○ Nessuna scheda</span>}
+                      </div>
+                      {a.codeLoadedAt && (
+                        <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
+                          ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
+                          {a.aiProfile && <span style={{ marginLeft: 6, color: "#1A6EBD" }}>· AI: {(a.aiProfile?.interventionTypes?.length || 0)} tipi intervento rilevati</span>}
                         </div>
-                       {a.codeLoadedAt && (
-                         <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
-                           ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
-                           {a.aiProfile && <span style={{ marginLeft: 6, color: "#1A6EBD" }}>· AI: {(a.aiProfile?.interventionTypes?.length || 0)} tipi intervento rilevati</span>}
-                         </div>
-                       )}
-                     </div>
-                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                       {canAiApp && (
-                         <button
-                           style={{ ...btnStyles.secondary,
-                             background: aiAppTarget === a.id ? "#FEF3C7" : a.aiProfile ? "#F0FDF4" : "#EFF6FF",
-                             borderColor: aiAppTarget === a.id ? "#FCD34D" : a.aiProfile ? "#86EFAC" : "#93C5FD",
-                             color: aiAppTarget === a.id ? "#92400E" : a.aiProfile ? "#166534" : "#1A6EBD",
-                             opacity: (aiAppBusy && aiAppTarget !== a.id) ? 0.4 : 1,
-                           }}
-                           disabled={aiAppBusy}
-                           title="Genera scheda AI: carica codice sorgente e documentazione per analisi intelligente"
-                           onClick={() => buildAiApplicationProfile(a)}>
-                           {aiAppTarget === a.id ? "⏳ Analisi AI…" : a.aiProfile ? "✓ Rigenera scheda AI" : "✨ Genera scheda AI"}
-                         </button>
-                       )}
-                       <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
-                       <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
-                     </div>
+                      )}
+                    </div>
+
+                    {/* ── PANNELLO SCHEDA TECNICA ── */}
+                    {isTechOpen && (
+                      <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "12px 14px", fontSize: 13 }}>
+                        <div style={{ fontWeight: 700, color: "#166534", marginBottom: 8 }}>Scheda tecnica — {a.name}</div>
+                        {tp.summary && <p style={{ margin: "0 0 10px", color: "#374151", lineHeight: 1.5 }}>{tp.summary}</p>}
+                        {[
+                          { label: "Linguaggi",       values: tp.languages      },
+                          { label: "Framework",        values: tp.frameworks     },
+                          { label: "Database",         values: tp.databases      },
+                          { label: "Integrazioni",     values: tp.integrations   },
+                          { label: "Interfacce",       values: tp.interfaces     },
+                          { label: "Infrastruttura",   values: tp.infrastructure },
+                          { label: "Testing",          values: tp.testing        },
+                        ].filter(r => (r.values || []).length > 0).map(row => (
+                          <div key={row.label} style={{ display: "flex", gap: 8, marginBottom: 6, flexWrap: "wrap", alignItems: "baseline" }}>
+                            <span style={{ fontWeight: 600, color: "#166534", minWidth: 110, fontSize: 12 }}>{row.label}</span>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {row.values.map((v, vi) => <span key={vi} style={{ ...styles.badge, background: "#dcfce7", color: "#166534" }}>{v}</span>)}
+                            </div>
+                          </div>
+                        ))}
+                        {tp.totalFiles > 0 && <div style={{ fontSize: 11, color: "#4b7a5f", marginTop: 4 }}>File analizzati: {tp.totalFiles}</div>}
+                      </div>
+                    )}
+
+                    {/* ── PANNELLO SCHEDA AI ── */}
+                    {isAiOpen && (
+                      <div style={{ background: "#faf5ff", border: "1px solid #c4b5fd", borderRadius: 10, padding: "12px 14px", fontSize: 13 }}>
+                        <div style={{ fontWeight: 700, color: "#5b21b6", marginBottom: 8 }}>Scheda AI — {a.name}</div>
+                        {ai.techSummary && <p style={{ margin: "0 0 10px", color: "#374151", lineHeight: 1.5 }}>{ai.techSummary}</p>}
+
+                        {(ai.interventionTypes || []).length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontWeight: 600, color: "#5b21b6", marginBottom: 5, fontSize: 12 }}>Tipi di intervento rilevati</div>
+                            {ai.interventionTypes.map((it, idx) => (
+                              <div key={idx} style={{ background: "#ede9fe", borderRadius: 7, padding: "6px 10px", marginBottom: 5 }}>
+                                <div style={{ fontWeight: 600 }}>{it.id} — {it.title}</div>
+                                {it.description && <div style={{ color: "#4c1d95", fontSize: 12, marginTop: 2 }}>{it.description}</div>}
+                                {(it.catalogCategories || []).length > 0 && (
+                                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+                                    {it.catalogCategories.map((c, ci) => <span key={ci} style={{ ...styles.badge, background: "#ddd6fe", color: "#4c1d95", fontSize: 11 }}>{c}</span>)}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {(ai.risks || []).length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontWeight: 600, color: "#5b21b6", marginBottom: 5, fontSize: 12 }}>Rischi rilevati</div>
+                            <ul style={{ margin: 0, paddingLeft: 18, color: "#374151" }}>
+                              {ai.risks.map((r, ri) => <li key={ri} style={{ marginBottom: 3, fontSize: 12 }}>{r}</li>)}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(ai.catalogMappings || []).length > 0 && (
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#5b21b6", marginBottom: 5, fontSize: 12 }}>Mapping catalogo suggerito</div>
+                            {ai.catalogMappings.map((m, mi) => (
+                              <div key={mi} style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 4, fontSize: 12 }}>
+                                <span style={{ ...styles.badge, background: "#ddd6fe", color: "#4c1d95" }}>#{m.catalogId}</span>
+                                <span style={{ fontWeight: 500 }}>{m.name}</span>
+                                {m.type && <span style={{ ...styles.badge, fontSize: 11 }}>{m.type}</span>}
+                                {m.complexity && <span style={{ ...styles.badge, fontSize: 11 }}>{m.complexity}</span>}
+                                {m.rationale && <span style={{ color: "#64748b", fontStyle: "italic" }}>— {m.rationale}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── pulsanti azione ── */}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {canAiApp && (
+                        <button
+                          style={{ ...btnStyles.secondary,
+                            background: aiAppTarget === a.id ? "#FEF3C7" : a.aiProfile ? "#F0FDF4" : "#EFF6FF",
+                            borderColor: aiAppTarget === a.id ? "#FCD34D" : a.aiProfile ? "#86EFAC" : "#93C5FD",
+                            color: aiAppTarget === a.id ? "#92400E" : a.aiProfile ? "#166534" : "#1A6EBD",
+                            opacity: (aiAppBusy && aiAppTarget !== a.id) ? 0.4 : 1,
+                          }}
+                          disabled={aiAppBusy}
+                          title="Genera scheda AI: carica codice sorgente e documentazione per analisi intelligente"
+                          onClick={() => buildAiApplicationProfile(a)}>
+                          {aiAppTarget === a.id ? "⏳ Analisi AI…" : a.aiProfile ? "✓ Rigenera scheda AI" : "✨ Genera scheda AI"}
+                        </button>
+                      )}
+                      <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
+                      <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
+                    </div>
                   </div>
                 );
               })}
