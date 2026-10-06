@@ -331,12 +331,17 @@ public static class ContractParserService
     }
 
     // ── Estrae solo le pagine rilevanti (TOW + prime pagine) per l'analisi AI ──
-    // Restituisce testo compatto entro maxChars, privilegiando le pagine con TOW.
-    public static string ExtractRelevantPages(Stream pdfStream, int maxChars = 8000)
+    // Restituisce testo compatto entro maxChars, privilegiando le pagine con TOW e lotti.
+    public static string ExtractRelevantPages(Stream pdfStream, int maxChars = 12000)
     {
-        var keywords = new[] { "tow", "transazion", "allegat", "requisit", "criterio", "criteri",
-                                "capitolato", "oggetto", "committente", "scadenza", "importo",
-                                "aggiudicazion", "offerta", "tecnica", "economica", "lotto" };
+        var keywords = new[] {
+            "tow", "transazion", "allegat", "requisit", "criterio", "criteri",
+            "capitolato", "oggetto", "committente", "scadenza", "importo",
+            "aggiudicazion", "offerta", "tecnica", "economica",
+            "lotto", "lotto 1", "lotto 2", "lotto 3", "lotto i", "lotto ii",
+            "oggetto del servizio", "descrizione del servizio", "servizi a task",
+            "base d'asta", "base asta", "accordo quadro"
+        };
 
         using var doc = PdfDocument.Open(pdfStream);
         var pages = doc.GetPages().ToList();
@@ -353,15 +358,15 @@ public static class ContractParserService
 
         var sb = new System.Text.StringBuilder();
 
-        // Prima: prime 3 pagine (intestazione, oggetto, committente)
-        foreach (var p in pageTexts.Take(3))
+        // Prima: prime 5 pagine (intestazione, oggetto, committente, struttura lotti)
+        foreach (var p in pageTexts.Take(5))
         {
             sb.Append($"[Pag.{p.num}] ").AppendLine(p.text);
             if (sb.Length >= maxChars) break;
         }
 
         // Poi: pagine rilevanti non già incluse
-        foreach (var p in pageTexts.Skip(3).Where(p => p.relevant))
+        foreach (var p in pageTexts.Skip(5).Where(p => p.relevant))
         {
             if (sb.Length >= maxChars) break;
             sb.Append($"[Pag.{p.num}] ").AppendLine(p.text);

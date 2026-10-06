@@ -289,7 +289,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [analyzingCap, setAnalyzingCap]       = React.useState(false);
   const [capError,     setCapError]           = React.useState("");
   const [dettagliOpen, setDettagliOpen]       = React.useState({});
-  const [lottoAttivo,  setLottoAttivo]        = React.useState(null); // null = tutti
+  // lottoAttivo: null = tutti (solo se >1 lotti), 0 = primo lotto, ecc.
+  // Inizializza a 0 se c'è già un capitolato con un solo lotto
+  const [lottoAttivo,  setLottoAttivo]        = React.useState(() => {
+    const lottiSalvati = gara?.capitolato?.lotti || [];
+    return lottiSalvati.length === 1 ? 0 : null;
+  });
   const [towFiles,     setTowFiles]           = React.useState({});     // { 1: File, 2: File, ... }
   const [catalogFiles, setCatalogFiles]       = React.useState({});     // { 1: File, 2: File, ... }
   const [capFile,      setCapFile]            = React.useState(null);   // File capitolato tenuto in memoria
@@ -898,7 +903,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                 const isGen  = analyzingProposte[lottoAttivo];
                                 return (
                                   <button
-                                    onClick={() => handleGeneraProposte(lottoAttivo)}
+                                    onClick={() => setTimeout(() => handleGeneraProposte(lottoAttivo), 0)}
                                     disabled={isGen || analyzingCap}
                                     style={{ background: haProp ? "#fff" : AMBER, color: haProp ? AMBER_DARK : "#78350f", border: "2px solid " + AMBER, borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: isGen ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: isGen ? 0.8 : 1 }}>
                                     {isGen
