@@ -81,18 +81,13 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // 2) Analisi AI per struttura gara + lotti (senza TOW e senza catalogo)
-        var instruction = "Sei un esperto di gare d'appalto IT italiane. Analizza il documento e rispondi SOLO con JSON puro (no markdown). " +
-            "Campi generali: titolo, sintesi, oggetto, committente, importoBase, scadenza, allegatiCitati (array stringhe), note. " +
-            "Campo lotti: array di oggetti, uno per ogni lotto trovato. Se non ci sono lotti espliciti crea un unico lotto chiamato 'Gara'. " +
-            "Ogni lotto ha: nome, descrizione, " +
-            "sezioni (array con numero/titolo/sintesi — includi TUTTI i livelli es. 1, 1.1, 1.2, 2, 2.1), " +
-            "requisitiTecnici (array stringhe), " +
-            "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli), " +
-            "criteriValutazione (array con criterio/peso), " +
-            "importoBase (importo base d'asta specifico del lotto come stringa, es. '1.234.567,00 €'), " +
-            "proposte: { tecnica (array con sezione/desc/dettagli), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato) }. " +
-            "Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
+        // 2) Analisi AI — SOLO struttura (no proposte per stare dentro max_tokens)
+        // Le proposte vengono generate on-demand per lotto via /analizza-proposte
+        var instruction =
+            "Sei un esperto di gare d'appalto IT italiane. Rispondi SOLO con JSON puro, zero markdown, zero testo extra. " +
+            "Schema: {titolo,sintesi,oggetto,committente,importoBase,scadenza,allegatiCitati[],note,lotti[]}. " +
+            "Ogni lotto: {nome,descrizione,importoBase,requisitiTecnici[],documentiRichiesti[{nome,tipo,obbligatorio}],criteriValutazione[{criterio,peso}],sezioni[{numero,titolo,sintesi}]}. " +
+            "Se non ci sono lotti espliciti usa un unico lotto 'Gara'. Solo JSON valido.";
 
         var userMessage = $"File: {file.FileName}\n\nTESTO:\n{fullText}";
 
@@ -269,5 +264,64 @@ public class GareController : ControllerBase
         using var s = f.OpenReadStream();
         entries = ContractParserService.ParseCatalogPdf(s, lot);
         return Ok(new { count = entries.Count, entries });
+    }
+
+    // POST /api/gare/analizza-proposte
+    // Riceve il PDF + nomeLotto e restituisce solo le proposte (tecnica/economica/piano)
+    // Chiamato on-demand per ogni lotto dopo l'analisi struttura principale.
+    [HttpPost("analizza-proposte")]
+    public async Task<IActionResult> AnalizzaProposte()
+    {
+        if (!CanAccess()) return Forbid();
+
+        var form = Request.Form;
+        var file = form.Files.GetFile("file");
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "file mancante" });
+
+        var nomeLotto = form["nomeLotto"].ToString();
+        var lottoNum  = form["lottoNum"].ToString();
+
+        string fullText;
+        try
+        {
+            using var s = file.OpenReadStream();
+            fullText = ContractParserService.ExtractRelevantPages(s, maxChars: 8000);
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Errore lettura PDF: " + ex.Message }); }
+
+        var instruction =
+            "Sei un esperto di gare d'appalto IT italiane. Rispondi SOLO con JSON puro, zero markdown, zero testo extra. " +
+            "Schema: {tecnica[{sezione,desc,dettagli}], economica[{voce,gg,tariffa,importo,dettagli}], piano[{milestone,data,durata,owner,stato}]}. " +
+            "Genera proposte realistiche per rispondere alla gara descritta. Solo JSON valido.";
+
+        var lottoDesc = !string.IsNullOrEmpty(nomeLotto) ? $"Lotto: {nomeLotto}" : (!string.IsNullOrEmpty(lottoNum) ? $"Lotto {lottoNum}" : "");
+        var userMessage = $"File: {file.FileName}\n{lottoDesc}\n\nTESTO:\n{fullText}";
+
+        JsonObject analysis;
+        string provider, usedModel;
+        try
+        {
+            var (key, ep, mdl, sty, auth) = GetUserAiSettings();
+            JsonObject? usage;
+            (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
+                instruction, userMessage, key, ep, mdl, sty, auth);
+        }
+        catch (Exception ex)
+        {
+            var msg = ex.Message;
+            if (msg.Contains("API key") || msg.Contains("401") || msg.Contains("403"))
+                return StatusCode(401, new { message = "Chiave AI non configurata o non valida." });
+            return StatusCode(500, new { message = "Errore analisi AI: " + msg });
+        }
+
+        if (analysis.TryGetPropertyValue("error", out _) && analysis.TryGetPropertyValue("rawText", out var rawNode))
+        {
+            var rawText = rawNode?.ToString() ?? "";
+            var preview = rawText.Length > 500 ? rawText[..500] + "…" : rawText;
+            return StatusCode(502, new { message = $"AI non ha restituito JSON valido: {preview}", rawText });
+        }
+
+        return Ok(new { ok = true, proposte = analysis });
     }
 }

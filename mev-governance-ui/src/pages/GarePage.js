@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { getGare, putGara, deleteGara, analizzaCapitolatoGara } from "../services/mevService";
+import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
 const AMBER_DARK   = "#b45309";
@@ -292,6 +292,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [lottoAttivo,  setLottoAttivo]        = React.useState(null); // null = tutti
   const [towFiles,     setTowFiles]           = React.useState({});     // { 1: File, 2: File, ... }
   const [catalogFiles, setCatalogFiles]       = React.useState({});     // { 1: File, 2: File, ... }
+  const [capFile,      setCapFile]            = React.useState(null);   // File capitolato tenuto in memoria
+  const [analyzingProposte, setAnalyzingProposte] = React.useState({}); // { lottoIdx: bool }
   const towFileRefs    = React.useRef({});
   const catalogFileRefs = React.useRef({});
   const docFileRefs = React.useRef({});
@@ -400,6 +402,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
   const handleAnalizzaCapitolato = async (file) => {
     if (!file) return;
+    setCapFile(file); // teniamo il file per analisi proposte on-demand
     setAnalyzingCap(true);
     setCapError("");
     try {
@@ -526,6 +529,33 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       setCapError(err?.message || "Errore analisi capitolato");
     } finally {
       setAnalyzingCap(false);
+    }
+  };
+
+  // Genera proposte (tecnica/economica/piano) per un lotto specifico — on-demand
+  const handleGeneraProposte = async (lottoIdx) => {
+    if (!capFile) { alert("Ricarica il capitolato PDF per generare le proposte."); return; }
+    const lotto = lotti[lottoIdx];
+    if (!lotto) return;
+    setAnalyzingProposte(prev => ({ ...prev, [lottoIdx]: true }));
+    try {
+      const result = await analizzaProposteGara(capFile, lotto.nome, lottoIdx + 1);
+      const p = result.proposte || {};
+      const get    = (obj, ...ks) => { for (const k of ks) if (obj && obj[k] != null) return obj[k]; return null; };
+      const getArr = (obj, ...ks) => { const v = get(obj, ...ks); return Array.isArray(v) ? v : []; };
+      const normTec = (s, i) => ({ _id: i, sezione: get(s,"sezione","section","titolo") || "", desc: get(s,"desc","descrizione","description") || "", dettagli: get(s,"dettagli","details") || "", _docAttachment: null });
+      const normEco = (r, i) => ({ _id: i, voce: get(r,"voce","nome","name","descrizione") || "", gg: get(r,"gg","giorni") ?? null, tariffa: get(r,"tariffa") ?? null, importo: Number(get(r,"importo","totale","amount") ?? 0), dettagli: get(r,"dettagli","nota","note") || "", _docAttachment: null });
+      const proposte = {
+        tecnica:   getArr(p,"tecnica","technical").map(normTec),
+        economica: getArr(p,"economica","economic").map(normEco),
+        piano:     getArr(p,"piano","plan"),
+      };
+      const lottiUpd = lotti.map((l, i) => i === lottoIdx ? { ...l, proposte } : l);
+      onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
+    } catch (err) {
+      alert("Errore generazione proposte: " + (err?.message || err));
+    } finally {
+      setAnalyzingProposte(prev => ({ ...prev, [lottoIdx]: false }));
     }
   };
 
@@ -858,6 +888,26 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                   Base d'asta: {lotto.importoBase}
                                 </div>
                               )}
+                            </div>
+                          )}
+                          {/* Bottone genera proposte per lotto selezionato */}
+                          {lotto && lottoAttivo != null && (
+                            <div style={{ marginTop: 10 }}>
+                              {(() => {
+                                const haProp = (lotto.proposte?.tecnica?.length || 0) + (lotto.proposte?.economica?.length || 0) > 0;
+                                const isGen  = analyzingProposte[lottoAttivo];
+                                return (
+                                  <button
+                                    onClick={() => handleGeneraProposte(lottoAttivo)}
+                                    disabled={isGen || analyzingCap}
+                                    style={{ background: haProp ? "#fff" : AMBER, color: haProp ? AMBER_DARK : "#78350f", border: "2px solid " + AMBER, borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: isGen ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: isGen ? 0.8 : 1 }}>
+                                    {isGen
+                                      ? <><span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid rgba(120,53,15,0.3)", borderTopColor: AMBER_DARK, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Generazione proposte...</>
+                                      : <><span>🤖</span>{haProp ? "Rigenera proposte AI" : "Genera proposte AI per questo lotto"}</>
+                                    }
+                                  </button>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>

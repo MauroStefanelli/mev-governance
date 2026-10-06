@@ -754,6 +754,27 @@ export const analizzaCapitolatoGara = async (file, towFiles = {}, catalogFiles =
   return response.json();
 };
 
+// Genera proposte (tecnica/economica/piano) per un singolo lotto — chiamata separata per evitare truncation
+export const analizzaProposteGara = async (file, nomeLotto, lottoNum) => {
+  const form = new FormData();
+  form.append("file", file);
+  if (nomeLotto) form.append("nomeLotto", nomeLotto);
+  if (lottoNum != null) form.append("lottoNum", String(lottoNum));
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/analizza-proposte`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
+  return response.json();
+};
+
 export const getGare = async () => {
   const params = new URLSearchParams({ entity_type: "gara" });
   const response = await fetchWithRefresh(
