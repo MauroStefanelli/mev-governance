@@ -40,12 +40,6 @@ public class GareController : ControllerBase
         );
     }
 
-    // POST /api/gare/analizza-capitolato
-    // Accetta un file PDF multipart e restituisce analisi AI completa del capitolato di gara.
-    // Il prompt richiede all'AI di:
-    //   - estrarre i nomi dei file PDF allegati/citati nel documento
-    //   - produrre dettagli operativi per ogni documento da produrre, ogni sezione tecnica,
-    //     ogni voce economica — inclusi riferimenti agli allegati PDF del capitolato
     [HttpPost("analizza-capitolato")]
     public async Task<IActionResult> AnalizzaCapitolato()
     {
@@ -59,7 +53,6 @@ public class GareController : ControllerBase
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Sono accettati solo file PDF." });
 
-        // Estrae il testo dal PDF
         string fullText;
         try
         {
@@ -74,123 +67,23 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // Strategia: estrai le sezioni più rilevanti invece di inviare tutto il testo.
-        // 1) Cerca blocchi di testo che contengono parole chiave chiave (TOW, prezzi, requisiti, ecc.)
-        // 2) Prendi inizio + fine documento (intestazione + conclusioni) sempre presenti
-        // 3) Limita a 12.000 caratteri totali per stare nei limiti di Capgemini
-        var compressed = System.Text.RegularExpressions.Regex.Replace(fullText, @"[ \t]{2,}", " ");
-        compressed = System.Text.RegularExpressions.Regex.Replace(compressed, @"\n{3,}", "\n\n").Trim();
+        // Comprimi spazi multipli e limita a 6000 char — Capgemini va in 504 con input maggiori
+        var compressed = System.Text.RegularExpressions.Regex.Replace(fullText, @"\s{2,}", " ").Trim();
+        var snippet = compressed.Length > 6000 ? compressed[..6000] + "\n[...troncato...]" : compressed;
 
-        string snippet;
-        if (compressed.Length <= 12000)
-        {
-            snippet = compressed;
-        }
-        else
-        {
-            // Dividi in paragrafi e seleziona quelli più rilevanti
-            var paragraphs = compressed.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
-            var keywords = new[] { "tow", "transazion", "allegat", "tabella", "prezz", "importo", "requisit",
-                                   "criterio", "criteri", "valutazione", "scadenza", "capitolato", "oggetto",
-                                   "committente", "aggiudicazione", "offerta", "tecnica", "economica" };
-            var relevant = paragraphs
-                .Where(p => keywords.Any(k => p.ToLowerInvariant().Contains(k)))
-                .ToList();
+        // Prompt minimalista: Capgemini non regge prompt lunghi
+        var instruction = "Sei un esperto di gare d'appalto IT italiane. Analizza il documento e rispondi SOLO con JSON puro (no markdown). " +
+            "Estrai i seguenti campi: titolo, sintesi, oggetto, committente, importoBase, scadenza, " +
+            "allegatiCitati (array di stringhe con nomi file citati), " +
+            "tow (array di oggetti con campi id/descrizione/quantita/unitaMisura/importo/note — i TOW sono Transazioni di Lavoro, cercali ovunque nel documento), " +
+            "sezioni (array con numero/titolo/sintesi), " +
+            "requisitiTecnici (array di stringhe), " +
+            "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli/allegatiRiferimento), " +
+            "criteriValutazione (array con criterio/peso), " +
+            "proposte con sotto-campi: tecnica (array con sezione/desc/dettagli/allegatiRiferimento), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato), " +
+            "note. Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
 
-            // Sempre includi inizio e fine documento
-            var head = compressed[..Math.Min(2000, compressed.Length)];
-            var tail = compressed.Length > 2000 ? compressed[^Math.Min(2000, compressed.Length - 2000)..] : "";
-
-            var middle = string.Join("\n\n", relevant);
-            if (middle.Length > 8000) middle = middle[..8000];
-
-            snippet = head + "\n\n[...sezioni rilevanti...]\n\n" + middle;
-            if (!string.IsNullOrEmpty(tail)) snippet += "\n\n[...fine documento...]\n\n" + tail;
-        }
-
-        var instruction = @"Sei un esperto di gare d'appalto pubbliche italiane nel settore IT/digitale.
-Analizza il seguente documento di gara / capitolato tecnico in modo APPROFONDITO e OPERATIVO.
-
-ISTRUZIONI IMPORTANTI:
-1. Estrai TUTTI i nomi di file PDF, allegati, appendici, tabelle citati nel testo (es. ""Allegato 1.pdf"", ""Appendice A - Catalogo.pdf"", ""Tab. 1 - Prezzi.xlsx"" ecc.) — elencali nel campo ""allegatiCitati"".
-2. CERCA CON ATTENZIONE i TOW (Transaction of Work / Transazioni di Lavoro) presenti nel documento: possono essere in forma di tabella, lista numerata, allegato tecnico o sezione dedicata. Estrai TUTTI i TOW trovati con tutti i campi disponibili (ID, codice, descrizione, quantità, importo, unità misura, ecc.). Se non ci sono TOW espliciti, restituisci un array vuoto.
-3. Per ogni documento da produrre per la risposta alla gara, fornisci istruzioni OPERATIVE e SPECIFICHE su come compilarlo, cosa deve contenere, quali sezioni del capitolato rispettare, e quali allegati/file del capitolato consultare.
-4. Per la proposta tecnica, descrivi CONCRETAMENTE cosa scrivere in ciascuna sezione, con riferimento ai requisiti specifici del capitolato.
-5. Per la proposta economica, stima importi REALISTICI basandoti su eventuali prezzi/tariffe presenti nel capitolato o su benchmark di mercato IT.
-
-Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown, senza ```json, solo JSON puro) con questa struttura:
-{
-  ""titolo"": ""titolo ufficiale del documento"",
-  ""sintesi"": ""sintesi esecutiva in 5-8 frasi: oggetto della gara, committente, ambito tecnologico, requisiti principali, elementi differenzianti"",
-  ""oggetto"": ""oggetto specifico della fornitura/servizio"",
-  ""committente"": ""nome ente committente"",
-  ""importoBase"": ""importo a base d'asta se presente, altrimenti null"",
-  ""scadenza"": ""data scadenza presentazione offerte se presente, altrimenti null"",
-  ""allegatiCitati"": [
-    ""nome-file-1.pdf"",
-    ""nome-file-2.pdf""
-  ],
-  ""tow"": [
-    {
-      ""id"": ""codice o ID del TOW se presente, altrimenti null"",
-      ""descrizione"": ""descrizione completa del TOW come riportata nel documento"",
-      ""quantita"": ""quantità numerica se presente, altrimenti null"",
-      ""unitaMisura"": ""unità di misura se presente (es. ore, giornate, pezzi), altrimenti null"",
-      ""importo"": ""importo o valore economico se presente, altrimenti null"",
-      ""note"": ""qualsiasi informazione aggiuntiva rilevante sul TOW""
-    }
-  ],
-  ""sezioni"": [
-    { ""numero"": ""1"", ""titolo"": ""..."", ""sintesi"": ""sintesi della sezione in 1-2 frasi"" }
-  ],
-  ""requisitiTecnici"": [""requisito tecnico specifico 1"", ""requisito tecnico specifico 2""],
-  ""documentiRichiesti"": [
-    {
-      ""nome"": ""nome del documento da produrre"",
-      ""tipo"": ""tecnico|economico|amministrativo|legale"",
-      ""obbligatorio"": true,
-      ""dettagli"": ""Istruzioni operative dettagliate su cosa deve contenere questo documento, come strutturarlo, quali sezioni del capitolato rispettare, quali allegati consultare. Minimo 3-5 frasi specifiche."",
-      ""allegatiRiferimento"": [""nome-allegato-capitolato.pdf""]
-    }
-  ],
-  ""criteriValutazione"": [
-    { ""criterio"": ""..."", ""peso"": ""xx punti o xx%"" }
-  ],
-  ""proposte"": {
-    ""tecnica"": [
-      {
-        ""sezione"": ""titolo sezione proposta tecnica"",
-        ""desc"": ""Descrizione di alto livello della sezione"",
-        ""dettagli"": ""Istruzioni operative CONCRETE su cosa scrivere in questa sezione: punti chiave da sviluppare, requisiti del capitolato da rispettare (cita i paragrafi specifici se presenti nel testo), approccio metodologico suggerito, elementi differenzianti da evidenziare. Minimo 4-6 frasi."",
-        ""allegatiRiferimento"": [""nome-allegato.pdf""]
-      }
-    ],
-    ""economica"": [
-      {
-        ""voce"": ""nome voce di costo"",
-        ""gg"": 0,
-        ""tariffa"": 0,
-        ""importo"": 0,
-        ""dettagli"": ""Spiegazione di come è stata stimata questa voce, a quale attività/requisito del capitolato si riferisce, come giustificarla nell'offerta economica."",
-        ""allegatiRiferimento"": [""nome-allegato.pdf""]
-      }
-    ],
-    ""piano"": [
-      {
-        ""milestone"": ""nome milestone"",
-        ""data"": ""data stimata"",
-        ""durata"": ""durata stimata"",
-        ""owner"": ""responsabile"",
-        ""stato"": ""Pianificato""
-      }
-    ]
-  },
-  ""note"": ""eventuali vincoli, avvertenze o note importanti non categorizzate""
-}";
-
-        // Usa AnalyzeWithInstructionsAsync per bypassare il system prompt del Configuratore
-        // e usare il prompt specifico per l'analisi di gara
-        var userMessage = $"Analizza questo documento di gara/capitolato tecnico.\n\nFile: {file.FileName}\nLunghezza testo: {fullText.Length} caratteri\n\nTESTO DEL DOCUMENTO:\n{snippet}";
+        var userMessage = $"File: {file.FileName}\n\nTESTO:\n{snippet}";
 
         try
         {
