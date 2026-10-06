@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { getGare, putGara, deleteGara } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
 const AMBER_DARK   = "#b45309";
@@ -105,7 +106,7 @@ function ChecklistSidebar({ checklist, onToggle }) {
 }
 
 // ── Vista 1: Lista Gare ───────────────────────────────────────────────────────
-function ListaGare({ gare, onApri, onNuova }) {
+function ListaGare({ gare, onApri, onNuova, onDelete }) {
   const statoColor = {
     "Bozza":          { bg: "#f9fafb", color: "#6b7280", dot: "#9ca3af" },
     "In lavorazione": { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
@@ -168,6 +169,10 @@ function ListaGare({ gare, onApri, onNuova }) {
               <div key={g.id} onClick={() => onApri(g.id)} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", boxShadow: "0 2px 10px rgba(0,0,0,0.06)", padding: "20px 22px", cursor: "pointer", transition: "all 0.2s", position: "relative", overflow: "hidden" }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor = AMBER_BORDER; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.06)"; e.currentTarget.style.borderColor = "#e5e7eb"; }}>
+                {/* Pulsante elimina */}
+                <button onClick={e => { e.stopPropagation(); onDelete(g); }} title="Elimina gara" style={{ position: "absolute", top: 10, right: 10, background: "none", border: "none", cursor: "pointer", color: "#d1d5db", fontSize: 16, lineHeight: 1, padding: "2px 5px", borderRadius: 4, zIndex: 1 }}
+                  onMouseEnter={e => e.currentTarget.style.color = "#dc2626"}
+                  onMouseLeave={e => e.currentTarget.style.color = "#d1d5db"}>×</button>
                 {/* Accent top */}
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg," + AMBER + "," + AMBER_DARK + ")" }} />
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
@@ -277,7 +282,7 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
 }
 
 // ── Vista 3: Dettaglio Gara ───────────────────────────────────────────────────
-function DettaglioGara({ gara, onBack, onUpdate }) {
+function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [isDragOver, setIsDragOver]   = React.useState(false);
   const [analyzing,  setAnalyzing]    = React.useState(false);
   const [activeTab,  setActiveTab]    = React.useState("documenti");
@@ -375,6 +380,7 @@ function DettaglioGara({ gara, onBack, onUpdate }) {
         {/* Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <button onClick={onBack} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", color: "#fff", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>← Risposte di Gara</button>
+          <button onClick={() => onDelete(gara)} style={{ background: "rgba(220,38,38,0.25)", border: "1px solid rgba(220,38,38,0.4)", color: "#fca5a5", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600, marginLeft: "auto" }}>Elimina gara</button>
           <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>/</span>
           <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: 600 }}>{gara.nome}</span>
         </div>
@@ -595,12 +601,27 @@ function DettaglioGara({ gara, onBack, onUpdate }) {
 // ── Componente principale ─────────────────────────────────────────────────────
 export default function GarePage({ onUnauthorized }) {
   const [gare,            setGare]            = React.useState([]);
+  const [loading,         setLoading]         = React.useState(true);
+  const [saving,          setSaving]          = React.useState(false);
+  const [error,           setError]           = React.useState("");
   const [selectedId,      setSelectedId]      = React.useState(null);
   const [showNuovaModale, setShowNuovaModale] = React.useState(false);
 
   const selectedGara = gare.find(g => g.id === selectedId) || null;
 
-  const handleCreaGara = (form) => {
+  // Carica gare dal backend all'avvio
+  React.useEffect(() => {
+    setLoading(true);
+    getGare()
+      .then(data => { setGare(data || []); setLoading(false); })
+      .catch(err => {
+        if (err?.status === 401 || err?.status === 403) { onUnauthorized && onUnauthorized(); }
+        setError("Errore caricamento gare");
+        setLoading(false);
+      });
+  }, []);
+
+  const handleCreaGara = async (form) => {
     const nuova = {
       id:          newId(),
       nome:        form.nome.trim(),
@@ -616,34 +637,78 @@ export default function GarePage({ onUnauthorized }) {
       aiResult:    null,
       createdAt:   new Date().toISOString(),
     };
-    setGare(prev => [nuova, ...prev]);
-    setShowNuovaModale(false);
-    setSelectedId(nuova.id);
-  };
-
-  const handleUpdateGara = (updated) => {
-    setGare(prev => prev.map(g => g.id === updated.id ? updated : g));
-    if (selectedId === updated.id) {
-      // refresh: il componente usa `selectedGara` che si ricalcola
+    setSaving(true);
+    try {
+      const saved = await putGara(nuova);
+      const payload = saved.payload || saved.Payload || nuova;
+      const withRecordId = { ...payload, _recordId: saved.Id || saved.id || payload._recordId };
+      setGare(prev => [withRecordId, ...prev]);
+      setShowNuovaModale(false);
+      setSelectedId(nuova.id);
+    } catch (err) {
+      setError("Errore salvataggio gara");
+    } finally {
+      setSaving(false);
     }
   };
 
+  const handleUpdateGara = async (updated) => {
+    // Aggiorna stato locale immediatamente (UI reattiva)
+    setGare(prev => prev.map(g => g.id === updated.id ? updated : g));
+    // Persiste in background
+    try {
+      await putGara(updated);
+    } catch (err) {
+      setError("Errore salvataggio — riprova");
+    }
+  };
+
+  const handleDeleteGara = async (gara) => {
+    if (!window.confirm("Eliminare la gara \"" + gara.nome + "\"? L'operazione non è reversibile.")) return;
+    setGare(prev => prev.filter(g => g.id !== gara.id));
+    if (selectedId === gara.id) setSelectedId(null);
+    if (gara._recordId) {
+      try { await deleteGara(gara._recordId); } catch {}
+    }
+  };
+
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: 36, height: 36, border: "3px solid #fcd34d", borderTopColor: "#b45309", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
+        <div style={{ color: "#9ca3af", fontSize: 14 }}>Caricamento gare...</div>
+      </div>
+      <style>{"@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}"}</style>
+    </div>
+  );
+
   return (
     <>
+      {error && (
+        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 9999, background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 20px", fontSize: 13, color: "#dc2626", fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+          {error} <button onClick={() => setError("")} style={{ marginLeft: 10, background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>×</button>
+        </div>
+      )}
+      {saving && (
+        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9998, background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "8px 16px", fontSize: 12, color: "#b45309", fontWeight: 600 }}>
+          Salvataggio...
+        </div>
+      )}
       {selectedGara ? (
         <DettaglioGara
           gara={selectedGara}
           onBack={() => setSelectedId(null)}
           onUpdate={handleUpdateGara}
+          onDelete={handleDeleteGara}
         />
       ) : (
         <ListaGare
           gare={gare}
           onApri={(id) => setSelectedId(id)}
           onNuova={() => setShowNuovaModale(true)}
+          onDelete={handleDeleteGara}
         />
       )}
-
       {showNuovaModale && (
         <ModaleNuovaGara
           onCrea={handleCreaGara}

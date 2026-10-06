@@ -726,6 +726,41 @@ export const putSharedApplications = async (contractId, lot, applications) => {
   });
 };
 
+// ── Gare (Risposte di Gara) — condivise tra tutti i Bid Manager dell'ambiente ─
+// Ogni gara è un record separato con entity_type="gara" e record_key="gara|{id}"
+// contract_id e lot_id sono null perché le gare sono trasversali all'ambiente.
+
+export const getGare = async () => {
+  const params = new URLSearchParams({ entity_type: "gara" });
+  const response = await fetchWithRefresh(
+    `${API_BASE_URL}/api/configuratore/records?${params}`,
+    { headers: authHeaders() }
+  );
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) return [];
+  const data = await response.json();
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  return records.map(r => {
+    const p = r.payload || r.Payload || {};
+    return { ...p, _recordId: r.Id || r.id };
+  });
+};
+
+export const putGara = async (gara) => {
+  return upsertConfiguratoreRecord({
+    record_key:  `gara|${gara.id}`,
+    entity_type: "gara",
+    contract_id: null,
+    lot_id:      null,
+    title:       gara.nome || "Gara senza nome",
+    payload:     { ...gara, updatedAt: new Date().toISOString() },
+  });
+};
+
+export const deleteGara = async (recordId) => {
+  return deleteConfiguratoreRecord(recordId);
+};
+
 // ── Release schedule per contratto ──────────────────────────────────────────
 export const getReleaseSchedules = async (contractId) => {
   const params = new URLSearchParams({ entity_type: "release_calendar", contract_id: contractId });
