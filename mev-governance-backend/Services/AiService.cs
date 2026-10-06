@@ -207,29 +207,32 @@ public class AiService
 
     private JsonObject ParseAnalysisJson(string text)
     {
-        var value = text.Trim();
-        // Rimuove backtick markdown in tutte le varianti:
-        // ```json{...}```  ```json\n{...}\n```  ```\n{...}\n```
-        value = System.Text.RegularExpressions.Regex.Replace(value, @"^```(?:json)?", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        value = System.Text.RegularExpressions.Regex.Replace(value, @"```\s*$", "").Trim();
-        if (string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("Il servizio AI ha restituito una risposta vuota");
 
-        // Se l'AI ha omesso la { } radice (es. risponde direttamente con "tecnica": [...])
-        // avvolgiamo il testo in un oggetto
-        if (!value.StartsWith("{") && !value.StartsWith("["))
-            value = "{" + value + "}";
+        // Strategia robusta: trova il primo { o [ e l'ultimo } o ]
+        // Gestisce qualsiasi variante di backtick markdown, testo libero prima/dopo il JSON
+        var firstCurly  = text.IndexOf('{');
+        var firstSquare = text.IndexOf('[');
+        int start = firstCurly >= 0 && firstSquare >= 0
+            ? Math.Min(firstCurly, firstSquare)
+            : firstCurly >= 0 ? firstCurly : firstSquare;
+
+        if (start < 0)
+            throw new InvalidOperationException("Il servizio AI ha restituito testo non convertibile in JSON. Riprova l'analisi");
+
+        char open  = text[start];
+        char close = open == '{' ? '}' : ']';
+        var end = text.LastIndexOf(close);
+
+        if (end <= start)
+            throw new InvalidOperationException("Il servizio AI ha restituito testo non convertibile in JSON. Riprova l'analisi");
+
+        var value = text.Substring(start, end - start + 1);
 
         try { return JsonNode.Parse(value)?.AsObject() ?? new JsonObject(); }
         catch (JsonException)
         {
-            var start = value.IndexOf('{');
-            var end = value.LastIndexOf('}');
-            if (start >= 0 && end > start)
-            {
-                try { return JsonNode.Parse(value.Substring(start, end - start + 1))?.AsObject() ?? new JsonObject(); }
-                catch (JsonException) { }
-            }
             throw new InvalidOperationException("Il servizio AI ha restituito testo non convertibile in JSON. Riprova l'analisi");
         }
     }
