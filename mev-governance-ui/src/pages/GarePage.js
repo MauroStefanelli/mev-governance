@@ -509,6 +509,18 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         allegatiCitati     = getArr(a,"allegatiCitati","AllegatiCitati","allegati_citati","allegati");
       }
 
+      // TOW: estratti dal capitolato (sia struttura nuova che vecchia)
+      const normTow = (t, i) => ({
+        _id:         i,
+        id:          get(t,"id","Id","ID","codice","Codice","cod") || null,
+        descrizione: get(t,"descrizione","Descrizione","description","nome","nome_tow","titolo") || "",
+        quantita:    get(t,"quantita","Quantita","quantità","Quantità","qty","quantity") ?? null,
+        unitaMisura: get(t,"unitaMisura","UnitaMisura","unita_misura","unità","um","uom") || null,
+        importo:     get(t,"importo","Importo","valore","Valore","amount","price") ?? null,
+        note:        get(t,"note","Note","notes","info") || "",
+      });
+      const tow = getArr(a,"tow","Tow","TOW","tows","transazioni","transazioniLavoro","transaction_of_work").map(normTow);
+
       const capData = {
         titolo:             get(a,"titolo","Titolo","title","Title") || result.fileName || file.name,
         sintesi,
@@ -517,6 +529,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         importoBase:        get(a,"importoBase","ImportoBase","importo_base","importo","baseAsta") || "",
         scadenza:           get(a,"scadenza","Scadenza","deadline") || "",
         allegatiCitati,
+        tow,
         sezioni:            getArr(a,"sezioni","Sezioni","sections"),
         requisitiTecnici:   getArr(a,"requisitiTecnici","RequisitiTecnici","requisiti_tecnici","requisiti","requirements"),
         documentiRichiesti,
@@ -527,7 +540,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         analyzedAt:         new Date().toISOString(),
       };
 
-      console.log("[GarePage] capData:", { isVecchia, nDoc: capData.documentiRichiesti.length, nTec: capData.proposte.tecnica.length });
+      console.log("[GarePage] capData:", { isVecchia, nTow: capData.tow.length, nDoc: capData.documentiRichiesti.length, nTec: capData.proposte.tecnica.length });
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
       setCapError(err?.message || "Errore analisi capitolato");
@@ -796,6 +809,45 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                         </div>
                       )}
                     </div>
+
+                    {/* TOW estratti dal capitolato */}
+                    {(cap.tow || []).length > 0 && (
+                      <div style={{ background: "#fff", borderRadius: 10, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
+                        <div style={{ background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 16 }}>📋</span>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({cap.tow.length})</div>
+                          <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
+                        </div>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: AMBER_BG, borderBottom: "2px solid " + AMBER_BORDER }}>
+                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>ID/Cod.</th>
+                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Descrizione</th>
+                                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Quantità</th>
+                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>U.M.</th>
+                                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Importo</th>
+                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Note</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {cap.tow.map((t, i) => (
+                                <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                                  <td style={{ padding: "8px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                                    {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
+                                  </td>
+                                  <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>{t.descrizione || "—"}</td>
+                                  <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.quantita != null ? t.quantita : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                  <td style={{ padding: "8px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>{t.unitaMisura || <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                  <td style={{ padding: "8px 12px", color: "#111827", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.importo != null ? (isNaN(Number(t.importo)) ? t.importo : "€ " + Number(t.importo).toLocaleString("it-IT")) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                  <td style={{ padding: "8px 12px", color: "#6b7280", fontSize: 11 }}>{t.note || <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
                     {cap.note && (
                       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>

@@ -82,9 +82,10 @@ Analizza il seguente documento di gara / capitolato tecnico in modo APPROFONDITO
 
 ISTRUZIONI IMPORTANTI:
 1. Estrai TUTTI i nomi di file PDF, allegati, appendici, tabelle citati nel testo (es. ""Allegato 1.pdf"", ""Appendice A - Catalogo.pdf"", ""Tab. 1 - Prezzi.xlsx"" ecc.) — elencali nel campo ""allegatiCitati"".
-2. Per ogni documento da produrre per la risposta alla gara, fornisci istruzioni OPERATIVE e SPECIFICHE su come compilarlo, cosa deve contenere, quali sezioni del capitolato rispettare, e quali allegati/file del capitolato consultare.
-3. Per la proposta tecnica, descrivi CONCRETAMENTE cosa scrivere in ciascuna sezione, con riferimento ai requisiti specifici del capitolato.
-4. Per la proposta economica, stima importi REALISTICI basandoti su eventuali prezzi/tariffe presenti nel capitolato o su benchmark di mercato IT.
+2. CERCA CON ATTENZIONE i TOW (Transaction of Work / Transazioni di Lavoro) presenti nel documento: possono essere in forma di tabella, lista numerata, allegato tecnico o sezione dedicata. Estrai TUTTI i TOW trovati con tutti i campi disponibili (ID, codice, descrizione, quantità, importo, unità misura, ecc.). Se non ci sono TOW espliciti, restituisci un array vuoto.
+3. Per ogni documento da produrre per la risposta alla gara, fornisci istruzioni OPERATIVE e SPECIFICHE su come compilarlo, cosa deve contenere, quali sezioni del capitolato rispettare, e quali allegati/file del capitolato consultare.
+4. Per la proposta tecnica, descrivi CONCRETAMENTE cosa scrivere in ciascuna sezione, con riferimento ai requisiti specifici del capitolato.
+5. Per la proposta economica, stima importi REALISTICI basandoti su eventuali prezzi/tariffe presenti nel capitolato o su benchmark di mercato IT.
 
 Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown, senza ```json, solo JSON puro) con questa struttura:
 {
@@ -97,6 +98,16 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown, senza ```jso
   ""allegatiCitati"": [
     ""nome-file-1.pdf"",
     ""nome-file-2.pdf""
+  ],
+  ""tow"": [
+    {
+      ""id"": ""codice o ID del TOW se presente, altrimenti null"",
+      ""descrizione"": ""descrizione completa del TOW come riportata nel documento"",
+      ""quantita"": ""quantità numerica se presente, altrimenti null"",
+      ""unitaMisura"": ""unità di misura se presente (es. ore, giornate, pezzi), altrimenti null"",
+      ""importo"": ""importo o valore economico se presente, altrimenti null"",
+      ""note"": ""qualsiasi informazione aggiuntiva rilevante sul TOW""
+    }
   ],
   ""sezioni"": [
     { ""numero"": ""1"", ""titolo"": ""..."", ""sintesi"": ""sintesi della sezione in 1-2 frasi"" }
