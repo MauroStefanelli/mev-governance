@@ -83,14 +83,12 @@ public class GareController : ControllerBase
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
         // 2) Analisi AI — SOLO struttura (no proposte per stare dentro max_tokens)
-        // Le proposte vengono generate on-demand per lotto via /analizza-proposte
-        var instruction =
-            "Sei un esperto di gare d'appalto IT italiane. Rispondi SOLO con JSON puro, zero markdown, zero testo extra. " +
-            "Schema: {titolo,sintesi,oggetto,committente,importoBase,scadenza,allegatiCitati[],note,lotti[]}. " +
-            "Ogni lotto: {nome,descrizione,importoBase,requisitiTecnici[],documentiRichiesti[{nome,tipo,obbligatorio}],criteriValutazione[{criterio,peso}],sezioni[{numero,titolo,sintesi}]}. " +
-            "Se non ci sono lotti espliciti usa un unico lotto 'Gara'. Solo JSON valido.";
-
-        var userMessage = $"File: {file.FileName}\n\nTESTO:\n{fullText}";
+        // Usa AnalizzaGaraAsync: stesso pattern di AnalyzeAsync con schema JSON incorporato nel messaggio
+        var garaContext = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            fileName  = file.FileName,
+            testo     = fullText
+        });
 
         JsonObject analysis;
         string provider, usedModel;
@@ -98,8 +96,8 @@ public class GareController : ControllerBase
         {
             var (key, ep, mdl, sty, auth) = GetUserAiSettings();
             JsonObject? usage;
-            (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
-                instruction, userMessage, key, ep, mdl, sty, auth);
+            (analysis, provider, usedModel, usage) = await _ai.AnalizzaGaraAsync(
+                garaContext, key, ep, mdl, sty, auth);
         }
         catch (Exception ex)
         {
@@ -277,22 +275,14 @@ public class GareController : ControllerBase
         if (context.ValueKind != JsonValueKind.Object)
             return BadRequest(new { message = "Contesto non valido" });
 
-        var instruction =
-            "Sei un esperto di gare d'appalto IT italiane. Analizza il contesto della gara e genera proposte di risposta. " +
-            "Rispondi SOLO con JSON puro, nessun markdown. " +
-            "Schema: {tecnica:[{sezione,desc,dettagli}], economica:[{voce,gg,tariffa,importo,dettagli}], piano:[{milestone,data,durata,owner,stato}]}. " +
-            "Max 6 voci per array. Solo JSON valido.";
-
-        var userMessage = "Contesto gara:\n" + context.ToString();
-
         JsonObject analysis;
         string provider, usedModel;
         try
         {
             var (key, ep, mdl, sty, auth) = GetUserAiSettings();
             JsonObject? usage;
-            (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
-                instruction, userMessage, key, ep, mdl, sty, auth);
+            (analysis, provider, usedModel, usage) = await _ai.AnalizzaProposteGaraAsync(
+                context, key, ep, mdl, sty, auth);
         }
         catch (Exception ex)
         {

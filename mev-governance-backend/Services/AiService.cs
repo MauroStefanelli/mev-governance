@@ -482,7 +482,183 @@ public class AiService
     }
 
     // ============================================================
-    // POST /api/configuratore/ai/development
+    // AnalizzaGaraAsync — analisi struttura capitolato
+    // Stesso pattern di AnalyzeAsync: structured:true con schema gara
+    // ============================================================
+    private const string GaraAnalysisInstructions =
+        "Sei un esperto di gare d'appalto IT italiane. Analizza il capitolato e restituisci la struttura della gara. " +
+        "Individua tutti i lotti presenti (Lotto 1, Lotto 2, ecc.). Se non ci sono lotti espliciti crea un unico lotto 'Gara'. " +
+        "Per ogni lotto estrai: nome, descrizione, importoBase, requisitiTecnici, documentiRichiesti, criteriValutazione, sezioni. " +
+        "Rispondi ESCLUSIVAMENTE con JSON valido secondo lo schema fornito. Nessun testo aggiuntivo.";
+
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalizzaGaraAsync(
+        JsonElement context,
+        string? userApiKey = null, string? userEndpoint = null,
+        string? userModel = null, string? userStyle = null, string? userAuthMode = null)
+    {
+        var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
+        var systemRole = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) ? "system" : "developer";
+        var messages = new JsonArray
+        {
+            new JsonObject { ["role"] = systemRole, ["content"] = GaraAnalysisInstructions },
+            new JsonObject { ["role"] = "user", ["content"] = "Capitolato da analizzare:\n" + context.ToString() }
+        };
+        var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
+        // Aggiunge lo schema gara come istruzione nel messaggio utente (come AnalyzeAsync per Capgemini)
+        var schema = GaraAnalysisSchema();
+        var schemaInstruction = "\nRestituisci esclusivamente JSON valido, senza Markdown, con questa struttura: " + schema.ToJsonString();
+        if (payload["messages"] is JsonArray msgs && msgs.Count > 0 && msgs[^1] is JsonObject last)
+            last["content"] = (last["content"]?.GetValue<string>() ?? "") + schemaInstruction;
+
+        var response = await PostAsync(s, payload);
+        var responseText = ExtractResponseText(response);
+        JsonObject analysis;
+        try { analysis = ParseAnalysisJson(responseText); }
+        catch (InvalidOperationException)
+        {
+            analysis = new JsonObject
+            {
+                ["error"]   = "Il servizio AI ha restituito testo non convertibile in JSON.",
+                ["rawText"] = responseText.Length > 4000 ? responseText[..4000] : responseText
+            };
+        }
+        return (
+            analysis,
+            s.Provider,
+            response.GetStringProp("model") ?? s.Model,
+            response.TryGetPropertyValue("usage", out var usage) ? usage as JsonObject : null
+        );
+    }
+
+    // ============================================================
+    // AnalizzaProposteGaraAsync — proposte tecnica/economica/piano
+    // ============================================================
+    private const string GaraProposteInstructions =
+        "Sei un esperto di gare d'appalto IT italiane. Genera proposte di risposta per il lotto descritto. " +
+        "Rispondi ESCLUSIVAMENTE con JSON valido secondo lo schema fornito. Nessun testo aggiuntivo.";
+
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalizzaProposteGaraAsync(
+        JsonElement context,
+        string? userApiKey = null, string? userEndpoint = null,
+        string? userModel = null, string? userStyle = null, string? userAuthMode = null)
+    {
+        var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
+        var systemRole = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) ? "system" : "developer";
+        var messages = new JsonArray
+        {
+            new JsonObject { ["role"] = systemRole, ["content"] = GaraProposteInstructions },
+            new JsonObject { ["role"] = "user", ["content"] = "Contesto gara:\n" + context.ToString() }
+        };
+        var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
+        var schema = GaraProposteSchema();
+        var schemaInstruction = "\nRestituisci esclusivamente JSON valido, senza Markdown, con questa struttura: " + schema.ToJsonString();
+        if (payload["messages"] is JsonArray msgs && msgs.Count > 0 && msgs[^1] is JsonObject last)
+            last["content"] = (last["content"]?.GetValue<string>() ?? "") + schemaInstruction;
+
+        var response = await PostAsync(s, payload);
+        var responseText = ExtractResponseText(response);
+        JsonObject analysis;
+        try { analysis = ParseAnalysisJson(responseText); }
+        catch (InvalidOperationException)
+        {
+            analysis = new JsonObject
+            {
+                ["error"]   = "Il servizio AI ha restituito testo non convertibile in JSON.",
+                ["rawText"] = responseText.Length > 4000 ? responseText[..4000] : responseText
+            };
+        }
+        return (
+            analysis,
+            s.Provider,
+            response.GetStringProp("model") ?? s.Model,
+            response.TryGetPropertyValue("usage", out var usage2) ? usage2 as JsonObject : null
+        );
+    }
+
+    private static JsonObject GaraAnalysisSchema() => new JsonObject
+    {
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["titolo"]        = new JsonObject { ["type"] = "string" },
+            ["sintesi"]       = new JsonObject { ["type"] = "string" },
+            ["oggetto"]       = new JsonObject { ["type"] = "string" },
+            ["committente"]   = new JsonObject { ["type"] = "string" },
+            ["importoBase"]   = new JsonObject { ["type"] = "string" },
+            ["scadenza"]      = new JsonObject { ["type"] = "string" },
+            ["note"]          = new JsonObject { ["type"] = "string" },
+            ["allegatiCitati"]= new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },
+            ["lotti"]         = new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["nome"]              = new JsonObject { ["type"] = "string" },
+                        ["descrizione"]       = new JsonObject { ["type"] = "string" },
+                        ["importoBase"]       = new JsonObject { ["type"] = "string" },
+                        ["requisitiTecnici"]  = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },
+                        ["documentiRichiesti"]= new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                            ["properties"] = new JsonObject {
+                                ["nome"] = new JsonObject { ["type"] = "string" },
+                                ["tipo"] = new JsonObject { ["type"] = "string" },
+                                ["obbligatorio"] = new JsonObject { ["type"] = "boolean" }
+                            }
+                        }},
+                        ["criteriValutazione"]= new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                            ["properties"] = new JsonObject {
+                                ["criterio"] = new JsonObject { ["type"] = "string" },
+                                ["peso"]     = new JsonObject { ["type"] = "string" }
+                            }
+                        }},
+                        ["sezioni"]           = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                            ["properties"] = new JsonObject {
+                                ["numero"] = new JsonObject { ["type"] = "string" },
+                                ["titolo"] = new JsonObject { ["type"] = "string" },
+                                ["sintesi"] = new JsonObject { ["type"] = "string" }
+                            }
+                        }},
+                    }
+                }
+            }
+        }
+    };
+
+    private static JsonObject GaraProposteSchema() => new JsonObject
+    {
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["tecnica"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                ["properties"] = new JsonObject {
+                    ["sezione"]  = new JsonObject { ["type"] = "string" },
+                    ["desc"]     = new JsonObject { ["type"] = "string" },
+                    ["dettagli"] = new JsonObject { ["type"] = "string" }
+                }
+            }},
+            ["economica"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                ["properties"] = new JsonObject {
+                    ["voce"]     = new JsonObject { ["type"] = "string" },
+                    ["gg"]       = new JsonObject { ["type"] = "number" },
+                    ["tariffa"]  = new JsonObject { ["type"] = "number" },
+                    ["importo"]  = new JsonObject { ["type"] = "number" },
+                    ["dettagli"] = new JsonObject { ["type"] = "string" }
+                }
+            }},
+            ["piano"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                ["properties"] = new JsonObject {
+                    ["milestone"] = new JsonObject { ["type"] = "string" },
+                    ["data"]      = new JsonObject { ["type"] = "string" },
+                    ["durata"]    = new JsonObject { ["type"] = "string" },
+                    ["owner"]     = new JsonObject { ["type"] = "string" },
+                    ["stato"]     = new JsonObject { ["type"] = "string" }
+                }
+            }}
+        }
+    };
+
     // Verifica un piano di sviluppo stimato (raccomandazioni).
     // ============================================================
     public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> DevelopmentAsync(
