@@ -208,10 +208,16 @@ public class AiService
     private JsonObject ParseAnalysisJson(string text)
     {
         var value = text.Trim();
+        // Rimuove backtick markdown (```json ... ```)
         value = System.Text.RegularExpressions.Regex.Replace(value, @"^```(?:json)?\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         value = System.Text.RegularExpressions.Regex.Replace(value, @"\s*```$", "").Trim();
         if (string.IsNullOrWhiteSpace(value))
             throw new InvalidOperationException("Il servizio AI ha restituito una risposta vuota");
+
+        // Se l'AI ha omesso la { } radice (es. risponde direttamente con "tecnica": [...])
+        // avvolgiamo il testo in un oggetto
+        if (!value.StartsWith("{") && !value.StartsWith("["))
+            value = "{" + value + "}";
 
         try { return JsonNode.Parse(value)?.AsObject() ?? new JsonObject(); }
         catch (JsonException)
