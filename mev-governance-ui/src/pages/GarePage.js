@@ -450,6 +450,9 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         prezziSemplice:  c.prezziSemplice  ?? null,
         prezziMedio:     c.prezziMedio     ?? null,
         prezziComplesso: c.prezziComplesso ?? null,
+        modSemplice:     c.modSemplice     ?? null,
+        modMedio:        c.modMedio        ?? null,
+        modComplesso:    c.modComplesso    ?? null,
       });
       const normLotto = (l, i) => {
         const proposte = get(l,"proposte","Proposte") || {};
@@ -508,6 +511,13 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         analyzedAt:    new Date().toISOString(),
       };
 
+      // Debug: log errori parser dal backend
+      const rawLotti = getArr(a,"lotti","Lotti","lots","lotto");
+      rawLotti.forEach((l, i) => {
+        if (l._catalogError) console.error(`[GarePage] Lotto ${i+1} catalogError:`, l._catalogError);
+        if (l._towError)     console.error(`[GarePage] Lotto ${i+1} towError:`, l._towError);
+        console.log(`[GarePage] Lotto ${i+1} debug:`, { towCapitolato: l._towCapitolatoCount, towPrices: l._towPricesCount, catalogCount: l._catalogCount });
+      });
       console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase })) });
       setLottoAttivo(capData.lotti.length > 1 ? null : 0);
       onUpdate({ ...gara, capitolato: capData });
@@ -905,30 +915,43 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                 <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal catalogo</span>
                               </div>
                               <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                                   <thead>
                                     <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
-                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Ambito</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Nome componente</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Semplice (€)</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Medio (€)</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Complesso (€)</th>
+                                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", whiteSpace: "nowrap", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>ID</th>
+                                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>Ambito</th>
+                                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>Nome componente</th>
+                                      <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", borderBottom: "1px solid #bfdbfe" }}>Realizzazione</th>
+                                      <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderBottom: "1px solid #bfdbfe" }}>Modifica</th>
+                                    </tr>
+                                    <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
+                                      {["Semplice","Medio","Complesso"].map((l,i) => (
+                                        <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", borderRight: i===2 ? "1px solid #bfdbfe" : "none" }}>{l}</th>
+                                      ))}
+                                      {["Semplice","Medio","Complesso"].map(l => (
+                                        <th key={"m"+l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap" }}>{l}</th>
+                                      ))}
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {d.catalogo.map((c, i) => (
-                                      <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
-                                        <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
-                                          <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{c.id}</span>
-                                        </td>
-                                        <td style={{ padding: "8px 12px", color: "#374151" }}>{c.ambito || "—"}</td>
-                                        <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500 }}>{c.nome || "—"}</td>
-                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600 }}>{c.prezziSemplice != null ? Number(c.prezziSemplice).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600 }}>{c.prezziMedio != null ? Number(c.prezziMedio).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600 }}>{c.prezziComplesso != null ? Number(c.prezziComplesso).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                      </tr>
-                                    ))}
+                                    {d.catalogo.map((c, i) => {
+                                      const fmt = v => v != null && v > 0 ? Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>;
+                                      return (
+                                        <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
+                                          <td style={{ padding: "7px 10px", whiteSpace: "nowrap", borderRight: "1px solid #f0f0f0" }}>
+                                            <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 6px", fontWeight: 700 }}>{c.id}</span>
+                                          </td>
+                                          <td style={{ padding: "7px 10px", color: "#374151", borderRight: "1px solid #f0f0f0" }}>{c.ambito || "—"}</td>
+                                          <td style={{ padding: "7px 10px", color: "#111827", fontWeight: 500, borderRight: "1px solid #f0f0f0" }}>{c.nome || "—"}</td>
+                                          <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right" }}>{fmt(c.prezziSemplice)}</td>
+                                          <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right" }}>{fmt(c.prezziMedio)}</td>
+                                          <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right", borderRight: "1px solid #f0f0f0" }}>{fmt(c.prezziComplesso)}</td>
+                                          <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modSemplice)}</td>
+                                          <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modMedio)}</td>
+                                          <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modComplesso)}</td>
+                                        </tr>
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>

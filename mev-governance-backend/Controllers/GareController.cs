@@ -134,6 +134,7 @@ public class GareController : ControllerBase
 
                 Dictionary<string, double> towPrices = new();
                 string towSource = "";
+                string? towError = null;
                 if (towFile != null && towFile.Length > 0)
                 {
                     try
@@ -146,7 +147,7 @@ public class GareController : ControllerBase
                             towPrices = ContractParserService.ParseTowPricePdf(ts, lotNum);
                         towSource = towFile.FileName;
                     }
-                    catch { /* ignora errori, procedi senza prezzi */ }
+                    catch (Exception ex) { towError = ex.Message; }
                 }
 
                 // Costruisci array tow finale: unione di tutte le chiavi
@@ -177,9 +178,14 @@ public class GareController : ControllerBase
                     lotto["tow"] = towArr;
                     if (!string.IsNullOrEmpty(towSource)) lotto["towSource"] = towSource;
                 }
+                lotto["_towCapitolatoCount"] = towCapitolato.Count;
+                lotto["_towPricesCount"]     = towPrices.Count;
+                if (towError != null) lotto["_towError"] = towError;
 
                 // ── Catalogo ─────────────────────────────────────────────────
                 var catalogFile = form.Files.GetFile($"catalogFile_{lotNum}");
+                string? catalogError = null;
+                int catalogCount = 0;
                 if (catalogFile != null && catalogFile.Length > 0 &&
                     catalogFile.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
                 {
@@ -187,23 +193,29 @@ public class GareController : ControllerBase
                     {
                         using var cs = catalogFile.OpenReadStream();
                         var entries = ContractParserService.ParseCatalogPdf(cs, lotNum);
+                        catalogCount = entries.Count;
                         var catArr = new JsonArray();
                         foreach (var e in entries)
                             catArr.Add(new JsonObject
                             {
-                                ["id"]          = e.Id,
-                                ["ambito"]       = e.Ambito,
-                                ["nome"]         = e.Nome,
-                                ["descrizione"]  = e.Descrizione,
+                                ["id"]               = e.Id,
+                                ["ambito"]           = e.Ambito,
+                                ["nome"]             = e.Nome,
+                                ["descrizione"]      = e.Descrizione,
                                 ["prezziSemplice"]   = e.Prezzi.Realizzazione.Semplice,
                                 ["prezziMedio"]      = e.Prezzi.Realizzazione.Medio,
                                 ["prezziComplesso"]  = e.Prezzi.Realizzazione.Complesso,
+                                ["modSemplice"]      = e.Prezzi.Modifica.Semplice,
+                                ["modMedio"]         = e.Prezzi.Modifica.Medio,
+                                ["modComplesso"]     = e.Prezzi.Modifica.Complesso,
                             });
                         lotto["catalogo"]       = catArr;
                         lotto["catalogoSource"] = catalogFile.FileName;
                     }
-                    catch { /* ignora errori parsing catalogo */ }
+                    catch (Exception ex) { catalogError = ex.Message; }
                 }
+                lotto["_catalogCount"] = catalogCount;
+                if (catalogError != null) lotto["_catalogError"] = catalogError;
             }
         }
 

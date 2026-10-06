@@ -56,18 +56,16 @@ public static class ContractParserService
 
                 var row = items.Where(x => x.Y <= top && x.Y > bottom).ToList();
 
-                // Prezzi: colonna >70% larghezza, formato italiano NNN.NNN,NN o NNN,NN
+                // Prezzi: colonna >70% larghezza — usa IsMoneyToken per supportare tutti i formati
                 var prices = row
-                    .Where(x => x.X / w > 0.70 && (
-                        Regex.IsMatch(x.Text, @"^\d{1,3}(?:\.\d{3})+,\d{2}$") ||
-                        Regex.IsMatch(x.Text, @"^\d{1,7},\d{2}$")))
+                    .Where(x => x.X / w > 0.70 && IsMoneyToken(x.Text))
                     .OrderBy(x => x.X)
                     .Select(x => ParseMoney(x.Text))
                     .Take(6)
                     .ToList();
 
-                // Richiedi almeno 3 prezzi (Semplice/Medio/Complesso per Realizzazione)
-                if (prices.Count < 3) continue;
+                // Richiedi esattamente 6 prezzi come il parser JS originale (3 realizzazione + 3 modifica)
+                if (prices.Count < 6) continue;
 
                 var name = ZoneText(row, w * 0.09, w * 0.185)
                     .Replace("Nome Driver", "", StringComparison.OrdinalIgnoreCase).Trim();
@@ -178,20 +176,12 @@ public static class ContractParserService
                 var m = Regex.Match(txt, $@"TOW\s*0?{lot}\.(\d+)", RegexOptions.IgnoreCase);
                 if (!m.Success) continue;
 
-                // Cerca valori monetari in tutti i formati:
-                //   1.234,56   1.234,56 €   3607,00   3607,00 €   1234.56
+                // Cerca valori monetari con IsMoneyToken (gestisce €, formati con/senza sep. migliaia)
                 var nums = new List<double>();
                 foreach (var word in lineItems.Select(x => x.Text))
                 {
-                    // Rimuovi simbolo euro e spazi
-                    var w = word.Replace("€", "").Replace("£", "").Trim();
-                    if (string.IsNullOrEmpty(w)) continue;
-                    // Formato italiano con separatori migliaia: 1.234,56
-                    if (Regex.IsMatch(w, @"^\d{1,3}(?:\.\d{3})+,\d{2}$"))
-                        nums.Add(ParseMoney(w));
-                    // Formato italiano senza separatori: 3607,00
-                    else if (Regex.IsMatch(w, @"^\d{1,7},\d{2}$"))
-                        nums.Add(ParseMoney(w));
+                    if (IsMoneyToken(word))
+                        nums.Add(ParseMoney(word));
                 }
 
                 if (nums.Count > 0)
@@ -214,13 +204,43 @@ public static class ContractParserService
 
     private static double ParseMoney(string s)
     {
-        // Formato italiano: 1.234,56 → 1234.56
-        var clean = Regex.Replace(s, @"\s", "")
-                         .Replace(".", "")
-                         .Replace(",", ".")
-                         .Trim();
+        // Identico al JS originale: parseMoney = s => Number(s.replace(/\s/g,'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))
+        // Prima rimuovi separatori migliaia (punti), poi converti virgola decimale, poi rimuovi tutto il non-numerico
+        var clean = Regex.Replace(s, @"\s", "")   // spazi
+                         .Replace("€", "")         // simbolo euro attaccato
+                         .Replace("£", "");         // altri simboli valuta
+
+        // Formato italiano: 1.234,56 → prima rimuovi punti migliaia, poi converti virgola
+        if (Regex.IsMatch(clean, @"^\d{1,3}(?:\.\d{3})+,\d{2}$"))
+        {
+            clean = clean.Replace(".", "").Replace(",", ".");
+        }
+        else if (Regex.IsMatch(clean, @"^\d{1,7},\d{2}$"))
+        {
+            // Formato senza separatori migliaia: 3607,00
+            clean = clean.Replace(",", ".");
+        }
+        else
+        {
+            // Fallback: rimuovi tutto il non-numerico tranne punto e meno
+            clean = Regex.Replace(clean.Replace(",", "."), @"[^0-9.\-]", "");
+        }
+
         return double.TryParse(clean, System.Globalization.NumberStyles.Any,
             System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    // Controlla se una stringa rappresenta un valore monetario in formato italiano
+    private static bool IsMoneyToken(string text)
+    {
+        // Rimuovi simbolo euro eventualmente attaccato
+        var t = text.Replace("€", "").Replace("£", "").Trim();
+        if (string.IsNullOrEmpty(t)) return false;
+        // Con separatori migliaia: 1.234,56
+        if (Regex.IsMatch(t, @"^\d{1,3}(?:\.\d{3})+,\d{2}$")) return true;
+        // Senza separatori migliaia: 3607,00
+        if (Regex.IsMatch(t, @"^\d{1,7},\d{2}$")) return true;
+        return false;
     }
 
     private class PdfItem
@@ -264,23 +284,17 @@ public static class ContractParserService
                 var nums = new List<double>();
                 foreach (var word in afterTow.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    // Rimuovi simbolo euro
-                    var w = word.Replace("€", "").Replace("£", "").Trim();
-                    if (string.IsNullOrEmpty(w)) continue;
-                    // Formato italiano con separatori: 1.234,56
-                    if (Regex.IsMatch(w, @"^\d{1,3}(?:\.\d{3})+,\d{2}$"))
-                        nums.Add(ParseMoney(w));
-                    // Formato italiano senza separatori: 3607,00
-                    else if (Regex.IsMatch(w, @"^\d{1,7},\d{2}$"))
-                        nums.Add(ParseMoney(w));
-                    // Percentuale: 32,26% → ignora
-                    else if (Regex.IsMatch(w, @"^\d+,\d+%$"))
-                        continue;
-                    // Intero puro
-                    else if (Regex.IsMatch(w, @"^\d+$") && int.TryParse(w, out var intVal) && intVal > 0)
+                    // Percentuali → ignora
+                    if (Regex.IsMatch(word, @"^\d+[,.]\d+%$")) continue;
+                    // Simbolo euro standalone → ignora
+                    if (word == "€" || word == "£") continue;
+
+                    if (IsMoneyToken(word))
+                        nums.Add(ParseMoney(word));
+                    else if (Regex.IsMatch(word, @"^\d+$") && int.TryParse(word, out var intVal) && intVal > 0)
                         nums.Add(intVal);
                     else
-                        descParts.Append(w).Append(' ');
+                        descParts.Append(word).Append(' ');
                 }
 
                 var descrizione = descParts.ToString().Trim();
