@@ -499,7 +499,8 @@ public class AiService
         "Sei un esperto di gare d'appalto IT italiane. Analizza il capitolato e restituisci la struttura della gara. " +
         "Individua tutti i lotti presenti (Lotto 1, Lotto 2, ecc.). Se non ci sono lotti espliciti crea un unico lotto 'Gara'. " +
         "Per ogni lotto estrai: nome, descrizione, importoBase, requisitiTecnici, documentiRichiesti, criteriValutazione, sezioni. " +
-        "Rispondi ESCLUSIVAMENTE con JSON valido secondo lo schema fornito. Nessun testo aggiuntivo.";
+        "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 150 caratteri. Max 5 voci per array. " +
+        "Rispondi ESCLUSIVAMENTE con JSON valido. Nessun markdown, nessun backtick, nessun testo extra.";
 
     public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalizzaGaraAsync(
         JsonElement context,
@@ -545,7 +546,9 @@ public class AiService
     // ============================================================
     private const string GaraProposteInstructions =
         "Sei un esperto di gare d'appalto IT italiane. Genera proposte di risposta per il lotto descritto. " +
-        "Rispondi ESCLUSIVAMENTE con JSON valido secondo lo schema fornito. Nessun testo aggiuntivo.";
+        "IMPORTANTE: risposte brevi e concise. Max 3 voci per array. " +
+        "Ogni campo stringa: massimo 150 caratteri. Nessun testo extra. " +
+        "Rispondi ESCLUSIVAMENTE con JSON valido secondo lo schema fornito. Nessun markdown, nessun backtick.";
 
     public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalizzaProposteGaraAsync(
         JsonElement context,
