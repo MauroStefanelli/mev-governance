@@ -225,7 +225,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
 builder.Services.AddHttpClient("ConfiguratoreAi", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(180);
+    client.Timeout = TimeSpan.FromSeconds(360);
 });
 
 var app = builder.Build();
