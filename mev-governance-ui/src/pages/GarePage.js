@@ -288,13 +288,29 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [activeTab,  setActiveTab]            = React.useState("documenti");
   const [analyzingCap, setAnalyzingCap]       = React.useState(false);
   const [capError,     setCapError]           = React.useState("");
+  // { "doc-0": true, "tec-1": false, ... } — pannelli Dettagli aperti
+  const [dettagliOpen, setDettagliOpen]       = React.useState({});
+  // Ref per input file nascosti per ogni voce (keyed by "doc-0", "tec-1", "eco-2")
+  const docFileRefs = React.useRef({});
   const fileInputRef    = useRef(null);
   const capFileInputRef = useRef(null);
 
   const files      = gara.fileNames || [];
   const checklist  = gara.checklist || DEFAULT_CHECKLIST.map(c => ({ ...c }));
-  const analyzed   = gara.analyzed || false;
-  const aiResult   = gara.aiResult  || null;
+  const analyzed   = gara.analyzed || (gara.capitolato?.proposte != null) || false;
+  // aiResult: supporta sia la struttura vecchia (gara.aiResult) sia la nuova (gara.capitolato.proposte)
+  const cap        = gara.capitolato || null;
+  const aiResult   = gara.aiResult ? {
+    documenti: (gara.aiResult.documenti || []).map((d, i) => ({ ...d, _id: i, dettagli: d.dettagli || "", allegatiRiferimento: d.allegatiRiferimento || [], _docAttachment: d._docAttachment || null })),
+    tecnica:   (gara.aiResult.tecnica || []).map((s, i) => ({ ...s, _id: i, dettagli: s.dettagli || "", allegatiRiferimento: s.allegatiRiferimento || [], _docAttachment: s._docAttachment || null })),
+    economica: (gara.aiResult.economica || []).map((r, i) => ({ ...r, _id: i, dettagli: r.dettagli || "", allegatiRiferimento: r.allegatiRiferimento || [], _docAttachment: r._docAttachment || null })),
+    piano:     gara.aiResult.piano || [],
+  } : cap?.proposte ? {
+    documenti: cap.documentiRichiesti || [],
+    tecnica:   cap.proposte.tecnica   || [],
+    economica: cap.proposte.economica || [],
+    piano:     cap.proposte.piano     || [],
+  } : null;
 
   const handleDrop = (e) => {
     e.preventDefault(); setIsDragOver(false);
@@ -369,6 +385,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       const result = await analizzaCapitolatoGara(file);
       const a = result.analysis || {};
       // Normalizza: accetta sia snake_case che camelCase
+      // Normalizza la risposta AI (accetta sia la struttura vecchia che la nuova con proposte)
+      const proposte = a.proposte || {};
       const capData = {
         titolo:               a.titolo             || a.title || "",
         sintesi:              a.sintesi             || a.summary || "",
@@ -376,10 +394,34 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         committente:          a.committente         || a.client || "",
         importoBase:          a.importoBase         || a.importo_base || "",
         scadenza:             a.scadenza            || a.deadline || "",
+        allegatiCitati:       a.allegatiCitati      || a.allegati_citati || [],
         sezioni:              a.sezioni             || a.sections || [],
         requisitiTecnici:     a.requisitiTecnici    || a.requisiti_tecnici || a.requirements || [],
-        documentiRichiesti:   a.documentiRichiesti  || a.documenti_richiesti || a.documents || [],
+        documentiRichiesti:   (a.documentiRichiesti || a.documenti_richiesti || a.documents || []).map((d, i) => ({
+          ...d,
+          _id: i,
+          dettagli:             d.dettagli || "",
+          allegatiRiferimento:  d.allegatiRiferimento || d.allegati_riferimento || [],
+          _docAttachment:       null, // allegato prodotto dall'utente
+        })),
         criteriValutazione:   a.criteriValutazione  || a.criteri_valutazione || a.criteria || [],
+        proposte: {
+          tecnica:   (proposte.tecnica || a.tecnica || []).map((s, i) => ({
+            ...s,
+            _id: i,
+            dettagli:            s.dettagli || "",
+            allegatiRiferimento: s.allegatiRiferimento || s.allegati_riferimento || [],
+            _docAttachment:      null,
+          })),
+          economica: (proposte.economica || a.economica || []).map((r, i) => ({
+            ...r,
+            _id: i,
+            dettagli:            r.dettagli || "",
+            allegatiRiferimento: r.allegatiRiferimento || r.allegati_riferimento || [],
+            _docAttachment:      null,
+          })),
+          piano:     proposte.piano || a.piano || [],
+        },
         note:                 a.note                || "",
         fileName:             result.fileName       || file.name,
         analyzedAt:           new Date().toISOString(),
@@ -395,6 +437,43 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const toggleCheck = (id) => {
     const updated = checklist.map(c => c.id === id ? { ...c, done: !c.done } : c);
     onUpdate({ ...gara, checklist: updated });
+  };
+
+  // Apre/chiude il pannello Dettagli per una voce (key = "doc-0", "tec-1", "eco-2")
+  const toggleDettagli = (key) => setDettagliOpen(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Collega un file (documento prodotto) a una voce di documentiRichiesti/tecnica/economica
+  // section: "doc" | "tec" | "eco" — idx: indice nell'array
+  const handleAttachDoc = (section, idx, file) => {
+    if (!file || !gara.capitolato) return;
+    const cap = { ...gara.capitolato };
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const attachment = { name: file.name, size: file.size, dataUrl: ev.target.result, attachedAt: new Date().toISOString() };
+      if (section === "doc") {
+        cap.documentiRichiesti = cap.documentiRichiesti.map((d, i) => i === idx ? { ...d, _docAttachment: attachment } : d);
+      } else if (section === "tec") {
+        cap.proposte = { ...cap.proposte, tecnica: (cap.proposte?.tecnica || []).map((s, i) => i === idx ? { ...s, _docAttachment: attachment } : s) };
+      } else if (section === "eco") {
+        cap.proposte = { ...cap.proposte, economica: (cap.proposte?.economica || []).map((r, i) => i === idx ? { ...r, _docAttachment: attachment } : r) };
+      }
+      onUpdate({ ...gara, capitolato: cap });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Rimuove il documento allegato da una voce
+  const handleRemoveDoc = (section, idx) => {
+    if (!gara.capitolato) return;
+    const cap = { ...gara.capitolato };
+    if (section === "doc") {
+      cap.documentiRichiesti = cap.documentiRichiesti.map((d, i) => i === idx ? { ...d, _docAttachment: null } : d);
+    } else if (section === "tec") {
+      cap.proposte = { ...cap.proposte, tecnica: (cap.proposte?.tecnica || []).map((s, i) => i === idx ? { ...s, _docAttachment: null } : s) };
+    } else if (section === "eco") {
+      cap.proposte = { ...cap.proposte, economica: (cap.proposte?.economica || []).map((r, i) => i === idx ? { ...r, _docAttachment: null } : r) };
+    }
+    onUpdate({ ...gara, capitolato: cap });
   };
 
   const gg = giorni(gara.scadenza);
@@ -649,60 +728,180 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
               </div>
               <div style={{ padding: "18px 22px" }}>
 
+                {/* ── TAB DOCUMENTI DA PRODURRE ── */}
                 {activeTab === "documenti" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {aiResult.documenti.map(d => (
-                      <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10, background: "#fafafa", border: "1px solid #f0f0f0" }}>
-                        <span style={{ fontSize: 18 }}>📄</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{d.nome}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{d.tipo}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {aiResult.documenti.map((d, i) => {
+                      const key = "doc-" + i;
+                      const open = !!dettagliOpen[key];
+                      const att = d._docAttachment;
+                      return (
+                        <div key={i} style={{ borderRadius: 10, background: "#fafafa", border: "1px solid #f0f0f0", overflow: "hidden" }}>
+                          {/* Riga principale */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
+                            <span style={{ fontSize: 17 }}>📄</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{d.nome || d.name}</div>
+                              <div style={{ fontSize: 11, color: "#9ca3af" }}>{d.tipo || d.type}</div>
+                            </div>
+                            {d.priorita && <PrioritaBadge p={d.priorita} />}
+                            {d.obbligatorio != null && (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: d.obbligatorio ? "#dc2626" : "#9ca3af", border: "1px solid " + (d.obbligatorio ? "#fca5a5" : "#e5e7eb"), borderRadius: 6, padding: "1px 7px" }}>{d.obbligatorio ? "Obbligatorio" : "Facoltativo"}</span>
+                            )}
+                            {/* Tasto Dettagli */}
+                            {d.dettagli && (
+                              <button onClick={() => toggleDettagli(key)} style={{ background: open ? AMBER_LIGHT : "#f1f5f9", color: open ? AMBER_DARK : "#475569", border: "1px solid " + (open ? AMBER_BORDER : "#e2e8f0"), borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                {open ? "Chiudi" : "Dettagli"}
+                              </button>
+                            )}
+                            {/* Tasto Documento */}
+                            <div style={{ position: "relative" }}>
+                              <input ref={el => docFileRefs.current[key] = el} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) handleAttachDoc("doc", i, f); e.target.value = ""; }} />
+                              {att ? (
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={att.name}>✓ {att.name}</span>
+                                  <button onClick={() => handleRemoveDoc("doc", i)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✕</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => docFileRefs.current[key]?.click()} style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #86efac", borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                  + Documento
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {/* Pannello Dettagli */}
+                          {open && d.dettagli && (
+                            <div style={{ borderTop: "1px solid #f0e8d0", background: AMBER_BG, padding: "12px 16px 12px 42px" }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Istruzioni operative</div>
+                              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>{d.dettagli}</div>
+                              {(d.allegatiRiferimento || []).length > 0 && (
+                                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700 }}>Allegati da consultare:</span>
+                                  {d.allegatiRiferimento.map((al, ai) => (
+                                    <span key={ai} style={{ background: "#fff", border: "1px solid " + AMBER_BORDER, color: "#92400e", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{al}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <PrioritaBadge p={d.priorita} />
-                        <StatoBadge s={d.stato} />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
+                {/* ── TAB PROPOSTA TECNICA ── */}
                 {activeTab === "tecnica" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {aiResult.tecnica.map((s, i) => (
-                      <div key={i} style={{ borderLeft: "3px solid " + AMBER, paddingLeft: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{s.sezione}</div>
-                        <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>{s.desc}</div>
-                      </div>
-                    ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {aiResult.tecnica.map((s, i) => {
+                      const key = "tec-" + i;
+                      const open = !!dettagliOpen[key];
+                      const att = s._docAttachment;
+                      return (
+                        <div key={i} style={{ borderRadius: 10, border: "1px solid #f0f0f0", overflow: "hidden", background: "#fafafa" }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderLeft: "3px solid " + AMBER }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 3 }}>{s.sezione}</div>
+                              <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>{s.desc}</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 7, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                              {s.dettagli && (
+                                <button onClick={() => toggleDettagli(key)} style={{ background: open ? AMBER_LIGHT : "#f1f5f9", color: open ? AMBER_DARK : "#475569", border: "1px solid " + (open ? AMBER_BORDER : "#e2e8f0"), borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                  {open ? "Chiudi" : "Dettagli"}
+                                </button>
+                              )}
+                              <div>
+                                <input ref={el => docFileRefs.current[key] = el} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) handleAttachDoc("tec", i, f); e.target.value = ""; }} />
+                                {att ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={att.name}>✓ {att.name}</span>
+                                    <button onClick={() => handleRemoveDoc("tec", i)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✕</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => docFileRefs.current[key]?.click()} style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #86efac", borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                    + Documento
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {open && s.dettagli && (
+                            <div style={{ borderTop: "1px solid #f0e8d0", background: AMBER_BG, padding: "12px 16px 12px 20px" }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Istruzioni operative</div>
+                              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>{s.dettagli}</div>
+                              {(s.allegatiRiferimento || []).length > 0 && (
+                                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700 }}>Allegati da consultare:</span>
+                                  {s.allegatiRiferimento.map((al, ai) => (
+                                    <span key={ai} style={{ background: "#fff", border: "1px solid " + AMBER_BORDER, color: "#92400e", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{al}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
+                {/* ── TAB PROPOSTA ECONOMICA ── */}
                 {activeTab === "economica" && (
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                      <thead>
-                        <tr style={{ background: AMBER_LIGHT }}>
-                          {["Voce","GG","Tariffa","Importo"].map(h => (
-                            <th key={h} style={{ padding: "9px 12px", textAlign: h === "Voce" ? "left" : "right", fontWeight: 700, color: AMBER_DARK, borderBottom: "2px solid " + AMBER_BORDER }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {aiResult.economica.map((r, i) => (
-                          <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                            <td style={{ padding: "9px 12px", color: "#111827", borderBottom: "1px solid #f0f0f0" }}>{r.voce}</td>
-                            <td style={{ padding: "9px 12px", textAlign: "right", color: "#6b7280", borderBottom: "1px solid #f0f0f0" }}>{r.gg ?? "-"}</td>
-                            <td style={{ padding: "9px 12px", textAlign: "right", color: "#6b7280", borderBottom: "1px solid #f0f0f0" }}>{r.tariffa ? "\u20ac " + r.tariffa.toLocaleString("it-IT") : "-"}</td>
-                            <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600, color: "#111827", borderBottom: "1px solid #f0f0f0" }}>{"\u20ac " + r.importo.toLocaleString("it-IT")}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr style={{ background: AMBER_LIGHT }}>
-                          <td colSpan={3} style={{ padding: "11px 12px", fontWeight: 800, color: AMBER_DARK, fontSize: 14 }}>TOTALE</td>
-                          <td style={{ padding: "11px 12px", textAlign: "right", fontWeight: 800, color: AMBER_DARK, fontSize: 15 }}>{"\u20ac " + totEco.toLocaleString("it-IT")}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {aiResult.economica.map((r, i) => {
+                      const key = "eco-" + i;
+                      const open = !!dettagliOpen[key];
+                      const att = r._docAttachment;
+                      return (
+                        <div key={i} style={{ borderRadius: 10, border: "1px solid #f0f0f0", overflow: "hidden", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{r.voce}</div>
+                            </div>
+                            <span style={{ fontSize: 12, color: "#6b7280", minWidth: 50, textAlign: "right" }}>{r.gg != null ? r.gg + " gg" : "-"}</span>
+                            <span style={{ fontSize: 12, color: "#6b7280", minWidth: 80, textAlign: "right" }}>{r.tariffa ? "€ " + r.tariffa.toLocaleString("it-IT") : "-"}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "#111827", minWidth: 90, textAlign: "right" }}>{"€ " + (r.importo || 0).toLocaleString("it-IT")}</span>
+                            {r.dettagli && (
+                              <button onClick={() => toggleDettagli(key)} style={{ background: open ? AMBER_LIGHT : "#f1f5f9", color: open ? AMBER_DARK : "#475569", border: "1px solid " + (open ? AMBER_BORDER : "#e2e8f0"), borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                {open ? "Chiudi" : "Dettagli"}
+                              </button>
+                            )}
+                            <div>
+                              <input ref={el => docFileRefs.current[key] = el} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) handleAttachDoc("eco", i, f); e.target.value = ""; }} />
+                              {att ? (
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={att.name}>✓ {att.name}</span>
+                                  <button onClick={() => handleRemoveDoc("eco", i)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✕</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => docFileRefs.current[key]?.click()} style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #86efac", borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                  + Documento
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {open && r.dettagli && (
+                            <div style={{ borderTop: "1px solid #f0e8d0", background: AMBER_BG, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Stima e giustificazione</div>
+                              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>{r.dettagli}</div>
+                              {(r.allegatiRiferimento || []).length > 0 && (
+                                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700 }}>Allegati da consultare:</span>
+                                  {r.allegatiRiferimento.map((al, ai) => (
+                                    <span key={ai} style={{ background: "#fff", border: "1px solid " + AMBER_BORDER, color: "#92400e", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{al}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {/* Totale */}
+                    <div style={{ background: AMBER_LIGHT, border: "1px solid " + AMBER_BORDER, borderRadius: 10, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16 }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: AMBER_DARK }}>TOTALE</span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: AMBER_DARK }}>{"€ " + totEco.toLocaleString("it-IT")}</span>
+                    </div>
                   </div>
                 )}
 
