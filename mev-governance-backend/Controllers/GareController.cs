@@ -74,11 +74,39 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // Comprimi spazi multipli e righe vuote per ridurre i token mantenendo il contenuto
+        // Strategia: estrai le sezioni più rilevanti invece di inviare tutto il testo.
+        // 1) Cerca blocchi di testo che contengono parole chiave chiave (TOW, prezzi, requisiti, ecc.)
+        // 2) Prendi inizio + fine documento (intestazione + conclusioni) sempre presenti
+        // 3) Limita a 12.000 caratteri totali per stare nei limiti di Capgemini
         var compressed = System.Text.RegularExpressions.Regex.Replace(fullText, @"[ \t]{2,}", " ");
         compressed = System.Text.RegularExpressions.Regex.Replace(compressed, @"\n{3,}", "\n\n").Trim();
-        // Usa fino a 30.000 caratteri compressi: sufficiente per ~60-70 pagine di capitolato
-        var snippet = compressed.Length > 30000 ? compressed[..30000] + "\n[... testo troncato ...]" : compressed;
+
+        string snippet;
+        if (compressed.Length <= 12000)
+        {
+            snippet = compressed;
+        }
+        else
+        {
+            // Dividi in paragrafi e seleziona quelli più rilevanti
+            var paragraphs = compressed.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var keywords = new[] { "tow", "transazion", "allegat", "tabella", "prezz", "importo", "requisit",
+                                   "criterio", "criteri", "valutazione", "scadenza", "capitolato", "oggetto",
+                                   "committente", "aggiudicazione", "offerta", "tecnica", "economica" };
+            var relevant = paragraphs
+                .Where(p => keywords.Any(k => p.ToLowerInvariant().Contains(k)))
+                .ToList();
+
+            // Sempre includi inizio e fine documento
+            var head = compressed[..Math.Min(2000, compressed.Length)];
+            var tail = compressed.Length > 2000 ? compressed[^Math.Min(2000, compressed.Length - 2000)..] : "";
+
+            var middle = string.Join("\n\n", relevant);
+            if (middle.Length > 8000) middle = middle[..8000];
+
+            snippet = head + "\n\n[...sezioni rilevanti...]\n\n" + middle;
+            if (!string.IsNullOrEmpty(tail)) snippet += "\n\n[...fine documento...]\n\n" + tail;
+        }
 
         var instruction = @"Sei un esperto di gare d'appalto pubbliche italiane nel settore IT/digitale.
 Analizza il seguente documento di gara / capitolato tecnico in modo APPROFONDITO e OPERATIVO.
