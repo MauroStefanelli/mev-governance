@@ -215,6 +215,21 @@ public static class ContractParserService
         public double X { get; set; }
         public double Y { get; set; }
     }
+
+    // ── Estrae il testo grezzo da un PDF (per analisi AI capitolato di gara) ──
+    public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
+    {
+        var sb = new System.Text.StringBuilder();
+        using var doc = PdfDocument.Open(pdfStream);
+        foreach (var page in doc.GetPages())
+        {
+            foreach (var word in page.GetWords())
+                sb.Append(word.Text).Append(' ');
+            sb.AppendLine();
+            if (sb.Length > maxChars) break;
+        }
+        return sb.ToString().Trim();
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,22 +265,4 @@ public class ComplexityPrices
     public double Semplice { get; set; }
     public double Medio { get; set; }
     public double Complesso { get; set; }
-}
-
-// Estrae il testo completo da un PDF (per analisi AI capitolato di gara)
-public static partial class ContractParserService
-{
-    public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
-    {
-        var sb = new System.Text.StringBuilder();
-        using var doc = PdfDocument.Open(pdfStream);
-        foreach (var page in doc.GetPages())
-        {
-            foreach (var word in page.GetWords())
-                sb.Append(word.Text).Append(' ');
-            sb.AppendLine();
-            if (sb.Length > maxChars) break;
-        }
-        return sb.ToString().Trim();
-    }
 }

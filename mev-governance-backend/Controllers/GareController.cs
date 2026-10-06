@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using MevGovernanceBackend.Services;
 using MevGovernanceBackend.Data;
@@ -26,14 +27,19 @@ public class GareController : ControllerBase
         User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager") ||
         User.IsInRole("Admin")      || User.IsInRole("Developer");
 
-    private (string? key, string? endpoint, string? model, string? authMode) GetUserAiSettings()
+    private (string? key, string? endpoint, string? model, string? style, string? authMode) GetUserAiSettings()
     {
-        var userId = User.FindFirst("sub")?.Value
-                  ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userId, out var uid)) return (null, null, null, null);
-        var setting = _db.UserSettings.FirstOrDefault(s => s.UserId == uid);
-        if (setting == null) return (null, null, null, null);
-        return (setting.AiApiKey, setting.AiEndpoint, setting.AiModel, setting.AiAuthMode);
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out var userId)) return (null, null, null, null, null);
+        var user = _db.Users.Find(userId);
+        if (user == null) return (null, null, null, null, null);
+        return (
+            string.IsNullOrWhiteSpace(user.AiApiKey)   ? null : user.AiApiKey,
+            string.IsNullOrWhiteSpace(user.AiEndpoint) ? null : user.AiEndpoint,
+            string.IsNullOrWhiteSpace(user.AiModel)    ? null : user.AiModel,
+            string.IsNullOrWhiteSpace(user.AiStyle)    ? null : user.AiStyle,
+            string.IsNullOrWhiteSpace(user.AiAuthMode) ? null : user.AiAuthMode
+        );
     }
 
     // POST /api/gare/analizza-capitolato
@@ -66,10 +72,10 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // Prepara il contesto per l'AI
+        // Prepara il contesto per l'AI come JsonObject → serializza → deserializza come JsonElement
         var snippet = fullText.Length > 30000 ? fullText[..30000] + "\n[... testo troncato ...]" : fullText;
 
-        var aiCtx = new JsonObject
+        var aiCtxObj = new JsonObject
         {
             ["task"]        = "bid_document_analysis",
             ["fileName"]    = file.FileName,
@@ -98,34 +104,31 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura:
             ["documentText"] = snippet,
         };
 
+        // Serializza e rideserializza come JsonElement (firma attesa da AiService)
+        var aiCtxJson = aiCtxObj.ToJsonString();
+        var aiCtxElement = JsonSerializer.Deserialize<JsonElement>(aiCtxJson);
+
         try
         {
-            var (userKey, userEndpoint, userModel, userAuthMode) = GetUserAiSettings();
-            var globalKey      = _config["OPENAI_API_KEY"] ?? _config["AI_API_KEY"] ?? "";
-            var globalEndpoint = _config["OPENAI_API_BASE"] ?? _config["AI_API_BASE"] ?? "";
-            var globalModel    = _config["AI_MODEL"] ?? "";
-
-            var apiKey   = !string.IsNullOrWhiteSpace(userKey)      ? userKey      : globalKey;
-            var endpoint = !string.IsNullOrWhiteSpace(userEndpoint) ? userEndpoint : globalEndpoint;
-            var model    = !string.IsNullOrWhiteSpace(userModel)    ? userModel    : globalModel;
-            var authMode = !string.IsNullOrWhiteSpace(userAuthMode) ? userAuthMode : "bearer";
-
-            var (analysis, provider, usedModel, _) = await _ai.AnalyzeAsync(
-                apiKey, endpoint, model, authMode, aiCtx.ToJsonString());
+            var (key, ep, mdl, sty, auth) = GetUserAiSettings();
+            var (analysis, provider, usedModel, usage) = await _ai.AnalyzeAsync(aiCtxElement, key, ep, mdl, sty, auth);
 
             return Ok(new
             {
-                ok          = true,
-                fileName    = file.FileName,
-                textLength  = fullText.Length,
+                ok         = true,
+                fileName   = file.FileName,
+                textLength = fullText.Length,
                 provider,
-                model       = usedModel,
+                model      = usedModel,
                 analysis,
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Errore analisi AI: " + ex.Message });
+            var msg = ex.Message;
+            if (msg.Contains("API key") || msg.Contains("401") || msg.Contains("403") || msg.Contains("Unauthorized"))
+                return StatusCode(401, new { message = "Chiave AI non configurata o non valida. Vai su Profilo → API Key AI e inserisci la tua chiave." });
+            return StatusCode(500, new { message = "Errore analisi AI: " + msg });
         }
     }
 }
