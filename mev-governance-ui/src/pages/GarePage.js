@@ -383,49 +383,89 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
     setCapError("");
     try {
       const result = await analizzaCapitolatoGara(file);
+      // LOG per debug: mostra la struttura reale restituita dall'AI
+      console.log("[GarePage] analisi capitolato - result raw:", JSON.stringify(result, null, 2));
       const a = result.analysis || {};
-      // Normalizza: accetta sia snake_case che camelCase
-      // Normalizza la risposta AI (accetta sia la struttura vecchia che la nuova con proposte)
-      const proposte = a.proposte || {};
+      console.log("[GarePage] analisi capitolato - chiavi di a:", Object.keys(a));
+
+      // Helper: legge un campo accettando camelCase, PascalCase, snake_case
+      const get = (obj, ...keys) => { for (const k of keys) { if (obj[k] != null) return obj[k]; } return null; };
+      const getArr = (obj, ...keys) => { const v = get(obj, ...keys); return Array.isArray(v) ? v : []; };
+
+      const proposte = get(a, "proposte", "Proposte") || {};
+
+      // Normalizza un documento da produrre (documentiRichiesti)
+      const normDoc = (d, i) => ({
+        ...d,
+        _id: i,
+        nome:                get(d, "nome", "Nome", "name", "Name") || "",
+        tipo:                get(d, "tipo", "Tipo", "type", "Type") || "",
+        obbligatorio:        get(d, "obbligatorio", "Obbligatorio", "required", "Required") ?? true,
+        dettagli:            get(d, "dettagli", "Dettagli", "details", "Details", "istruzioni", "Istruzioni") || "",
+        allegatiRiferimento: getArr(d, "allegatiRiferimento", "AllegratiRiferimento", "allegati_riferimento", "allegatiRif", "references", "References"),
+        _docAttachment:      null,
+      });
+
+      // Normalizza una sezione tecnica
+      const normTec = (s, i) => ({
+        ...s,
+        _id: i,
+        sezione:             get(s, "sezione", "Sezione", "section", "Section", "titolo", "Titolo", "title") || "",
+        desc:                get(s, "desc", "Desc", "descrizione", "Descrizione", "description", "Description", "contenuto") || "",
+        dettagli:            get(s, "dettagli", "Dettagli", "details", "Details", "istruzioni", "Istruzioni") || "",
+        allegatiRiferimento: getArr(s, "allegatiRiferimento", "allegati_riferimento", "allegatiRif", "references"),
+        _docAttachment:      null,
+      });
+
+      // Normalizza una voce economica
+      const normEco = (r, i) => ({
+        ...r,
+        _id: i,
+        voce:                get(r, "voce", "Voce", "nome", "Nome", "name", "descrizione") || "",
+        gg:                  get(r, "gg", "Gg", "giorni", "Giorni", "days") ?? null,
+        tariffa:             get(r, "tariffa", "Tariffa", "tariff", "prezzoUnitario") ?? null,
+        importo:             Number(get(r, "importo", "Importo", "totale", "Totale", "amount", "Amount") ?? 0),
+        dettagli:            get(r, "dettagli", "Dettagli", "details", "Details", "nota", "Nota", "note") || "",
+        allegatiRiferimento: getArr(r, "allegatiRiferimento", "allegati_riferimento", "references"),
+        _docAttachment:      null,
+      });
+
       const capData = {
-        titolo:               a.titolo             || a.title || "",
-        sintesi:              a.sintesi             || a.summary || "",
-        oggetto:              a.oggetto             || a.object || "",
-        committente:          a.committente         || a.client || "",
-        importoBase:          a.importoBase         || a.importo_base || "",
-        scadenza:             a.scadenza            || a.deadline || "",
-        allegatiCitati:       a.allegatiCitati      || a.allegati_citati || [],
-        sezioni:              a.sezioni             || a.sections || [],
-        requisitiTecnici:     a.requisitiTecnici    || a.requisiti_tecnici || a.requirements || [],
-        documentiRichiesti:   (a.documentiRichiesti || a.documenti_richiesti || a.documents || []).map((d, i) => ({
-          ...d,
-          _id: i,
-          dettagli:             d.dettagli || "",
-          allegatiRiferimento:  d.allegatiRiferimento || d.allegati_riferimento || [],
-          _docAttachment:       null, // allegato prodotto dall'utente
-        })),
-        criteriValutazione:   a.criteriValutazione  || a.criteri_valutazione || a.criteria || [],
+        titolo:             get(a, "titolo", "Titolo", "title", "Title") || "",
+        sintesi:            get(a, "sintesi", "Sintesi", "summary", "Summary", "sommario") || "",
+        oggetto:            get(a, "oggetto", "Oggetto", "object", "Object") || "",
+        committente:        get(a, "committente", "Committente", "client", "Client", "ente") || "",
+        importoBase:        get(a, "importoBase", "ImportoBase", "importo_base", "importo", "baseAsta") || "",
+        scadenza:           get(a, "scadenza", "Scadenza", "deadline", "Deadline") || "",
+        allegatiCitati:     getArr(a, "allegatiCitati", "AllegatiCitati", "allegati_citati", "allegati", "Allegati"),
+        sezioni:            getArr(a, "sezioni", "Sezioni", "sections", "Sections"),
+        requisitiTecnici:   getArr(a, "requisitiTecnici", "RequisitiTecnici", "requisiti_tecnici", "requisiti", "requirements"),
+        documentiRichiesti: getArr(a, "documentiRichiesti", "DocumentiRichiesti", "documenti_richiesti", "documenti", "documents").map(normDoc),
+        criteriValutazione: getArr(a, "criteriValutazione", "CriteriValutazione", "criteri_valutazione", "criteri", "criteria"),
         proposte: {
-          tecnica:   (proposte.tecnica || a.tecnica || []).map((s, i) => ({
-            ...s,
-            _id: i,
-            dettagli:            s.dettagli || "",
-            allegatiRiferimento: s.allegatiRiferimento || s.allegati_riferimento || [],
-            _docAttachment:      null,
-          })),
-          economica: (proposte.economica || a.economica || []).map((r, i) => ({
-            ...r,
-            _id: i,
-            dettagli:            r.dettagli || "",
-            allegatiRiferimento: r.allegatiRiferimento || r.allegati_riferimento || [],
-            _docAttachment:      null,
-          })),
-          piano:     proposte.piano || a.piano || [],
+          tecnica:   getArr(proposte, "tecnica", "Tecnica", "technical", ...
+            // fallback: cerca anche direttamente in a
+            []).concat(getArr(a, "tecnica", "Tecnica", "technical", "proposte_tecnica")).map(normTec),
+          economica: getArr(proposte, "economica", "Economica", "economic", ...
+            []).concat(getArr(a, "economica", "Economica", "economic", "proposte_economica")).map(normEco),
+          piano:     getArr(proposte, "piano", "Piano", "plan", ...
+            []).concat(getArr(a, "piano", "Piano", "plan")),
         },
-        note:                 a.note                || "",
-        fileName:             result.fileName       || file.name,
-        analyzedAt:           new Date().toISOString(),
+        note:       get(a, "note", "Note", "notes", "Notes") || "",
+        fileName:   result.fileName || file.name,
+        analyzedAt: new Date().toISOString(),
       };
+
+      console.log("[GarePage] capData costruito:", {
+        titolo: capData.titolo,
+        nDocumenti: capData.documentiRichiesti.length,
+        primoDoc: capData.documentiRichiesti[0],
+        nTecnica: capData.proposte.tecnica.length,
+        primaTec: capData.proposte.tecnica[0],
+        nEconomica: capData.proposte.economica.length,
+        allegatiCitati: capData.allegatiCitati,
+      });
+
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
       setCapError(err?.message || "Errore analisi capitolato");
