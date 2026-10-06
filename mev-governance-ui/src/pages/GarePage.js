@@ -59,7 +59,7 @@ function StatoBadge({ s }) {
 }
 
 // ── Checklist sidebar ─────────────────────────────────────────────────────────
-function ChecklistSidebar({ checklist, onToggle }) {
+function ChecklistSidebar({ checklist, onToggle, lottoNome }) {
   const doneCount = checklist.filter(c => c.done).length;
   const pct = checklist.length ? Math.round(doneCount / checklist.length * 100) : 0;
   return (
@@ -67,7 +67,7 @@ function ChecklistSidebar({ checklist, onToggle }) {
       <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Attivita' da fare</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Attivita' da fare{lottoNome ? ` — ${lottoNome}` : ""}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{doneCount} / {checklist.length} completate</div>
           </div>
           <div style={{ fontSize: 22 }}>✅</div>
@@ -451,6 +451,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
             economica: getArr(proposte,"economica","economic").map(normEco),
             piano:     getArr(proposte,"piano","plan"),
           },
+          checklist: DEFAULT_CHECKLIST.map(c => ({ ...c })),
         };
       };
 
@@ -500,9 +501,19 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
     }
   };
 
+  // Checklist: usa quella del lotto attivo se disponibile, altrimenti quella della gara
+  const checklistAttiva = lottoCorr?.checklist || checklist;
   const toggleCheck = (id) => {
-    const updated = checklist.map(c => c.id === id ? { ...c, done: !c.done } : c);
-    onUpdate({ ...gara, checklist: updated });
+    if (lottoCorr && cap) {
+      // Aggiorna checklist del lotto attivo
+      const lottiUpd = lotti.map((l, i) => i === lottoAttivo
+        ? { ...l, checklist: l.checklist.map(c => c.id === id ? { ...c, done: !c.done } : c) }
+        : l);
+      onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
+    } else {
+      const updated = checklist.map(c => c.id === id ? { ...c, done: !c.done } : c);
+      onUpdate({ ...gara, checklist: updated });
+    }
   };
 
   // Apre/chiude il pannello Dettagli per una voce (key = "doc-0", "tec-1", "eco-2")
@@ -764,22 +775,61 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
                           {/* Sezioni */}
-                          {(d.sezioni || []).length > 0 && (
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sezioni ({d.sezioni.length})</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                {d.sezioni.map((s, i) => (
-                                  <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: "#fafafa", borderRadius: 8, border: "1px solid #f0f0f0" }}>
-                                    <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{s.numero || i+1}</span>
-                                    <div style={{ flex: 1 }}>
-                                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{s.titolo}</div>
-                                      {s.sintesi && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{s.sintesi}</div>}
-                                    </div>
-                                  </div>
-                                ))}
+                          {(d.sezioni || []).length > 0 && (() => {
+                            // Raggruppa per numero padre (es. "1", "2") — i sotto-numeri sono "1.1", "1.2"
+                            const gruppi = {};
+                            (d.sezioni || []).forEach(s => {
+                              const num = String(s.numero || "");
+                              const padre = num.includes(".") ? num.split(".")[0] : num;
+                              if (!gruppi[padre]) gruppi[padre] = { padre: null, figli: [] };
+                              if (!num.includes(".")) gruppi[padre].padre = s;
+                              else gruppi[padre].figli.push(s);
+                            });
+                            return (
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sezioni ({d.sezioni.length})</div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {Object.entries(gruppi).sort(([a],[b]) => parseFloat(a)-parseFloat(b)).map(([numPadre, g]) => {
+                                    const hasFigli = g.figli.length > 0;
+                                    const isOpen = !!dettagliOpen["sez-" + numPadre];
+                                    return (
+                                      <div key={numPadre} style={{ borderRadius: 8, border: "1px solid " + (isOpen ? AMBER_BORDER : "#f0f0f0"), overflow: "hidden" }}>
+                                        {/* Riga padre */}
+                                        <div
+                                          onClick={() => hasFigli && toggleDettagli("sez-" + numPadre)}
+                                          style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: isOpen ? AMBER_BG : "#fafafa", cursor: hasFigli ? "pointer" : "default" }}>
+                                          <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{numPadre}</span>
+                                          <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{g.padre?.titolo || `Sezione ${numPadre}`}</div>
+                                            {g.padre?.sintesi && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.padre.sintesi}</div>}
+                                          </div>
+                                          {hasFigli && (
+                                            <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
+                                              {isOpen ? "▲" : "▼"} {g.figli.length} sottosezioni
+                                            </span>
+                                          )}
+                                        </div>
+                                        {/* Figli espandibili */}
+                                        {hasFigli && isOpen && (
+                                          <div style={{ borderTop: "1px solid " + AMBER_BORDER, background: "#fff" }}>
+                                            {g.figli.sort((a,b) => parseFloat(a.numero)-parseFloat(b.numero)).map((sf, fi) => (
+                                              <div key={fi} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "8px 12px 8px 28px", borderBottom: fi < g.figli.length-1 ? "1px solid #f5f5f5" : "none" }}>
+                                                <span style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 6, padding: "2px 7px", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{sf.numero}</span>
+                                                <div style={{ flex: 1 }}>
+                                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{sf.titolo}</div>
+                                                  {sf.sintesi && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{sf.sintesi}</div>}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {/* 3 colonne: requisiti, documenti, criteri */}
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
@@ -830,6 +880,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                     <tr style={{ background: AMBER_BG, borderBottom: "2px solid " + AMBER_BORDER }}>
                                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID/Cod.</th>
                                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase" }}>Descrizione</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Quantità</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Importo</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -839,6 +891,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                           {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
                                         </td>
                                         <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>{t.descrizione || "—"}</td>
+                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.quantita != null ? Number(t.quantita).toLocaleString("it-IT") : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                        <td style={{ padding: "8px 12px", color: "#111827", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.importo != null ? "€ " + Number(t.importo).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -1100,7 +1154,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         </div>
 
         {/* Sidebar checklist */}
-        <ChecklistSidebar checklist={checklist} onToggle={toggleCheck} />
+        <ChecklistSidebar checklist={checklistAttiva} onToggle={toggleCheck} lottoNome={lottoCorr?.nome || null} />
 
       </div>
 

@@ -216,7 +216,71 @@ public static class ContractParserService
         public double Y { get; set; }
     }
 
-    // ── Estrae il testo grezzo da un PDF (per analisi AI capitolato di gara) ──
+    // ── Estrae righe TOW complete dal PDF (id, descrizione, quantità, importo) ──
+    // Legge ogni riga che contiene un codice TOW (es. TOW01.1) e raccoglie
+    // tutta la parte testuale come descrizione + i valori numerici come importo/quantità.
+    public static List<TowRow> ExtractTowRows(Stream pdfStream)
+    {
+        var rows = new List<TowRow>();
+        using var doc = PdfDocument.Open(pdfStream);
+        foreach (var page in doc.GetPages())
+        {
+            var items = page.GetWords()
+                .Select(wd => new PdfItem { Text = wd.Text.Trim(), X = wd.BoundingBox.Left, Y = wd.BoundingBox.Bottom })
+                .Where(x => !string.IsNullOrEmpty(x.Text))
+                .ToList();
+
+            // Raggruppa per riga (Y arrotondato a multipli di 3)
+            var lines = items
+                .GroupBy(x => (int)(Math.Round(x.Y / 3.0) * 3))
+                .OrderByDescending(g => g.Key)
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.X).ToList());
+
+            foreach (var (_, lineItems) in lines)
+            {
+                var txt = string.Join(" ", lineItems.Select(x => x.Text));
+                var mTow = Regex.Match(txt, @"TOW\s*0?(\d+)\.(\d+)", RegexOptions.IgnoreCase);
+                if (!mTow.Success) continue;
+
+                var codice = $"TOW0{mTow.Groups[1].Value}.{mTow.Groups[2].Value}";
+
+                // Tutto il testo non numerico dopo il codice TOW = descrizione
+                var afterTow = txt.Substring(mTow.Index + mTow.Length).Trim();
+                var descParts = new System.Text.StringBuilder();
+                var nums = new List<double>();
+                foreach (var word in afterTow.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    // Formato numerico italiano (1.234,56) o intero
+                    if (Regex.IsMatch(word, @"^\d{1,3}(?:\.\d{3})*,\d{2}$") || Regex.IsMatch(word, @"^\d+$"))
+                    {
+                        var n = ParseMoney(word);
+                        if (n > 0) nums.Add(n);
+                    }
+                    else
+                    {
+                        descParts.Append(word).Append(' ');
+                    }
+                }
+
+                var descrizione = descParts.ToString().Trim();
+                // Se descrizione vuota, cerca anche a sinistra del codice TOW
+                if (string.IsNullOrEmpty(descrizione))
+                {
+                    var beforeTow = txt.Substring(0, mTow.Index).Trim();
+                    // Rimuovi eventuali numeri iniziali (numeri di riga)
+                    descrizione = Regex.Replace(beforeTow, @"^\d+\s*", "").Trim();
+                }
+
+                double? quantita = nums.Count >= 2 ? nums[0] : (double?)null;
+                double? importo  = nums.Count >= 2 ? nums[^1] : (nums.Count == 1 ? nums[0] : (double?)null);
+
+                // Evita duplicati (stessa pagina, stesso codice)
+                if (!rows.Any(r => r.Id == codice))
+                    rows.Add(new TowRow { Id = codice, Descrizione = descrizione, Quantita = quantita, Importo = importo });
+            }
+        }
+        return rows;
+    }
     public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
     {
         var sb = new System.Text.StringBuilder();
@@ -310,4 +374,12 @@ public class ComplexityPrices
     public double Semplice { get; set; }
     public double Medio { get; set; }
     public double Complesso { get; set; }
+}
+
+public class TowRow
+{
+    public string Id          { get; set; } = "";
+    public string Descrizione { get; set; } = "";
+    public double? Quantita   { get; set; }
+    public double? Importo    { get; set; }
 }

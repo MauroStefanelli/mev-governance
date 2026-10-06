@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MevGovernanceBackend.Services;
 using MevGovernanceBackend.Data;
+using System.Text.Json.Nodes;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -53,12 +54,16 @@ public class GareController : ControllerBase
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Sono accettati solo file PDF." });
 
+        // 1) Estrai TOW direttamente dal PDF (parser geometrico, preciso come Gestione Contratti)
+        List<TowRow> towRows;
         string fullText;
         try
         {
-            using var stream = file.OpenReadStream();
-            // ExtractRelevantPages: prime 3 pagine + pagine con TOW/requisiti/criteri — max 8000 char
-            fullText = ContractParserService.ExtractRelevantPages(stream, maxChars: 8000);
+            using var s1 = file.OpenReadStream();
+            towRows = ContractParserService.ExtractTowRows(s1);
+
+            using var s2 = file.OpenReadStream();
+            fullText = ContractParserService.ExtractRelevantPages(s2, maxChars: 8000);
         }
         catch (Exception ex)
         {
@@ -68,23 +73,20 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        var snippet = fullText;
-
-        // Prompt: struttura per lotti
+        // 2) Analisi AI per struttura generale + lotti (senza TOW — li iniettiamo noi)
         var instruction = "Sei un esperto di gare d'appalto IT italiane. Analizza il documento e rispondi SOLO con JSON puro (no markdown). " +
-            "La struttura ha due livelli: dati generali della gara e poi i lotti. " +
             "Campi generali: titolo, sintesi, oggetto, committente, importoBase, scadenza, allegatiCitati (array stringhe), note. " +
-            "Campo lotti: array di oggetti, uno per ogni lotto trovato nel documento. Se non ci sono lotti espliciti crea un unico lotto chiamato 'Gara'. " +
-            "Ogni lotto ha: nome (es. 'Lotto 1 - Tracciatura'), descrizione, " +
-            "sezioni (array con numero/titolo/sintesi), " +
+            "Campo lotti: array di oggetti, uno per ogni lotto trovato. Se non ci sono lotti espliciti crea un unico lotto chiamato 'Gara'. " +
+            "Ogni lotto ha: nome, descrizione, " +
+            "sezioni (array con numero/titolo/sintesi — includi TUTTI i livelli es. 1, 1.1, 1.2, 2, 2.1), " +
             "requisitiTecnici (array stringhe), " +
-            "tow (array con id/descrizione — i TOW sono Transazioni di Lavoro, cercali ovunque nel documento), " +
             "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli), " +
             "criteriValutazione (array con criterio/peso), " +
             "proposte: { tecnica (array con sezione/desc/dettagli), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato) }. " +
+            "NON includere il campo tow: viene estratto automaticamente dal parser PDF. " +
             "Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
 
-        var userMessage = $"File: {file.FileName}\n\nTESTO (pagine rilevanti):\n{snippet}";
+        var userMessage = $"File: {file.FileName}\n\nTESTO:\n{fullText}";
 
         try
         {
@@ -92,11 +94,60 @@ public class GareController : ControllerBase
             var (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
                 instruction, userMessage, key, ep, mdl, sty, auth);
 
+            // 3) Inietta i TOW estratti dal parser nei lotti (distribuzione per numero lotto)
+            if (analysis.TryGetPropertyValue("lotti", out var lottiNode) && lottiNode is JsonArray lotti)
+            {
+                // Raggruppa TOW per numero lotto (TOW01.x → lotto 1, TOW02.x → lotto 2, ecc.)
+                var towByLot = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<TowRow>>();
+                foreach (var t in towRows)
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(t.Id, @"TOW0?(\d+)\.", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    var lotN = m.Success && int.TryParse(m.Groups[1].Value, out var n) ? n : 0;
+                    if (!towByLot.ContainsKey(lotN)) towByLot[lotN] = new();
+                    towByLot[lotN].Add(t);
+                }
+
+                for (int i = 0; i < lotti.Count; i++)
+                {
+                    if (lotti[i] is not JsonObject lotto) continue;
+                    // Associa i TOW al lotto per indice (lotto 0 → towByLot[1] o [0])
+                    var lotKey = towByLot.ContainsKey(i + 1) ? i + 1 : (towByLot.ContainsKey(0) ? 0 : -1);
+                    var towList = lotKey >= 0 ? towByLot[lotKey] : towRows; // fallback: tutti i TOW al primo lotto
+                    var towArr = new JsonArray();
+                    foreach (var t in towList)
+                    {
+                        var obj = new JsonObject
+                        {
+                            ["id"]          = t.Id,
+                            ["descrizione"] = t.Descrizione,
+                        };
+                        if (t.Quantita.HasValue)  obj["quantita"]  = t.Quantita.Value;
+                        if (t.Importo.HasValue)   obj["importo"]   = t.Importo.Value;
+                        towArr.Add(obj);
+                    }
+                    lotto["tow"] = towArr;
+                }
+            }
+            else if (towRows.Count > 0)
+            {
+                // Nessun campo lotti nell'analisi: aggiungi tow al livello radice
+                var towArr = new JsonArray();
+                foreach (var t in towRows)
+                {
+                    var obj = new JsonObject { ["id"] = t.Id, ["descrizione"] = t.Descrizione };
+                    if (t.Quantita.HasValue) obj["quantita"] = t.Quantita.Value;
+                    if (t.Importo.HasValue)  obj["importo"]  = t.Importo.Value;
+                    towArr.Add(obj);
+                }
+                analysis["tow"] = towArr;
+            }
+
             return Ok(new
             {
                 ok         = true,
                 fileName   = file.FileName,
                 textLength = fullText.Length,
+                towCount   = towRows.Count,
                 provider,
                 model      = usedModel,
                 analysis,
