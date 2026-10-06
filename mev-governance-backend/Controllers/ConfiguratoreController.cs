@@ -37,7 +37,8 @@ public class ConfiguratoreController : ControllerBase
     private bool CanAccessRecords()
     {
         return User.IsInRole("SuperAdmin") || User.IsInRole("Developer")
-            || User.IsInRole("Admin") || User.IsInRole("Manager");
+            || User.IsInRole("Admin") || User.IsInRole("Manager")
+            || User.IsInRole("Bid Manager");
     }
 
     private static readonly string[] ValidEntities =

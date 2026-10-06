@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { getGare, putGara, deleteGara } from "../services/mevService";
+import { getGare, putGara, deleteGara, analizzaCapitolatoGara } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
 const AMBER_DARK   = "#b45309";
@@ -283,10 +283,13 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
 
 // ── Vista 3: Dettaglio Gara ───────────────────────────────────────────────────
 function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
-  const [isDragOver, setIsDragOver]   = React.useState(false);
-  const [analyzing,  setAnalyzing]    = React.useState(false);
-  const [activeTab,  setActiveTab]    = React.useState("documenti");
-  const fileInputRef = useRef(null);
+  const [isDragOver, setIsDragOver]           = React.useState(false);
+  const [analyzing,  setAnalyzing]            = React.useState(false);
+  const [activeTab,  setActiveTab]            = React.useState("documenti");
+  const [analyzingCap, setAnalyzingCap]       = React.useState(false);
+  const [capError,     setCapError]           = React.useState("");
+  const fileInputRef    = useRef(null);
+  const capFileInputRef = useRef(null);
 
   const files      = gara.fileNames || [];
   const checklist  = gara.checklist || DEFAULT_CHECKLIST.map(c => ({ ...c }));
@@ -356,6 +359,37 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         },
       });
     }, 2800);
+  };
+
+  const handleAnalizzaCapitolato = async (file) => {
+    if (!file) return;
+    setAnalyzingCap(true);
+    setCapError("");
+    try {
+      const result = await analizzaCapitolatoGara(file);
+      const a = result.analysis || {};
+      // Normalizza: accetta sia snake_case che camelCase
+      const capData = {
+        titolo:               a.titolo             || a.title || "",
+        sintesi:              a.sintesi             || a.summary || "",
+        oggetto:              a.oggetto             || a.object || "",
+        committente:          a.committente         || a.client || "",
+        importoBase:          a.importoBase         || a.importo_base || "",
+        scadenza:             a.scadenza            || a.deadline || "",
+        sezioni:              a.sezioni             || a.sections || [],
+        requisitiTecnici:     a.requisitiTecnici    || a.requisiti_tecnici || a.requirements || [],
+        documentiRichiesti:   a.documentiRichiesti  || a.documenti_richiesti || a.documents || [],
+        criteriValutazione:   a.criteriValutazione  || a.criteri_valutazione || a.criteria || [],
+        note:                 a.note                || "",
+        fileName:             result.fileName       || file.name,
+        analyzedAt:           new Date().toISOString(),
+      };
+      onUpdate({ ...gara, capitolato: capData });
+    } catch (err) {
+      setCapError(err?.message || "Errore analisi capitolato");
+    } finally {
+      setAnalyzingCap(false);
+    }
   };
 
   const toggleCheck = (id) => {
@@ -468,6 +502,128 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* ── SEZIONE ANALISI CAPITOLATO ── */}
+          <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
+            <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Analisi Capitolato AI</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>Carica il capitolato tecnico PDF: l'AI estrae sintesi, sezioni, requisiti e documenti richiesti</div>
+              </div>
+              {gara.capitolato && (
+                <span style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #86efac", borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>
+                  ✓ Analizzato: {gara.capitolato.fileName}
+                </span>
+              )}
+            </div>
+            <div style={{ padding: "18px 22px" }}>
+              {/* Upload PDF capitolato */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: gara.capitolato ? 16 : 0 }}>
+                <button
+                  onClick={() => capFileInputRef.current && capFileInputRef.current.click()}
+                  disabled={analyzingCap}
+                  style={{ background: analyzingCap ? "#d97706" : "#fff", color: AMBER_DARK, border: "2px solid " + AMBER, borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: analyzingCap ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 8, opacity: analyzingCap ? 0.8 : 1, transition: "all 0.2s" }}>
+                  {analyzingCap
+                    ? <><span style={{ display: "inline-block", width: 13, height: 13, border: "2px solid rgba(120,53,15,0.3)", borderTopColor: AMBER_DARK, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Analisi in corso...</>
+                    : <><span style={{ fontSize: 15 }}>📄</span>{gara.capitolato ? "Rianalizza capitolato" : "Carica e analizza capitolato PDF"}</>
+                  }
+                </button>
+                <input ref={capFileInputRef} type="file" accept=".pdf" style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files[0]; if (f) handleAnalizzaCapitolato(f); e.target.value = ""; }} />
+                {capError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{capError}</span>}
+              </div>
+
+              {/* Risultati analisi capitolato */}
+              {gara.capitolato && (() => {
+                const cap = gara.capitolato;
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Header info estratte */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+                      {[
+                        { label: "Committente",   value: cap.committente  },
+                        { label: "Oggetto",        value: cap.oggetto      },
+                        { label: "Importo base",   value: cap.importoBase  },
+                        { label: "Scadenza",       value: cap.scadenza     },
+                      ].filter(r => r.value).map((r, i) => (
+                        <div key={i} style={{ background: AMBER_BG, border: "1px solid " + AMBER_BORDER, borderRadius: 8, padding: "9px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: AMBER_DARK, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{r.label}</div>
+                          <div style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{r.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Sintesi */}
+                    {cap.sintesi && (
+                      <div style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0", padding: "12px 16px" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sintesi</div>
+                        <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{cap.sintesi}</div>
+                      </div>
+                    )}
+
+                    {/* Sezioni */}
+                    {(cap.sezioni || []).length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sezioni ({cap.sezioni.length})</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {cap.sezioni.map((s, i) => (
+                            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: "#fafafa", borderRadius: 8, border: "1px solid #f0f0f0" }}>
+                              <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{s.numero || i+1}</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{s.titolo}</div>
+                                {s.sintesi && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{s.sintesi}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3 colonne: requisiti, documenti, criteri */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+                      {(cap.requisitiTecnici || []).length > 0 && (
+                        <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Requisiti tecnici ({cap.requisitiTecnici.length})</div>
+                          {cap.requisitiTecnici.map((r, i) => (
+                            <div key={i} style={{ fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < cap.requisitiTecnici.length-1 ? "1px solid #f0f0f0" : "none" }}>• {r}</div>
+                          ))}
+                        </div>
+                      )}
+                      {(cap.documentiRichiesti || []).length > 0 && (
+                        <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Documenti richiesti ({cap.documentiRichiesti.length})</div>
+                          {cap.documentiRichiesti.map((d, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < cap.documentiRichiesti.length-1 ? "1px solid #f0f0f0" : "none" }}>
+                              <span style={{ fontSize: 9, color: d.obbligatorio ? "#dc2626" : "#9ca3af" }}>●</span>
+                              <span style={{ flex: 1 }}>{d.nome}</span>
+                              {d.tipo && <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 600 }}>{d.tipo}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {(cap.criteriValutazione || []).length > 0 && (
+                        <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Criteri valutazione ({cap.criteriValutazione.length})</div>
+                          {cap.criteriValutazione.map((c, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < cap.criteriValutazione.length-1 ? "1px solid #f0f0f0" : "none" }}>
+                              <span style={{ flex: 1 }}>{c.criterio}</span>
+                              {c.peso && <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{c.peso}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {cap.note && (
+                      <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
+                        <strong>Note:</strong> {cap.note}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

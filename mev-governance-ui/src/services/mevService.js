@@ -730,6 +730,23 @@ export const putSharedApplications = async (contractId, lot, applications) => {
 // Ogni gara è un record separato con entity_type="gara" e record_key="gara|{id}"
 // contract_id e lot_id sono null perché le gare sono trasversali all'ambiente.
 
+// Analizza un PDF di capitolato/bando con AI e restituisce sintesi + sezioni
+export const analizzaCapitolatoGara = async (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/analizza-capitolato`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text);
+  }
+  return response.json();
+};
+
 export const getGare = async () => {
   const params = new URLSearchParams({ entity_type: "gara" });
   const response = await fetchWithRefresh(
