@@ -230,6 +230,51 @@ public static class ContractParserService
         }
         return sb.ToString().Trim();
     }
+
+    // ── Estrae solo le pagine rilevanti (TOW + prime pagine) per l'analisi AI ──
+    // Restituisce testo compatto entro maxChars, privilegiando le pagine con TOW.
+    public static string ExtractRelevantPages(Stream pdfStream, int maxChars = 8000)
+    {
+        var keywords = new[] { "tow", "transazion", "allegat", "requisit", "criterio", "criteri",
+                                "capitolato", "oggetto", "committente", "scadenza", "importo",
+                                "aggiudicazion", "offerta", "tecnica", "economica" };
+
+        using var doc = PdfDocument.Open(pdfStream);
+        var pages = doc.GetPages().ToList();
+        var pageTexts = new List<(int num, string text, bool relevant)>();
+
+        foreach (var page in pages)
+        {
+            var words = page.GetWords().Select(w => w.Text.Trim()).Where(t => !string.IsNullOrEmpty(t));
+            var text = string.Join(" ", words);
+            var lower = text.ToLowerInvariant();
+            var relevant = keywords.Any(k => lower.Contains(k));
+            pageTexts.Add((page.Number, text, relevant));
+        }
+
+        var sb = new System.Text.StringBuilder();
+
+        // Prima: prime 3 pagine (intestazione, oggetto, committente)
+        foreach (var p in pageTexts.Take(3))
+        {
+            sb.Append($"[Pag.{p.num}] ").AppendLine(p.text);
+            if (sb.Length >= maxChars) break;
+        }
+
+        // Poi: pagine rilevanti non già incluse
+        foreach (var p in pageTexts.Skip(3).Where(p => p.relevant))
+        {
+            if (sb.Length >= maxChars) break;
+            sb.Append($"[Pag.{p.num}] ").AppendLine(p.text);
+        }
+
+        var result = sb.ToString().Trim();
+        // Comprimi spazi multipli
+        result = Regex.Replace(result, @"\s{2,}", " ");
+        if (result.Length > maxChars)
+            result = result[..maxChars] + "\n[...troncato...]";
+        return result;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

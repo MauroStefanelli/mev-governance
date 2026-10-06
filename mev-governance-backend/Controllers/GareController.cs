@@ -57,7 +57,8 @@ public class GareController : ControllerBase
         try
         {
             using var stream = file.OpenReadStream();
-            fullText = ContractParserService.ExtractFullText(stream, maxChars: 80000);
+            // ExtractRelevantPages: prime 3 pagine + pagine con TOW/requisiti/criteri — max 8000 char
+            fullText = ContractParserService.ExtractRelevantPages(stream, maxChars: 8000);
         }
         catch (Exception ex)
         {
@@ -67,9 +68,7 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // Comprimi spazi multipli e limita a 6000 char — Capgemini va in 504 con input maggiori
-        var compressed = System.Text.RegularExpressions.Regex.Replace(fullText, @"\s{2,}", " ").Trim();
-        var snippet = compressed.Length > 6000 ? compressed[..6000] + "\n[...troncato...]" : compressed;
+        var snippet = fullText;
 
         // Prompt minimalista: Capgemini non regge prompt lunghi
         var instruction = "Sei un esperto di gare d'appalto IT italiane. Analizza il documento e rispondi SOLO con JSON puro (no markdown). " +
@@ -83,7 +82,7 @@ public class GareController : ControllerBase
             "proposte con sotto-campi: tecnica (array con sezione/desc/dettagli/allegatiRiferimento), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato), " +
             "note. Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
 
-        var userMessage = $"File: {file.FileName}\n\nTESTO:\n{snippet}";
+        var userMessage = $"File: {file.FileName}\n\nTESTO (pagine rilevanti):\n{snippet}";
 
         try
         {
