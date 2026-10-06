@@ -208,9 +208,10 @@ public class AiService
     private JsonObject ParseAnalysisJson(string text)
     {
         var value = text.Trim();
-        // Rimuove backtick markdown (```json ... ```)
-        value = System.Text.RegularExpressions.Regex.Replace(value, @"^```(?:json)?\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        value = System.Text.RegularExpressions.Regex.Replace(value, @"\s*```$", "").Trim();
+        // Rimuove backtick markdown in tutte le varianti:
+        // ```json{...}```  ```json\n{...}\n```  ```\n{...}\n```
+        value = System.Text.RegularExpressions.Regex.Replace(value, @"^```(?:json)?", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        value = System.Text.RegularExpressions.Regex.Replace(value, @"```\s*$", "").Trim();
         if (string.IsNullOrWhiteSpace(value))
             throw new InvalidOperationException("Il servizio AI ha restituito una risposta vuota");
 
