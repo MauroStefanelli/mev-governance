@@ -434,6 +434,46 @@ public class AiService
     }
 
     // ============================================================
+    // Versione con system prompt custom (usata da GareController
+    // e altri controller che hanno il proprio prompt specializzato).
+    // ============================================================
+    public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalyzeWithInstructionsAsync(
+        string systemInstructions,
+        string userMessage,
+        string? userApiKey = null, string? userEndpoint = null,
+        string? userModel = null, string? userStyle = null, string? userAuthMode = null)
+    {
+        var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
+        var systemRole = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) ? "system" : "developer";
+        var messages = new JsonArray
+        {
+            new JsonObject { ["role"] = systemRole, ["content"] = systemInstructions },
+            new JsonObject { ["role"] = "user",     ["content"] = userMessage }
+        };
+        var payload = BuildPayload(s, s.Endpoint, messages, structured: true);
+        var response = await PostAsync(s, payload);
+        var responseText = ExtractResponseText(response);
+
+        JsonObject analysis;
+        try { analysis = ParseAnalysisJson(responseText); }
+        catch (InvalidOperationException)
+        {
+            analysis = new JsonObject
+            {
+                ["error"]   = "Il servizio AI ha restituito testo non convertibile in JSON.",
+                ["rawText"] = responseText.Length > 4000 ? responseText[..4000] : responseText
+            };
+        }
+
+        return (
+            analysis,
+            s.Provider,
+            response.GetStringProp("model") ?? s.Model,
+            response.TryGetPropertyValue("usage", out var usage) ? usage as JsonObject : null
+        );
+    }
+
+    // ============================================================
     // POST /api/configuratore/ai/development
     // Verifica un piano di sviluppo stimato (raccomandazioni).
     // ============================================================

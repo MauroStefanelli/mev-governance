@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using MevGovernanceBackend.Services;
 using MevGovernanceBackend.Data;
 
@@ -148,22 +146,15 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido (senza markdown, senza ```jso
   ""note"": ""eventuali vincoli, avvertenze o note importanti non categorizzate""
 }";
 
-        var aiCtxObj = new JsonObject
-        {
-            ["task"]         = "bid_document_analysis_detailed",
-            ["fileName"]     = file.FileName,
-            ["textLength"]   = fullText.Length,
-            ["instruction"]  = instruction,
-            ["documentText"] = snippet,
-        };
-
-        var aiCtxJson    = aiCtxObj.ToJsonString();
-        var aiCtxElement = JsonSerializer.Deserialize<JsonElement>(aiCtxJson);
+        // Usa AnalyzeWithInstructionsAsync per bypassare il system prompt del Configuratore
+        // e usare il prompt specifico per l'analisi di gara
+        var userMessage = $"Analizza questo documento di gara/capitolato tecnico.\n\nFile: {file.FileName}\nLunghezza testo: {fullText.Length} caratteri\n\nTESTO DEL DOCUMENTO:\n{snippet}";
 
         try
         {
             var (key, ep, mdl, sty, auth) = GetUserAiSettings();
-            var (analysis, provider, usedModel, usage) = await _ai.AnalyzeAsync(aiCtxElement, key, ep, mdl, sty, auth);
+            var (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
+                instruction, userMessage, key, ep, mdl, sty, auth);
 
             return Ok(new
             {
