@@ -74,8 +74,11 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // Usa fino a 50.000 caratteri per dare più contesto all'AI
-        var snippet = fullText.Length > 50000 ? fullText[..50000] + "\n[... testo troncato ...]" : fullText;
+        // Comprimi spazi multipli e righe vuote per ridurre i token mantenendo il contenuto
+        var compressed = System.Text.RegularExpressions.Regex.Replace(fullText, @"[ \t]{2,}", " ");
+        compressed = System.Text.RegularExpressions.Regex.Replace(compressed, @"\n{3,}", "\n\n").Trim();
+        // Usa fino a 30.000 caratteri compressi: sufficiente per ~60-70 pagine di capitolato
+        var snippet = compressed.Length > 30000 ? compressed[..30000] + "\n[... testo troncato ...]" : compressed;
 
         var instruction = @"Sei un esperto di gare d'appalto pubbliche italiane nel settore IT/digitale.
 Analizza il seguente documento di gara / capitolato tecnico in modo APPROFONDITO e OPERATIVO.
