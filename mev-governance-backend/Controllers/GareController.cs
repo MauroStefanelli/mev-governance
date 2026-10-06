@@ -41,6 +41,13 @@ public class GareController : ControllerBase
         );
     }
 
+    // POST /api/gare/analizza-capitolato
+    // Campi form accettati:
+    //   file            — PDF capitolato tecnico (obbligatorio)
+    //   towFile_1       — PDF/XLSX listino prezzi TOW lotto 1 (opzionale)
+    //   towFile_2       — PDF/XLSX listino prezzi TOW lotto 2 (opzionale)
+    //   catalogFile_1   — PDF catalogo lotto 1 (opzionale)
+    //   catalogFile_2   — PDF catalogo lotto 2 (opzionale)
     [HttpPost("analizza-capitolato")]
     public async Task<IActionResult> AnalizzaCapitolato()
     {
@@ -54,16 +61,17 @@ public class GareController : ControllerBase
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Sono accettati solo file PDF." });
 
-        // 1) Estrai TOW direttamente dal PDF (parser geometrico, preciso come Gestione Contratti)
-        List<TowRow> towRows;
+        // 1) Estrai testo + righe TOW dal capitolato (un'unica lettura del file)
         string fullText;
+        List<TowRow> towRowsFromCapitolato;
         try
         {
-            using var s1 = file.OpenReadStream();
-            towRows = ContractParserService.ExtractTowRows(s1);
-
-            using var s2 = file.OpenReadStream();
-            fullText = ContractParserService.ExtractRelevantPages(s2, maxChars: 8000);
+            // Prima passata: testo per l'AI
+            using (var s = file.OpenReadStream())
+                fullText = ContractParserService.ExtractRelevantPages(s, maxChars: 8000);
+            // Seconda passata: estrazione geometrica righe TOW (id+descrizione+quantita)
+            using (var s2 = file.OpenReadStream())
+                towRowsFromCapitolato = ContractParserService.ExtractTowRows(s2);
         }
         catch (Exception ex)
         {
@@ -73,7 +81,7 @@ public class GareController : ControllerBase
         if (string.IsNullOrWhiteSpace(fullText) || fullText.Length < 100)
             return BadRequest(new { message = "Il PDF non contiene testo leggibile o e' troppo corto." });
 
-        // 2) Analisi AI per struttura generale + lotti (senza TOW — li iniettiamo noi)
+        // 2) Analisi AI per struttura gara + lotti (senza TOW e senza catalogo)
         var instruction = "Sei un esperto di gare d'appalto IT italiane. Analizza il documento e rispondi SOLO con JSON puro (no markdown). " +
             "Campi generali: titolo, sintesi, oggetto, committente, importoBase, scadenza, allegatiCitati (array stringhe), note. " +
             "Campo lotti: array di oggetti, uno per ogni lotto trovato. Se non ci sono lotti espliciti crea un unico lotto chiamato 'Gara'. " +
@@ -83,82 +91,129 @@ public class GareController : ControllerBase
             "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli), " +
             "criteriValutazione (array con criterio/peso), " +
             "proposte: { tecnica (array con sezione/desc/dettagli), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato) }. " +
-            "NON includere il campo tow: viene estratto automaticamente dal parser PDF. " +
             "Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
 
         var userMessage = $"File: {file.FileName}\n\nTESTO:\n{fullText}";
 
+        JsonObject analysis;
+        string provider, usedModel;
         try
         {
             var (key, ep, mdl, sty, auth) = GetUserAiSettings();
-            var (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
+            JsonObject? usage;
+            (analysis, provider, usedModel, usage) = await _ai.AnalyzeWithInstructionsAsync(
                 instruction, userMessage, key, ep, mdl, sty, auth);
-
-            // 3) Inietta i TOW estratti dal parser nei lotti (distribuzione per numero lotto)
-            if (analysis.TryGetPropertyValue("lotti", out var lottiNode) && lottiNode is JsonArray lotti)
-            {
-                // Raggruppa TOW per numero lotto (TOW01.x → lotto 1, TOW02.x → lotto 2, ecc.)
-                var towByLot = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<TowRow>>();
-                foreach (var t in towRows)
-                {
-                    var m = System.Text.RegularExpressions.Regex.Match(t.Id, @"TOW0?(\d+)\.", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    var lotN = m.Success && int.TryParse(m.Groups[1].Value, out var n) ? n : 0;
-                    if (!towByLot.ContainsKey(lotN)) towByLot[lotN] = new();
-                    towByLot[lotN].Add(t);
-                }
-
-                for (int i = 0; i < lotti.Count; i++)
-                {
-                    if (lotti[i] is not JsonObject lotto) continue;
-                    // Associa i TOW al lotto per indice (lotto 0 → towByLot[1] o [0])
-                    var lotKey = towByLot.ContainsKey(i + 1) ? i + 1 : (towByLot.ContainsKey(0) ? 0 : -1);
-                    var towList = lotKey >= 0 ? towByLot[lotKey] : towRows; // fallback: tutti i TOW al primo lotto
-                    var towArr = new JsonArray();
-                    foreach (var t in towList)
-                    {
-                        var obj = new JsonObject
-                        {
-                            ["id"]          = t.Id,
-                            ["descrizione"] = t.Descrizione,
-                        };
-                        if (t.Quantita.HasValue)  obj["quantita"]  = t.Quantita.Value;
-                        if (t.Importo.HasValue)   obj["importo"]   = t.Importo.Value;
-                        towArr.Add(obj);
-                    }
-                    lotto["tow"] = towArr;
-                }
-            }
-            else if (towRows.Count > 0)
-            {
-                // Nessun campo lotti nell'analisi: aggiungi tow al livello radice
-                var towArr = new JsonArray();
-                foreach (var t in towRows)
-                {
-                    var obj = new JsonObject { ["id"] = t.Id, ["descrizione"] = t.Descrizione };
-                    if (t.Quantita.HasValue) obj["quantita"] = t.Quantita.Value;
-                    if (t.Importo.HasValue)  obj["importo"]  = t.Importo.Value;
-                    towArr.Add(obj);
-                }
-                analysis["tow"] = towArr;
-            }
-
-            return Ok(new
-            {
-                ok         = true,
-                fileName   = file.FileName,
-                textLength = fullText.Length,
-                towCount   = towRows.Count,
-                provider,
-                model      = usedModel,
-                analysis,
-            });
         }
         catch (Exception ex)
         {
             var msg = ex.Message;
             if (msg.Contains("API key") || msg.Contains("401") || msg.Contains("403") || msg.Contains("Unauthorized"))
-                return StatusCode(401, new { message = "Chiave AI non configurata o non valida. Vai su Profilo → API Key AI e inserisci la tua chiave." });
+                return StatusCode(401, new { message = "Chiave AI non configurata o non valida." });
             return StatusCode(500, new { message = "Errore analisi AI: " + msg });
         }
+
+        // 3) Per ogni lotto: leggi towFile_N e catalogFile_N con i parser collaudati
+        if (analysis.TryGetPropertyValue("lotti", out var lottiNode) && lottiNode is JsonArray lotti)
+        {
+            for (int i = 0; i < lotti.Count; i++)
+            {
+                if (lotti[i] is not JsonObject lotto) continue;
+                var lotNum = i + 1;
+
+                // ── TOW: merge descrizioni (dal capitolato) + importi (dal listino prezzi) ──
+                var towFile = form.Files.GetFile($"towFile_{lotNum}");
+
+                // Righe TOW del capitolato per questo lotto (filtra per prefisso numerico)
+                var towCapitolato = towRowsFromCapitolato
+                    .Where(r => {
+                        var prefix = r.Id.Length >= 5 ? r.Id.Substring(3, 1) : "";
+                        return prefix == lotNum.ToString() || r.Id.StartsWith($"TOW0{lotNum}.", StringComparison.OrdinalIgnoreCase);
+                    })
+                    .ToDictionary(r => r.Id.ToUpperInvariant(), r => r);
+
+                Dictionary<string, double> towPrices = new();
+                string towSource = "";
+                if (towFile != null && towFile.Length > 0)
+                {
+                    try
+                    {
+                        using var ts = towFile.OpenReadStream();
+                        if (towFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                            towFile.FileName.EndsWith(".xls",  StringComparison.OrdinalIgnoreCase))
+                            towPrices = ContractParserService.ParseTowPriceExcel(ts, lotNum);
+                        else
+                            towPrices = ContractParserService.ParseTowPricePdf(ts, lotNum);
+                        towSource = towFile.FileName;
+                    }
+                    catch { /* ignora errori, procedi senza prezzi */ }
+                }
+
+                // Costruisci array tow finale: unione di tutte le chiavi
+                var allTowKeys = towCapitolato.Keys
+                    .Union(towPrices.Keys.Select(k => k.ToUpperInvariant()))
+                    .Distinct()
+                    .OrderBy(k => k);
+
+                var towArr = new JsonArray();
+                foreach (var key in allTowKeys)
+                {
+                    towCapitolato.TryGetValue(key, out var row);
+                    towPrices.TryGetValue(key, out var price);
+                    // Se non trovato in towPrices prova anche senza normalizzazione case
+                    if (price == 0)
+                        towPrices.TryGetValue(key.ToUpperInvariant(), out price);
+                    var node = new JsonObject
+                    {
+                        ["id"]          = key,
+                        ["descrizione"] = row?.Descrizione ?? "",
+                        ["quantita"]    = row?.Quantita.HasValue == true ? JsonValue.Create(row.Quantita!.Value) : null,
+                        ["importo"]     = price > 0 ? JsonValue.Create(price) : (row?.Importo.HasValue == true ? JsonValue.Create(row.Importo!.Value) : null),
+                    };
+                    towArr.Add(node);
+                }
+                if (towArr.Count > 0)
+                {
+                    lotto["tow"] = towArr;
+                    if (!string.IsNullOrEmpty(towSource)) lotto["towSource"] = towSource;
+                }
+
+                // ── Catalogo ─────────────────────────────────────────────────
+                var catalogFile = form.Files.GetFile($"catalogFile_{lotNum}");
+                if (catalogFile != null && catalogFile.Length > 0 &&
+                    catalogFile.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        using var cs = catalogFile.OpenReadStream();
+                        var entries = ContractParserService.ParseCatalogPdf(cs, lotNum);
+                        var catArr = new JsonArray();
+                        foreach (var e in entries)
+                            catArr.Add(new JsonObject
+                            {
+                                ["id"]          = e.Id,
+                                ["ambito"]       = e.Ambito,
+                                ["nome"]         = e.Nome,
+                                ["descrizione"]  = e.Descrizione,
+                                ["prezziSemplice"]   = e.Prezzi.Realizzazione.Semplice,
+                                ["prezziMedio"]      = e.Prezzi.Realizzazione.Medio,
+                                ["prezziComplesso"]  = e.Prezzi.Realizzazione.Complesso,
+                            });
+                        lotto["catalogo"]       = catArr;
+                        lotto["catalogoSource"] = catalogFile.FileName;
+                    }
+                    catch { /* ignora errori parsing catalogo */ }
+                }
+            }
+        }
+
+        return Ok(new
+        {
+            ok         = true,
+            fileName   = file.FileName,
+            textLength = fullText.Length,
+            provider,
+            model      = usedModel,
+            analysis,
+        });
     }
 }

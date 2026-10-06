@@ -730,10 +730,15 @@ export const putSharedApplications = async (contractId, lot, applications) => {
 // Ogni gara è un record separato con entity_type="gara" e record_key="gara|{id}"
 // contract_id e lot_id sono null perché le gare sono trasversali all'ambiente.
 
-// Analizza un PDF di capitolato/bando con AI e restituisce sintesi + sezioni
-export const analizzaCapitolatoGara = async (file) => {
+// Analizza un PDF di capitolato/bando con AI e restituisce sintesi + sezioni.
+// towFiles:     { 1: File, 2: File } — listini prezzi TOW per lotto (opzionali)
+// catalogFiles: { 1: File, 2: File } — PDF catalogo per lotto (opzionali)
+export const analizzaCapitolatoGara = async (file, towFiles = {}, catalogFiles = {}) => {
   const form = new FormData();
   form.append("file", file);
+  // Allega i file TOW e Catalogo per ogni lotto
+  Object.entries(towFiles).forEach(([lotNum, f]) => { if (f) form.append(`towFile_${lotNum}`, f); });
+  Object.entries(catalogFiles).forEach(([lotNum, f]) => { if (f) form.append(`catalogFile_${lotNum}`, f); });
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/analizza-capitolato`, {
     method: "POST",
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },

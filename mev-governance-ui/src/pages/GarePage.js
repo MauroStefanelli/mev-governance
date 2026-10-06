@@ -290,6 +290,10 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [capError,     setCapError]           = React.useState("");
   const [dettagliOpen, setDettagliOpen]       = React.useState({});
   const [lottoAttivo,  setLottoAttivo]        = React.useState(null); // null = tutti
+  const [towFiles,     setTowFiles]           = React.useState({});     // { 1: File, 2: File, ... }
+  const [catalogFiles, setCatalogFiles]       = React.useState({});     // { 1: File, 2: File, ... }
+  const towFileRefs    = React.useRef({});
+  const catalogFileRefs = React.useRef({});
   const docFileRefs = React.useRef({});
   const fileInputRef    = useRef(null);
   const capFileInputRef = useRef(null);
@@ -399,7 +403,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
     setAnalyzingCap(true);
     setCapError("");
     try {
-      const result = await analizzaCapitolatoGara(file);
+      const result = await analizzaCapitolatoGara(file, towFiles, catalogFiles);
       const a = result.analysis || {};
       console.log("[GarePage] analisi capitolato - chiavi:", Object.keys(a));
 
@@ -434,6 +438,18 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         _id: i,
         id: get(t,"id","Id","ID","codice") || null,
         descrizione: get(t,"descrizione","description","nome") || "",
+        quantita:    get(t,"quantita","Quantita","qty") ?? null,
+        importo:     get(t,"importo","Importo","price","prezzo") ?? null,
+      });
+      const normCatalog = (c, i) => ({
+        _id: i,
+        id: c.id ?? i,
+        ambito: c.ambito || "",
+        nome: c.nome || "",
+        descrizione: c.descrizione || "",
+        prezziSemplice:  c.prezziSemplice  ?? null,
+        prezziMedio:     c.prezziMedio     ?? null,
+        prezziComplesso: c.prezziComplesso ?? null,
       });
       const normLotto = (l, i) => {
         const proposte = get(l,"proposte","Proposte") || {};
@@ -446,6 +462,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
           tow: getArr(l,"tow","TOW","tows","transazioni").map(normTow),
           documentiRichiesti: getArr(l,"documentiRichiesti","documenti","documents").map(normDoc),
           criteriValutazione: getArr(l,"criteriValutazione","criteri","criteria"),
+          catalogo: getArr(l,"catalogo","catalog","vociCatalogo").map(normCatalog),
           proposte: {
             tecnica:   getArr(proposte,"tecnica","technical").map(normTec),
             economica: getArr(proposte,"economica","economic").map(normEco),
@@ -691,6 +708,70 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                 {capError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{capError}</span>}
               </div>
 
+              {/* ── File TOW e Catalogo per lotto (opzionali) ── */}
+              {(() => {
+                // Mostra i lotti noti dall'analisi precedente, oppure Lotto 1 e Lotto 2 come default
+                const lottiNoti = (gara.capitolato?.lotti || []);
+                const numLotti = lottiNoti.length > 0 ? lottiNoti.length : 2;
+                const rows = Array.from({ length: numLotti }, (_, i) => ({
+                  num: i + 1,
+                  nome: lottiNoti[i]?.nome || `Lotto ${i + 1}`,
+                }));
+                return (
+                  <div style={{ marginTop: 14, background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 16px" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      File Listino TOW e Catalogo — opzionali, migliorano la precisione
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {rows.map(({ num, nome }) => (
+                        <div key={num} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                          <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 10px", fontWeight: 700, fontSize: 12, flexShrink: 0, minWidth: 68 }}>{nome}</span>
+
+                          {/* TOW */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => towFileRefs.current[num] && towFileRefs.current[num].click()}
+                              style={{ background: towFiles[num] ? "#f0fdf4" : "#fff", color: towFiles[num] ? "#16a34a" : "#6b7280", border: "1px solid " + (towFiles[num] ? "#86efac" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                              {towFiles[num] ? `✓ TOW: ${towFiles[num].name.slice(0,28)}` : "📋 Listino TOW (PDF/XLSX)"}
+                            </button>
+                            <input
+                              ref={el => towFileRefs.current[num] = el}
+                              type="file" accept=".pdf,.xlsx,.xls" style={{ display: "none" }}
+                              onChange={e => { const f = e.target.files[0]; if (f) setTowFiles(prev => ({ ...prev, [num]: f })); e.target.value = ""; }} />
+                            {towFiles[num] && (
+                              <button type="button" onClick={() => setTowFiles(prev => { const n = {...prev}; delete n[num]; return n; })}
+                                style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+                            )}
+                          </div>
+
+                          {/* Catalogo */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => catalogFileRefs.current[num] && catalogFileRefs.current[num].click()}
+                              style={{ background: catalogFiles[num] ? "#eff6ff" : "#fff", color: catalogFiles[num] ? "#1d4ed8" : "#6b7280", border: "1px solid " + (catalogFiles[num] ? "#93c5fd" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                              {catalogFiles[num] ? `✓ Cat: ${catalogFiles[num].name.slice(0,28)}` : "📦 Catalogo (PDF)"}
+                            </button>
+                            <input
+                              ref={el => catalogFileRefs.current[num] = el}
+                              type="file" accept=".pdf" style={{ display: "none" }}
+                              onChange={e => { const f = e.target.files[0]; if (f) setCatalogFiles(prev => ({ ...prev, [num]: f })); e.target.value = ""; }} />
+                            {catalogFiles[num] && (
+                              <button type="button" onClick={() => setCatalogFiles(prev => { const n = {...prev}; delete n[num]; return n; })}
+                                style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
+                      I listini TOW e Catalogo vengono letti con lo stesso parser di "Gestione Contratti" — dati precisi senza AI.
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Risultati analisi capitolato */}
               {gara.capitolato && (() => {
                 const cap = gara.capitolato;
@@ -807,7 +888,46 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                             <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
                                               {isOpen ? "▲" : "▼"} {g.figli.length} sottosezioni
                                             </span>
-                                          )}
+                          )}
+
+                          {/* Catalogo voci */}
+                          {(d.catalogo || []).length > 0 && (
+                            <div style={{ background: "#fff", borderRadius: 10, border: "2px solid #93c5fd", overflow: "hidden" }}>
+                              <div style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontSize: 16 }}>📦</span>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Voci di Catalogo ({d.catalogo.length})</div>
+                                <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal catalogo</span>
+                              </div>
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                  <thead>
+                                    <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
+                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Ambito</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Nome componente</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Semplice (€)</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Medio (€)</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Complesso (€)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {d.catalogo.map((c, i) => (
+                                      <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
+                                        <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                                          <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{c.id}</span>
+                                        </td>
+                                        <td style={{ padding: "8px 12px", color: "#374151" }}>{c.ambito || "—"}</td>
+                                        <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500 }}>{c.nome || "—"}</td>
+                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600 }}>{c.prezziSemplice != null ? Number(c.prezziSemplice).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600 }}>{c.prezziMedio != null ? Number(c.prezziMedio).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600 }}>{c.prezziComplesso != null ? Number(c.prezziComplesso).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                                         </div>
                                         {/* Figli espandibili */}
                                         {hasFigli && isOpen && (
