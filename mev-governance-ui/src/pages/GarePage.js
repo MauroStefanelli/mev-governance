@@ -543,6 +543,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       console.log("[GarePage] capData:", { isVecchia, nTow: capData.tow.length, nDoc: capData.documentiRichiesti.length, nTec: capData.proposte.tecnica.length });
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
+      console.error("[GarePage] errore analisi capitolato:", err?.message || err);
       setCapError(err?.message || "Errore analisi capitolato");
     } finally {
       setAnalyzingCap(false);

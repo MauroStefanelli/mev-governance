@@ -742,7 +742,9 @@ export const analizzaCapitolatoGara = async (file) => {
   if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text);
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
   }
   return response.json();
 };
