@@ -716,8 +716,13 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                 </button>
                 <input ref={capFileInputRef} type="file" accept=".pdf" style={{ display: "none" }}
                   onChange={e => { const f = e.target.files[0]; if (f) handleAnalizzaCapitolato(f); e.target.value = ""; }} />
-                {capError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{capError}</span>}
               </div>
+              {capError && (
+                <div style={{ marginTop: 10, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginBottom: 4 }}>Errore analisi AI</div>
+                  <div style={{ fontSize: 11, color: "#7f1d1d", fontFamily: "monospace", whiteSpace: "pre-wrap", maxHeight: 200, overflowY: "auto", wordBreak: "break-all" }}>{capError}</div>
+                </div>
+              )}
 
               {/* ── File TOW e Catalogo per lotto (opzionali) ── */}
               {(() => {
