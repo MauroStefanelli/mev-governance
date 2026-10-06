@@ -445,10 +445,16 @@ public class AiService
     {
         var s = Settings(userApiKey, userEndpoint, userModel, userStyle, userAuthMode);
         var systemRole = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) ? "system" : "developer";
+
+        // Capgemini ignora spesso le istruzioni nel system prompt: rinforziamo nel messaggio utente
+        var finalUserMessage = s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase)
+            ? userMessage + "\n\nIMPORTANTE: Rispondi ESCLUSIVAMENTE con JSON puro valido. Nessun testo introduttivo, nessun markdown, nessun ```json. Solo il JSON richiesto."
+            : userMessage;
+
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = systemRole, ["content"] = systemInstructions },
-            new JsonObject { ["role"] = "user",     ["content"] = userMessage }
+            new JsonObject { ["role"] = "user",     ["content"] = finalUserMessage }
         };
         // structured: false — usa il prompt nel messaggio di sistema (no schema JSON del Configuratore)
         var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
