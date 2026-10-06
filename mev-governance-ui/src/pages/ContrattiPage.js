@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import * as XLSX from "xlsx";
-import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord } from "../services/mevService";
+import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord, recalcConsumoTow } from "../services/mevService";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
@@ -1402,21 +1402,38 @@ function ReleaseScheduleSection({ contractId }) {
 function ContrattiPage({ onUnauthorized, ambienteId }) {
   const [towRows, setTowRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [recalcing, setRecalcing] = useState(false);
+  const [recalcMsg, setRecalcMsg] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setTowRows([]);
-      try {
-        const tow = await getConsumoTow();
-        setTowRows(tow);
-      } catch (e) {
-        if (e.message === "401") onUnauthorized?.();
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setTowRows([]);
+    try {
+      const tow = await getConsumoTow();
+      setTowRows(tow);
+    } catch (e) {
+      if (e.message === "401") onUnauthorized?.();
+    } finally {
+      setLoading(false);
+    }
   }, [ambienteId]); // eslint-disable-line
+
+  useEffect(() => { loadData(); }, [ambienteId]); // eslint-disable-line
+
+  const handleRecalc = async () => {
+    setRecalcing(true);
+    setRecalcMsg("");
+    try {
+      await recalcConsumoTow();
+      await loadData();
+      setRecalcMsg("Ricalcolo completato.");
+    } catch (e) {
+      setRecalcMsg("Errore: " + (e.message || "ricalcolo fallito"));
+    } finally {
+      setRecalcing(false);
+      setTimeout(() => setRecalcMsg(""), 4000);
+    }
+  };
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#666", fontSize: "15px" }}>
@@ -1426,6 +1443,23 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
 
   return (
     <div style={{ padding: "24px 28px", background: "#f8fafc", minHeight: "100vh" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 12, gap: 12 }}>
+        {recalcMsg && (
+          <span style={{ fontSize: 13, color: recalcMsg.startsWith("Errore") ? "#dc2626" : "#16a34a", fontWeight: 600 }}>
+            {recalcMsg}
+          </span>
+        )}
+        <button
+          onClick={handleRecalc}
+          disabled={recalcing}
+          style={{ background: recalcing ? "#e5e7eb" : "#1a73e8", color: recalcing ? "#9ca3af" : "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: recalcing ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 7 }}
+        >
+          {recalcing
+            ? <><span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid #9ca3af", borderTopColor: "#1a73e8", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Ricalcolo...</>
+            : "↺ Ricalcola"
+          }
+        </button>
+      </div>
       <ConsumoTowSection towRows={towRows} ambienteId={ambienteId} />
     </div>
   );

@@ -931,6 +931,27 @@ public class ContrattoController : BaseController
             .Where(m => m.AmbienteId == ambienteId)
             .ToList();
 
+        // Leggi gli Ordini di Consegna dell'ambiente e somma per TipoContratto
+        // (fonte primaria per OrdinatiRda — allineata con Gestione Ordini)
+        static decimal ParseImportoOrdine(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return 0;
+            s = s.Replace(".", "").Replace(",", ".").Trim();
+            return decimal.TryParse(s, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0;
+        }
+
+        // Somma ordini per contratto (campo Contratto dell'ordine, normalizzato uppercase)
+        var ordiniPerContratto = _db.OrdiniConsegna
+            .AsNoTracking()
+            .Where(o => o.AmbienteId == ambienteId)
+            .ToList()
+            .GroupBy(o => (o.Contratto ?? "").Trim().ToUpperInvariant())
+            .ToDictionary(g => g.Key, g => g.Sum(o => ParseImportoOrdine(o.Importo)));
+
+        // Somma totale ordini (per fallback proporzionale quando il contratto non è valorizzato)
+        var totaleOrdini = ordiniPerContratto.Values.Sum();
+
         // ── DIAGNOSTICA ──────────────────────────────────────────────────────
         Console.WriteLine($"[TOW RECALC] Ambiente={ambienteId} | MevItems totali={mevItems.Count}");
         var statoCounts = mevItems.GroupBy(m => m.Stato ?? "(null)").Select(g => $"{g.Key}={g.Count()}");
@@ -1006,32 +1027,29 @@ public class ContrattoController : BaseController
                         .Sum(m => qtaSelector(m) ?? 0);
                 }
 
-                // OrdinatiRda: somma MevItem.OrdinatoBdo per le righe che hanno quantità
-                // su questo TOW (stesso criterio di Approvato) — stessa fonte di MEV e MEV-CAP.
-                decimal ordinati;
-                if (valUnitario > 0)
+                // OrdinatiRda: somma degli Ordini di Consegna (fonte primaria = Gestione Ordini)
+                // ripartita tra i TOW proporzionalmente al loro ValoreTotale.
+                // Fallback a MevItem.OrdinatoBdo se non esistono ordini per questo contratto.
+                decimal ordinati = 0;
+                var contrattoKey = contratto.Trim().ToUpperInvariant();
+
+                if (ordiniPerContratto.TryGetValue(contrattoKey, out var totaleOrdinato) && totaleOrdinato > 0)
                 {
-                    // TOW a tariffa: proporziona OrdinatoBdo sulla quota di questo TOW
-                    // rispetto al totale delle qty TOW della riga MEV.
-                    // Semplificazione conservativa: somma OrdinatoBdo × (qtaTow / qtaTotaleRiga)
-                    // dove qtaTotaleRiga = sum di tutti i campi TowXXX della riga.
-                    // Se la riga ha un solo TOW (caso comune), il peso è 1.
-                    ordinati = mevContratto
-                        .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
-                        .Sum(m =>
-                        {
-                            decimal qtaTow = qtaSelector(m) ?? 0;
-                            // Somma di tutti i TOW della riga per calcolare il peso
-                            decimal qtaTotaleRiga =
-                                (m.Tow021 ?? 0) + (m.Tow022 ?? 0) + (m.Tow023 ?? 0) +
-                                (m.Tow024 ?? 0) + (m.Tow025 ?? 0) + (m.Tow026 ?? 0);
-                            decimal peso = qtaTotaleRiga > 0 ? qtaTow / qtaTotaleRiga : 1m;
-                            return m.OrdinatoBdo * peso;
-                        });
+                    // Ripartisci proporzionalmente per ValoreTotale del TOW
+                    decimal totaleValoreTowContratto = towsContratto.Sum(t => t.ValoreTotale);
+                    if (totaleValoreTowContratto > 0)
+                        ordinati = totaleOrdinato * (towRow.ValoreTotale / totaleValoreTowContratto);
+                }
+                else if (totaleOrdini > 0)
+                {
+                    // Ordini esistono ma senza contratto valorizzato: ripartisci sul totale ValoreTotale
+                    decimal totaleValoriTutti = towRows.Sum(t => t.ValoreTotale);
+                    if (totaleValoriTutti > 0)
+                        ordinati = totaleOrdini * (towRow.ValoreTotale / totaleValoriTutti);
                 }
                 else
                 {
-                    // TOW a importo diretto: stessa logica, campo memorizza già €
+                    // Nessun ordine: fallback a MevItem.OrdinatoBdo
                     ordinati = mevContratto
                         .Where(m => (qtaSelector(m) ?? 0) > 0 && m.OrdinatoBdo > 0)
                         .Sum(m =>
