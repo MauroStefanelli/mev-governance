@@ -237,7 +237,7 @@ public static class ContractParserService
     {
         var keywords = new[] { "tow", "transazion", "allegat", "requisit", "criterio", "criteri",
                                 "capitolato", "oggetto", "committente", "scadenza", "importo",
-                                "aggiudicazion", "offerta", "tecnica", "economica" };
+                                "aggiudicazion", "offerta", "tecnica", "economica", "lotto" };
 
         using var doc = PdfDocument.Open(pdfStream);
         var pages = doc.GetPages().ToList();

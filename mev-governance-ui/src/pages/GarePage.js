@@ -288,9 +288,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [activeTab,  setActiveTab]            = React.useState("documenti");
   const [analyzingCap, setAnalyzingCap]       = React.useState(false);
   const [capError,     setCapError]           = React.useState("");
-  // { "doc-0": true, "tec-1": false, ... } — pannelli Dettagli aperti
   const [dettagliOpen, setDettagliOpen]       = React.useState({});
-  // Ref per input file nascosti per ogni voce (keyed by "doc-0", "tec-1", "eco-2")
+  const [lottoAttivo,  setLottoAttivo]        = React.useState(null); // null = tutti
   const docFileRefs = React.useRef({});
   const fileInputRef    = useRef(null);
   const capFileInputRef = useRef(null);
@@ -299,20 +298,25 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const checklist  = gara.checklist || DEFAULT_CHECKLIST.map(c => ({ ...c }));
   const cap        = gara.capitolato || null;
 
-  // aiResult: fonte unica = cap.proposte (popolato dall'analisi capitolato AI).
-  // Fallback su gara.aiResult (mock vecchio) se cap.proposte non esiste.
+  // Lotti estratti dall'AI — array di { nome, descrizione, sezioni, requisitiTecnici, tow,
+  // documentiRichiesti, criteriValutazione, proposte:{tecnica,economica,piano} }
+  const lotti = cap?.lotti || [];
+  const lottoCorr = lottoAttivo != null ? lotti[lottoAttivo] : null;
+
+  // aiResult: dal lotto attivo se disponibile, altrimenti dal livello radice
   const aiResult = (() => {
-    if (cap?.proposte) {
+    const src = lottoCorr || cap;
+    if (src?.proposte) {
       return {
-        documenti: cap.documentiRichiesti || [],
-        tecnica:   cap.proposte.tecnica   || [],
-        economica: cap.proposte.economica || [],
-        piano:     cap.proposte.piano     || [],
+        documenti: src.documentiRichiesti || [],
+        tecnica:   src.proposte.tecnica   || [],
+        economica: src.proposte.economica || [],
+        piano:     src.proposte.piano     || [],
       };
     }
     if (gara.aiResult) {
       const r = gara.aiResult;
-      const norm = (arr, i) => arr.map((x, j) => ({ ...x, _id: j, dettagli: x.dettagli || "", allegatiRiferimento: x.allegatiRiferimento || [], _docAttachment: x._docAttachment || null }));
+      const norm = arr => arr.map((x, j) => ({ ...x, _id: j, dettagli: x.dettagli || "", allegatiRiferimento: x.allegatiRiferimento || [], _docAttachment: x._docAttachment || null }));
       return {
         documenti: norm(r.documenti || []),
         tecnica:   norm(r.tecnica   || []),
@@ -397,157 +401,103 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
     try {
       const result = await analizzaCapitolatoGara(file);
       const a = result.analysis || {};
-      const keys = Object.keys(a);
-      console.log("[GarePage] analisi capitolato - chiavi:", keys);
+      console.log("[GarePage] analisi capitolato - chiavi:", Object.keys(a));
 
-      // Helper: legge un campo accettando camelCase, PascalCase, snake_case
       const get    = (obj, ...ks) => { for (const k of ks) if (obj[k] != null) return obj[k]; return null; };
       const getArr = (obj, ...ks) => { const v = get(obj, ...ks); return Array.isArray(v) ? v : []; };
 
-      // ── Struttura NUOVA (dopo redeploy) ────────────────────────────────────
-      // { titolo, sintesi, oggetto, committente, allegatiCitati, sezioni,
-      //   requisitiTecnici, documentiRichiesti[{nome,tipo,dettagli,allegatiRiferimento}],
-      //   criteriValutazione, proposte:{tecnica,economica,piano}, note }
-      //
-      // ── Struttura VECCHIA / Configuratore (prima del redeploy) ────────────
-      // { summary, proposals[{type,complexity,rationale,additionalInfo,confidence}], warnings }
-
-      const isVecchia = !get(a, "documentiRichiesti", "titolo", "proposte") && (get(a, "summary") || get(a, "proposals"));
-
-      let documentiRichiesti, tecnica, economica, piano, sintesi, allegatiCitati;
-
-      if (isVecchia) {
-        // Adatta la struttura del Configuratore alla GarePage
-        const proposals = getArr(a, "proposals", "Proposals");
-        const warnings  = getArr(a, "warnings",  "Warnings");
-
-        // Documenti da produrre: ogni proposal diventa un documento
-        documentiRichiesti = proposals.map((p, i) => ({
-          _id:                i,
-          nome:               `${get(p,"type","Type") || "Intervento"} ${get(p,"complexity","Complexity") || ""}`.trim(),
-          tipo:               get(p,"type","Type") || "Tecnico",
-          obbligatorio:       true,
-          dettagli:           [
-            get(p,"rationale","Rationale") || "",
-            get(p,"additionalInfo","AdditionalInfo","additional_info") ? `\n\nNote operative: ${get(p,"additionalInfo","AdditionalInfo","additional_info")}` : "",
-          ].join("").trim(),
-          allegatiRiferimento: [],
-          _docAttachment:     null,
-        }));
-
-        // Proposta tecnica: raggruppa per tipo/complessità + warnings come ultima sezione
-        const byType = {};
-        proposals.forEach(p => {
-          const k = get(p,"type","Type") || "Altro";
-          if (!byType[k]) byType[k] = [];
-          byType[k].push(p);
-        });
-        tecnica = Object.entries(byType).map(([tipo, ps], i) => ({
-          _id:     i,
-          sezione: tipo,
-          desc:    ps.map(p => `[${get(p,"complexity","Complexity") || "?"}] ${(get(p,"rationale","Rationale") || "").split(".")[0]}.`).join(" "),
-          dettagli: ps.map(p => {
-            const rat  = get(p,"rationale","Rationale") || "";
-            const info = get(p,"additionalInfo","AdditionalInfo","additional_info") || "";
-            return [rat, info ? `Indicazioni operative: ${info}` : ""].filter(Boolean).join("\n\n");
-          }).join("\n\n---\n\n"),
-          allegatiRiferimento: [],
-          _docAttachment:      null,
-        }));
-        if (warnings.length > 0) {
-          tecnica.push({
-            _id:     tecnica.length,
-            sezione: "Avvertenze e limitazioni analisi",
-            desc:    "L'AI ha rilevato i seguenti avvisi — verificare prima di procedere.",
-            dettagli: warnings.join("\n\n"),
-            allegatiRiferimento: [],
-            _docAttachment: null,
-          });
-        }
-
-        economica      = [];
-        piano          = [];
-        sintesi        = get(a, "summary", "Summary") || "";
-        allegatiCitati = [];
-
-      } else {
-        // Struttura NUOVA — mappatura diretta
-        const proposte = get(a, "proposte", "Proposte") || {};
-        const normDoc  = (d, i) => ({
-          _id:                i,
-          nome:               get(d,"nome","Nome","name") || "",
-          tipo:               get(d,"tipo","Tipo","type") || "",
-          obbligatorio:       get(d,"obbligatorio","Obbligatorio","required") ?? true,
-          dettagli:           get(d,"dettagli","Dettagli","details","istruzioni") || "",
-          allegatiRiferimento:getArr(d,"allegatiRiferimento","allegati_riferimento","references"),
-          _docAttachment:     null,
-        });
-        const normTec  = (s, i) => ({
-          _id:     i,
-          sezione: get(s,"sezione","Sezione","section","titolo","title") || "",
-          desc:    get(s,"desc","Desc","descrizione","description","contenuto") || "",
-          dettagli:get(s,"dettagli","Dettagli","details","istruzioni") || "",
-          allegatiRiferimento:getArr(s,"allegatiRiferimento","allegati_riferimento","references"),
-          _docAttachment: null,
-        });
-        const normEco  = (r, i) => ({
-          _id:     i,
-          voce:    get(r,"voce","Voce","nome","name","descrizione") || "",
-          gg:      get(r,"gg","Gg","giorni","days") ?? null,
-          tariffa: get(r,"tariffa","Tariffa","tariff") ?? null,
-          importo: Number(get(r,"importo","Importo","totale","amount") ?? 0),
-          dettagli:get(r,"dettagli","Dettagli","details","nota","note") || "",
-          allegatiRiferimento:getArr(r,"allegatiRiferimento","allegati_riferimento","references"),
-          _docAttachment: null,
-        });
-
-        documentiRichiesti = getArr(a,"documentiRichiesti","DocumentiRichiesti","documenti_richiesti","documenti","documents").map(normDoc);
-        tecnica            = getArr(proposte,"tecnica","Tecnica","technical").concat(getArr(a,"tecnica","Tecnica")).map(normTec);
-        economica          = getArr(proposte,"economica","Economica","economic").concat(getArr(a,"economica","Economica")).map(normEco);
-        piano              = getArr(proposte,"piano","Piano","plan").concat(getArr(a,"piano","Piano"));
-        sintesi            = get(a,"sintesi","Sintesi","summary","Summary","sommario") || "";
-        allegatiCitati     = getArr(a,"allegatiCitati","AllegatiCitati","allegati_citati","allegati");
-      }
-
-      // TOW: estratti dal capitolato (sia struttura nuova che vecchia)
-      const normTow = (t, i) => ({
-        _id:         i,
-        id:          get(t,"id","Id","ID","codice","Codice","cod") || null,
-        descrizione: get(t,"descrizione","Descrizione","description","nome","nome_tow","titolo") || "",
-        quantita:    get(t,"quantita","Quantita","quantità","Quantità","qty","quantity") ?? null,
-        unitaMisura: get(t,"unitaMisura","UnitaMisura","unita_misura","unità","um","uom") || null,
-        importo:     get(t,"importo","Importo","valore","Valore","amount","price") ?? null,
-        note:        get(t,"note","Note","notes","info") || "",
+      const normDoc = (d, i) => ({
+        _id: i,
+        nome: get(d,"nome","name") || "",
+        tipo: get(d,"tipo","type") || "",
+        obbligatorio: get(d,"obbligatorio","required") ?? true,
+        dettagli: get(d,"dettagli","details") || "",
+        _docAttachment: null,
       });
-      const tow = getArr(a,"tow","Tow","TOW","tows","transazioni","transazioniLavoro","transaction_of_work").map(normTow);
-
-      const capData = {
-        titolo:             get(a,"titolo","Titolo","title","Title") || result.fileName || file.name,
-        sintesi,
-        oggetto:            get(a,"oggetto","Oggetto","object") || "",
-        committente:        get(a,"committente","Committente","client","ente") || "",
-        importoBase:        get(a,"importoBase","ImportoBase","importo_base","importo","baseAsta") || "",
-        scadenza:           get(a,"scadenza","Scadenza","deadline") || "",
-        allegatiCitati,
-        tow,
-        sezioni:            getArr(a,"sezioni","Sezioni","sections"),
-        requisitiTecnici:   getArr(a,"requisitiTecnici","RequisitiTecnici","requisiti_tecnici","requisiti","requirements"),
-        documentiRichiesti,
-        criteriValutazione: getArr(a,"criteriValutazione","CriteriValutazione","criteri_valutazione","criteri","criteria"),
-        proposte:           { tecnica, economica, piano },
-        note:               get(a,"note","Note","notes") || "",
-        fileName:           result.fileName || file.name,
-        analyzedAt:         new Date().toISOString(),
+      const normTec = (s, i) => ({
+        _id: i,
+        sezione: get(s,"sezione","section","titolo","title") || "",
+        desc: get(s,"desc","descrizione","description") || "",
+        dettagli: get(s,"dettagli","details") || "",
+        _docAttachment: null,
+      });
+      const normEco = (r, i) => ({
+        _id: i,
+        voce: get(r,"voce","nome","name","descrizione") || "",
+        gg: get(r,"gg","giorni") ?? null,
+        tariffa: get(r,"tariffa") ?? null,
+        importo: Number(get(r,"importo","totale","amount") ?? 0),
+        dettagli: get(r,"dettagli","nota","note") || "",
+        _docAttachment: null,
+      });
+      const normTow = (t, i) => ({
+        _id: i,
+        id: get(t,"id","Id","ID","codice") || null,
+        descrizione: get(t,"descrizione","description","nome") || "",
+      });
+      const normLotto = (l, i) => {
+        const proposte = get(l,"proposte","Proposte") || {};
+        return {
+          _id: i,
+          nome: get(l,"nome","name","lotto","titolo") || `Lotto ${i+1}`,
+          descrizione: get(l,"descrizione","description","sintesi") || "",
+          sezioni: getArr(l,"sezioni","sections"),
+          requisitiTecnici: getArr(l,"requisitiTecnici","requisiti_tecnici","requisiti","requirements"),
+          tow: getArr(l,"tow","TOW","tows","transazioni").map(normTow),
+          documentiRichiesti: getArr(l,"documentiRichiesti","documenti","documents").map(normDoc),
+          criteriValutazione: getArr(l,"criteriValutazione","criteri","criteria"),
+          proposte: {
+            tecnica:   getArr(proposte,"tecnica","technical").map(normTec),
+            economica: getArr(proposte,"economica","economic").map(normEco),
+            piano:     getArr(proposte,"piano","plan"),
+          },
+        };
       };
 
-      console.log("[GarePage] capData:", { isVecchia, nTow: capData.tow.length, nDoc: capData.documentiRichiesti.length, nTec: capData.proposte.tecnica.length });
+      // Struttura nuova: { titolo, sintesi, lotti:[] }
+      // Struttura vecchia fallback: nessun campo lotti
+      const lottiRaw = getArr(a,"lotti","Lotti","lots","lotto");
+      const lotti = lottiRaw.length > 0
+        ? lottiRaw.map(normLotto)
+        : [{
+            _id: 0,
+            nome: "Gara",
+            descrizione: get(a,"sintesi","oggetto") || "",
+            sezioni: getArr(a,"sezioni","sections"),
+            requisitiTecnici: getArr(a,"requisitiTecnici","requisiti_tecnici","requisiti"),
+            tow: getArr(a,"tow","TOW","tows","transazioni").map(normTow),
+            documentiRichiesti: getArr(a,"documentiRichiesti","documenti").map(normDoc),
+            criteriValutazione: getArr(a,"criteriValutazione","criteri"),
+            proposte: {
+              tecnica:   getArr(get(a,"proposte")||{},"tecnica","technical").map(normTec),
+              economica: getArr(get(a,"proposte")||{},"economica","economic").map(normEco),
+              piano:     getArr(get(a,"proposte")||{},"piano","plan"),
+            },
+          }];
+
+      const capData = {
+        titolo:        get(a,"titolo","title") || result.fileName || file.name,
+        sintesi:       get(a,"sintesi","summary","sommario") || "",
+        oggetto:       get(a,"oggetto","object") || "",
+        committente:   get(a,"committente","client","ente") || "",
+        importoBase:   get(a,"importoBase","importo_base","importo") || "",
+        scadenza:      get(a,"scadenza","deadline") || "",
+        allegatiCitati: getArr(a,"allegatiCitati","allegati_citati","allegati"),
+        lotti,
+        note:          get(a,"note","notes") || "",
+        fileName:      result.fileName || file.name,
+        analyzedAt:    new Date().toISOString(),
+      };
+
+      console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length })) });
+      setLottoAttivo(capData.lotti.length > 1 ? null : 0);
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
       console.error("[GarePage] errore analisi capitolato:", err?.message || err);
       setCapError(err?.message || "Errore analisi capitolato");
     } finally {
       setAnalyzingCap(false);
-     }
+    }
   };
 
   const toggleCheck = (id) => {
@@ -733,15 +683,18 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
               {/* Risultati analisi capitolato */}
               {gara.capitolato && (() => {
                 const cap = gara.capitolato;
+                const lotti = cap.lotti || [];
+                const lotto = lottoAttivo != null ? lotti[lottoAttivo] : null;
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {/* Header info estratte */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+
+                    {/* Info generali */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
                       {[
-                        { label: "Committente",   value: cap.committente  },
-                        { label: "Oggetto",        value: cap.oggetto      },
-                        { label: "Importo base",   value: cap.importoBase  },
-                        { label: "Scadenza",       value: cap.scadenza     },
+                        { label: "Committente", value: cap.committente },
+                        { label: "Oggetto",     value: cap.oggetto },
+                        { label: "Importo base", value: cap.importoBase },
+                        { label: "Scadenza",    value: cap.scadenza },
                       ].filter(r => r.value).map((r, i) => (
                         <div key={i} style={{ background: AMBER_BG, border: "1px solid " + AMBER_BORDER, borderRadius: 8, padding: "9px 12px" }}>
                           <div style={{ fontSize: 10, fontWeight: 700, color: AMBER_DARK, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{r.label}</div>
@@ -750,105 +703,153 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                       ))}
                     </div>
 
-                    {/* Sintesi */}
+                    {/* Sintesi gara */}
                     {cap.sintesi && (
                       <div style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0", padding: "12px 16px" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sintesi</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sintesi della gara</div>
                         <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{cap.sintesi}</div>
                       </div>
                     )}
 
-                    {/* Sezioni */}
-                    {(cap.sezioni || []).length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sezioni ({cap.sezioni.length})</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {cap.sezioni.map((s, i) => (
-                            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: "#fafafa", borderRadius: 8, border: "1px solid #f0f0f0" }}>
-                              <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{s.numero || i+1}</span>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{s.titolo}</div>
-                                {s.sintesi && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{s.sintesi}</div>}
+                    {/* ── SELETTORE LOTTI ── */}
+                    {lotti.length > 0 && (
+                      <div style={{ background: "#fff", borderRadius: 12, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
+                        <div style={{ background: "linear-gradient(135deg,#78350f," + AMBER_DARK + ")", padding: "12px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 16 }}>🗂️</span>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>Lotti della gara</div>
+                          <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{lotti.length} lott{lotti.length === 1 ? "o" : "i"}</span>
+                        </div>
+                        <div style={{ padding: "14px 18px" }}>
+                          {lotti.length > 1 && (
+                            <div style={{ marginBottom: 12, fontSize: 12, color: "#6b7280" }}>
+                              Seleziona un lotto per filtrare tutte le sezioni, o visualizza tutti insieme.
+                            </div>
+                          )}
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {lotti.length > 1 && (
+                              <button
+                                onClick={() => setLottoAttivo(null)}
+                                style={{ padding: "8px 18px", borderRadius: 9, border: "2px solid " + (lottoAttivo === null ? AMBER : "#e5e7eb"), background: lottoAttivo === null ? AMBER_LIGHT : "#fff", color: lottoAttivo === null ? AMBER_DARK : "#374151", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}>
+                                Tutti i lotti
+                              </button>
+                            )}
+                            {lotti.map((l, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setLottoAttivo(i)}
+                                style={{ padding: "8px 18px", borderRadius: 9, border: "2px solid " + (lottoAttivo === i ? AMBER : "#e5e7eb"), background: lottoAttivo === i ? AMBER : "#fff", color: lottoAttivo === i ? "#78350f" : "#374151", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", boxShadow: lottoAttivo === i ? "0 2px 8px rgba(245,158,11,0.3)" : "none" }}>
+                                {l.nome}
+                              </button>
+                            ))}
+                          </div>
+                          {lotto && lotto.descrizione && (
+                            <div style={{ marginTop: 12, padding: "10px 14px", background: AMBER_BG, borderRadius: 8, border: "1px solid " + AMBER_BORDER, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
+                              {lotto.descrizione}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── CONTENUTO FILTRATO PER LOTTO ── */}
+                    {(() => {
+                      const src = lotto || (lotti.length === 1 ? lotti[0] : null);
+                      if (!src && lotti.length > 1) return (
+                        <div style={{ padding: "18px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 13, color: "#6b7280", textAlign: "center" }}>
+                          Seleziona un lotto per visualizzare sezioni, requisiti, TOW, documenti e criteri.
+                        </div>
+                      );
+                      const d = src || {};
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                          {/* Sezioni */}
+                          {(d.sezioni || []).length > 0 && (
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sezioni ({d.sezioni.length})</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {d.sezioni.map((s, i) => (
+                                  <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: "#fafafa", borderRadius: 8, border: "1px solid #f0f0f0" }}>
+                                    <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{s.numero || i+1}</span>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{s.titolo}</div>
+                                      {s.sintesi && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{s.sintesi}</div>}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          )}
 
-                    {/* 3 colonne: requisiti, documenti, criteri */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-                      {(cap.requisitiTecnici || []).length > 0 && (
-                        <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Requisiti tecnici ({cap.requisitiTecnici.length})</div>
-                          {cap.requisitiTecnici.map((r, i) => (
-                            <div key={i} style={{ fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < cap.requisitiTecnici.length-1 ? "1px solid #f0f0f0" : "none" }}>• {r}</div>
-                          ))}
-                        </div>
-                      )}
-                      {(cap.documentiRichiesti || []).length > 0 && (
-                        <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Documenti richiesti ({cap.documentiRichiesti.length})</div>
-                          {cap.documentiRichiesti.map((d, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < cap.documentiRichiesti.length-1 ? "1px solid #f0f0f0" : "none" }}>
-                              <span style={{ fontSize: 9, color: d.obbligatorio ? "#dc2626" : "#9ca3af" }}>●</span>
-                              <span style={{ flex: 1 }}>{d.nome}</span>
-                              {d.tipo && <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 600 }}>{d.tipo}</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {(cap.criteriValutazione || []).length > 0 && (
-                        <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Criteri valutazione ({cap.criteriValutazione.length})</div>
-                          {cap.criteriValutazione.map((c, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < cap.criteriValutazione.length-1 ? "1px solid #f0f0f0" : "none" }}>
-                              <span style={{ flex: 1 }}>{c.criterio}</span>
-                              {c.peso && <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{c.peso}</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                          {/* 3 colonne: requisiti, documenti, criteri */}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+                            {(d.requisitiTecnici || []).length > 0 && (
+                              <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Requisiti tecnici ({d.requisitiTecnici.length})</div>
+                                {d.requisitiTecnici.map((r, i) => (
+                                  <div key={i} style={{ fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < d.requisitiTecnici.length-1 ? "1px solid #f0f0f0" : "none" }}>• {r}</div>
+                                ))}
+                              </div>
+                            )}
+                            {(d.documentiRichiesti || []).length > 0 && (
+                              <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Documenti richiesti ({d.documentiRichiesti.length})</div>
+                                {d.documentiRichiesti.map((doc, i) => (
+                                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < d.documentiRichiesti.length-1 ? "1px solid #f0f0f0" : "none" }}>
+                                    <span style={{ fontSize: 9, color: doc.obbligatorio ? "#dc2626" : "#9ca3af" }}>●</span>
+                                    <span style={{ flex: 1 }}>{doc.nome}</span>
+                                    {doc.tipo && <span style={{ background: "#f1f5f9", color: "#64748b", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 600 }}>{doc.tipo}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {(d.criteriValutazione || []).length > 0 && (
+                              <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Criteri valutazione ({d.criteriValutazione.length})</div>
+                                {d.criteriValutazione.map((c, i) => (
+                                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < d.criteriValutazione.length-1 ? "1px solid #f0f0f0" : "none" }}>
+                                    <span style={{ flex: 1 }}>{c.criterio}</span>
+                                    {c.peso && <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 700 }}>{c.peso}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
-                    {/* TOW estratti dal capitolato */}
-                    {(cap.tow || []).length > 0 && (
-                      <div style={{ background: "#fff", borderRadius: 10, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
-                        <div style={{ background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 16 }}>📋</span>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({cap.tow.length})</div>
-                          <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
+                          {/* TOW */}
+                          {(d.tow || []).length > 0 && (
+                            <div style={{ background: "#fff", borderRadius: 10, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
+                              <div style={{ background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontSize: 16 }}>📋</span>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({d.tow.length})</div>
+                                <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
+                              </div>
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                  <thead>
+                                    <tr style={{ background: AMBER_BG, borderBottom: "2px solid " + AMBER_BORDER }}>
+                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID/Cod.</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase" }}>Descrizione</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {d.tow.map((t, i) => (
+                                      <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                                        <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                                          {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
+                                        </td>
+                                        <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>{t.descrizione || "—"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
                         </div>
-                        <div style={{ overflowX: "auto" }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                            <thead>
-                              <tr style={{ background: AMBER_BG, borderBottom: "2px solid " + AMBER_BORDER }}>
-                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>ID/Cod.</th>
-                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Descrizione</th>
-                                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Quantità</th>
-                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>U.M.</th>
-                                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Importo</th>
-                                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Note</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {cap.tow.map((t, i) => (
-                                <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                                  <td style={{ padding: "8px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>
-                                    {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
-                                  </td>
-                                  <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>{t.descrizione || "—"}</td>
-                                  <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.quantita != null ? t.quantita : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                  <td style={{ padding: "8px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>{t.unitaMisura || <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                  <td style={{ padding: "8px 12px", color: "#111827", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.importo != null ? (isNaN(Number(t.importo)) ? t.importo : "€ " + Number(t.importo).toLocaleString("it-IT")) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                  <td style={{ padding: "8px 12px", color: "#6b7280", fontSize: 11 }}>{t.note || <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {cap.note && (
                       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>

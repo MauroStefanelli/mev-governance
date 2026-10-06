@@ -70,17 +70,19 @@ public class GareController : ControllerBase
 
         var snippet = fullText;
 
-        // Prompt minimalista: Capgemini non regge prompt lunghi
+        // Prompt: struttura per lotti
         var instruction = "Sei un esperto di gare d'appalto IT italiane. Analizza il documento e rispondi SOLO con JSON puro (no markdown). " +
-            "Estrai i seguenti campi: titolo, sintesi, oggetto, committente, importoBase, scadenza, " +
-            "allegatiCitati (array di stringhe con nomi file citati), " +
-            "tow (array di oggetti con campi id/descrizione/quantita/unitaMisura/importo/note — i TOW sono Transazioni di Lavoro, cercali ovunque nel documento), " +
+            "La struttura ha due livelli: dati generali della gara e poi i lotti. " +
+            "Campi generali: titolo, sintesi, oggetto, committente, importoBase, scadenza, allegatiCitati (array stringhe), note. " +
+            "Campo lotti: array di oggetti, uno per ogni lotto trovato nel documento. Se non ci sono lotti espliciti crea un unico lotto chiamato 'Gara'. " +
+            "Ogni lotto ha: nome (es. 'Lotto 1 - Tracciatura'), descrizione, " +
             "sezioni (array con numero/titolo/sintesi), " +
-            "requisitiTecnici (array di stringhe), " +
-            "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli/allegatiRiferimento), " +
+            "requisitiTecnici (array stringhe), " +
+            "tow (array con id/descrizione — i TOW sono Transazioni di Lavoro, cercali ovunque nel documento), " +
+            "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli), " +
             "criteriValutazione (array con criterio/peso), " +
-            "proposte con sotto-campi: tecnica (array con sezione/desc/dettagli/allegatiRiferimento), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato), " +
-            "note. Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
+            "proposte: { tecnica (array con sezione/desc/dettagli), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato) }. " +
+            "Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
 
         var userMessage = $"File: {file.FileName}\n\nTESTO (pagine rilevanti):\n{snippet}";
 
