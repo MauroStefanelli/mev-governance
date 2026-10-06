@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MevGovernanceBackend.Services;
 using MevGovernanceBackend.Data;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace MevGovernanceBackend.Controllers;
@@ -61,14 +62,14 @@ public class GareController : ControllerBase
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Sono accettati solo file PDF." });
 
-        // 1) Estrai testo + righe TOW dal capitolato (un'unica lettura del file)
+        // 1) Estrai testo + righe TOW dal capitolato
         string fullText;
         List<TowRow> towRowsFromCapitolato;
         try
         {
-            // Prima passata: testo per l'AI
+            // Prima passata: testo per l'AI — 4000 char come Gestione Contratti (max_tokens=4096)
             using (var s = file.OpenReadStream())
-                fullText = ContractParserService.ExtractRelevantPages(s, maxChars: 8000);
+                fullText = ContractParserService.ExtractRelevantPages(s, maxChars: 4000);
             // Seconda passata: estrazione geometrica righe TOW (id+descrizione+quantita)
             using (var s2 = file.OpenReadStream())
                 towRowsFromCapitolato = ContractParserService.ExtractTowRows(s2);
@@ -267,36 +268,22 @@ public class GareController : ControllerBase
     }
 
     // POST /api/gare/analizza-proposte
-    // Riceve il PDF + nomeLotto e restituisce solo le proposte (tecnica/economica/piano)
-    // Chiamato on-demand per ogni lotto dopo l'analisi struttura principale.
+    // Riceve un contesto JSON (titolo gara, lotto, requisiti) e restituisce proposte tecnica/economica/piano.
+    // NON legge il PDF — usa i dati già estratti dall'analisi struttura. Stesso pattern di AnalyzeAsync.
     [HttpPost("analizza-proposte")]
-    public async Task<IActionResult> AnalizzaProposte()
+    public async Task<IActionResult> AnalizzaProposte([FromBody] JsonElement context)
     {
         if (!CanAccess()) return Forbid();
-
-        var form = Request.Form;
-        var file = form.Files.GetFile("file");
-        if (file == null || file.Length == 0)
-            return BadRequest(new { message = "file mancante" });
-
-        var nomeLotto = form["nomeLotto"].ToString();
-        var lottoNum  = form["lottoNum"].ToString();
-
-        string fullText;
-        try
-        {
-            using var s = file.OpenReadStream();
-            fullText = ContractParserService.ExtractRelevantPages(s, maxChars: 8000);
-        }
-        catch (Exception ex) { return StatusCode(500, new { message = "Errore lettura PDF: " + ex.Message }); }
+        if (context.ValueKind != JsonValueKind.Object)
+            return BadRequest(new { message = "Contesto non valido" });
 
         var instruction =
-            "Sei un esperto di gare d'appalto IT italiane. Rispondi SOLO con JSON puro, zero markdown, zero testo extra. " +
-            "Schema: {tecnica[{sezione,desc,dettagli}], economica[{voce,gg,tariffa,importo,dettagli}], piano[{milestone,data,durata,owner,stato}]}. " +
-            "Genera proposte realistiche per rispondere alla gara descritta. Solo JSON valido.";
+            "Sei un esperto di gare d'appalto IT italiane. Analizza il contesto della gara e genera proposte di risposta. " +
+            "Rispondi SOLO con JSON puro, nessun markdown. " +
+            "Schema: {tecnica:[{sezione,desc,dettagli}], economica:[{voce,gg,tariffa,importo,dettagli}], piano:[{milestone,data,durata,owner,stato}]}. " +
+            "Max 6 voci per array. Solo JSON valido.";
 
-        var lottoDesc = !string.IsNullOrEmpty(nomeLotto) ? $"Lotto: {nomeLotto}" : (!string.IsNullOrEmpty(lottoNum) ? $"Lotto {lottoNum}" : "");
-        var userMessage = $"File: {file.FileName}\n{lottoDesc}\n\nTESTO:\n{fullText}";
+        var userMessage = "Contesto gara:\n" + context.ToString();
 
         JsonObject analysis;
         string provider, usedModel;

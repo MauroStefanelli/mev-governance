@@ -539,12 +539,28 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
   // Genera proposte (tecnica/economica/piano) per un lotto specifico — on-demand
   const handleGeneraProposte = async (lottoIdx) => {
-    if (!capFile) { alert("Ricarica il capitolato PDF per generare le proposte."); return; }
     const lotto = lotti[lottoIdx];
     if (!lotto) return;
     setAnalyzingProposte(prev => ({ ...prev, [lottoIdx]: true }));
     try {
-      const result = await analizzaProposteGara(capFile, lotto.nome, lottoIdx + 1);
+      // Contesto JSON strutturato — stesso pattern di Gestione Contratti, NO upload PDF
+      const context = {
+        gara: {
+          titolo:      cap?.titolo || "",
+          committente: cap?.committente || "",
+          importoBase: cap?.importoBase || "",
+          scadenza:    cap?.scadenza || "",
+        },
+        lotto: {
+          nome:               lotto.nome,
+          descrizione:        lotto.descrizione || "",
+          importoBase:        lotto.importoBase || "",
+          requisitiTecnici:   lotto.requisitiTecnici || [],
+          criteriValutazione: lotto.criteriValutazione || [],
+          documentiRichiesti: (lotto.documentiRichiesti || []).map(d => d.nome).filter(Boolean),
+        },
+      };
+      const result = await analizzaProposteGara(context);
       const p = result.proposte || {};
       const get    = (obj, ...ks) => { for (const k of ks) if (obj && obj[k] != null) return obj[k]; return null; };
       const getArr = (obj, ...ks) => { const v = get(obj, ...ks); return Array.isArray(v) ? v : []; };

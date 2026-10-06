@@ -457,10 +457,8 @@ public class AiService
             new JsonObject { ["role"] = "user",     ["content"] = finalUserMessage }
         };
         // structured: false — usa il prompt nel messaggio di sistema (no schema JSON del Configuratore)
+        // max_tokens: NON sovrascrivere — BuildPayload imposta 4096 per Capgemini (stesso di Gestione Contratti)
         var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
-        // Per Capgemini la risposta gara è molto più lunga del Configuratore: aumenta max_tokens
-        if (s.Endpoint.Contains("capgemini", StringComparison.OrdinalIgnoreCase) && payload.ContainsKey("max_tokens"))
-            payload["max_tokens"] = 8192;
         var response = await PostAsync(s, payload);
         var responseText = ExtractResponseText(response);
 
