@@ -383,95 +383,144 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
     setCapError("");
     try {
       const result = await analizzaCapitolatoGara(file);
-      // LOG per debug: mostra la struttura reale restituita dall'AI
-      console.log("[GarePage] analisi capitolato - result raw:", JSON.stringify(result, null, 2));
       const a = result.analysis || {};
-      console.log("[GarePage] analisi capitolato - chiavi di a:", Object.keys(a));
+      const keys = Object.keys(a);
+      console.log("[GarePage] analisi capitolato - chiavi:", keys);
 
       // Helper: legge un campo accettando camelCase, PascalCase, snake_case
-      const get = (obj, ...keys) => { for (const k of keys) { if (obj[k] != null) return obj[k]; } return null; };
-      const getArr = (obj, ...keys) => { const v = get(obj, ...keys); return Array.isArray(v) ? v : []; };
+      const get    = (obj, ...ks) => { for (const k of ks) if (obj[k] != null) return obj[k]; return null; };
+      const getArr = (obj, ...ks) => { const v = get(obj, ...ks); return Array.isArray(v) ? v : []; };
 
-      const proposte = get(a, "proposte", "Proposte") || {};
+      // ── Struttura NUOVA (dopo redeploy) ────────────────────────────────────
+      // { titolo, sintesi, oggetto, committente, allegatiCitati, sezioni,
+      //   requisitiTecnici, documentiRichiesti[{nome,tipo,dettagli,allegatiRiferimento}],
+      //   criteriValutazione, proposte:{tecnica,economica,piano}, note }
+      //
+      // ── Struttura VECCHIA / Configuratore (prima del redeploy) ────────────
+      // { summary, proposals[{type,complexity,rationale,additionalInfo,confidence}], warnings }
 
-      // Normalizza un documento da produrre (documentiRichiesti)
-      const normDoc = (d, i) => ({
-        ...d,
-        _id: i,
-        nome:                get(d, "nome", "Nome", "name", "Name") || "",
-        tipo:                get(d, "tipo", "Tipo", "type", "Type") || "",
-        obbligatorio:        get(d, "obbligatorio", "Obbligatorio", "required", "Required") ?? true,
-        dettagli:            get(d, "dettagli", "Dettagli", "details", "Details", "istruzioni", "Istruzioni") || "",
-        allegatiRiferimento: getArr(d, "allegatiRiferimento", "AllegratiRiferimento", "allegati_riferimento", "allegatiRif", "references", "References"),
-        _docAttachment:      null,
-      });
+      const isVecchia = !get(a, "documentiRichiesti", "titolo", "proposte") && (get(a, "summary") || get(a, "proposals"));
 
-      // Normalizza una sezione tecnica
-      const normTec = (s, i) => ({
-        ...s,
-        _id: i,
-        sezione:             get(s, "sezione", "Sezione", "section", "Section", "titolo", "Titolo", "title") || "",
-        desc:                get(s, "desc", "Desc", "descrizione", "Descrizione", "description", "Description", "contenuto") || "",
-        dettagli:            get(s, "dettagli", "Dettagli", "details", "Details", "istruzioni", "Istruzioni") || "",
-        allegatiRiferimento: getArr(s, "allegatiRiferimento", "allegati_riferimento", "allegatiRif", "references"),
-        _docAttachment:      null,
-      });
+      let documentiRichiesti, tecnica, economica, piano, sintesi, allegatiCitati;
 
-      // Normalizza una voce economica
-      const normEco = (r, i) => ({
-        ...r,
-        _id: i,
-        voce:                get(r, "voce", "Voce", "nome", "Nome", "name", "descrizione") || "",
-        gg:                  get(r, "gg", "Gg", "giorni", "Giorni", "days") ?? null,
-        tariffa:             get(r, "tariffa", "Tariffa", "tariff", "prezzoUnitario") ?? null,
-        importo:             Number(get(r, "importo", "Importo", "totale", "Totale", "amount", "Amount") ?? 0),
-        dettagli:            get(r, "dettagli", "Dettagli", "details", "Details", "nota", "Nota", "note") || "",
-        allegatiRiferimento: getArr(r, "allegatiRiferimento", "allegati_riferimento", "references"),
-        _docAttachment:      null,
-      });
+      if (isVecchia) {
+        // Adatta la struttura del Configuratore alla GarePage
+        const proposals = getArr(a, "proposals", "Proposals");
+        const warnings  = getArr(a, "warnings",  "Warnings");
+
+        // Documenti da produrre: ogni proposal diventa un documento
+        documentiRichiesti = proposals.map((p, i) => ({
+          _id:                i,
+          nome:               `${get(p,"type","Type") || "Intervento"} ${get(p,"complexity","Complexity") || ""}`.trim(),
+          tipo:               get(p,"type","Type") || "Tecnico",
+          obbligatorio:       true,
+          dettagli:           [
+            get(p,"rationale","Rationale") || "",
+            get(p,"additionalInfo","AdditionalInfo","additional_info") ? `\n\nNote operative: ${get(p,"additionalInfo","AdditionalInfo","additional_info")}` : "",
+          ].join("").trim(),
+          allegatiRiferimento: [],
+          _docAttachment:     null,
+        }));
+
+        // Proposta tecnica: raggruppa per tipo/complessità + warnings come ultima sezione
+        const byType = {};
+        proposals.forEach(p => {
+          const k = get(p,"type","Type") || "Altro";
+          if (!byType[k]) byType[k] = [];
+          byType[k].push(p);
+        });
+        tecnica = Object.entries(byType).map(([tipo, ps], i) => ({
+          _id:     i,
+          sezione: tipo,
+          desc:    ps.map(p => `[${get(p,"complexity","Complexity") || "?"}] ${(get(p,"rationale","Rationale") || "").split(".")[0]}.`).join(" "),
+          dettagli: ps.map(p => {
+            const rat  = get(p,"rationale","Rationale") || "";
+            const info = get(p,"additionalInfo","AdditionalInfo","additional_info") || "";
+            return [rat, info ? `Indicazioni operative: ${info}` : ""].filter(Boolean).join("\n\n");
+          }).join("\n\n---\n\n"),
+          allegatiRiferimento: [],
+          _docAttachment:      null,
+        }));
+        if (warnings.length > 0) {
+          tecnica.push({
+            _id:     tecnica.length,
+            sezione: "Avvertenze e limitazioni analisi",
+            desc:    "L'AI ha rilevato i seguenti avvisi — verificare prima di procedere.",
+            dettagli: warnings.join("\n\n"),
+            allegatiRiferimento: [],
+            _docAttachment: null,
+          });
+        }
+
+        economica      = [];
+        piano          = [];
+        sintesi        = get(a, "summary", "Summary") || "";
+        allegatiCitati = [];
+
+      } else {
+        // Struttura NUOVA — mappatura diretta
+        const proposte = get(a, "proposte", "Proposte") || {};
+        const normDoc  = (d, i) => ({
+          _id:                i,
+          nome:               get(d,"nome","Nome","name") || "",
+          tipo:               get(d,"tipo","Tipo","type") || "",
+          obbligatorio:       get(d,"obbligatorio","Obbligatorio","required") ?? true,
+          dettagli:           get(d,"dettagli","Dettagli","details","istruzioni") || "",
+          allegatiRiferimento:getArr(d,"allegatiRiferimento","allegati_riferimento","references"),
+          _docAttachment:     null,
+        });
+        const normTec  = (s, i) => ({
+          _id:     i,
+          sezione: get(s,"sezione","Sezione","section","titolo","title") || "",
+          desc:    get(s,"desc","Desc","descrizione","description","contenuto") || "",
+          dettagli:get(s,"dettagli","Dettagli","details","istruzioni") || "",
+          allegatiRiferimento:getArr(s,"allegatiRiferimento","allegati_riferimento","references"),
+          _docAttachment: null,
+        });
+        const normEco  = (r, i) => ({
+          _id:     i,
+          voce:    get(r,"voce","Voce","nome","name","descrizione") || "",
+          gg:      get(r,"gg","Gg","giorni","days") ?? null,
+          tariffa: get(r,"tariffa","Tariffa","tariff") ?? null,
+          importo: Number(get(r,"importo","Importo","totale","amount") ?? 0),
+          dettagli:get(r,"dettagli","Dettagli","details","nota","note") || "",
+          allegatiRiferimento:getArr(r,"allegatiRiferimento","allegati_riferimento","references"),
+          _docAttachment: null,
+        });
+
+        documentiRichiesti = getArr(a,"documentiRichiesti","DocumentiRichiesti","documenti_richiesti","documenti","documents").map(normDoc);
+        tecnica            = getArr(proposte,"tecnica","Tecnica","technical").concat(getArr(a,"tecnica","Tecnica")).map(normTec);
+        economica          = getArr(proposte,"economica","Economica","economic").concat(getArr(a,"economica","Economica")).map(normEco);
+        piano              = getArr(proposte,"piano","Piano","plan").concat(getArr(a,"piano","Piano"));
+        sintesi            = get(a,"sintesi","Sintesi","summary","Summary","sommario") || "";
+        allegatiCitati     = getArr(a,"allegatiCitati","AllegatiCitati","allegati_citati","allegati");
+      }
 
       const capData = {
-        titolo:             get(a, "titolo", "Titolo", "title", "Title") || "",
-        sintesi:            get(a, "sintesi", "Sintesi", "summary", "Summary", "sommario") || "",
-        oggetto:            get(a, "oggetto", "Oggetto", "object", "Object") || "",
-        committente:        get(a, "committente", "Committente", "client", "Client", "ente") || "",
-        importoBase:        get(a, "importoBase", "ImportoBase", "importo_base", "importo", "baseAsta") || "",
-        scadenza:           get(a, "scadenza", "Scadenza", "deadline", "Deadline") || "",
-        allegatiCitati:     getArr(a, "allegatiCitati", "AllegatiCitati", "allegati_citati", "allegati", "Allegati"),
-        sezioni:            getArr(a, "sezioni", "Sezioni", "sections", "Sections"),
-        requisitiTecnici:   getArr(a, "requisitiTecnici", "RequisitiTecnici", "requisiti_tecnici", "requisiti", "requirements"),
-        documentiRichiesti: getArr(a, "documentiRichiesti", "DocumentiRichiesti", "documenti_richiesti", "documenti", "documents").map(normDoc),
-        criteriValutazione: getArr(a, "criteriValutazione", "CriteriValutazione", "criteri_valutazione", "criteri", "criteria"),
-        proposte: {
-          tecnica:   getArr(proposte, "tecnica", "Tecnica", "technical", ...
-            // fallback: cerca anche direttamente in a
-            []).concat(getArr(a, "tecnica", "Tecnica", "technical", "proposte_tecnica")).map(normTec),
-          economica: getArr(proposte, "economica", "Economica", "economic", ...
-            []).concat(getArr(a, "economica", "Economica", "economic", "proposte_economica")).map(normEco),
-          piano:     getArr(proposte, "piano", "Piano", "plan", ...
-            []).concat(getArr(a, "piano", "Piano", "plan")),
-        },
-        note:       get(a, "note", "Note", "notes", "Notes") || "",
-        fileName:   result.fileName || file.name,
-        analyzedAt: new Date().toISOString(),
+        titolo:             get(a,"titolo","Titolo","title","Title") || result.fileName || file.name,
+        sintesi,
+        oggetto:            get(a,"oggetto","Oggetto","object") || "",
+        committente:        get(a,"committente","Committente","client","ente") || "",
+        importoBase:        get(a,"importoBase","ImportoBase","importo_base","importo","baseAsta") || "",
+        scadenza:           get(a,"scadenza","Scadenza","deadline") || "",
+        allegatiCitati,
+        sezioni:            getArr(a,"sezioni","Sezioni","sections"),
+        requisitiTecnici:   getArr(a,"requisitiTecnici","RequisitiTecnici","requisiti_tecnici","requisiti","requirements"),
+        documentiRichiesti,
+        criteriValutazione: getArr(a,"criteriValutazione","CriteriValutazione","criteri_valutazione","criteri","criteria"),
+        proposte:           { tecnica, economica, piano },
+        note:               get(a,"note","Note","notes") || "",
+        fileName:           result.fileName || file.name,
+        analyzedAt:         new Date().toISOString(),
       };
 
-      console.log("[GarePage] capData costruito:", {
-        titolo: capData.titolo,
-        nDocumenti: capData.documentiRichiesti.length,
-        primoDoc: capData.documentiRichiesti[0],
-        nTecnica: capData.proposte.tecnica.length,
-        primaTec: capData.proposte.tecnica[0],
-        nEconomica: capData.proposte.economica.length,
-        allegatiCitati: capData.allegatiCitati,
-      });
-
+      console.log("[GarePage] capData:", { isVecchia, nDoc: capData.documentiRichiesti.length, nTec: capData.proposte.tecnica.length });
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
       setCapError(err?.message || "Errore analisi capitolato");
     } finally {
       setAnalyzingCap(false);
-    }
+     }
   };
 
   const toggleCheck = (id) => {
