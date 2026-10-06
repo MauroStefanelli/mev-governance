@@ -90,6 +90,7 @@ public class GareController : ControllerBase
             "requisitiTecnici (array stringhe), " +
             "documentiRichiesti (array con nome/tipo/obbligatorio/dettagli), " +
             "criteriValutazione (array con criterio/peso), " +
+            "importoBase (importo base d'asta specifico del lotto come stringa, es. '1.234.567,00 €'), " +
             "proposte: { tecnica (array con sezione/desc/dettagli), economica (array con voce/gg/tariffa/importo/dettagli), piano (array con milestone/data/durata/owner/stato) }. " +
             "Rispondi ESCLUSIVAMENTE con JSON valido, nessun testo aggiuntivo.";
 
@@ -215,5 +216,34 @@ public class GareController : ControllerBase
             model      = usedModel,
             analysis,
         });
+    }
+
+    // POST /api/gare/debug-tow?lot=2
+    // Restituisce il raw output di ParseTowPricePdf e ExtractTowRows su un PDF
+    [HttpPost("debug-tow")]
+    public IActionResult DebugTow([FromQuery] int lot = 1)
+    {
+        if (!CanAccess()) return Forbid();
+        var f = Request.Form.Files.GetFile("file");
+        if (f == null) return BadRequest(new { message = "file mancante" });
+        List<TowRow> rows;
+        Dictionary<string, double> prices;
+        using (var s1 = f.OpenReadStream()) rows   = ContractParserService.ExtractTowRows(s1);
+        using (var s2 = f.OpenReadStream()) prices = ContractParserService.ParseTowPricePdf(s2, lot);
+        return Ok(new { extractTowRows = rows, parseTowPricePdf = prices });
+    }
+
+    // POST /api/gare/debug-catalog?lot=1
+    // Restituisce il raw output di ParseCatalogPdf su un PDF
+    [HttpPost("debug-catalog")]
+    public IActionResult DebugCatalog([FromQuery] int lot = 1)
+    {
+        if (!CanAccess()) return Forbid();
+        var f = Request.Form.Files.GetFile("file");
+        if (f == null) return BadRequest(new { message = "file mancante" });
+        List<CatalogEntry> entries;
+        using var s = f.OpenReadStream();
+        entries = ContractParserService.ParseCatalogPdf(s, lot);
+        return Ok(new { count = entries.Count, entries });
     }
 }

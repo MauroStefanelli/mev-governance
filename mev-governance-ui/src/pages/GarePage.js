@@ -457,6 +457,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
           _id: i,
           nome: get(l,"nome","name","lotto","titolo") || `Lotto ${i+1}`,
           descrizione: get(l,"descrizione","description","sintesi") || "",
+          importoBase: get(l,"importoBase","importo_base","importo","baseAsta") || "",
           sezioni: getArr(l,"sezioni","sections"),
           requisitiTecnici: getArr(l,"requisitiTecnici","requisiti_tecnici","requisiti","requirements"),
           tow: getArr(l,"tow","TOW","tows","transazioni").map(normTow),
@@ -507,7 +508,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         analyzedAt:    new Date().toISOString(),
       };
 
-      console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length })) });
+      console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase })) });
       setLottoAttivo(capData.lotti.length > 1 ? null : 0);
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
@@ -834,9 +835,14 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                               </button>
                             ))}
                           </div>
-                          {lotto && lotto.descrizione && (
+                          {lotto && (lotto.descrizione || lotto.importoBase) && (
                             <div style={{ marginTop: 12, padding: "10px 14px", background: AMBER_BG, borderRadius: 8, border: "1px solid " + AMBER_BORDER, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
-                              {lotto.descrizione}
+                              {lotto.descrizione && <div>{lotto.descrizione}</div>}
+                              {lotto.importoBase && (
+                                <div style={{ marginTop: lotto.descrizione ? 6 : 0, fontSize: 12, fontWeight: 700, color: AMBER_DARK }}>
+                                  Base d'asta: {lotto.importoBase}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
