@@ -297,20 +297,33 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
   const files      = gara.fileNames || [];
   const checklist  = gara.checklist || DEFAULT_CHECKLIST.map(c => ({ ...c }));
-  const analyzed   = gara.analyzed || (gara.capitolato?.proposte != null) || false;
-  // aiResult: supporta sia la struttura vecchia (gara.aiResult) sia la nuova (gara.capitolato.proposte)
   const cap        = gara.capitolato || null;
-  const aiResult   = gara.aiResult ? {
-    documenti: (gara.aiResult.documenti || []).map((d, i) => ({ ...d, _id: i, dettagli: d.dettagli || "", allegatiRiferimento: d.allegatiRiferimento || [], _docAttachment: d._docAttachment || null })),
-    tecnica:   (gara.aiResult.tecnica || []).map((s, i) => ({ ...s, _id: i, dettagli: s.dettagli || "", allegatiRiferimento: s.allegatiRiferimento || [], _docAttachment: s._docAttachment || null })),
-    economica: (gara.aiResult.economica || []).map((r, i) => ({ ...r, _id: i, dettagli: r.dettagli || "", allegatiRiferimento: r.allegatiRiferimento || [], _docAttachment: r._docAttachment || null })),
-    piano:     gara.aiResult.piano || [],
-  } : cap?.proposte ? {
-    documenti: cap.documentiRichiesti || [],
-    tecnica:   cap.proposte.tecnica   || [],
-    economica: cap.proposte.economica || [],
-    piano:     cap.proposte.piano     || [],
-  } : null;
+
+  // aiResult: fonte unica = cap.proposte (popolato dall'analisi capitolato AI).
+  // Fallback su gara.aiResult (mock vecchio) se cap.proposte non esiste.
+  const aiResult = (() => {
+    if (cap?.proposte) {
+      return {
+        documenti: cap.documentiRichiesti || [],
+        tecnica:   cap.proposte.tecnica   || [],
+        economica: cap.proposte.economica || [],
+        piano:     cap.proposte.piano     || [],
+      };
+    }
+    if (gara.aiResult) {
+      const r = gara.aiResult;
+      const norm = (arr, i) => arr.map((x, j) => ({ ...x, _id: j, dettagli: x.dettagli || "", allegatiRiferimento: x.allegatiRiferimento || [], _docAttachment: x._docAttachment || null }));
+      return {
+        documenti: norm(r.documenti || []),
+        tecnica:   norm(r.tecnica   || []),
+        economica: norm(r.economica || []),
+        piano:     r.piano || [],
+      };
+    }
+    return null;
+  })();
+
+  const analyzed = aiResult !== null;
 
   const handleDrop = (e) => {
     e.preventDefault(); setIsDragOver(false);
