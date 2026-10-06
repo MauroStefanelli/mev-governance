@@ -284,6 +284,18 @@ public class GareController : ControllerBase
             (analysis, provider, usedModel, usage) = await _ai.AnalizzaProposteGaraAsync(
                 context, key, ep, mdl, sty, auth);
         }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("AI_OUTPUT_TRUNCATED"))
+        {
+            return StatusCode(502, new { message = "La risposta AI è stata troncata (output troppo lungo). Riprova: il modello genererà una risposta più breve.", code = "AI_OUTPUT_TRUNCATED" });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("AI_REFUSAL"))
+        {
+            return StatusCode(502, new { message = "Il modello AI ha rifiutato di rispondere. Riprova.", code = "AI_REFUSAL" });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("AI_"))
+        {
+            return StatusCode(502, new { message = "Errore risposta AI: " + ex.Message, code = ex.Message });
+        }
         catch (Exception ex)
         {
             var msg = ex.Message;
