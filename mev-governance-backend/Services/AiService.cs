@@ -450,7 +450,8 @@ public class AiService
             new JsonObject { ["role"] = systemRole, ["content"] = systemInstructions },
             new JsonObject { ["role"] = "user",     ["content"] = userMessage }
         };
-        var payload = BuildPayload(s, s.Endpoint, messages, structured: true);
+        // structured: false — usa il prompt nel messaggio di sistema (no schema JSON del Configuratore)
+        var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
         var response = await PostAsync(s, payload);
         var responseText = ExtractResponseText(response);
 
