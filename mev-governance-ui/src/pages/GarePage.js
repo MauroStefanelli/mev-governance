@@ -358,7 +358,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   // Inizializza a 0 se c'è già un capitolato con un solo lotto
   const [lottoAttivo,  setLottoAttivo]        = React.useState(() => {
     const lottiSalvati = gara?.capitolato?.lotti || [];
-    return lottiSalvati.length === 1 ? 0 : null;
+    return lottiSalvati.length >= 1 ? 0 : null;  // seleziona sempre il primo lotto
   });
   const [towFiles,     setTowFiles]           = React.useState({});     // { 1: File, 2: File, ... }
   const [catalogFiles, setCatalogFiles]       = React.useState({});     // { 1: File, 2: File, ... }
@@ -603,7 +603,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         console.log(`[GarePage] Lotto ${i+1} catalogo raw length=${rawCat.length}`, rawCat.length > 0 ? JSON.stringify(rawCat[0]).slice(0,200) : "(vuoto)");
       });
       console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase, tow0: l.tow[0] })) });
-      setLottoAttivo(capData.lotti.length > 1 ? null : 0);
+      setLottoAttivo(0);  // seleziona sempre il primo lotto dopo analisi
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {
       console.error("[GarePage] errore analisi capitolato:", err?.message || err);
@@ -1047,11 +1047,51 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                     {/* ── CONTENUTO FILTRATO PER LOTTO ── */}
                     {(() => {
                       const src = lotto || (lotti.length === 1 ? lotti[0] : null);
-                      if (!src && lotti.length > 1) return (
-                        <div style={{ padding: "18px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 13, color: "#6b7280", textAlign: "center" }}>
-                          Seleziona un lotto per visualizzare sezioni, requisiti, TOW, documenti e criteri.
-                        </div>
-                      );
+                      if (!src && lotti.length > 1) {
+                        // Modalità "Tutti i lotti": mostra TOW e Catalogo per ogni lotto in sequenza
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                            {lotti.map((lottoItem, li) => (
+                              <div key={li} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "2px solid " + AMBER_BORDER, paddingBottom: 6 }}>
+                                  {lottoItem.nome}
+                                </div>
+                                {(lottoItem.tow || []).length > 0 && (() => {
+                                  const baseAsta = parseFloat(lottoItem.importoBase) || 0;
+                                  return (
+                                    <div style={{ overflowX: "auto" }}>
+                                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, border: "1px solid " + AMBER_BORDER, borderRadius: 8 }}>
+                                        <thead>
+                                          <tr style={{ background: AMBER_BG }}>
+                                            <th style={{ padding: "7px 10px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11 }}>ID</th>
+                                            <th style={{ padding: "7px 10px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11 }}>Descrizione</th>
+                                            <th style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11 }}>Peso %</th>
+                                            <th style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11 }}>Importo (€)</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {lottoItem.tow.map((t, ti) => {
+                                            const peso = t.pesoEffort != null ? Number(t.pesoEffort) : null;
+                                            const imp = peso != null && baseAsta > 0 ? (peso / 100) * baseAsta : null;
+                                            return (
+                                              <tr key={ti} style={{ borderBottom: "1px solid #f0f0f0", background: ti % 2 === 0 ? "#fff" : "#fafafa" }}>
+                                                <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}><span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 6px", fontWeight: 700, fontSize: 11 }}>{t.id}</span></td>
+                                                <td style={{ padding: "7px 10px", color: "#111827", fontWeight: 500 }}>{t.acatalogo ? <span style={{ color: "#1d4ed8", fontWeight: 700, fontSize: 11 }}>A catalogo</span> : (t.descrizione || "—")}</td>
+                                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{peso != null ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 6px", fontWeight: 700, fontSize: 11 }}>{peso.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</span> : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                                <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600, color: imp != null ? "#111827" : "#d1d5db" }}>{imp != null ? "€ " + imp.toLocaleString("it-IT", { minimumFractionDigits: 2 }) : "—"}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
                       const d = src || {};
                       return (
                         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
