@@ -257,63 +257,104 @@ public static class ContractParserService
     {
         var rows = new List<TowRow>();
         using var doc = PdfDocument.Open(pdfStream);
+
         foreach (var page in doc.GetPages())
         {
-            var items = page.GetWords()
+            var allWords = page.GetWords()
                 .Select(wd => new PdfItem { Text = wd.Text.Trim(), X = wd.BoundingBox.Left, Y = wd.BoundingBox.Bottom })
                 .Where(x => !string.IsNullOrEmpty(x.Text))
                 .ToList();
 
-            // Raggruppa per riga (Y arrotondato a multipli di 3)
-            var lines = items
-                .GroupBy(x => (int)(Math.Round(x.Y / 3.0) * 3))
+            if (allWords.Count == 0) continue;
+
+            // ── Raggruppa tutte le parole per riga Y (tolleranza 4pt) ──────────
+            var lineGroups = allWords
+                .GroupBy(x => (int)(Math.Round(x.Y / 4.0) * 4))
                 .OrderByDescending(g => g.Key)
-                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.X).ToList());
+                .Select(g => g.OrderBy(x => x.X).ToList())
+                .ToList();
 
-            foreach (var (_, lineItems) in lines)
+            // ── Trova righe contenenti un codice TOW (anche su celle separate) ─
+            // Strategia: raccoglie tutti i token TOW presenti sulla pagina con la loro Y
+            var towTokens = new List<(string Id, double Y, double X)>();
+            foreach (var line in lineGroups)
             {
-                var txt = string.Join(" ", lineItems.Select(x => x.Text));
-                var mTow = Regex.Match(txt, @"TOW\s*0?(\d+)\.(\d+)", RegexOptions.IgnoreCase);
-                if (!mTow.Success) continue;
-
-                var codice = $"TOW0{mTow.Groups[1].Value}.{mTow.Groups[2].Value}";
-
-                // Tutto il testo non numerico dopo il codice TOW = descrizione
-                var afterTow = txt.Substring(mTow.Index + mTow.Length).Trim();
-                var descParts = new System.Text.StringBuilder();
-                var nums = new List<double>();
-                foreach (var word in afterTow.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                var txt = string.Join(" ", line.Select(x => x.Text));
+                foreach (Match m in Regex.Matches(txt, @"TOW\s*0?(\d+)\.(\d+)", RegexOptions.IgnoreCase))
                 {
-                    // Percentuali → ignora
-                    if (Regex.IsMatch(word, @"^\d+[,.]\d+%$")) continue;
-                    // Simbolo euro standalone → ignora
-                    if (word == "€" || word == "£") continue;
-
-                    if (IsMoneyToken(word))
-                        nums.Add(ParseMoney(word));
-                    else if (Regex.IsMatch(word, @"^\d+$") && int.TryParse(word, out var intVal) && intVal > 0)
-                        nums.Add(intVal);
-                    else
-                        descParts.Append(word).Append(' ');
+                    var id = $"TOW0{m.Groups[1].Value}.{m.Groups[2].Value}";
+                    // X media della riga, Y della riga
+                    var yKey = line[0].Y;
+                    var xKey = line.First(w => w.Text.Contains("TOW", StringComparison.OrdinalIgnoreCase)).X;
+                    towTokens.Add((id, yKey, xKey));
                 }
+            }
 
-                var descrizione = descParts.ToString().Trim();
-                // Se descrizione vuota, cerca anche a sinistra del codice TOW
-                if (string.IsNullOrEmpty(descrizione))
+            if (towTokens.Count == 0) continue;
+
+            // Determina la colonna X dove appaiono tipicamente i codici TOW
+            double towColX = towTokens.Select(t => t.X).OrderBy(x => x).Skip(towTokens.Count / 4).First();
+
+            // ── Per ogni codice TOW trovato, cerca la descrizione ────────────────
+            // La descrizione è nella stessa riga o in righe adiacenti (±20pt)
+            // in una colonna a SINISTRA o subito a DESTRA del codice TOW
+            // (nella tabella del documento, la descrizione è a sinistra del codice)
+            foreach (var (towId, towY, towX) in towTokens)
+            {
+                if (rows.Any(r => r.Id == towId)) continue; // no duplicati
+
+                // Raccoglie tutte le parole nelle righe vicine (±30pt di Y)
+                var nearWords = allWords
+                    .Where(w => Math.Abs(w.Y - towY) <= 30)
+                    .OrderBy(w => w.Y)
+                    .ThenBy(w => w.X)
+                    .ToList();
+
+                // Testo descrizione = parole a sinistra della colonna TOW (o su righe parallele a sinistra)
+                // oppure parole a destra se non c'è nulla a sinistra
+                var descWords = nearWords
+                    .Where(w => !Regex.IsMatch(w.Text, @"TOW\s*0?\d+\.\d+", RegexOptions.IgnoreCase))
+                    .Where(w => !Regex.IsMatch(w.Text, @"^\d+[,.]?\d*%?$"))   // no numeri puri / percentuali
+                    .Where(w => w.Text != "€" && w.Text != "N°" && w.Text != "N" && w.Text.Length > 1)
+                    .ToList();
+
+                // Preferisci parole a sinistra della colonna TOW (descrizione nella colonna sinistra)
+                var leftDesc = descWords.Where(w => w.X < towX - 5).OrderBy(w => w.X).ToList();
+                var descParts = leftDesc.Count > 0 ? leftDesc : descWords.Where(w => w.X > towX + 30).ToList();
+
+                // Rimuovi parole che sono intestazioni di colonna tipiche
+                var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    { "Ambito", "Type-of-Work", "Unità", "Misura", "Qtà", "Peso", "Effort",
+                      "Lotto", "Sistemi", "Integrata", "Tracciatura", "Logistica", "Software",
+                      "Sviluppo", "Manutenzioni", "Evolutive", "Straordinarie", "Servizi", "task",
+                      "canone", "Totale", "TOTALE", "100,00%", "Iniziative" };
+                var cleanDesc = descParts
+                    .Where(w => !stopWords.Contains(w.Text))
+                    .Select(w => w.Text)
+                    .ToList();
+
+                var descrizione = string.Join(" ", cleanDesc).Trim();
+
+                // Cerca quantità e importo: numeri interi o decimali nella riga del TOW
+                var numWords = nearWords
+                    .Where(w => Regex.IsMatch(w.Text, @"^\d+([,.]\d+)?$") && !w.Text.Contains("%"))
+                    .Select(w => { double.TryParse(w.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v); return v; })
+                    .Where(v => v > 0)
+                    .ToList();
+
+                double? quantita = numWords.Count >= 1 ? numWords[0] : null;
+                double? importo  = numWords.Count >= 2 ? numWords[^1] : null;
+
+                rows.Add(new TowRow
                 {
-                    var beforeTow = txt.Substring(0, mTow.Index).Trim();
-                    // Rimuovi eventuali numeri iniziali (numeri di riga)
-                    descrizione = Regex.Replace(beforeTow, @"^\d+\s*", "").Trim();
-                }
-
-                double? quantita = nums.Count >= 2 ? nums[0] : (double?)null;
-                double? importo  = nums.Count >= 2 ? nums[^1] : (nums.Count == 1 ? nums[0] : (double?)null);
-
-                // Evita duplicati (stessa pagina, stesso codice)
-                if (!rows.Any(r => r.Id == codice))
-                    rows.Add(new TowRow { Id = codice, Descrizione = descrizione, Quantita = quantita, Importo = importo });
+                    Id          = towId,
+                    Descrizione = descrizione,
+                    Quantita    = quantita,
+                    Importo     = importo,
+                });
             }
         }
+
         return rows;
     }
     public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
