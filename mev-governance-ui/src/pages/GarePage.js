@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara } from "../services/mevService";
+import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara, analizzaOffertaExcel } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
 const AMBER_DARK   = "#b45309";
@@ -344,9 +344,52 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   });
   const [fileNames, setFileNames] = React.useState(gara.fileNames || []);
   const [isDragOver, setIsDragOver] = React.useState(false);
+  // Excel offerta per lotto: { 1: File, 2: File }
+  const [excelFiles, setExcelFiles]     = React.useState({});
+  const [excelPwds, setExcelPwds]       = React.useState({});  // { 1: "pwd" } — salvate offuscate
+  const [excelLoading, setExcelLoading] = React.useState({});
+  const [excelError, setExcelError]     = React.useState({});
   const [error, setError] = React.useState("");
   const fileInputRef = React.useRef(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const lottiGara = gara.capitolato?.lotti || [];
+  const numLotti  = lottiGara.length > 0 ? lottiGara.length : 2;
+  const lottiRows = Array.from({ length: numLotti }, (_, i) => ({
+    num: i + 1,
+    nome: lottiGara[i]?.nome || `Lotto ${i + 1}`,
+  }));
+
+  const handleCaricaExcel = async (num, file) => {
+    const pwd = excelPwds[num] || "";
+    setExcelLoading(prev => ({ ...prev, [num]: true }));
+    setExcelError(prev => ({ ...prev, [num]: "" }));
+    try {
+      const res = await analizzaOffertaExcel(file, num, pwd);
+      if (res.ok && res.data) {
+        // Salva i dati parsati nella gara e la password offuscata
+        const offertaLotti = { ...(gara.offertaLotti || {}) };
+        offertaLotti[num] = { ...res.data, excelFileName: file.name };
+        const offertaPasswords = { ...(gara.offertaPasswords || {}) };
+        if (pwd) offertaPasswords[num] = btoa(pwd); // offuscamento base64
+        // Aggiorna la gara tramite onSalva con i dati aggiornati
+        // Nota: salviamo temporaneamente nei ref per passarlo al submit
+        setExcelFiles(prev => ({ ...prev, [num]: file }));
+        // Memorizza in uno stato interno per passarlo al submit finale
+        setForm(f => ({
+          ...f,
+          _offertaLotti: offertaLotti,
+          _offertaPasswords: offertaPasswords,
+        }));
+      } else {
+        setExcelError(prev => ({ ...prev, [num]: res.message || "Errore parsing" }));
+      }
+    } catch (err) {
+      setExcelError(prev => ({ ...prev, [num]: err.message || "Errore" }));
+    } finally {
+      setExcelLoading(prev => ({ ...prev, [num]: false }));
+    }
+  };
 
   const handleDrop = (e) => {
     e.preventDefault(); setIsDragOver(false);
@@ -366,7 +409,10 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.nome.trim()) { setError("Il nome della gara è obbligatorio."); return; }
-    onSalva({ ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim(), fileNames });
+    const updated = { ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim(), fileNames };
+    if (form._offertaLotti) updated.offertaLotti = form._offertaLotti;
+    if (form._offertaPasswords) updated.offertaPasswords = form._offertaPasswords;
+    onSalva(updated);
   };
 
   const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginTop: 4 };
@@ -441,6 +487,45 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
             </div>
           </div>
 
+          {/* Excel offerta per lotto */}
+          <div style={{ marginBottom: 20, border: "1px solid #f0f0f0", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ padding: "10px 14px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14 }}>📊</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>Excel Offerta per lotto</span>
+              <span style={{ fontSize: 11, color: "#4ade80" }}>(opzionale — protetto da password)</span>
+            </div>
+            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {lottiRows.map(({ num, nome }) => {
+                const existing = gara.offertaLotti?.[num];
+                const isLoaded = !!existing || !!excelFiles[num];
+                return (
+                  <div key={num} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, background: AMBER_LIGHT, borderRadius: 6, padding: "2px 9px", border: "1px solid " + AMBER_BORDER, flexShrink: 0 }}>{nome}</span>
+                    <label htmlFor={`excel-file-mod-${num}`}
+                      style={{ background: isLoaded ? "#f0fdf4" : "#fff", color: isLoaded ? "#16a34a" : "#6b7280", border: "1px solid " + (isLoaded ? "#86efac" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-block" }}>
+                      {excelFiles[num] ? `✓ ${excelFiles[num].name.slice(0,28)}` : existing?.excelFileName ? `✓ ${existing.excelFileName.slice(0,28)} (già importato)` : "📊 Carica Excel (.xlsx)"}
+                    </label>
+                    <input id={`excel-file-mod-${num}`} type="file" accept=".xlsx,.xls" style={{ display: "none" }}
+                      onChange={e => { const f = e.target.files[0]; if (f) { setExcelFiles(prev => ({ ...prev, [num]: f })); handleCaricaExcel(num, f); } e.target.value = ""; }} />
+                    <input
+                      type="password"
+                      placeholder="Password (se protetto)"
+                      value={excelPwds[num] || ""}
+                      onChange={e => setExcelPwds(prev => ({ ...prev, [num]: e.target.value }))}
+                      style={{ padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 11, fontFamily: "inherit", outline: "none", width: 160 }} />
+                    {excelLoading[num] && <span style={{ fontSize: 11, color: "#6b7280" }}>Parsing...</span>}
+                    {excelError[num] && <span style={{ fontSize: 11, color: "#dc2626" }}>{excelError[num]}</span>}
+                    {existing && !excelLoading[num] && !excelError[num] && (
+                      <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 700 }}>
+                        ✓ {existing.offertaEconomica ? `${existing.offertaEconomica.righe?.length || 0} righe eco.` : ""}{existing.offertaCatalogo ? ` · ${existing.offertaCatalogo.length || 0} voci cat.` : ""}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#dc2626", marginBottom: 16 }}>{error}</div>}
           <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
             <button type="button" onClick={onAnnulla} style={{ padding: "10px 22px", borderRadius: 9, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Annulla</button>
@@ -448,6 +533,193 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ── Tab Offerta Economica ─────────────────────────────────────────────────────
+function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara }) {
+  const [lottoSel, setLottoSel] = React.useState(Object.keys(offertaLotti)[0] || "1");
+  const offerta = offertaLotti[lottoSel];
+  const eco = offerta?.offertaEconomica;
+
+  const handleChange = (idx, field, value) => {
+    const lottiUpd = { ...offertaLotti };
+    const righe = [...(eco?.righe || [])];
+    righe[idx] = { ...righe[idx], [field]: value };
+    lottiUpd[lottoSel] = { ...offerta, offertaEconomica: { ...eco, righe } };
+    onUpdate({ ...gara, offertaLotti: lottiUpd });
+  };
+
+  const totaleOfferto = (eco?.righe || []).reduce((s, r) => s + (parseFloat(r.importoOfferto) || 0), 0);
+  const importoBase = eco?.importoBaseGara || offerta?.offertaEconomica?.importoBaseGara;
+  const sopraSoglia = importoBase && totaleOfferto >= importoBase;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(135deg, #166534, #16a34a)", padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 18 }}>📊</span>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Offerta Economica</div>
+        {importoBase && (
+          <span style={{ background: sopraSoglia ? "rgba(220,38,38,0.85)" : "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>
+            Base gara: € {Number(importoBase).toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            {sopraSoglia && " ⚠ SUPERA LA SOGLIA"}
+          </span>
+        )}
+        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+          {Object.keys(offertaLotti).map(num => (
+            <button key={num} onClick={() => setLottoSel(num)}
+              style={{ background: lottoSel === num ? "#fff" : "rgba(255,255,255,0.2)", color: lottoSel === num ? "#166534" : "#fff", border: "none", borderRadius: 7, padding: "4px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              {lotti[parseInt(num) - 1]?.nome || `Lotto ${num}`}
+            </button>
+          ))}
+        </div>
+      </div>
+      {!eco ? (
+        <div style={{ padding: "24px", color: "#6b7280", fontSize: 13 }}>Nessun dato offerta economica per questo lotto. Carica l'Excel dal modale Modifica.</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f0fdf4", borderBottom: "2px solid #86efac" }}>
+                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase" }}>Codice</th>
+                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase" }}>Descrizione</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase" }}>Qtà</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase" }}>Prezzo Unit.</th>
+                <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase" }}>Importo Offerto</th>
+                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase" }}>Regole cliente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eco.righe.map((r, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid #f0f0f0", background: idx % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                  <td style={{ padding: "6px 12px", fontWeight: 700, color: "#166534" }}>{r.codice}</td>
+                  <td style={{ padding: "6px 12px", color: "#374151", maxWidth: 240 }}>{r.descrizione}</td>
+                  <td style={{ padding: "6px 12px", textAlign: "right", color: "#374151" }}>{r.quantita != null ? Number(r.quantita).toLocaleString("it-IT") : "—"}</td>
+                  <td style={{ padding: "6px 12px", textAlign: "right" }}>
+                    <input type="number" value={r.prezzoUnitario ?? ""} placeholder="0"
+                      onChange={e => handleChange(idx, "prezzoUnitario", e.target.value ? parseFloat(e.target.value) : null)}
+                      style={{ width: 90, padding: "3px 6px", border: "1px solid #d1fae5", borderRadius: 5, fontSize: 12, textAlign: "right", outline: "none" }} />
+                  </td>
+                  <td style={{ padding: "6px 12px", textAlign: "right" }}>
+                    <input type="number" value={r.importoOfferto ?? ""} placeholder="0"
+                      onChange={e => handleChange(idx, "importoOfferto", e.target.value ? parseFloat(e.target.value) : null)}
+                      style={{ width: 110, padding: "3px 6px", border: "1px solid #d1fae5", borderRadius: 5, fontSize: 12, textAlign: "right", outline: "none", background: sopraSoglia ? "#fef2f2" : "#fff" }} />
+                  </td>
+                  <td style={{ padding: "6px 12px", color: "#6b7280", fontSize: 11, maxWidth: 200 }}>{r.regole || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: "#f0fdf4", borderTop: "2px solid #86efac" }}>
+                <td colSpan={4} style={{ padding: "8px 12px", fontWeight: 700, color: "#166534", fontSize: 12 }}>Totale offerta</td>
+                <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, fontSize: 14, color: sopraSoglia ? "#dc2626" : "#166534" }}>
+                  € {totaleOfferto.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {sopraSoglia && <span style={{ fontSize: 10, marginLeft: 4 }}>⚠</span>}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab Offerta Catalogo ──────────────────────────────────────────────────────
+function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
+  const [lottoSel, setLottoSel] = React.useState(Object.keys(offertaLotti)[0] || "1");
+  const offerta = offertaLotti[lottoSel];
+  const cat = offerta?.offertaCatalogo || [];
+
+  const handleChangeOfferto = (idx, fasciaIdx, value) => {
+    const lottiUpd = { ...offertaLotti };
+    const righe = [...cat];
+    const righa = { ...righe[idx] };
+    const prezzi = [...(righa.prezziOfferto || [])];
+    prezzi[fasciaIdx] = { ...prezzi[fasciaIdx], valore: value ? parseFloat(value) : null };
+    righa.prezziOfferto = prezzi;
+    righe[idx] = righa;
+    lottiUpd[lottoSel] = { ...offerta, offertaCatalogo: righe };
+    onUpdate({ ...gara, offertaLotti: lottiUpd });
+  };
+
+  const fasceLabels = cat.length > 0 && cat[0].prezziOfferto?.length > 0
+    ? cat[0].prezziOfferto.map(p => p.fascia)
+    : ["Semplice", "Medio", "Complesso"];
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 18 }}>📦</span>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Offerta Catalogo</div>
+        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+          {Object.keys(offertaLotti).map(num => (
+            <button key={num} onClick={() => setLottoSel(num)}
+              style={{ background: lottoSel === num ? "#fff" : "rgba(255,255,255,0.2)", color: lottoSel === num ? "#1d4ed8" : "#fff", border: "none", borderRadius: 7, padding: "4px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              {lotti[parseInt(num) - 1]?.nome || `Lotto ${num}`}
+            </button>
+          ))}
+        </div>
+      </div>
+      {cat.length === 0 ? (
+        <div style={{ padding: "24px", color: "#6b7280", fontSize: 13 }}>Nessun dato catalogo per questo lotto. Carica l'Excel dal modale Modifica.</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
+                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>ID</th>
+                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Ambito</th>
+                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Nome</th>
+                <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #bfdbfe", borderLeft: "1px solid #bfdbfe" }}>Prezzi catalogo (Realizzazione)</th>
+                {fasceLabels.map((f, i) => null)}
+                <th colSpan={fasceLabels.length} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #86efac", borderLeft: "1px solid #86efac", background: "#f0fdf4" }}>Prezzo Offerto Realizzazione</th>
+                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", borderLeft: "1px solid #bfdbfe" }}>Regole</th>
+              </tr>
+              <tr style={{ background: "#eff6ff", borderBottom: "1px solid #bfdbfe" }}>
+                <th colSpan={3} />
+                {["Semplice","Medio","Complesso"].map(l => (
+                  <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", fontSize: 10, borderLeft: l === "Semplice" ? "1px solid #bfdbfe" : "none" }}>{l}</th>
+                ))}
+                {fasceLabels.map((f, i) => (
+                  <th key={f} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#166534", whiteSpace: "nowrap", fontSize: 10, background: "#f0fdf4", borderLeft: i === 0 ? "1px solid #86efac" : "none" }}>{f}</th>
+                ))}
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {cat.map((r, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid #f0f0f0", background: idx % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                  <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1d4ed8" }}>{r.id}</td>
+                  <td style={{ padding: "6px 10px", color: "#374151" }}>{r.ambito || "—"}</td>
+                  <td style={{ padding: "6px 10px", color: "#374151", maxWidth: 200 }}>{r.nome}</td>
+                  {[r.prezzoRealizzazioneSemplice, r.prezzoRealizzazioneMedio, r.prezzoRealizzazioneComplesso].map((p, pi) => (
+                    <td key={pi} style={{ padding: "6px 8px", textAlign: "right", color: "#374151", borderLeft: pi === 0 ? "1px solid #e0e7ff" : "none" }}>
+                      {p != null ? p.toLocaleString("it-IT", { minimumFractionDigits: 2 }) : "—"}
+                    </td>
+                  ))}
+                  {fasceLabels.map((f, fi) => {
+                    const pv = r.prezziOfferto?.[fi];
+                    return (
+                      <td key={fi} style={{ padding: "4px 6px", background: "#f0fdf4", borderLeft: fi === 0 ? "1px solid #bbf7d0" : "none" }}>
+                        <div>
+                          <input type="number" value={pv?.valore ?? ""} placeholder="0.00"
+                            onChange={e => handleChangeOfferto(idx, fi, e.target.value)}
+                            style={{ width: 90, padding: "3px 6px", border: "1px solid #d1fae5", borderRadius: 5, fontSize: 12, textAlign: "right", outline: "none" }} />
+                          {pv?.regola && <div style={{ fontSize: 9, color: "#6b7280", marginTop: 2, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={pv.regola}>📌 {pv.regola}</div>}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: "6px 10px", color: "#6b7280", fontSize: 10, borderLeft: "1px solid #e5e7eb", maxWidth: 180 }} title={r.regole}>{r.regole ? r.regole.slice(0, 80) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -470,7 +742,6 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [capFile,      setCapFile]            = React.useState(null);   // File capitolato tenuto in memoria
   const [analyzingProposte, setAnalyzingProposte] = React.useState({}); // { lottoIdx: bool }
   const towFileRefs    = React.useRef({});
-  const catalogFileRefs = React.useRef({});
   const docFileRefs = React.useRef({});
   const capFileInputRef = useRef(null);
 
@@ -765,11 +1036,18 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   };
 
   const gg = giorni(gara.scadenza);
+  const offertaLotti = gara.offertaLotti || {};
+  const hasOfferta = Object.keys(offertaLotti).length > 0;
+
   const tabs = [
     { id: "documenti", label: "Documenti da produrre" },
     { id: "tecnica",   label: "Proposta tecnica" },
     { id: "economica", label: "Proposta economica" },
     { id: "piano",     label: "Piano di risposta" },
+    ...(hasOfferta ? [
+      { id: "offerta-eco", label: "📊 Offerta Economica" },
+      { id: "offerta-cat", label: "📦 Offerta Catalogo" },
+    ] : []),
   ];
   const totEco = aiResult ? aiResult.economica.reduce((s, r) => s + r.importo, 0) : 0;
 
@@ -879,14 +1157,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
                           {/* TOW */}
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => towFileRefs.current[num] && towFileRefs.current[num].click()}
-                              style={{ background: towFiles[num] ? "#f0fdf4" : "#fff", color: towFiles[num] ? "#16a34a" : "#6b7280", border: "1px solid " + (towFiles[num] ? "#86efac" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                            <label htmlFor={`tow-file-${num}`}
+                              style={{ background: towFiles[num] ? "#f0fdf4" : "#fff", color: towFiles[num] ? "#16a34a" : "#6b7280", border: "1px solid " + (towFiles[num] ? "#86efac" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-block" }}>
                               {towFiles[num] ? `✓ TOW: ${towFiles[num].name.slice(0,28)}` : "📋 Listino TOW (PDF/XLSX)"}
-                            </button>
+                            </label>
                             <input
-                              ref={el => towFileRefs.current[num] = el}
+                              id={`tow-file-${num}`}
                               type="file" accept=".pdf,.xlsx,.xls" style={{ display: "none" }}
                               onChange={e => { const f = e.target.files[0]; if (f) setTowFiles(prev => ({ ...prev, [num]: f })); e.target.value = ""; }} />
                             {towFiles[num] && (
@@ -897,18 +1173,16 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
                           {/* Catalogo */}
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => catalogFileRefs.current[num] && catalogFileRefs.current[num].click()}
-                              style={{ background: catalogFiles[num] ? "#eff6ff" : "#fff", color: catalogFiles[num] ? "#1d4ed8" : "#6b7280", border: "1px solid " + (catalogFiles[num] ? "#93c5fd" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                            <label htmlFor={`cat-file-${num}`}
+                              style={{ background: catalogFiles[num] ? "#eff6ff" : "#fff", color: catalogFiles[num] ? "#1d4ed8" : "#6b7280", border: "1px solid " + (catalogFiles[num] ? "#93c5fd" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-block" }}>
                               {catalogFiles[num]
                                 ? `✓ Cat: ${catalogFiles[num].name.slice(0,28)}`
-                                : (gara.catalogFileNames?.[num]
-                                    ? <span style={{ color: "#16a34a" }}>✓ {gara.catalogFileNames[num].slice(0,28)} (già analizzato)</span>
+                                : (gara.catalogFileNames?.[num] || gara.catalogFileNames?.[String(num)]
+                                    ? `✓ ${(gara.catalogFileNames[num] || gara.catalogFileNames[String(num)]).slice(0,28)} (già analizzato)`
                                     : "📦 Catalogo (PDF)")}
-                            </button>
+                            </label>
                             <input
-                              ref={el => catalogFileRefs.current[num] = el}
+                              id={`cat-file-${num}`}
                               type="file" accept=".pdf" style={{ display: "none" }}
                               onChange={e => { const f = e.target.files[0]; if (f) setCatalogFiles(prev => ({ ...prev, [num]: f })); e.target.value = ""; }} />
                             {catalogFiles[num] && (
@@ -1596,7 +1870,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                   </div>
                 )}
 
-                {activeTab === "piano" && (
+                 {activeTab === "piano" && (
                   <div>
                     {aiResult.piano.map((m, i) => (
                       <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", paddingBottom: 16, position: "relative" }}>
@@ -1622,6 +1896,16 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
               </div>
             </div>
+          )}
+
+          {/* ── TAB OFFERTA ECONOMICA ── */}
+          {activeTab === "offerta-eco" && (
+            <TabOffertaEconomica offertaLotti={offertaLotti} lotti={lotti} onUpdate={onUpdate} gara={gara} />
+          )}
+
+          {/* ── TAB OFFERTA CATALOGO ── */}
+          {activeTab === "offerta-cat" && (
+            <TabOffertaCatalogo offertaLotti={offertaLotti} lotti={lotti} onUpdate={onUpdate} gara={gara} />
           )}
 
           {/* Note */}

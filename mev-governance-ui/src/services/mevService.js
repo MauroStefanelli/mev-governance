@@ -771,6 +771,26 @@ export const analizzaProposteGara = async (context) => {
   return response.json();
 };
 
+// Parsa un file Excel offerta (protetto da password) per un lotto specifico
+export const analizzaOffertaExcel = async (file, lot, password) => {
+  const form = new FormData();
+  form.append("file", file);
+  if (password) form.append("password", password);
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/parse-offerta-excel?lot=${lot}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
+  return response.json();
+};
+
 export const getGare = async () => {
   const params = new URLSearchParams({ entity_type: "gara" });
   const response = await fetchWithRefresh(

@@ -499,7 +499,8 @@ public class AiService
         "Sei un esperto di gare d'appalto IT italiane. Analizza il capitolato e restituisci la struttura della gara. " +
         "Individua tutti i lotti presenti (Lotto 1, Lotto 2, ecc.). Se non ci sono lotti espliciti crea un unico lotto 'Gara'. " +
         "Per ogni lotto estrai: nome, descrizione, importoBase, requisitiTecnici, documentiRichiesti, criteriValutazione, sezioni. " +
-        "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 150 caratteri. Max 5 voci per array. " +
+        "Per ogni sezione includi SEMPRE numero, titolo e sintesi (breve descrizione del contenuto, max 200 caratteri). " +
+        "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 200 caratteri. Max 8 sezioni per lotto. " +
         "Rispondi ESCLUSIVAMENTE con JSON valido. Nessun markdown, nessun backtick, nessun testo extra.";
 
     public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalizzaGaraAsync(
@@ -703,6 +704,8 @@ public class AiService
                             }
                         }},
                         ["sezioni"]           = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",
+                            ["additionalProperties"] = false,
+                            ["required"] = new JsonArray { "numero", "titolo", "sintesi" },
                             ["properties"] = new JsonObject {
                                 ["numero"] = new JsonObject { ["type"] = "string" },
                                 ["titolo"] = new JsonObject { ["type"] = "string" },

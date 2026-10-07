@@ -327,8 +327,38 @@ public class GareController : ControllerBase
         return Ok(new { ok = true, proposte = analysis });
     }
 
-    // POST /api/gare/debug-catalog-raw
-    // Mostra le prime N parole del PDF catalogo con coordinate, per diagnosticare il parser
+    // POST /api/gare/parse-offerta-excel
+    // Riceve un file Excel (protetto da password) e restituisce i dati strutturati
+    // dei fogli "SCHEMA OFFERTA ECONOMICA" e "Schema Offerta Catalogo Lotto N"
+    // Campi form: file (xlsx), password (opzionale), lot (query param, default 1)
+    [HttpPost("parse-offerta-excel")]
+    public IActionResult ParseOffertaExcel([FromQuery] int lot = 1)
+    {
+        if (!CanAccess()) return Forbid();
+
+        var file = Request.Form.Files.GetFile("file");
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "Nessun file ricevuto. Invia il file Excel come campo 'file'." });
+
+        var password = Request.Form.TryGetValue("password", out var pwdVals) ? pwdVals.FirstOrDefault() : null;
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var result = ContractParserService.ParseOffertaExcel(stream, lot, password);
+
+            if (result.Error != null && result.OffertaEconomica == null && result.OffertaCatalogo == null)
+                return BadRequest(new { message = result.Error, fogliDisponibili = result.FogliDisponibili });
+
+            return Ok(new { ok = true, lotto = lot, data = result });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Errore parsing Excel: " + ex.Message });
+        }
+    }
+
+    // POST /api/gare/debug-catalog-raw    // Mostra le prime N parole del PDF catalogo con coordinate, per diagnosticare il parser
     [HttpPost("debug-catalog-raw")]
     public IActionResult DebugCatalogRaw([FromQuery] int lot = 1)
     {
