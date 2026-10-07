@@ -155,6 +155,7 @@ Check(noIndex.Contains("[Pag.195]") && noIndex.Contains("Requisiti finali"), "PD
 var withFooter = GaraSectionContext.Build(new List<(int, string)> { (1, "Testo utile TIPO DOCUMENTO TITOLO Pagina 1 di 200 CAPITOLATO SPECIALE boilerplate CAPITOLATO TECNICO seguito utile") }, 4000);
 Check(withFooter.Contains("Testo utile") && withFooter.Contains("seguito utile") && !withFooter.Contains("boilerplate"), "Il riquadro editoriale non sostituisce il contenuto utile");
 checks += RealLayoutRegression.Run();
+checks += await GaraAiRegression.Run();
 Console.WriteLine($"PASS: {checks} verifiche backend.");
 
 sealed class FakeClientFactory(string response) : IHttpClientFactory

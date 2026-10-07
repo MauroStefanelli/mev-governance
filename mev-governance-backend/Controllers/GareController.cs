@@ -107,17 +107,13 @@ public class GareController : ControllerBase
             return StatusCode(500, new { message = "Errore analisi AI: " + msg });
         }
 
-        // Detecta risposta AI non-JSON (es. Capgemini risponde in testo libero)
-        if (analysis.TryGetPropertyValue("error", out _) && analysis.TryGetPropertyValue("rawText", out var rawNode))
-        {
-            var rawText = rawNode?.ToString() ?? "";
-            var preview = rawText.Length > 500 ? rawText[..500] + "…" : rawText;
-            return StatusCode(502, new
-            {
-                message = $"Il modello AI non ha restituito JSON valido. Risposta ricevuta: {preview}",
-                rawText,
+        // Non salvare analisi parziali o risposte interrotte dal limite del modello.
+        if (analysis.TryGetPropertyValue("error", out var aiError))
+            return StatusCode(502, new {
+                message = aiError?.ToString() ?? "Il servizio AI non ha completato l'analisi.",
+                code = analysis["code"]?.ToString(),
+                finishReason = analysis["finishReason"]?.ToString()
             });
-        }
 
         // 3) Per ogni lotto: leggi towFile_N e catalogFile_N con i parser collaudati
         if (analysis.TryGetPropertyValue("lotti", out var lottiNode) && lottiNode is JsonArray lotti)
