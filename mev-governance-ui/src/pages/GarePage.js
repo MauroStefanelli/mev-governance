@@ -106,7 +106,7 @@ function ChecklistSidebar({ checklist, onToggle, lottoNome }) {
 }
 
 // ── Vista 1: Lista Gare ───────────────────────────────────────────────────────
-function ListaGare({ gare, onApri, onNuova, onDelete }) {
+function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
   const statoColor = {
     "Bozza":          { bg: "#f9fafb", color: "#6b7280", dot: "#9ca3af" },
     "In lavorazione": { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
@@ -169,7 +169,10 @@ function ListaGare({ gare, onApri, onNuova, onDelete }) {
               <div key={g.id} onClick={() => onApri(g.id)} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", boxShadow: "0 2px 10px rgba(0,0,0,0.06)", padding: "20px 22px", cursor: "pointer", transition: "all 0.2s", position: "relative", overflow: "hidden" }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor = AMBER_BORDER; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.06)"; e.currentTarget.style.borderColor = "#e5e7eb"; }}>
-                {/* Pulsante elimina */}
+                {/* Pulsanti elimina e modifica */}
+                <button onClick={e => { e.stopPropagation(); onModifica(g); }} title="Modifica gara" style={{ position: "absolute", top: 10, right: 34, background: "none", border: "none", cursor: "pointer", color: "#d1d5db", fontSize: 14, lineHeight: 1, padding: "2px 5px", borderRadius: 4, zIndex: 1 }}
+                  onMouseEnter={e => e.currentTarget.style.color = AMBER_DARK}
+                  onMouseLeave={e => e.currentTarget.style.color = "#d1d5db"}>✏️</button>
                 <button onClick={e => { e.stopPropagation(); onDelete(g); }} title="Elimina gara" style={{ position: "absolute", top: 10, right: 10, background: "none", border: "none", cursor: "pointer", color: "#d1d5db", fontSize: 16, lineHeight: 1, padding: "2px 5px", borderRadius: 4, zIndex: 1 }}
                   onMouseEnter={e => e.currentTarget.style.color = "#dc2626"}
                   onMouseLeave={e => e.currentTarget.style.color = "#d1d5db"}>×</button>
@@ -277,6 +280,71 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
   );
 }
 
+// ── Modale Modifica Gara ──────────────────────────────────────────────────────
+function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
+  const [form, setForm] = React.useState({
+    nome:     gara.nome     || "",
+    ente:     gara.ente     || "",
+    scadenza: gara.scadenza || "",
+    cig:      gara.cig      || "",
+    note:     gara.note     || "",
+  });
+  const [error, setError] = React.useState("");
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.nome.trim()) { setError("Il nome della gara è obbligatorio."); return; }
+    onSalva({ ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim() });
+  };
+
+  const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginTop: 4 };
+  const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 2 };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: "32px 36px", maxWidth: 520, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>Modifica Gara</div>
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Aggiorna i dati principali della gara</div>
+          </div>
+          <button onClick={onAnnulla} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Nome gara <span style={{ color: "#dc2626" }}>*</span></label>
+            <input style={inputStyle} value={form.nome} onChange={e => set("nome", e.target.value)} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Ente committente</label>
+            <input style={inputStyle} value={form.ente} onChange={e => set("ente", e.target.value)} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Data scadenza</label>
+              <input type="date" style={inputStyle} value={form.scadenza} onChange={e => set("scadenza", e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>CIG</label>
+              <input style={inputStyle} value={form.cig} onChange={e => set("cig", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Note</label>
+            <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={form.note} onChange={e => set("note", e.target.value)} />
+          </div>
+          {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#dc2626", marginBottom: 16 }}>{error}</div>}
+          <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <button type="button" onClick={onAnnulla} style={{ padding: "10px 22px", borderRadius: 9, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Annulla</button>
+            <button type="submit" style={{ padding: "10px 28px", borderRadius: 9, border: "none", background: "linear-gradient(135deg," + AMBER + "," + AMBER_DARK + ")", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 10px rgba(245,158,11,0.35)" }}>Salva</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Vista 3: Dettaglio Gara ───────────────────────────────────────────────────
 function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [isDragOver, setIsDragOver]           = React.useState(false);
@@ -285,6 +353,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [analyzingCap, setAnalyzingCap]       = React.useState(false);
   const [capError,     setCapError]           = React.useState("");
   const [dettagliOpen, setDettagliOpen]       = React.useState({});
+  const [showModifica, setShowModifica]       = React.useState(false);
   // lottoAttivo: null = tutti (solo se >1 lotti), 0 = primo lotto, ecc.
   // Inizializza a 0 se c'è già un capitolato con un solo lotto
   const [lottoAttivo,  setLottoAttivo]        = React.useState(() => {
@@ -446,19 +515,23 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         pesoEffort:  get(t,"pesoEffort","peso_effort","peso","weight") ?? null,
         acatalogo:   get(t,"acatalogo","ACatalogo","a_catalogo") ?? false,
       });
-      const normCatalog = (c, i) => ({
-        _id: i,
-        id: c.id ?? i,
-        ambito: c.ambito || "",
-        nome: c.nome || "",
-        descrizione: c.descrizione || "",
-        prezziSemplice:  c.prezziSemplice  ?? null,
-        prezziMedio:     c.prezziMedio     ?? null,
-        prezziComplesso: c.prezziComplesso ?? null,
-        modSemplice:     c.modSemplice     ?? null,
-        modMedio:        c.modMedio        ?? null,
-        modComplesso:    c.modComplesso    ?? null,
-      });
+      const normCatalog = (c, i) => {
+        // debug: log primo elemento
+        if (i === 0) console.log("[normCatalog] raw[0]:", JSON.stringify(c).slice(0, 300));
+        return {
+          _id: i,
+          id: c.id ?? i,
+          ambito: c.ambito || "",
+          nome: c.nome || "",
+          descrizione: c.descrizione || "",
+          prezziSemplice:  c.prezziSemplice  ?? null,
+          prezziMedio:     c.prezziMedio     ?? null,
+          prezziComplesso: c.prezziComplesso ?? null,
+          modSemplice:     c.modSemplice     ?? null,
+          modMedio:        c.modMedio        ?? null,
+          modComplesso:    c.modComplesso    ?? null,
+        };
+      };
       const normLotto = (l, i) => {
         const proposte = get(l,"proposte","Proposte") || {};
         return {
@@ -522,6 +595,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         if (l._catalogError) console.error(`[GarePage] Lotto ${i+1} catalogError:`, l._catalogError);
         if (l._towError)     console.error(`[GarePage] Lotto ${i+1} towError:`, l._towError);
         console.log(`[GarePage] Lotto ${i+1} debug:`, { towCapitolato: l._towCapitolatoCount, towPrices: l._towPricesCount, catalogCount: l._catalogCount });
+        // debug pesoEffort: mostra i primi 3 TOW raw
+        const rawTow = l.tow || [];
+        if (rawTow.length > 0) console.log(`[GarePage] Lotto ${i+1} TOW raw[0..2]:`, JSON.stringify(rawTow.slice(0,3)));
+        // debug catalogo: mostra raw
+        const rawCat = l.catalogo || [];
+        console.log(`[GarePage] Lotto ${i+1} catalogo raw length=${rawCat.length}`, rawCat.length > 0 ? JSON.stringify(rawCat[0]).slice(0,200) : "(vuoto)");
       });
       console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase })) });
       setLottoAttivo(capData.lotti.length > 1 ? null : 0);
@@ -646,6 +725,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         {/* Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <button onClick={onBack} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", color: "#fff", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>← Risposte di Gara</button>
+          <button onClick={() => setShowModifica(true)} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", color: "#fff", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>✏️ Modifica dati</button>
           <button onClick={() => onDelete(gara)} style={{ background: "rgba(220,38,38,0.25)", border: "1px solid rgba(220,38,38,0.4)", color: "#fca5a5", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600, marginLeft: "auto" }}>Elimina gara</button>
           <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>/</span>
           <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: 600 }}>{gara.nome}</span>
@@ -1482,6 +1562,13 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       </div>
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      {showModifica && (
+        <ModaleModificaGara
+          gara={gara}
+          onSalva={(updated) => { setShowModifica(false); onUpdate(updated); }}
+          onAnnulla={() => setShowModifica(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1494,6 +1581,7 @@ export default function GarePage({ onUnauthorized }) {
   const [error,           setError]           = React.useState("");
   const [selectedId,      setSelectedId]      = React.useState(null);
   const [showNuovaModale, setShowNuovaModale] = React.useState(false);
+  const [modificaGara,    setModificaGara]    = React.useState(null); // gara da modificare
 
   const selectedGara = gare.find(g => g.id === selectedId) || null;
 
@@ -1540,14 +1628,14 @@ export default function GarePage({ onUnauthorized }) {
   };
 
   const handleUpdateGara = async (updated) => {
-    // Aggiorna stato locale immediatamente (UI reattiva)
     setGare(prev => prev.map(g => g.id === updated.id ? updated : g));
-    // Persiste in background
-    try {
-      await putGara(updated);
-    } catch (err) {
-      setError("Errore salvataggio — riprova");
-    }
+    try { await putGara(updated); } catch (err) { setError("Errore salvataggio — riprova"); }
+  };
+
+  const handleModificaGara = async (updated) => {
+    setModificaGara(null);
+    setGare(prev => prev.map(g => g.id === updated.id ? updated : g));
+    try { await putGara(updated); } catch (err) { setError("Errore salvataggio — riprova"); }
   };
 
   const handleDeleteGara = async (gara) => {
@@ -1594,12 +1682,20 @@ export default function GarePage({ onUnauthorized }) {
           onApri={(id) => setSelectedId(id)}
           onNuova={() => setShowNuovaModale(true)}
           onDelete={handleDeleteGara}
+          onModifica={(g) => setModificaGara(g)}
         />
       )}
       {showNuovaModale && (
         <ModaleNuovaGara
           onCrea={handleCreaGara}
           onAnnulla={() => setShowNuovaModale(false)}
+        />
+      )}
+      {modificaGara && (
+        <ModaleModificaGara
+          gara={modificaGara}
+          onSalva={handleModificaGara}
+          onAnnulla={() => setModificaGara(null)}
         />
       )}
     </>
