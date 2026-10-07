@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
+import OffertaCatalogo, { aggiornaCatalogoModifica } from "../components/gare/OffertaCatalogo";
 import LottoFilePicker from "../components/gare/LottoFilePicker";
 import GaraSections from "../components/gare/GaraSections";
+import { lottiConBaseAsta, salvaBasiImportate } from "../components/gare/lottoAmounts";
 import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara, analizzaOffertaExcel } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
@@ -377,7 +379,7 @@ export function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
           ...previous,
           _offertaLotti: {
             ...(previous._offertaLotti || gara.offertaLotti || {}),
-            [num]: { ...res.data, excelFileName: file.name },
+            [num]: { ...aggiornaCatalogoModifica(res.data), excelFileName: file.name },
           },
         }));
       } else {
@@ -409,8 +411,11 @@ export function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
     e.preventDefault();
     if (!form.nome.trim()) { setError("Il nome della gara è obbligatorio."); return; }
     if (Object.values(excelLoading).some(Boolean)) return;
-    const updated = { ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim(), fileNames };
-    if (form._offertaLotti) updated.offertaLotti = form._offertaLotti;
+    let updated = { ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim(), fileNames };
+    if (form._offertaLotti) {
+      updated.offertaLotti = Object.fromEntries(Object.entries(form._offertaLotti).map(([num, offerta]) => [num, aggiornaCatalogoModifica(offerta)]));
+      updated = salvaBasiImportate(updated, form._offertaLotti, Object.keys(excelFiles).filter(num => !excelPending[num] && !excelError[num]));
+    }
     onSalva(updated);
   };
 
@@ -647,105 +652,8 @@ function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara }) {
 }
 
 // ── Tab Offerta Catalogo ──────────────────────────────────────────────────────
-export function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
-  const [lottoSel, setLottoSel] = React.useState(Object.keys(offertaLotti)[0] || "1");
-  const offerta = offertaLotti[lottoSel];
-  const cat = offerta?.offertaCatalogo || [];
-
-  const handleChangeOfferto = (idx, fasciaIdx, value) => {
-    const lottiUpd = { ...offertaLotti };
-    const righe = [...cat];
-    const righa = { ...righe[idx] };
-    const prezzi = [...(righa.prezziOfferto || [])];
-    prezzi[fasciaIdx] = { ...prezzi[fasciaIdx], fascia: prezzi[fasciaIdx]?.fascia || fasceLabels[fasciaIdx], valore: value ? parseFloat(value) : null };
-    righa.prezziOfferto = prezzi;
-    righe[idx] = righa;
-    lottiUpd[lottoSel] = { ...offerta, offertaCatalogo: righe };
-    onUpdate({ ...gara, offertaLotti: lottiUpd });
-  };
-
-  const fasceLabels = cat.length > 0 && cat[0].prezziOfferto?.length > 0
-    ? cat[0].prezziOfferto.map(p => p.fascia)
-    : ["Semplice", "Medio", "Complesso"];
-
-  return (
-    <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
-      <div style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 18 }}>📦</span>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Offerta Catalogo</div>
-        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-          {Object.keys(offertaLotti).map(num => (
-            <button key={num} onClick={() => setLottoSel(num)}
-              style={{ background: lottoSel === num ? "#fff" : "rgba(255,255,255,0.2)", color: lottoSel === num ? "#1d4ed8" : "#fff", border: "none", borderRadius: 7, padding: "4px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              {lotti[parseInt(num) - 1]?.nome || `Lotto ${num}`}
-            </button>
-          ))}
-        </div>
-      </div>
-      {cat.some(row => row.idGenerato) && (
-        <div style={{ padding: "8px 20px", fontSize: 12, color: "#475569", background: "#f8fafc" }}>
-          Il file identifica le voci per nome: la colonna ID resta vuota.
-        </div>
-      )}
-      {cat.length === 0 ? (
-        <div style={{ padding: "24px", color: "#6b7280", fontSize: 13 }}>Nessun dato catalogo per questo lotto. Carica l'Excel dal modale Modifica.</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
-                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>ID</th>
-                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Ambito</th>
-                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase" }}>Nome</th>
-                <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #bfdbfe", borderLeft: "1px solid #bfdbfe" }}>Prezzi catalogo (Realizzazione)</th>
-                {fasceLabels.map((f, i) => null)}
-                <th colSpan={fasceLabels.length} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#166534", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #86efac", borderLeft: "1px solid #86efac", background: "#f0fdf4" }}>Prezzo Offerto Realizzazione</th>
-                <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", fontSize: 11, textTransform: "uppercase", borderLeft: "1px solid #bfdbfe" }}>Regole</th>
-              </tr>
-              <tr style={{ background: "#eff6ff", borderBottom: "1px solid #bfdbfe" }}>
-                <th colSpan={3} />
-                {["Semplice","Medio","Complesso"].map(l => (
-                  <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", fontSize: 10, borderLeft: l === "Semplice" ? "1px solid #bfdbfe" : "none" }}>{l}</th>
-                ))}
-                {fasceLabels.map((f, i) => (
-                  <th key={f} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#166534", whiteSpace: "nowrap", fontSize: 10, background: "#f0fdf4", borderLeft: i === 0 ? "1px solid #86efac" : "none" }}>{f}</th>
-                ))}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {cat.map((r, idx) => (
-                <tr key={idx} style={{ borderBottom: "1px solid #f0f0f0", background: idx % 2 === 0 ? "#fff" : "#f9fafb" }}>
-                  <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1d4ed8" }}>{r.idGenerato ? "—" : r.id}</td>
-                  <td style={{ padding: "6px 10px", color: "#374151" }}>{r.ambito || "—"}</td>
-                  <td style={{ padding: "6px 10px", color: "#374151", maxWidth: 200 }}>{r.nome}</td>
-                  {[r.prezzoRealizzazioneSemplice, r.prezzoRealizzazioneMedio, r.prezzoRealizzazioneComplesso].map((p, pi) => (
-                    <td key={pi} style={{ padding: "6px 8px", textAlign: "right", color: "#374151", borderLeft: pi === 0 ? "1px solid #e0e7ff" : "none" }}>
-                      {p != null ? p.toLocaleString("it-IT", { minimumFractionDigits: 2 }) : "—"}
-                    </td>
-                  ))}
-                  {fasceLabels.map((f, fi) => {
-                    const pv = r.prezziOfferto?.[fi];
-                    return (
-                      <td key={fi} style={{ padding: "4px 6px", background: "#f0fdf4", borderLeft: fi === 0 ? "1px solid #bbf7d0" : "none" }}>
-                        <div>
-                          <input type="number" value={pv?.valore ?? ""} placeholder="0.00"
-                            onChange={e => handleChangeOfferto(idx, fi, e.target.value)}
-                            style={{ width: 90, padding: "3px 6px", border: "1px solid #d1fae5", borderRadius: 5, fontSize: 12, textAlign: "right", outline: "none" }} />
-                          {pv?.regola && <div style={{ fontSize: 9, color: "#6b7280", marginTop: 2, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={pv.regola}>📌 {pv.regola}</div>}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td style={{ padding: "6px 10px", color: "#6b7280", fontSize: 10, borderLeft: "1px solid #e5e7eb", maxWidth: 180 }} title={r.regole}>{r.regole ? r.regole.slice(0, 80) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+export function TabOffertaCatalogo(props) {
+  return <OffertaCatalogo {...props} />;
 }
 
 // ── Vista 3: Dettaglio Gara ───────────────────────────────────────────────────
@@ -775,7 +683,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
   // Lotti estratti dall'AI — array di { nome, descrizione, sezioni, requisitiTecnici, tow,
   // documentiRichiesti, criteriValutazione, proposte:{tecnica,economica,piano} }
-  const lotti = cap?.lotti || [];
+  const lotti = lottiConBaseAsta(cap?.lotti || [], gara.offertaLotti);
   const lottoCorr = lottoAttivo != null ? lotti[lottoAttivo] : null;
 
   // aiResult: dal lotto attivo se disponibile, altrimenti dal livello radice

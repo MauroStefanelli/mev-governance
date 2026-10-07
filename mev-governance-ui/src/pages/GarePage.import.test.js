@@ -13,14 +13,14 @@ function select(container, lot) {
 }
 test("selezione non importa, password errata poi corretta consente retry", async () => {
   const save = jest.fn();
-  const { container } = render(<ModaleModificaGara gara={{ nome: "Gara" }} onSalva={save} onAnnulla={() => {}} />);
+  const { container } = render(<ModaleModificaGara gara={{ nome: "Gara", capitolato: { lotti: [{ nome: "Lotto 1" }, { nome: "Lotto 2" }] } }} onSalva={save} onAnnulla={() => {}} />);
   const file = select(container, 1);
   expect(analizzaOffertaExcel).not.toHaveBeenCalled();
   analizzaOffertaExcel.mockRejectedValueOnce(new Error("Password errata"));
   userEvent.click(screen.getAllByText("Importa Excel")[0]);
   expect(await screen.findByText("Password errata")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Password Excel Lotto 1"), { target: { value: "corretta-à" } });
-  analizzaOffertaExcel.mockResolvedValueOnce({ ok: true, data: { offertaEconomica: { righe: [{ codice: "TOW01.1" }] }, avvisi: ["Colonna non riconosciuta"] } });
+  analizzaOffertaExcel.mockResolvedValueOnce({ ok: true, data: { offertaEconomica: { importoBaseGara: 123456, righe: [{ codice: "TOW01.1" }] }, avvisi: ["Colonna non riconosciuta"] } });
   userEvent.click(screen.getByText("Riprova importazione"));
   await waitFor(() => expect(screen.queryByText("Password errata")).not.toBeInTheDocument());
   expect(analizzaOffertaExcel).toHaveBeenLastCalledWith(file, 1, "corretta-à");
@@ -28,6 +28,8 @@ test("selezione non importa, password errata poi corretta consente retry", async
   userEvent.click(screen.getByText("Salva"));
   expect(save.mock.calls[0][0].offertaLotti[1].offertaEconomica.righe).toHaveLength(1);
   expect(save.mock.calls[0][0]).not.toHaveProperty("offertaPasswords");
+  expect(save.mock.calls[0][0].capitolato.lotti[0].importoBase).toBe(123456);
+  expect(save.mock.calls[0][0].capitolato.lotti[1].importoBase).toBeUndefined();
 });
 
 test("importazioni concorrenti di due lotti conservano entrambe e bloccano Salva", async () => {
@@ -55,5 +57,7 @@ test("catalogo senza ID originale mostra i nomi, senza esporre la chiave tecnica
   }] } }} lotti={[]} gara={{}} onUpdate={() => {}} />);
   expect(screen.getByText("Driver Alpha")).toBeInTheDocument();
   expect(screen.queryByText("driver-key-interna")).not.toBeInTheDocument();
-  expect(screen.getByText(/Il file identifica le voci per nome/)).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "ID" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "Ambito" })).not.toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Descrizione Driver" })).toBeInTheDocument();
 });
