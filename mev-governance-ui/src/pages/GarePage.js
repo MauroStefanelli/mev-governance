@@ -1,4 +1,6 @@
 import React, { useState, useRef } from "react";
+import LottoFilePicker from "../components/gare/LottoFilePicker";
+import GaraSections from "../components/gare/GaraSections";
 import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara, analizzaOffertaExcel } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
@@ -334,7 +336,7 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
 }
 
 // ── Modale Modifica Gara ──────────────────────────────────────────────────────
-function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
+export function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   const [form, setForm] = React.useState({
     nome:     gara.nome     || "",
     ente:     gara.ente     || "",
@@ -346,9 +348,10 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   const [isDragOver, setIsDragOver] = React.useState(false);
   // Excel offerta per lotto: { 1: File, 2: File }
   const [excelFiles, setExcelFiles]     = React.useState({});
-  const [excelPwds, setExcelPwds]       = React.useState({});  // { 1: "pwd" } — salvate offuscate
+  const [excelPwds, setExcelPwds]       = React.useState({});  // Password solo in memoria per aprire il file
   const [excelLoading, setExcelLoading] = React.useState({});
   const [excelError, setExcelError]     = React.useState({});
+  const [excelPending, setExcelPending] = React.useState({});
   const [error, setError] = React.useState("");
   const fileInputRef = React.useRef(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -361,25 +364,21 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   }));
 
   const handleCaricaExcel = async (num, file) => {
+    if (!file || excelLoading[num]) return;
     const pwd = excelPwds[num] || "";
     setExcelLoading(prev => ({ ...prev, [num]: true }));
     setExcelError(prev => ({ ...prev, [num]: "" }));
     try {
       const res = await analizzaOffertaExcel(file, num, pwd);
       if (res.ok && res.data) {
-        // Salva i dati parsati nella gara e la password offuscata
-        const offertaLotti = { ...(gara.offertaLotti || {}) };
-        offertaLotti[num] = { ...res.data, excelFileName: file.name };
-        const offertaPasswords = { ...(gara.offertaPasswords || {}) };
-        if (pwd) offertaPasswords[num] = btoa(pwd); // offuscamento base64
-        // Aggiorna la gara tramite onSalva con i dati aggiornati
-        // Nota: salviamo temporaneamente nei ref per passarlo al submit
-        setExcelFiles(prev => ({ ...prev, [num]: file }));
-        // Memorizza in uno stato interno per passarlo al submit finale
-        setForm(f => ({
-          ...f,
-          _offertaLotti: offertaLotti,
-          _offertaPasswords: offertaPasswords,
+        setExcelPending(prev => ({ ...prev, [num]: false }));
+        // Unisci al risultato più recente: importazioni di lotti diversi non si sovrascrivono.
+        setForm(previous => ({
+          ...previous,
+          _offertaLotti: {
+            ...(previous._offertaLotti || gara.offertaLotti || {}),
+            [num]: { ...res.data, excelFileName: file.name },
+          },
         }));
       } else {
         setExcelError(prev => ({ ...prev, [num]: res.message || "Errore parsing" }));
@@ -409,9 +408,9 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.nome.trim()) { setError("Il nome della gara è obbligatorio."); return; }
+    if (Object.values(excelLoading).some(Boolean)) return;
     const updated = { ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim(), fileNames };
     if (form._offertaLotti) updated.offertaLotti = form._offertaLotti;
-    if (form._offertaPasswords) updated.offertaPasswords = form._offertaPasswords;
     onSalva(updated);
   };
 
@@ -496,26 +495,46 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
             </div>
             <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
               {lottiRows.map(({ num, nome }) => {
-                const existing = gara.offertaLotti?.[num];
-                const isLoaded = !!existing || !!excelFiles[num];
+                const existing = form._offertaLotti?.[num] || gara.offertaLotti?.[num];
+                const isLoaded = !!existing && !excelPending[num];
                 return (
                   <div key={num} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, background: AMBER_LIGHT, borderRadius: 6, padding: "2px 9px", border: "1px solid " + AMBER_BORDER, flexShrink: 0 }}>{nome}</span>
                     <label htmlFor={`excel-file-mod-${num}`}
                       style={{ background: isLoaded ? "#f0fdf4" : "#fff", color: isLoaded ? "#16a34a" : "#6b7280", border: "1px solid " + (isLoaded ? "#86efac" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-block" }}>
-                      {excelFiles[num] ? `✓ ${excelFiles[num].name.slice(0,28)}` : existing?.excelFileName ? `✓ ${existing.excelFileName.slice(0,28)} (già importato)` : "📊 Carica Excel (.xlsx)"}
+                      {excelFiles[num] ? `${excelPending[num] ? "📊 Selezionato:" : "✓"} ${excelFiles[num].name}` : existing?.excelFileName ? `✓ ${existing.excelFileName.slice(0,28)} (già importato)` : "📊 Carica Excel (.xlsx)"}
                     </label>
-                    <input id={`excel-file-mod-${num}`} type="file" accept=".xlsx,.xls" style={{ display: "none" }}
-                      onChange={e => { const f = e.target.files[0]; if (f) { setExcelFiles(prev => ({ ...prev, [num]: f })); handleCaricaExcel(num, f); } e.target.value = ""; }} />
+                    <input id={`excel-file-mod-${num}`} type="file" accept=".xlsx,.xls" disabled={!!excelLoading[num]} style={{ display: "none" }}
+                      onChange={e => {
+                        const selected = e.target.files[0];
+                        if (selected) {
+                          setExcelFiles(prev => ({ ...prev, [num]: selected }));
+                          setExcelPending(prev => ({ ...prev, [num]: true }));
+                          setExcelError(prev => ({ ...prev, [num]: "" }));
+                        }
+                        e.target.value = "";
+                      }} />
                     <input
                       type="password"
                       placeholder="Password (se protetto)"
+                      disabled={!!excelLoading[num]}
+                      aria-label={`Password Excel Lotto ${num}`}
                       value={excelPwds[num] || ""}
                       onChange={e => setExcelPwds(prev => ({ ...prev, [num]: e.target.value }))}
                       style={{ padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 11, fontFamily: "inherit", outline: "none", width: 160 }} />
+                    <button type="button" disabled={!excelFiles[num] || !!excelLoading[num]}
+                      onClick={() => handleCaricaExcel(num, excelFiles[num])}
+                      style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid #86efac", background: "#f0fdf4", cursor: "pointer", fontSize: 11 }}>
+                      {excelLoading[num] ? "Importazione..." : excelError[num] ? "Riprova importazione" : "Importa Excel"}
+                    </button>
                     {excelLoading[num] && <span style={{ fontSize: 11, color: "#6b7280" }}>Parsing...</span>}
                     {excelError[num] && <span style={{ fontSize: 11, color: "#dc2626" }}>{excelError[num]}</span>}
-                    {existing && !excelLoading[num] && !excelError[num] && (
+                    {!excelPending[num] && (existing?.avvisi || []).length > 0 && (
+                      <div role="status" style={{ width: "100%", color: "#92400e", fontSize: 11 }}>
+                        {existing.avvisi.map((message, index) => <div key={index}>{message}</div>)}
+                      </div>
+                    )}
+                    {existing && !excelPending[num] && !excelLoading[num] && !excelError[num] && (
                       <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 700 }}>
                         ✓ {existing.offertaEconomica ? `${existing.offertaEconomica.righe?.length || 0} righe eco.` : ""}{existing.offertaCatalogo ? ` · ${existing.offertaCatalogo.length || 0} voci cat.` : ""}
                       </span>
@@ -529,7 +548,7 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
           {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#dc2626", marginBottom: 16 }}>{error}</div>}
           <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
             <button type="button" onClick={onAnnulla} style={{ padding: "10px 22px", borderRadius: 9, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Annulla</button>
-            <button type="submit" style={{ padding: "10px 28px", borderRadius: 9, border: "none", background: "linear-gradient(135deg," + AMBER + "," + AMBER_DARK + ")", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 10px rgba(245,158,11,0.35)" }}>Salva</button>
+            <button type="submit" disabled={Object.values(excelLoading).some(Boolean)} style={{ padding: "10px 28px", borderRadius: 9, border: "none", background: "linear-gradient(135deg," + AMBER + "," + AMBER_DARK + ")", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 10px rgba(245,158,11,0.35)" }}>Salva</button>
           </div>
         </form>
       </div>
@@ -628,7 +647,7 @@ function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara }) {
 }
 
 // ── Tab Offerta Catalogo ──────────────────────────────────────────────────────
-function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
+export function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
   const [lottoSel, setLottoSel] = React.useState(Object.keys(offertaLotti)[0] || "1");
   const offerta = offertaLotti[lottoSel];
   const cat = offerta?.offertaCatalogo || [];
@@ -638,7 +657,7 @@ function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
     const righe = [...cat];
     const righa = { ...righe[idx] };
     const prezzi = [...(righa.prezziOfferto || [])];
-    prezzi[fasciaIdx] = { ...prezzi[fasciaIdx], valore: value ? parseFloat(value) : null };
+    prezzi[fasciaIdx] = { ...prezzi[fasciaIdx], fascia: prezzi[fasciaIdx]?.fascia || fasceLabels[fasciaIdx], valore: value ? parseFloat(value) : null };
     righa.prezziOfferto = prezzi;
     righe[idx] = righa;
     lottiUpd[lottoSel] = { ...offerta, offertaCatalogo: righe };
@@ -663,6 +682,11 @@ function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
           ))}
         </div>
       </div>
+      {cat.some(row => row.idGenerato) && (
+        <div style={{ padding: "8px 20px", fontSize: 12, color: "#475569", background: "#f8fafc" }}>
+          Il file identifica le voci per nome: la colonna ID resta vuota.
+        </div>
+      )}
       {cat.length === 0 ? (
         <div style={{ padding: "24px", color: "#6b7280", fontSize: 13 }}>Nessun dato catalogo per questo lotto. Carica l'Excel dal modale Modifica.</div>
       ) : (
@@ -692,7 +716,7 @@ function TabOffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
             <tbody>
               {cat.map((r, idx) => (
                 <tr key={idx} style={{ borderBottom: "1px solid #f0f0f0", background: idx % 2 === 0 ? "#fff" : "#f9fafb" }}>
-                  <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1d4ed8" }}>{r.id}</td>
+                  <td style={{ padding: "6px 10px", fontWeight: 700, color: "#1d4ed8" }}>{r.idGenerato ? "—" : r.id}</td>
                   <td style={{ padding: "6px 10px", color: "#374151" }}>{r.ambito || "—"}</td>
                   <td style={{ padding: "6px 10px", color: "#374151", maxWidth: 200 }}>{r.nome}</td>
                   {[r.prezzoRealizzazioneSemplice, r.prezzoRealizzazioneMedio, r.prezzoRealizzazioneComplesso].map((p, pi) => (
@@ -897,6 +921,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         note:          get(a,"note","notes") || "",
         fileName:      result.fileName || file.name,
         analyzedAt:    new Date().toISOString(),
+        sectionDiagnostics: a._sectionDiagnostics || null,
       };
 
       // Debug: log errori parser dal backend
@@ -1173,18 +1198,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
                           {/* Catalogo */}
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <label htmlFor={`cat-file-${num}`}
-                              style={{ background: catalogFiles[num] ? "#eff6ff" : "#fff", color: catalogFiles[num] ? "#1d4ed8" : "#6b7280", border: "1px solid " + (catalogFiles[num] ? "#93c5fd" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-block" }}>
-                              {catalogFiles[num]
-                                ? `✓ Cat: ${catalogFiles[num].name.slice(0,28)}`
-                                : (gara.catalogFileNames?.[num] || gara.catalogFileNames?.[String(num)]
-                                    ? `✓ ${(gara.catalogFileNames[num] || gara.catalogFileNames[String(num)]).slice(0,28)} (già analizzato)`
-                                    : "📦 Catalogo (PDF)")}
-                            </label>
-                            <input
-                              id={`cat-file-${num}`}
-                              type="file" accept=".pdf" style={{ display: "none" }}
-                              onChange={e => { const f = e.target.files[0]; if (f) setCatalogFiles(prev => ({ ...prev, [num]: f })); e.target.value = ""; }} />
+                            <LottoFilePicker
+                              file={catalogFiles[num]}
+                              savedName={gara.catalogFileNames?.[num]}
+                              caption="📦 Catalogo (PDF)" prefix="Cat: " accept=".pdf"
+                              disabled={analyzingCap}
+                              onChange={selected => setCatalogFiles(prev => ({ ...prev, [num]: selected }))} />
                             {catalogFiles[num] && (
                               <button type="button" onClick={() => setCatalogFiles(prev => { const n = {...prev}; delete n[num]; return n; })}
                                 style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
@@ -1222,6 +1241,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                         </div>
                       ))}
                     </div>
+
+                    {cap.sectionDiagnostics?.totale > cap.sectionDiagnostics?.conSintesi && (
+                      <div role="status" style={{ color: "#92400e", fontSize: 12, padding: "8px 12px", background: "#fffbeb", borderRadius: 8 }}>
+                        {cap.sectionDiagnostics.totale - cap.sectionDiagnostics.conSintesi} sezioni senza sintesi disponibile: puoi aprirle per consultarne il titolo e il riferimento nel capitolato.
+                      </div>
+                    )}
 
                     {/* Sintesi gara */}
                     {cap.sintesi && (
@@ -1382,74 +1407,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
                           {/* Sezioni */}
-                          {(d.sezioni || []).length > 0 && (() => {
-                            // Raggruppa per numero padre (es. "1", "2") — i sotto-numeri sono "1.1", "1.2"
-                            const gruppi = {};
-                            (d.sezioni || []).forEach(s => {
-                              const num = String(s.numero || "");
-                              const padre = num.includes(".") ? num.split(".")[0] : num;
-                              if (!gruppi[padre]) gruppi[padre] = { padre: null, figli: [] };
-                              if (!num.includes(".")) gruppi[padre].padre = s;
-                              else gruppi[padre].figli.push(s);
-                            });
-                            return (
-                              <div>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sezioni ({d.sezioni.length})</div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                  {Object.entries(gruppi).sort(([a],[b]) => parseFloat(a)-parseFloat(b)).map(([numPadre, g]) => {
-                                    const hasFigli = g.figli.length > 0;
-                                    const hasSintesi = !hasFigli && !!g.padre?.sintesi;
-                                    const isOpen = !!dettagliOpen["sez-" + numPadre];
-                                    const isClickable = hasFigli || hasSintesi;
-                                    return (
-                                      <div key={numPadre} style={{ borderRadius: 8, border: "1px solid " + (isOpen ? AMBER_BORDER : "#f0f0f0"), overflow: "hidden" }}>
-                                        {/* Riga padre — sempre cliccabile se ha figli o sintesi */}
-                                        <div
-                                          onClick={() => isClickable && toggleDettagli("sez-" + numPadre)}
-                                          style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: isOpen ? AMBER_BG : "#fafafa", cursor: isClickable ? "pointer" : "default" }}>
-                                          <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{numPadre}</span>
-                                          <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{g.padre?.titolo || `Sezione ${numPadre}`}</div>
-                                            {/* Mostra sintesi inline se non ha figli e non è espansa */}
-                                            {!hasFigli && g.padre?.sintesi && !isOpen && (
-                                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.padre.sintesi}</div>
-                                            )}
-                                          </div>
-                                          {isClickable && (
-                                            <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
-                                              {hasFigli
-                                                ? (isOpen ? "▲" : "▼") + " " + g.figli.length + " sottosezioni"
-                                                : (isOpen ? "▲" : "▼")}
-                                            </span>
-                                          )}
-                                        </div>
-                                        {/* Sintesi espansa (senza figli) */}
-                                        {!hasFigli && hasSintesi && isOpen && (
-                                          <div style={{ borderTop: "1px solid " + AMBER_BORDER, background: "#fff", padding: "10px 14px 10px 32px" }}>
-                                            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{g.padre.sintesi}</div>
-                                          </div>
-                                        )}
-                                        {/* Figli espandibili */}
-                                        {hasFigli && isOpen && (
-                                          <div style={{ borderTop: "1px solid " + AMBER_BORDER, background: "#fff" }}>
-                                            {g.figli.sort((a,b) => parseFloat(a.numero)-parseFloat(b.numero)).map((sf, fi) => (
-                                              <div key={fi} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "8px 12px 8px 28px", borderBottom: fi < g.figli.length-1 ? "1px solid #f5f5f5" : "none" }}>
-                                                <span style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 6, padding: "2px 7px", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{sf.numero}</span>
-                                                <div style={{ flex: 1 }}>
-                                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{sf.titolo}</div>
-                                                  {sf.sintesi && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{sf.sintesi}</div>}
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
+                          <GaraSections key={lottoAttivo ?? "tutti"} sections={d.sezioni || []} />
 
                           {/* 3 colonne: requisiti, documenti, criteri */}
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>

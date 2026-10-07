@@ -332,29 +332,33 @@ public class GareController : ControllerBase
     // dei fogli "SCHEMA OFFERTA ECONOMICA" e "Schema Offerta Catalogo Lotto N"
     // Campi form: file (xlsx), password (opzionale), lot (query param, default 1)
     [HttpPost("parse-offerta-excel")]
-    public IActionResult ParseOffertaExcel([FromQuery] int lot = 1)
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
+    public async Task<IActionResult> ParseOffertaExcel([FromQuery] int lot = 1)
     {
         if (!CanAccess()) return Forbid();
-
-        var file = Request.Form.Files.GetFile("file");
+        if (lot <= 0) return BadRequest(new { message = "Lotto non valido." });
+        if (!Request.HasFormContentType) return BadRequest(new { message = "Invia il file come multipart/form-data." });
+        var form = await Request.ReadFormAsync(HttpContext.RequestAborted);
+        var file = form.Files.GetFile("file");
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "Nessun file ricevuto. Invia il file Excel come campo 'file'." });
-
-        var password = Request.Form.TryGetValue("password", out var pwdVals) ? pwdVals.FirstOrDefault() : null;
-
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension is not ".xlsx" and not ".xls")
+            return BadRequest(new { message = "Formato non supportato: carica un file .xlsx o .xls." });
+        var password = form.TryGetValue("password", out var pwdVals) ? pwdVals.FirstOrDefault() : null;
         try
         {
             using var stream = file.OpenReadStream();
             var result = ContractParserService.ParseOffertaExcel(stream, lot, password);
-
-            if (result.Error != null && result.OffertaEconomica == null && result.OffertaCatalogo == null)
-                return BadRequest(new { message = result.Error, fogliDisponibili = result.FogliDisponibili });
-
+            if (result.Error != null)
+                return BadRequest(new { message = result.Error, fogliDisponibili = result.FogliDisponibili,
+                    avvisi = result.Avvisi, diagnostica = result.Diagnostica });
             return Ok(new { ok = true, lotto = lot, data = result });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return StatusCode(500, new { message = "Errore parsing Excel: " + ex.Message });
+            return StatusCode(500, new { message = "Impossibile leggere il file Excel. Verifica il formato e riprova." });
         }
     }
 

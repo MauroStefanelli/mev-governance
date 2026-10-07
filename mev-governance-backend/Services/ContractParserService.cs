@@ -421,300 +421,8 @@ public static class ContractParserService
     // Usa ExcelDataReader per aprire file xlsx protetti da password (ClosedXML non supporta).
     // ─────────────────────────────────────────────────────────────────────────
     public static OffertaExcelResult ParseOffertaExcel(Stream xlsxStream, int lot, string? password)
-    {
-        var result = new OffertaExcelResult { Lotto = lot };
+        => OffertaExcelParser.Parse(xlsxStream, lot, password);
 
-        // Leggi tutti i bytes prima (il file stream può essere consumato)
-        var bytes = ReadAllBytes(xlsxStream);
-
-        // Prova prima con ExcelDataReader (supporta password xlsx OLE)
-        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-        ExcelDataReader.ExcelReaderConfiguration? cfg = string.IsNullOrEmpty(password) ? null
-            : new ExcelDataReader.ExcelReaderConfiguration { Password = password };
-
-        System.Data.DataSet ds;
-        try
-        {
-            using var ms = new MemoryStream(bytes);
-            using var reader = ExcelDataReader.ExcelReaderFactory.CreateReader(ms, cfg);
-            ds = reader.AsDataSet(new ExcelDataReader.ExcelDataSetConfiguration
-            {
-                ConfigureDataTable = _ => new ExcelDataReader.ExcelDataTableConfiguration { UseHeaderRow = false }
-            });
-        }
-        catch (Exception ex) when (ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase) ||
-                                    ex.Message.Contains("Invalid password", StringComparison.OrdinalIgnoreCase) ||
-                                    ex.Message.Contains("encrypt", StringComparison.OrdinalIgnoreCase))
-        {
-            result.Error = "Password errata o file protetto — impossibile aprire il file Excel.";
-            return result;
-        }
-
-        // Indici dei fogli per nome
-        var fogliNomi = ds.Tables.Cast<System.Data.DataTable>().Select(t => t.TableName).ToList();
-        result.FogliDisponibili = fogliNomi;
-
-        var tableEco = ds.Tables.Cast<System.Data.DataTable>().FirstOrDefault(t =>
-            t.TableName.Contains("OFFERTA ECONOMICA", StringComparison.OrdinalIgnoreCase) ||
-            t.TableName.Contains("SCHEMA OFFERTA", StringComparison.OrdinalIgnoreCase));
-
-        var tableCat = ds.Tables.Cast<System.Data.DataTable>().FirstOrDefault(t =>
-            t.TableName.Contains($"Catalogo Lotto {lot}", StringComparison.OrdinalIgnoreCase) ||
-            t.TableName.Contains($"Catalogo L{lot}", StringComparison.OrdinalIgnoreCase) ||
-            (t.TableName.Contains("Catalogo", StringComparison.OrdinalIgnoreCase) && t.TableName.Contains(lot.ToString())));
-
-        // Fallback: primo foglio con "Catalogo"
-        if (tableCat == null)
-            tableCat = ds.Tables.Cast<System.Data.DataTable>().FirstOrDefault(t =>
-                t.TableName.Contains("Catalogo", StringComparison.OrdinalIgnoreCase));
-
-        if (tableEco != null)
-            result.OffertaEconomica = ParseTableOffertaEconomica(tableEco, lot);
-
-        if (tableCat != null)
-            result.OffertaCatalogo = ParseTableOffertaCatalogo(tableCat, lot);
-
-        if (tableEco == null && tableCat == null)
-            result.Error = $"Nessun foglio offerta trovato. Fogli disponibili: {string.Join(", ", fogliNomi)}";
-
-        return result;
-    }
-
-    private static string CellStr(System.Data.DataRow row, int col)
-    {
-        if (col >= row.Table.Columns.Count) return "";
-        var v = row[col];
-        return v == null || v == DBNull.Value ? "" : v.ToString()?.Trim() ?? "";
-    }
-
-    private static double? CellDbl(System.Data.DataRow row, int col)
-    {
-        if (col >= row.Table.Columns.Count) return null;
-        var v = row[col];
-        if (v == null || v == DBNull.Value) return null;
-        if (v is double d) return d;
-        if (v is decimal dec) return (double)dec;
-        if (v is float f) return (double)f;
-        if (v is int i) return (double)i;
-        var s = v.ToString()?.Replace(".", "").Replace(",", ".").Trim() ?? "";
-        return double.TryParse(s, System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out var p) ? p : null;
-    }
-
-    private static OffertaEconomica ParseTableOffertaEconomica(System.Data.DataTable table, int lot)
-    {
-        var eco = new OffertaEconomica();
-        var towRx = new Regex(@"TOW\s*0?\d+\.\d+", RegexOptions.IgnoreCase);
-        var headerRow = -1;
-        var colMap = new Dictionary<string, int>(); // nome → colonna index
-
-        var rows = table.Rows.Cast<System.Data.DataRow>().ToList();
-
-        for (int ri = 0; ri < rows.Count; ri++)
-        {
-            var row = rows[ri];
-            var rowText = string.Join("|", Enumerable.Range(0, table.Columns.Count).Select(c => CellStr(row, c)));
-
-            // Cerca importo base gara nella riga
-            if (rowText.Contains("IMPORTO BASE", StringComparison.OrdinalIgnoreCase) ||
-                rowText.Contains("NON PUO ESSERE", StringComparison.OrdinalIgnoreCase) ||
-                rowText.Contains("IMPORTO TOTALE OFFERTO", StringComparison.OrdinalIgnoreCase))
-            {
-                // Cerca numero > 1000 nella stessa riga
-                for (int c = 0; c < table.Columns.Count && eco.ImportoBaseGara == null; c++)
-                {
-                    var v = CellDbl(row, c);
-                    if (v.HasValue && v.Value > 10000) eco.ImportoBaseGara = v;
-                }
-                // Cerca nelle righe successive se non trovato
-                if (eco.ImportoBaseGara == null && ri + 1 < rows.Count)
-                {
-                    for (int c = 0; c < table.Columns.Count; c++)
-                    {
-                        var v = CellDbl(rows[ri + 1], c);
-                        if (v.HasValue && v.Value > 10000) { eco.ImportoBaseGara = v; break; }
-                    }
-                }
-            }
-
-            // Detect header row (contiene "Codice" o "TOW" e "Descrizione")
-            if (headerRow < 0 && (rowText.Contains("Codice", StringComparison.OrdinalIgnoreCase) ||
-                                   rowText.Contains("Descrizione", StringComparison.OrdinalIgnoreCase)))
-            {
-                headerRow = ri;
-                for (int c = 0; c < table.Columns.Count; c++)
-                {
-                    var t = CellStr(row, c).ToLowerInvariant();
-                    if (t.Contains("codice") || Regex.IsMatch(t, @"^tow")) colMap["codice"] = c;
-                    else if (t.Contains("descriz")) colMap["descrizione"] = c;
-                    else if (t.Contains("quant")) colMap["quantita"] = c;
-                    else if (t.Contains("prezzo") && t.Contains("unit")) colMap["prezzoUnitario"] = c;
-                    else if (t.Contains("importo") || t.Contains("totale")) colMap["importo"] = c;
-                    else if (t.Contains("regol") || t.Contains("vincol") || t.Contains("nota")) colMap["regole"] = c;
-                }
-                continue;
-            }
-
-            // Riga con codice TOW
-            var codiceCol = -1;
-            string codice = "";
-            for (int c = 0; c < table.Columns.Count; c++)
-            {
-                var t = CellStr(row, c);
-                if (towRx.IsMatch(t)) { codiceCol = c; codice = t.Trim().ToUpperInvariant(); break; }
-            }
-            if (codiceCol < 0) continue;
-
-            string GetC(string key) => colMap.TryGetValue(key, out var ci) ? CellStr(row, ci) : "";
-            double? GetN(string key) => colMap.TryGetValue(key, out var ci) ? CellDbl(row, ci) : null;
-
-            var desc = GetC("descrizione");
-            if (string.IsNullOrEmpty(desc))
-            {
-                // Prendi tutti i valori stringa non numerici dalla riga, escluso il codice
-                desc = string.Join(" ", Enumerable.Range(0, table.Columns.Count)
-                    .Where(c => c != codiceCol)
-                    .Select(c => CellStr(row, c))
-                    .Where(t => !string.IsNullOrWhiteSpace(t) && !double.TryParse(t.Replace(",", "."), out _))
-                    .Take(3));
-            }
-
-            eco.Righe.Add(new RigaOffertaEconomica
-            {
-                Codice         = codice,
-                Descrizione    = desc.Trim(),
-                Quantita       = GetN("quantita"),
-                PrezzoUnitario = GetN("prezzoUnitario"),
-                ImportoOfferto = GetN("importo"),
-                Regole         = GetC("regole"),
-            });
-        }
-
-        return eco;
-    }
-
-    private static List<RigaOffertaCatalogo> ParseTableOffertaCatalogo(System.Data.DataTable table, int lot)
-    {
-        var righe = new List<RigaOffertaCatalogo>();
-        var idRx = new Regex(@"^\d{2,5}$");
-        var colMap = new Dictionary<string, int>();
-        var prezziOffertoKeys = new List<(string label, int col)>();
-
-        var rows = table.Rows.Cast<System.Data.DataRow>().ToList();
-
-        for (int ri = 0; ri < rows.Count; ri++)
-        {
-            var row = rows[ri];
-
-            // Detect header
-            var rowText = string.Join("|", Enumerable.Range(0, table.Columns.Count).Select(c => CellStr(row, c)));
-            if (rowText.Contains("Ambito", StringComparison.OrdinalIgnoreCase) ||
-                rowText.Contains("Componente", StringComparison.OrdinalIgnoreCase) ||
-                rowText.Contains("Realizzazione", StringComparison.OrdinalIgnoreCase))
-            {
-                colMap.Clear(); prezziOffertoKeys.Clear();
-                // Cerca anche la riga successiva per intestazioni su più righe
-                var headerRows = new List<System.Data.DataRow> { row };
-                if (ri + 1 < rows.Count) headerRows.Add(rows[ri + 1]);
-
-                // Prima passata: riga corrente
-                for (int c = 0; c < table.Columns.Count; c++)
-                {
-                    var t = CellStr(row, c).ToLowerInvariant();
-                    if (t == "id" || t == "cod" || t == "codice") colMap["id"] = c;
-                    else if (t.Contains("ambito")) colMap["ambito"] = c;
-                    else if (t.Contains("nome") || t.Contains("componente") || t.Contains("driver")) colMap["nome"] = c;
-                    else if (t.Contains("descriz")) colMap["descrizione"] = c;
-                    else if (t.Contains("regol") || t.Contains("vincol")) colMap["regole"] = c;
-                }
-
-                // Seconda passata: cerca "Semplice", "Medio", "Complesso", "Prezzo Offerto"
-                // (possono essere in riga successiva)
-                foreach (var hr in headerRows)
-                {
-                    for (int c = 0; c < table.Columns.Count; c++)
-                    {
-                        var t = CellStr(hr, c).ToLowerInvariant();
-                        if (t.Contains("semplice") && !colMap.ContainsKey("sempliceR")) colMap["sempliceR"] = c;
-                        else if (t.Contains("medio") && !colMap.ContainsKey("medioR")) colMap["medioR"] = c;
-                        else if (t.Contains("complesso") && !colMap.ContainsKey("complessoR")) colMap["complessoR"] = c;
-                        else if (t.Contains("semplice")) colMap["sempliceM"] = c;
-                        else if (t.Contains("medio")) colMap["medioM"] = c;
-                        else if (t.Contains("complesso")) colMap["complessoM"] = c;
-                        // "Prezzo Offerto" colonne
-                        if (t.Contains("prezzo") && t.Contains("offert"))
-                        {
-                            // Determina fascia dal testo o dalla posizione relativa
-                            var label = t.Contains("sempl") ? "Semplice" :
-                                        t.Contains("medio") ? "Medio" :
-                                        t.Contains("compl") ? "Complesso" : $"Col{c}";
-                            if (!prezziOffertoKeys.Any(k => k.col == c))
-                                prezziOffertoKeys.Add((label, c));
-                        }
-                    }
-                }
-
-                // Se non abbiamo trovato "Prezzo Offerto" espliciti, cerca colonne dopo "Complesso"
-                if (prezziOffertoKeys.Count == 0 && colMap.TryGetValue("complessoR", out var lastR))
-                {
-                    // Le colonne successive alla complessità di Realizzazione potrebbero essere "Prezzo Offerto"
-                    for (int c = lastR + 1; c < table.Columns.Count && prezziOffertoKeys.Count < 3; c++)
-                    {
-                        var h = CellStr(row, c).ToLowerInvariant();
-                        if (!string.IsNullOrEmpty(h))
-                            prezziOffertoKeys.Add((prezziOffertoKeys.Count == 0 ? "Semplice" : prezziOffertoKeys.Count == 1 ? "Medio" : "Complesso", c));
-                    }
-                }
-
-                continue;
-            }
-
-            // Riga dati: cerca ID
-            var idCol = -1;
-            for (int c = 0; c < table.Columns.Count; c++)
-            {
-                var t = CellStr(row, c);
-                if (idRx.IsMatch(t)) { idCol = c; break; }
-            }
-            if (idCol < 0)
-            {
-                if (colMap.TryGetValue("id", out var idC))
-                {
-                    var t = CellStr(row, idC);
-                    if (!string.IsNullOrWhiteSpace(t)) idCol = idC;
-                }
-            }
-            if (idCol < 0) continue;
-
-            string GetC(string key) => colMap.TryGetValue(key, out var ci) ? CellStr(row, ci) : "";
-            double? GetN(string key) => colMap.TryGetValue(key, out var ci) ? CellDbl(row, ci) : null;
-
-            var prezziOfferto = prezziOffertoKeys.Select(pk => new PrezzoOffertoConRegola
-            {
-                Fascia = pk.label,
-                Valore = CellDbl(row, pk.col),
-                Regola = "",
-            }).ToList();
-
-            righe.Add(new RigaOffertaCatalogo
-            {
-                Id                               = CellStr(row, idCol),
-                Ambito                           = GetC("ambito"),
-                Nome                             = GetC("nome"),
-                Descrizione                      = GetC("descrizione"),
-                PrezzoRealizzazioneSemplice       = GetN("sempliceR"),
-                PrezzoRealizzazioneMedio          = GetN("medioR"),
-                PrezzoRealizzazioneComplesso      = GetN("complessoR"),
-                PrezzoModificaSemplice            = GetN("sempliceM"),
-                PrezzoModificaMedio               = GetN("medioM"),
-                PrezzoModificaComplesso           = GetN("complessoM"),
-                PrezziOfferto                    = prezziOfferto,
-                Regole                           = GetC("regole"),
-            });
-        }
-
-        return righe;
-    }
     public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
     {
         var sb = new System.Text.StringBuilder();
@@ -831,6 +539,8 @@ public class OffertaExcelResult
     public int Lotto { get; set; }
     public string? Error { get; set; }
     public List<string>? FogliDisponibili { get; set; }
+    public List<string> Avvisi { get; set; } = new();
+    public List<ExcelSheetDiagnostic> Diagnostica { get; set; } = new();
     public OffertaEconomica? OffertaEconomica { get; set; }
     public List<RigaOffertaCatalogo>? OffertaCatalogo { get; set; }
 }
@@ -843,6 +553,11 @@ public class OffertaEconomica
 
 public class RigaOffertaEconomica
 {
+    public string Ambito { get; set; } = "";
+    public string TipoServizio { get; set; } = "";
+    public string UnitaMisura { get; set; } = "";
+    public bool ACatalogo { get; set; }
+    public int RigaExcel { get; set; }
     public string Codice        { get; set; } = "";
     public string Descrizione   { get; set; } = "";
     public double? Quantita     { get; set; }
@@ -853,6 +568,9 @@ public class RigaOffertaEconomica
 
 public class RigaOffertaCatalogo
 {
+    public bool IdGenerato { get; set; }
+    public int RigaExcel { get; set; }
+    public List<PrezzoOffertoConRegola> PrezziOffertoModifica { get; set; } = new();
     public string Id            { get; set; } = "";
     public string Ambito        { get; set; } = "";
     public string Nome          { get; set; } = "";
@@ -872,4 +590,14 @@ public class PrezzoOffertoConRegola
     public string Fascia    { get; set; } = "";
     public double? Valore   { get; set; }
     public string Regola    { get; set; } = "";
+}
+
+public class ExcelSheetDiagnostic
+{
+    public string Foglio { get; set; } = "";
+    public int RigaIntestazione { get; set; }
+    public Dictionary<string, int> Colonne { get; set; } = new(); // Indici Excel: base 1
+    public int RigheLette { get; set; }
+    public int RigheIgnorate { get; set; }
+    public bool IdGenerati { get; set; }
 }

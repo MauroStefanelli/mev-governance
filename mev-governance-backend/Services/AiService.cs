@@ -500,6 +500,7 @@ public class AiService
         "Individua tutti i lotti presenti (Lotto 1, Lotto 2, ecc.). Se non ci sono lotti espliciti crea un unico lotto 'Gara'. " +
         "Per ogni lotto estrai: nome, descrizione, importoBase, requisitiTecnici, documentiRichiesti, criteriValutazione, sezioni. " +
         "Per ogni sezione includi SEMPRE numero, titolo e sintesi (breve descrizione del contenuto, max 200 caratteri). " +
+        "Sintesi deve descrivere il contenuto disponibile, non ripetere il titolo. Se il testo include solo l'indice o il titolo, usa sintesi vuota senza inventare contenuti. " +
         "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 200 caratteri. Max 8 sezioni per lotto. " +
         "Rispondi ESCLUSIVAMENTE con JSON valido. Nessun markdown, nessun backtick, nessun testo extra.";
 
@@ -533,6 +534,12 @@ public class AiService
                 ["error"]   = "Il servizio AI ha restituito testo non convertibile in JSON.",
                 ["rawText"] = responseText.Length > 4000 ? responseText[..4000] : responseText
             };
+        }
+        if (!analysis.ContainsKey("error"))
+        {
+            var diagnostics = GaraSectionDiagnostics.Inspect(analysis);
+            diagnostics["finishReason"] = response["choices"]?[0]?["finish_reason"]?.DeepClone();
+            analysis["_sectionDiagnostics"] = diagnostics;
         }
         return (
             analysis,
@@ -709,7 +716,8 @@ public class AiService
                             ["properties"] = new JsonObject {
                                 ["numero"] = new JsonObject { ["type"] = "string" },
                                 ["titolo"] = new JsonObject { ["type"] = "string" },
-                                ["sintesi"] = new JsonObject { ["type"] = "string" }
+                                ["sintesi"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200,
+                                    ["description"] = "Sintesi del contenuto disponibile; vuota solo se manca il testo della sezione." }
                             }
                         }},
                     }
