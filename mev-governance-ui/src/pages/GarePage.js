@@ -1145,6 +1145,15 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                             );
                           })()}
 
+                          {cap.note && (
+                            <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
+                              <strong>Note:</strong> {cap.note}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {cap.note && (
                       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>
                         <strong>Note:</strong> {cap.note}
