@@ -251,6 +251,18 @@ public class GareController : ControllerBase
         return Ok(new { extractTowRows = rows, parseTowPricePdf = prices });
     }
 
+    // POST /api/gare/debug-tow-raw
+    // Mostra coordinate (X,Y) di ogni parola nelle pagine che contengono codici TOW
+    [HttpPost("debug-tow-raw")]
+    public IActionResult DebugTowRaw()
+    {
+        if (!CanAccess()) return Forbid();
+        var f = Request.Form.Files.GetFile("file");
+        if (f == null) return BadRequest(new { message = "file mancante" });
+        var result = ContractParserService.ExtractTowRawWords(f.OpenReadStream());
+        return Ok(result);
+    }
+
     // POST /api/gare/debug-catalog?lot=1
     // Restituisce il raw output di ParseCatalogPdf su un PDF
     [HttpPost("debug-catalog")]

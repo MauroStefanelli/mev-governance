@@ -253,6 +253,23 @@ public static class ContractParserService
     // ── Estrae righe TOW complete dal PDF (id, descrizione, quantità, importo) ──
     // Legge ogni riga che contiene un codice TOW (es. TOW01.1) e raccoglie
     // tutta la parte testuale come descrizione + i valori numerici come importo/quantità.
+    // Debug: restituisce coordinate raw di ogni parola nelle pagine che contengono TOW
+    public static object ExtractTowRawWords(Stream pdfStream)
+    {
+        var pages = new List<object>();
+        using var doc = PdfDocument.Open(pdfStream);
+        foreach (var page in doc.GetPages())
+        {
+            var words = page.GetWords()
+                .Select(w => new { t = w.Text, x = Math.Round(w.BoundingBox.Left, 1), y = Math.Round(w.BoundingBox.Bottom, 1) })
+                .ToList();
+            var pageText = string.Join(" ", words.Select(w => w.t));
+            if (!Regex.IsMatch(pageText, @"TOW\s*0?\d+\.\d+", RegexOptions.IgnoreCase)) continue;
+            pages.Add(new { pageNum = page.Number, width = Math.Round(page.Width, 1), height = Math.Round(page.Height, 1), words });
+        }
+        return new { pages };
+    }
+
     public static List<TowRow> ExtractTowRows(Stream pdfStream)
     {
         var rows = new List<TowRow>();
