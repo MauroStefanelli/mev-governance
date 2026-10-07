@@ -293,63 +293,66 @@ public static class ContractParserService
                 .Select(g => g.OrderBy(w => w.X).ToList())
                 .ToList();
 
-            // Identifica la colonna X dove appaiono i codici TOW isolati (non in lista)
-            // Prende la X modale dei codici TOW trovati su righe da soli o con poche parole
-            var towCandidateXs = new List<double>();
-            foreach (var line in lineGroups)
+            // Conta righe con codice TOW isolato (non in lista con virgola/parentesi)
+            var isolatedTowLines = lineGroups.Where(line =>
             {
-                var txt = string.Join(" ", line.Select(w => w.Text));
-                var towMatches = Regex.Matches(txt, @"\bTOW\s*0?\d+\.\d+\b", RegexOptions.IgnoreCase);
-                if (towMatches.Count == 1) // riga con un solo codice TOW
-                {
-                    var towWord = line.FirstOrDefault(w => Regex.IsMatch(w.Text, @"\bTOW\s*0?\d+\.\d+\b", RegexOptions.IgnoreCase));
-                    if (towWord != null) towCandidateXs.Add(towWord.X);
-                }
-            }
-            if (towCandidateXs.Count == 0) continue;
+                var towWords = line.Where(w =>
+                    Regex.IsMatch(w.Text, @"^TOW\s*0?\d+\.\d+$", RegexOptions.IgnoreCase)).ToList();
+                return towWords.Count == 1;
+            }).ToList();
 
-            // Colonna TOW = mediana delle X candidate
-            towCandidateXs.Sort();
-            double towColX = towCandidateXs[towCandidateXs.Count / 2];
-            double towColTolerance = 30; // ±30pt
+            // Serve almeno 3 righe con TOW isolati per essere una pagina-tabella
+            if (isolatedTowLines.Count < 3) continue;
 
-            // Per ogni riga con un singolo codice TOW nella colonna giusta, estrai la riga
+            // Colonna X dei TOW isolati = mediana
+            var towXs = isolatedTowLines
+                .Select(line => line.First(w => Regex.IsMatch(w.Text, @"^TOW\s*0?\d+\.\d+$", RegexOptions.IgnoreCase)).X)
+                .OrderBy(x => x).ToList();
+            double towColX = towXs[towXs.Count / 2];
+            double towColTol = 25;
+
+            // Colonna quantità: numeri interi a destra (x > 70% larghezza pagina)
+            double pageW = page.Width;
+            double qtaMinX = pageW * 0.70;
+
             var towLines = new List<(string Id, string Descrizione, double? Quantita, double Y)>();
 
             foreach (var line in lineGroups)
             {
-                // Trova codici TOW isolati nella colonna attesa
-                var towWords = line.Where(w =>
-                    Regex.IsMatch(w.Text, @"\bTOW\s*0?\d+\.\d+\b", RegexOptions.IgnoreCase) &&
-                    Math.Abs(w.X - towColX) <= towColTolerance &&
-                    !w.Text.EndsWith(",") && !w.Text.EndsWith(")")
-                ).ToList();
+                var towWord = line.FirstOrDefault(w =>
+                    Regex.IsMatch(w.Text, @"^TOW\s*0?\d+\.\d+$", RegexOptions.IgnoreCase) &&
+                    Math.Abs(w.X - towColX) <= towColTol);
+                if (towWord == null) continue;
 
-                if (towWords.Count != 1) continue;
-                var towWord = towWords[0];
                 var m = Regex.Match(towWord.Text, @"TOW\s*0?(\d+)\.(\d+)", RegexOptions.IgnoreCase);
                 if (!m.Success) continue;
                 var towId = $"TOW0{m.Groups[1].Value}.{m.Groups[2].Value}";
 
-                // Descrizione = parole a destra della colonna TOW, escludendo numeri e percentuali
+                // Descrizione = parole a destra del TOW, prima della colonna quantità
                 var descWords = line
-                    .Where(w => w.X > towWord.X + 20)
+                    .Where(w => w.X > towWord.X + 15 && w.X < qtaMinX)
                     .Where(w => !Regex.IsMatch(w.Text, @"^[\d.,]+%?$"))
-                    .Where(w => w.Text != "€" && w.Text != "N°" && w.Text.Length > 1)
+                    .Where(w => w.Text.Length > 0)
                     .Select(w => w.Text)
                     .ToList();
                 var descrizione = string.Join(" ", descWords).Trim();
 
-                // Quantità = primo numero intero nella riga (colonna destra, x > 450)
-                var qtaWord = line.Where(w => w.X > 450 && Regex.IsMatch(w.Text, @"^\d+$")).FirstOrDefault();
-                double? quantita = qtaWord != null && double.TryParse(qtaWord.Text, out var qtaVal) ? qtaVal : (double?)null;
+                // Quantità = numero intero nella zona destra (colonna qtà)
+                var qtaWord = line
+                    .Where(w => w.X >= qtaMinX && Regex.IsMatch(w.Text, @"^\d+$"))
+                    .FirstOrDefault();
+                double? quantita = qtaWord != null && double.TryParse(qtaWord.Text, out var qv) ? qv : (double?)null;
 
                 towLines.Add((towId, descrizione, quantita, line[0].Y));
             }
 
-            // Eredita la descrizione dalla riga precedente se vuota (celle unite verticalmente)
+            if (towLines.Count == 0) continue;
+
+            // Eredita descrizione dalla riga precedente se vuota (celle unite verticalmente)
+            // Scorrendo dall'alto verso il basso (Y decrescente = dall'alto)
+            var ordered = towLines.OrderByDescending(t => t.Y).ToList();
             string lastDesc = "";
-            foreach (var (towId, desc, quantita, y) in towLines.OrderByDescending(t => t.Y))
+            foreach (var (towId, desc, quantita, y) in ordered)
             {
                 var finalDesc = string.IsNullOrWhiteSpace(desc) ? lastDesc : desc;
                 if (!string.IsNullOrWhiteSpace(desc)) lastDesc = desc;
@@ -359,15 +362,15 @@ public static class ContractParserService
             }
         }
 
-        // Deduplication finale mantenendo la prima occorrenza valida
+        // Deduplication: mantieni prima occorrenza con descrizione non vuota
         var seen = new HashSet<string>();
         var result = new List<TowRow>();
-        foreach (var r in rows)
+        foreach (var r in rows.OrderByDescending(r => string.IsNullOrWhiteSpace(r.Descrizione) ? 0 : 1))
         {
             if (seen.Add(r.Id))
                 result.Add(r);
         }
-        return result;
+        return result.OrderBy(r => r.Id).ToList();
     }
     public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
     {
