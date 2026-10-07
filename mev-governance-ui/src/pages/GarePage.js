@@ -217,7 +217,7 @@ function ListaGare({ gare, onApri, onNuova, onDelete }) {
 
 // ── Modale Nuova Gara ─────────────────────────────────────────────────────────
 function ModaleNuovaGara({ onCrea, onAnnulla }) {
-  const [form, setForm] = React.useState({ nome: "", ente: "", scadenza: "", cig: "", importoBase: "", note: "" });
+  const [form, setForm] = React.useState({ nome: "", ente: "", scadenza: "", cig: "", note: "" });
   const [error, setError] = React.useState("");
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -259,10 +259,6 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
               <label style={labelStyle}>CIG (opzionale)</label>
               <input style={inputStyle} placeholder="es. 9876543210" value={form.cig} onChange={e => set("cig", e.target.value)} />
             </div>
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Importo a base d'asta (€)</label>
-            <input type="number" style={inputStyle} placeholder="es. 500000" value={form.importoBase} onChange={e => set("importoBase", e.target.value)} />
           </div>
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle}>Note</label>
@@ -677,7 +673,6 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
           { label: "Documenti caricati", value: files.length, color: AMBER_DARK },
           { label: "Analisi AI",         value: analyzed ? "Completata" : "Non eseguita", color: analyzed ? "#16a34a" : "#9ca3af" },
           { label: "Attivita' completate", value: (checklist.filter(c=>c.done).length) + "/" + checklist.length, color: "#1d4ed8" },
-          gara.importoBase ? { label: "Base d'asta", value: "\u20ac " + Number(gara.importoBase).toLocaleString("it-IT"), color: "#7c3aed" } : null,
         ].filter(Boolean).map((k, i) => (
           <div key={i} style={{ background: "#fff", borderRadius: 10, padding: "14px 20px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", minWidth: 140 }}>
             <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{k.label}</div>
@@ -902,14 +897,47 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                               </button>
                             ))}
                           </div>
-                          {lotto && (lotto.descrizione || lotto.importoBase) && (
-                            <div style={{ marginTop: 12, padding: "10px 14px", background: AMBER_BG, borderRadius: 8, border: "1px solid " + AMBER_BORDER, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
-                              {lotto.descrizione && <div>{lotto.descrizione}</div>}
-                              {lotto.importoBase && (
-                                <div style={{ marginTop: lotto.descrizione ? 6 : 0, fontSize: 12, fontWeight: 700, color: AMBER_DARK }}>
-                                  Base d'asta: {lotto.importoBase}
-                                </div>
-                              )}
+                          {lotto && (lotto.descrizione || lotto.importoBase != null) && (
+                            <div style={{ marginTop: 12, padding: "12px 14px", background: AMBER_BG, borderRadius: 8, border: "1px solid " + AMBER_BORDER, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
+                              {lotto.descrizione && <div style={{ marginBottom: lotto.importoBase != null ? 8 : 0 }}>{lotto.descrizione}</div>}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, whiteSpace: "nowrap" }}>Base d'asta:</span>
+                                <input
+                                  type="number"
+                                  placeholder="es. 500000"
+                                  value={lotto.importoBase || ""}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const lottiUpd = lotti.map((l, i) => i === lottoAttivo ? { ...l, importoBase: val } : l);
+                                    onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
+                                  }}
+                                  style={{ flex: 1, padding: "5px 10px", border: "1px solid " + AMBER_BORDER, borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", minWidth: 0 }}
+                                />
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>€</span>
+                                {lotto.importoBase && (
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, whiteSpace: "nowrap" }}>
+                                    = {Number(lotto.importoBase).toLocaleString("it-IT", { maximumFractionDigits: 0 })} €
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {lotto && lottoAttivo != null && !lotto.importoBase && (
+                            <div style={{ marginTop: 10, padding: "10px 14px", background: "#fefce8", borderRadius: 8, border: "1px solid #fde68a", fontSize: 12, color: "#92400e" }}>
+                              <span style={{ fontWeight: 700 }}>Inserisci la base d'asta per questo lotto</span> — necessaria per calcolare gli importi TOW.
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                                <input
+                                  type="number"
+                                  placeholder="es. 500000"
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const lottiUpd = lotti.map((l, i) => i === lottoAttivo ? { ...l, importoBase: val } : l);
+                                    onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
+                                  }}
+                                  style={{ flex: 1, padding: "5px 10px", border: "1px solid #fde68a", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", minWidth: 0 }}
+                                />
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>€</span>
+                              </div>
                             </div>
                           )}
                           {/* Bottone genera proposte per lotto selezionato */}
@@ -1041,64 +1069,110 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                           </div>
 
                           {/* TOW */}
-                          {(d.tow || []).length > 0 && (
-                            <div style={{ background: "#fff", borderRadius: 10, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
-                              <div style={{ background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ fontSize: 16 }}>📋</span>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({d.tow.length})</div>
-                                <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
-                              </div>
-                              <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                                  <thead>
-                                    <tr style={{ background: AMBER_BG, borderBottom: "2px solid " + AMBER_BORDER }}>
-                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID/Cod.</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase" }}>Descrizione</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Quantità</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Peso Effort %</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {d.tow.map((t, i) => (
-                                      <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                                        <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
-                                          {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>
-                                          {t.acatalogo
-                                            ? <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>A catalogo</span>
-                                            : (t.descrizione || "—")}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.quantita != null ? Number(t.quantita).toLocaleString("it-IT") : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                        <td style={{ padding: "8px 12px", color: "#111827", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.pesoEffort != null ? Number(t.pesoEffort).toLocaleString("it-IT", { minimumFractionDigits: 2 }) + "%" : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                          {(d.tow || []).length > 0 && (() => {
+                            const baseAsta = parseFloat(d.importoBase) || 0;
+                            const hasPeso = d.tow.some(t => t.pesoEffort != null);
+                            return (
+                              <div style={{ background: "#fff", borderRadius: 10, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
+                                <div style={{ background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                                  <span style={{ fontSize: 16 }}>📋</span>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({d.tow.length})</div>
+                                  {!baseAsta && hasPeso && (
+                                    <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Inserisci base d'asta per calcolare importi</span>
+                                  )}
+                                  <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
+                                </div>
+                                <div style={{ overflowX: "auto" }}>
+                                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                    <thead>
+                                      <tr style={{ background: AMBER_BG, borderBottom: "2px solid " + AMBER_BORDER }}>
+                                        <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID/Cod.</th>
+                                        <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase" }}>Descrizione</th>
+                                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Quantità</th>
+                                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Peso Effort %</th>
+                                        <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Importo (€)</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                                    </thead>
+                                    <tbody>
+                                      {d.tow.map((t, i) => {
+                                        const peso = t.pesoEffort != null ? Number(t.pesoEffort) : null;
+                                        const importoCalc = peso != null && baseAsta > 0 ? (peso / 100) * baseAsta : null;
+                                        return (
+                                          <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                                            <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
+                                              {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
+                                            </td>
+                                            <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>
+                                              {t.acatalogo
+                                                ? <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>A catalogo</span>
+                                                : (t.descrizione || "—")}
+                                            </td>
+                                            <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                              {t.quantita != null ? Number(t.quantita).toLocaleString("it-IT") : <span style={{ color: "#d1d5db" }}>—</span>}
+                                            </td>
+                                            <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                              {peso != null
+                                                ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{peso.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</span>
+                                                : <span style={{ color: "#d1d5db" }}>—</span>}
+                                            </td>
+                                            <td style={{ padding: "8px 12px", color: importoCalc != null ? "#111827" : "#d1d5db", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                              {importoCalc != null
+                                                ? "€ " + importoCalc.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                : (t.acatalogo ? <span style={{ color: "#93c5fd", fontSize: 11 }}>A catalogo</span> : <span style={{ color: "#d1d5db" }}>—</span>)}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                    {baseAsta > 0 && d.tow.some(t => t.pesoEffort != null) && (
+                                      <tfoot>
+                                        <tr style={{ background: AMBER_BG, borderTop: "2px solid " + AMBER_BORDER }}>
+                                          <td colSpan={4} style={{ padding: "8px 12px", fontWeight: 700, color: AMBER_DARK, fontSize: 12 }}>Totale TOW (da peso effort)</td>
+                                          <td style={{ padding: "8px 12px", fontWeight: 800, color: AMBER_DARK, textAlign: "right", fontSize: 13 }}>
+                                            € {d.tow.reduce((s, t) => {
+                                              const p = t.pesoEffort != null ? Number(t.pesoEffort) : 0;
+                                              return s + (p / 100) * baseAsta;
+                                            }, 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                          </td>
+                                        </tr>
+                                      </tfoot>
+                                    )}
+                                  </table>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
-                          {/* Catalogo — riga collassabile con dettagli per ID */}
-                          {(d.catalogo || []).length > 0 && (() => {
+                          {/* Catalogo — sempre visibile quando lotto selezionato */}
+                          {(() => {
+                            const catalogo = d.catalogo || [];
                             const catKey = "cat-" + (lottoAttivo ?? 0);
                             const catOpen = !!dettagliOpen[catKey];
+                            const lotNum = (lottoAttivo ?? 0) + 1;
+                            const nomeDisplay = d.nome || `Lotto ${lotNum}`;
+                            const descDisplay = d.descrizione ? `— ${d.descrizione.slice(0, 60)}${d.descrizione.length > 60 ? "…" : ""}` : "";
                             return (
                               <div style={{ background: "#fff", borderRadius: 10, border: "2px solid #93c5fd", overflow: "hidden" }}>
-                                {/* Header collassabile */}
+                                {/* Header sempre cliccabile */}
                                 <div
-                                  onClick={() => toggleDettagli(catKey)}
-                                  style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                                  onClick={() => catalogo.length > 0 && toggleDettagli(catKey)}
+                                  style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, cursor: catalogo.length > 0 ? "pointer" : "default" }}>
                                   <span style={{ fontSize: 16 }}>📦</span>
-                                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
-                                    Catalogo {d.nome || `Lotto ${(lottoAttivo ?? 0) + 1}`}
-                                  </div>
-                                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", flex: 1 }}>{d.descrizione ? `— ${d.descrizione.slice(0, 60)}${d.descrizione.length > 60 ? "…" : ""}` : ""}</span>
-                                  <span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{d.catalogo.length} voci</span>
-                                  <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, marginLeft: 6 }}>{catOpen ? "▲" : "▼"}</span>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Catalogo {nomeDisplay}</div>
+                                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", flex: 1 }}>{descDisplay}</span>
+                                  {catalogo.length > 0
+                                    ? <><span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{catalogo.length} voci</span>
+                                        <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, marginLeft: 6 }}>{catOpen ? "▲" : "▼"}</span></>
+                                    : <span style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)", borderRadius: 20, padding: "2px 10px", fontSize: 11 }}>Nessun file caricato</span>
+                                  }
                                 </div>
-                                {/* Tabella dettagli — visibile solo se aperto */}
-                                {catOpen && (
+                                {/* Corpo */}
+                                {catalogo.length === 0 ? (
+                                  <div style={{ padding: "16px 18px", fontSize: 13, color: "#6b7280", background: "#f8faff", borderTop: "1px solid #e0e7ff" }}>
+                                    <div style={{ fontWeight: 600, color: "#1d4ed8", marginBottom: 6 }}>Catalogo non ancora caricato per questo lotto.</div>
+                                    <div>Carica il PDF del catalogo nel pannello sopra (<strong>📦 Catalogo (PDF)</strong>) e rilancia l'analisi del capitolato per visualizzare le voci con ID, ambito, nome componente e prezzi Realizzazione/Modifica.</div>
+                                  </div>
+                                ) : catOpen && (
                                   <div style={{ overflowX: "auto" }}>
                                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                                       <thead>
@@ -1110,8 +1184,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                           <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderBottom: "1px solid #bfdbfe" }}>Modifica</th>
                                         </tr>
                                         <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
-                                          {["Semplice","Medio","Complesso"].map((l,i) => (
-                                            <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", borderRight: i===2 ? "1px solid #bfdbfe" : "none" }}>{l}</th>
+                                          {["Semplice","Medio","Complesso"].map((l,ii) => (
+                                            <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", borderRight: ii===2 ? "1px solid #bfdbfe" : "none" }}>{l}</th>
                                           ))}
                                           {["Semplice","Medio","Complesso"].map(l => (
                                             <th key={"m"+l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap" }}>{l}</th>
@@ -1119,7 +1193,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {d.catalogo.map((c, i) => {
+                                        {catalogo.map((c, i) => {
                                           const fmt = v => v != null && v > 0 ? Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>;
                                           return (
                                             <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
@@ -1442,7 +1516,6 @@ export default function GarePage({ onUnauthorized }) {
       ente:        form.ente.trim(),
       scadenza:    form.scadenza,
       cig:         form.cig.trim(),
-      importoBase: form.importoBase,
       note:        form.note.trim(),
       stato:       "Bozza",
       fileNames:   [],
