@@ -221,13 +221,31 @@ function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
 // ── Modale Nuova Gara ─────────────────────────────────────────────────────────
 function ModaleNuovaGara({ onCrea, onAnnulla }) {
   const [form, setForm] = React.useState({ nome: "", ente: "", scadenza: "", cig: "", note: "" });
+  const [fileNames, setFileNames] = React.useState([]);
+  const [isDragOver, setIsDragOver] = React.useState(false);
   const [error, setError] = React.useState("");
+  const fileInputRef = React.useRef(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setIsDragOver(false);
+    const newFiles = Array.from(e.dataTransfer.files)
+      .filter(f => f.name.endsWith(".pdf") || f.name.endsWith(".docx") || f.name.endsWith(".zip"))
+      .map(f => ({ name: f.name, size: f.size }));
+    if (newFiles.length) setFileNames(prev => [...prev, ...newFiles]);
+  };
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files)
+      .filter(f => f.name.endsWith(".pdf") || f.name.endsWith(".docx") || f.name.endsWith(".zip"))
+      .map(f => ({ name: f.name, size: f.size }));
+    if (newFiles.length) setFileNames(prev => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.nome.trim()) { setError("Il nome della gara e' obbligatorio."); return; }
-    onCrea(form);
+    onCrea({ ...form, fileNames });
   };
 
   const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginTop: 4 };
@@ -235,11 +253,11 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: "32px 36px", maxWidth: 520, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: "32px 36px", maxWidth: 560, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>Nuova Gara</div>
-            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Inserisci i dati principali della gara</div>
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Inserisci i dati principali e carica i documenti</div>
           </div>
           <button onClick={onAnnulla} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
@@ -263,9 +281,44 @@ function ModaleNuovaGara({ onCrea, onAnnulla }) {
               <input style={inputStyle} placeholder="es. 9876543210" value={form.cig} onChange={e => set("cig", e.target.value)} />
             </div>
           </div>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Note</label>
             <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} placeholder="Annotazioni, link al bando, riferimenti interni..." value={form.note} onChange={e => set("note", e.target.value)} />
+          </div>
+
+          {/* Documenti di gara */}
+          <div style={{ marginBottom: 20, border: "1px solid #f0f0f0", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ padding: "10px 14px", background: "#f9fafb", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Documenti di gara</span>
+              {fileNames.length > 0 && <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, background: AMBER_LIGHT, borderRadius: 20, padding: "2px 9px", border: "1px solid " + AMBER_BORDER }}>{fileNames.length} file</span>}
+            </div>
+            <div style={{ padding: "12px 14px" }}>
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                style={{ border: "2px dashed " + (isDragOver ? AMBER : "#e5e7eb"), borderRadius: 10, padding: "20px 14px", textAlign: "center", cursor: "pointer", background: isDragOver ? AMBER_LIGHT : "#fafafa", transition: "all 0.2s" }}>
+                <div style={{ fontSize: 26, marginBottom: 6, opacity: 0.6 }}>📂</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isDragOver ? AMBER_DARK : "#6b7280" }}>Trascina i file qui, o clicca per selezionare</div>
+                <div style={{ fontSize: 11, color: "#d1d5db", marginTop: 2 }}>PDF, DOCX, ZIP fino a 50 MB</div>
+                <input ref={fileInputRef} type="file" multiple accept=".pdf,.docx,.zip" style={{ display: "none" }} onChange={handleFileChange} />
+              </div>
+              {fileNames.length > 0 && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+                  {fileNames.map((f, idx) => (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, background: AMBER_BG, borderRadius: 7, border: "1px solid " + AMBER_BORDER, padding: "5px 10px" }}>
+                      <span style={{ fontSize: 14 }}>{(f.name||"").endsWith(".pdf") ? "📄" : (f.name||"").endsWith(".zip") ? "🗜️" : "📝"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
+                        {f.size && <div style={{ fontSize: 11, color: "#9ca3af" }}>{(f.size / 1024).toFixed(1)} KB</div>}
+                      </div>
+                      <button type="button" onClick={() => setFileNames(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#dc2626", marginBottom: 16 }}>{error}</div>}
@@ -289,13 +342,31 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
     cig:      gara.cig      || "",
     note:     gara.note     || "",
   });
+  const [fileNames, setFileNames] = React.useState(gara.fileNames || []);
+  const [isDragOver, setIsDragOver] = React.useState(false);
   const [error, setError] = React.useState("");
+  const fileInputRef = React.useRef(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setIsDragOver(false);
+    const newFiles = Array.from(e.dataTransfer.files)
+      .filter(f => f.name.endsWith(".pdf") || f.name.endsWith(".docx") || f.name.endsWith(".zip"))
+      .map(f => ({ name: f.name, size: f.size }));
+    if (newFiles.length) setFileNames(prev => [...prev, ...newFiles]);
+  };
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files)
+      .filter(f => f.name.endsWith(".pdf") || f.name.endsWith(".docx") || f.name.endsWith(".zip"))
+      .map(f => ({ name: f.name, size: f.size }));
+    if (newFiles.length) setFileNames(prev => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.nome.trim()) { setError("Il nome della gara è obbligatorio."); return; }
-    onSalva({ ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim() });
+    onSalva({ ...gara, nome: form.nome.trim(), ente: form.ente.trim(), scadenza: form.scadenza, cig: form.cig.trim(), note: form.note.trim(), fileNames });
   };
 
   const inputStyle = { width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginTop: 4 };
@@ -303,11 +374,11 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: "32px 36px", maxWidth: 520, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: "32px 36px", maxWidth: 560, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>Modifica Gara</div>
-            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Aggiorna i dati principali della gara</div>
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Aggiorna dati e documenti della gara</div>
           </div>
           <button onClick={onAnnulla} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
@@ -330,10 +401,46 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
               <input style={inputStyle} value={form.cig} onChange={e => set("cig", e.target.value)} />
             </div>
           </div>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Note</label>
             <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={form.note} onChange={e => set("note", e.target.value)} />
           </div>
+
+          {/* Documenti di gara */}
+          <div style={{ marginBottom: 20, border: "1px solid #f0f0f0", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ padding: "10px 14px", background: "#f9fafb", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Documenti di gara</span>
+              {fileNames.length > 0 && <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, background: AMBER_LIGHT, borderRadius: 20, padding: "2px 9px", border: "1px solid " + AMBER_BORDER }}>{fileNames.length} file</span>}
+            </div>
+            <div style={{ padding: "12px 14px" }}>
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                style={{ border: "2px dashed " + (isDragOver ? AMBER : "#e5e7eb"), borderRadius: 10, padding: "18px 14px", textAlign: "center", cursor: "pointer", background: isDragOver ? AMBER_LIGHT : "#fafafa", transition: "all 0.2s" }}>
+                <div style={{ fontSize: 24, marginBottom: 5, opacity: 0.6 }}>📂</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isDragOver ? AMBER_DARK : "#6b7280" }}>Trascina i file qui, o clicca per selezionare</div>
+                <div style={{ fontSize: 11, color: "#d1d5db", marginTop: 2 }}>PDF, DOCX, ZIP fino a 50 MB</div>
+                <input ref={fileInputRef} type="file" multiple accept=".pdf,.docx,.zip" style={{ display: "none" }} onChange={handleFileChange} />
+              </div>
+              {fileNames.length > 0 && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+                  {fileNames.map((f, idx) => (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, background: AMBER_BG, borderRadius: 7, border: "1px solid " + AMBER_BORDER, padding: "5px 10px" }}>
+                      <span style={{ fontSize: 14 }}>{(f.name||"").endsWith(".pdf") ? "📄" : (f.name||"").endsWith(".zip") ? "🗜️" : "📝"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
+                        {f.size && <div style={{ fontSize: 11, color: "#9ca3af" }}>{(f.size / 1024).toFixed(1)} KB</div>}
+                      </div>
+                      <button type="button" onClick={() => setFileNames(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#dc2626", marginBottom: 16 }}>{error}</div>}
           <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
             <button type="button" onClick={onAnnulla} style={{ padding: "10px 22px", borderRadius: 9, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Annulla</button>
@@ -347,8 +454,6 @@ function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
 
 // ── Vista 3: Dettaglio Gara ───────────────────────────────────────────────────
 function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
-  const [isDragOver, setIsDragOver]           = React.useState(false);
-  const [analyzing,  setAnalyzing]            = React.useState(false);
   const [activeTab,  setActiveTab]            = React.useState("documenti");
   const [analyzingCap, setAnalyzingCap]       = React.useState(false);
   const [capError,     setCapError]           = React.useState("");
@@ -367,7 +472,6 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const towFileRefs    = React.useRef({});
   const catalogFileRefs = React.useRef({});
   const docFileRefs = React.useRef({});
-  const fileInputRef    = useRef(null);
   const capFileInputRef = useRef(null);
 
   const files      = gara.fileNames || [];
@@ -404,71 +508,6 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   })();
 
   const analyzed = aiResult !== null;
-
-  const handleDrop = (e) => {
-    e.preventDefault(); setIsDragOver(false);
-    const newFiles = Array.from(e.dataTransfer.files)
-      .filter(f => f.name.endsWith(".pdf") || f.name.endsWith(".docx") || f.name.endsWith(".zip"))
-      .map(f => ({ name: f.name, size: f.size }));
-    if (newFiles.length) onUpdate({ ...gara, fileNames: [...files, ...newFiles], stato: gara.stato === "Bozza" ? "In lavorazione" : gara.stato });
-  };
-
-  const handleFileChange = (e) => {
-    const newFiles = Array.from(e.target.files)
-      .filter(f => f.name.endsWith(".pdf") || f.name.endsWith(".docx") || f.name.endsWith(".zip"))
-      .map(f => ({ name: f.name, size: f.size }));
-    if (newFiles.length) onUpdate({ ...gara, fileNames: [...files, ...newFiles], stato: gara.stato === "Bozza" ? "In lavorazione" : gara.stato });
-    e.target.value = "";
-  };
-
-  const removeFile = (idx) => onUpdate({ ...gara, fileNames: files.filter((_, i) => i !== idx) });
-
-  const handleAnalyze = () => {
-    setAnalyzing(true);
-    setTimeout(() => {
-      setAnalyzing(false);
-      onUpdate({
-        ...gara,
-        analyzed: true,
-        aiResult: {
-          documenti: [
-            { id: 1, nome: "Relazione Tecnica",          tipo: "Documento principale", priorita: "Alta",  stato: "Da produrre" },
-            { id: 2, nome: "Piano di Qualita'",           tipo: "Piano",               priorita: "Alta",  stato: "Da produrre" },
-            { id: 3, nome: "CV del Team",                 tipo: "Allegato",            priorita: "Alta",  stato: "Da produrre" },
-            { id: 4, nome: "Referenze aziendali",         tipo: "Allegato",            priorita: "Media", stato: "Da produrre" },
-            { id: 5, nome: "Piano Gestione Rischi",       tipo: "Piano",               priorita: "Alta",  stato: "Da produrre" },
-            { id: 6, nome: "Schema Offerta Economica",    tipo: "Modulo",              priorita: "Alta",  stato: "Da produrre" },
-            { id: 7, nome: "Cronoprogramma",              tipo: "Piano",               priorita: "Media", stato: "Da produrre" },
-            { id: 8, nome: "DGUE compilato",              tipo: "Modulo europeo",      priorita: "Alta",  stato: "Da produrre" },
-          ],
-          tecnica: [
-            { sezione: "1. Soluzione proposta",      desc: "Architettura della soluzione, allineamento ai requisiti del capitolato e tecnologie chiave." },
-            { sezione: "2. Metodologia",             desc: "Approccio agile con sprint bimestrali, governance strutturata e KPI misurabili." },
-            { sezione: "3. Team di progetto",        desc: "PM senior, 2 Solution Architect certificati, team dev 6 risorse, specialista sicurezza." },
-            { sezione: "4. Piano di testing",        desc: "Test unitari 85% copertura, test integrazione, UAT con committente, collaudo finale." },
-            { sezione: "5. Post-avviamento",         desc: "SLA H24 4h severity critica, manutenzione evolutiva 12 mesi, formazione utenti." },
-          ],
-          economica: [
-            { voce: "Analisi e progettazione",       gg: 45,  tariffa: 750, importo: 33750 },
-            { voce: "Sviluppo e implementazione",    gg: 120, tariffa: 650, importo: 78000 },
-            { voce: "Testing e QA",                  gg: 30,  tariffa: 580, importo: 17400 },
-            { voce: "Project Management",            gg: 60,  tariffa: 850, importo: 51000 },
-            { voce: "Formazione",                    gg: 15,  tariffa: 700, importo: 10500 },
-            { voce: "Infrastruttura cloud (annuale)", gg: null, tariffa: null, importo: 24000 },
-            { voce: "Manutenzione evolutiva 12 mesi", gg: 24, tariffa: 620, importo: 14880 },
-          ],
-          piano: [
-            { milestone: "Kick-off e analisi requisiti",   data: "15 Feb 2025", durata: "3 sett.", owner: "PM + BA",             stato: "Pianificato" },
-            { milestone: "Progettazione architetturale",   data: "08 Mar 2025", durata: "4 sett.", owner: "Solution Architect",   stato: "Pianificato" },
-            { milestone: "Sprint 1 - Core funzionalita'",  data: "05 Apr 2025", durata: "6 sett.", owner: "Dev Team",            stato: "Pianificato" },
-            { milestone: "Sprint 2 - Integrazioni",        data: "17 Mag 2025", durata: "6 sett.", owner: "Dev Team",            stato: "Pianificato" },
-            { milestone: "Testing e UAT",                  data: "28 Giu 2025", durata: "4 sett.", owner: "QA + Cliente",        stato: "Pianificato" },
-            { milestone: "Go-live",                        data: "26 Lug 2025", durata: "2 sett.", owner: "PM + Cliente",        stato: "Pianificato" },
-          ],
-        },
-      });
-    }, 2800);
-  };
 
   const handleAnalizzaCapitolato = async (file) => {
     if (!file) return;
@@ -603,8 +642,25 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         console.log(`[GarePage] Lotto ${i+1} catalogo raw length=${rawCat.length}`, rawCat.length > 0 ? JSON.stringify(rawCat[0]).slice(0,200) : "(vuoto)");
       });
       console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase, tow0: l.tow[0] })) });
+      // Preserva importoBase e catalogo già inseriti dall'utente nei lotti precedenti
+      const lottiPrecedenti = gara.capitolato?.lotti || [];
+      capData.lotti = capData.lotti.map((l, i) => {
+        const prev = lottiPrecedenti[i];
+        return {
+          ...l,
+          // Mantieni importoBase già inserito dall'utente se non arriva dall'AI
+          importoBase: (prev?.importoBase && !l.importoBase) ? prev.importoBase : (l.importoBase || prev?.importoBase || ""),
+          // Mantieni catalogo già parsato se la nuova analisi non ha portato un catalogo
+          catalogo: (l.catalogo && l.catalogo.length > 0) ? l.catalogo : (prev?.catalogo || []),
+        };
+      });
+
+      // Salva i nomi dei file catalogo usati (per mostrare nell'UI che sono già stati caricati)
+      const catalogFileNamesUpd = { ...(gara.catalogFileNames || {}) };
+      Object.entries(catalogFiles).forEach(([num, f]) => { if (f) catalogFileNamesUpd[num] = f.name; });
+
       setLottoAttivo(0);  // seleziona sempre il primo lotto dopo analisi
-      onUpdate({ ...gara, capitolato: capData });
+      onUpdate({ ...gara, capitolato: capData, catalogFileNames: catalogFileNamesUpd });
     } catch (err) {
       console.error("[GarePage] errore analisi capitolato:", err?.message || err);
       setCapError(err?.message || "Errore analisi capitolato");
@@ -767,55 +823,6 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         {/* Colonna principale */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
 
-          {/* Upload */}
-          <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
-            <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Documenti di gara</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>Carica il bando, capitolato, allegati — PDF, DOCX, ZIP</div>
-              </div>
-              {files.length > 0 && <span style={{ fontSize: 12, color: AMBER_DARK, fontWeight: 700, background: AMBER_LIGHT, borderRadius: 20, padding: "3px 10px", border: "1px solid " + AMBER_BORDER }}>{files.length} file</span>}
-            </div>
-            <div style={{ padding: "18px 22px" }}>
-              <div
-                onDrop={handleDrop}
-                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-                onDragLeave={() => setIsDragOver(false)}
-                onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                style={{ border: "2px dashed " + (isDragOver ? AMBER : "#e5e7eb"), borderRadius: 12, padding: "28px 20px", textAlign: "center", cursor: "pointer", background: isDragOver ? AMBER_LIGHT : "#fafafa", transition: "all 0.2s" }}>
-                <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.7 }}>📂</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: isDragOver ? AMBER_DARK : "#6b7280" }}>Trascina i file qui, o clicca per selezionare</div>
-                <div style={{ fontSize: 11, color: "#d1d5db", marginTop: 3 }}>PDF, DOCX, ZIP fino a 50 MB</div>
-                <input ref={fileInputRef} type="file" multiple accept=".pdf,.docx,.zip" style={{ display: "none" }} onChange={handleFileChange} />
-              </div>
-
-              {files.length > 0 && (
-                <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 7 }}>
-                  {files.map((f, idx) => (
-                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, background: AMBER_BG, borderRadius: 8, border: "1px solid " + AMBER_BORDER, padding: "7px 12px" }}>
-                      <span style={{ fontSize: 16 }}>{(f.name||"").endsWith(".pdf") ? "📄" : (f.name||"").endsWith(".zip") ? "🗜️" : "📝"}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
-                        {f.size && <div style={{ fontSize: 11, color: "#9ca3af" }}>{(f.size / 1024).toFixed(1)} KB</div>}
-                      </div>
-                      <button onClick={e => { e.stopPropagation(); removeFile(idx); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 18, lineHeight: 1, padding: "2px 4px" }}>×</button>
-                    </div>
-                  ))}
-                  <div style={{ marginTop: 10 }}>
-                    <button onClick={handleAnalyze} disabled={analyzing} style={{ background: analyzing ? "#d97706" : AMBER, color: "#78350f", border: "none", borderRadius: 9, padding: "10px 24px", fontSize: 14, fontWeight: 800, cursor: analyzing ? "wait" : "pointer", boxShadow: "0 3px 10px rgba(245,158,11,0.3)", display: "inline-flex", alignItems: "center", gap: 8, opacity: analyzing ? 0.85 : 1, transition: "all 0.2s" }}>
-                      {analyzing ? (
-                        <><span style={{ display: "inline-block", width: 14, height: 14, border: "2.5px solid rgba(120,53,15,0.3)", borderTopColor: "#78350f", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Analisi in corso...</>
-                      ) : (
-                        <><span style={{ fontSize: 15 }}>🤖</span>{analyzed ? "Rigenera analisi AI" : "Analizza con AI"}</>
-                      )}
-                    </button>
-                    {analyzed && !analyzing && <span style={{ marginLeft: 12, fontSize: 12, color: "#16a34a", fontWeight: 700 }}>✓ Analisi completata</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* ── SEZIONE ANALISI CAPITOLATO ── */}
           <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
             <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
@@ -894,7 +901,11 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                               type="button"
                               onClick={() => catalogFileRefs.current[num] && catalogFileRefs.current[num].click()}
                               style={{ background: catalogFiles[num] ? "#eff6ff" : "#fff", color: catalogFiles[num] ? "#1d4ed8" : "#6b7280", border: "1px solid " + (catalogFiles[num] ? "#93c5fd" : "#e5e7eb"), borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                              {catalogFiles[num] ? `✓ Cat: ${catalogFiles[num].name.slice(0,28)}` : "📦 Catalogo (PDF)"}
+                              {catalogFiles[num]
+                                ? `✓ Cat: ${catalogFiles[num].name.slice(0,28)}`
+                                : (gara.catalogFileNames?.[num]
+                                    ? <span style={{ color: "#16a34a" }}>✓ {gara.catalogFileNames[num].slice(0,28)} (già analizzato)</span>
+                                    : "📦 Catalogo (PDF)")}
                             </button>
                             <input
                               ref={el => catalogFileRefs.current[num] = el}
@@ -1113,24 +1124,37 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                   {Object.entries(gruppi).sort(([a],[b]) => parseFloat(a)-parseFloat(b)).map(([numPadre, g]) => {
                                     const hasFigli = g.figli.length > 0;
+                                    const hasSintesi = !hasFigli && !!g.padre?.sintesi;
                                     const isOpen = !!dettagliOpen["sez-" + numPadre];
+                                    const isClickable = hasFigli || hasSintesi;
                                     return (
                                       <div key={numPadre} style={{ borderRadius: 8, border: "1px solid " + (isOpen ? AMBER_BORDER : "#f0f0f0"), overflow: "hidden" }}>
-                                        {/* Riga padre */}
+                                        {/* Riga padre — sempre cliccabile se ha figli o sintesi */}
                                         <div
-                                          onClick={() => hasFigli && toggleDettagli("sez-" + numPadre)}
-                                          style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: isOpen ? AMBER_BG : "#fafafa", cursor: hasFigli ? "pointer" : "default" }}>
+                                          onClick={() => isClickable && toggleDettagli("sez-" + numPadre)}
+                                          style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 12px", background: isOpen ? AMBER_BG : "#fafafa", cursor: isClickable ? "pointer" : "default" }}>
                                           <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{numPadre}</span>
                                           <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{g.padre?.titolo || `Sezione ${numPadre}`}</div>
-                                            {g.padre?.sintesi && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.padre.sintesi}</div>}
+                                            {/* Mostra sintesi inline se non ha figli e non è espansa */}
+                                            {!hasFigli && g.padre?.sintesi && !isOpen && (
+                                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.padre.sintesi}</div>
+                                            )}
                                           </div>
-                                          {hasFigli && (
+                                          {isClickable && (
                                             <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
-                                              {isOpen ? "▲" : "▼"} {g.figli.length} sottosezioni
+                                              {hasFigli
+                                                ? (isOpen ? "▲" : "▼") + " " + g.figli.length + " sottosezioni"
+                                                : (isOpen ? "▲" : "▼")}
                                             </span>
                                           )}
                                         </div>
+                                        {/* Sintesi espansa (senza figli) */}
+                                        {!hasFigli && hasSintesi && isOpen && (
+                                          <div style={{ borderTop: "1px solid " + AMBER_BORDER, background: "#fff", padding: "10px 14px 10px 32px" }}>
+                                            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{g.padre.sintesi}</div>
+                                          </div>
+                                        )}
                                         {/* Figli espandibili */}
                                         {hasFigli && isOpen && (
                                           <div style={{ borderTop: "1px solid " + AMBER_BORDER, background: "#fff" }}>
@@ -1192,6 +1216,19 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                           {(d.tow || []).length > 0 && (() => {
                             const baseAsta = parseFloat(d.importoBase) || 0;
                             const hasPeso = d.tow.some(t => t.pesoEffort != null);
+                            // Pre-calcola importo per ogni TOW
+                            const sommaPeso = d.tow.reduce((s, t) => s + (t.pesoEffort != null ? Number(t.pesoEffort) : 0), 0);
+                            const importiConPeso = d.tow.reduce((s, t) => s + (t.pesoEffort != null && baseAsta > 0 ? (Number(t.pesoEffort) / 100) * baseAsta : 0), 0);
+                            const towCalc = d.tow.map(t => {
+                              if (t.pesoEffort != null) {
+                                return { ...t, _importo: baseAsta > 0 ? (Number(t.pesoEffort) / 100) * baseAsta : null, _isResiduo: false };
+                              } else if (!t.acatalogo) {
+                                // TOW senza peso e non "A catalogo" → residuo
+                                return { ...t, _importo: baseAsta > 0 ? Math.max(0, baseAsta - importiConPeso) : null, _isResiduo: true };
+                              } else {
+                                return { ...t, _importo: null, _isResiduo: false };
+                              }
+                            });
                             return (
                               <div style={{ background: "#fff", borderRadius: 10, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
                                 <div style={{ background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -1214,9 +1251,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {d.tow.map((t, i) => {
+                                      {towCalc.map((t, i) => {
                                         const peso = t.pesoEffort != null ? Number(t.pesoEffort) : null;
-                                        const importoCalc = peso != null && baseAsta > 0 ? (peso / 100) * baseAsta : null;
                                         return (
                                           <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
                                             <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
@@ -1235,24 +1271,26 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                                 ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>{peso.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</span>
                                                 : <span style={{ color: "#d1d5db" }}>—</span>}
                                             </td>
-                                            <td style={{ padding: "8px 12px", color: importoCalc != null ? "#111827" : "#d1d5db", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
-                                              {importoCalc != null
-                                                ? "€ " + importoCalc.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                : (t.acatalogo ? <span style={{ color: "#93c5fd", fontSize: 11 }}>A catalogo</span> : <span style={{ color: "#d1d5db" }}>—</span>)}
+                                            <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                              {t._importo != null
+                                                ? <span style={{ color: t._isResiduo ? "#1d4ed8" : "#111827" }}>
+                                                    {t._isResiduo && <span title="Calcolato come residuo della base d'asta" style={{ fontSize: 10, marginRight: 4, color: "#93c5fd" }}>≈</span>}
+                                                    € {t._importo.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                  </span>
+                                                : (t.acatalogo
+                                                    ? <span style={{ color: "#93c5fd", fontSize: 11 }}>A catalogo</span>
+                                                    : <span style={{ color: "#d1d5db" }}>—</span>)}
                                             </td>
                                           </tr>
                                         );
                                       })}
                                     </tbody>
-                                    {baseAsta > 0 && d.tow.some(t => t.pesoEffort != null) && (
+                                    {baseAsta > 0 && hasPeso && (
                                       <tfoot>
                                         <tr style={{ background: AMBER_BG, borderTop: "2px solid " + AMBER_BORDER }}>
-                                          <td colSpan={4} style={{ padding: "8px 12px", fontWeight: 700, color: AMBER_DARK, fontSize: 12 }}>Totale TOW (da peso effort)</td>
+                                          <td colSpan={4} style={{ padding: "8px 12px", fontWeight: 700, color: AMBER_DARK, fontSize: 12 }}>Totale TOW calcolato</td>
                                           <td style={{ padding: "8px 12px", fontWeight: 800, color: AMBER_DARK, textAlign: "right", fontSize: 13 }}>
-                                            € {d.tow.reduce((s, t) => {
-                                              const p = t.pesoEffort != null ? Number(t.pesoEffort) : 0;
-                                              return s + (p / 100) * baseAsta;
-                                            }, 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            € {towCalc.filter(t => t._importo != null).reduce((s, t) => s + t._importo, 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                           </td>
                                         </tr>
                                       </tfoot>
