@@ -595,14 +595,14 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         if (l._catalogError) console.error(`[GarePage] Lotto ${i+1} catalogError:`, l._catalogError);
         if (l._towError)     console.error(`[GarePage] Lotto ${i+1} towError:`, l._towError);
         console.log(`[GarePage] Lotto ${i+1} debug:`, { towCapitolato: l._towCapitolatoCount, towPrices: l._towPricesCount, catalogCount: l._catalogCount });
-        // debug pesoEffort: mostra i primi 3 TOW raw
+        // debug pesoEffort: mostra i primi 3 TOW normalizzati
         const rawTow = l.tow || [];
         if (rawTow.length > 0) console.log(`[GarePage] Lotto ${i+1} TOW raw[0..2]:`, JSON.stringify(rawTow.slice(0,3)));
         // debug catalogo: mostra raw
         const rawCat = l.catalogo || [];
         console.log(`[GarePage] Lotto ${i+1} catalogo raw length=${rawCat.length}`, rawCat.length > 0 ? JSON.stringify(rawCat[0]).slice(0,200) : "(vuoto)");
       });
-      console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase })) });
+      console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase, tow0: l.tow[0] })) });
       setLottoAttivo(capData.lotti.length > 1 ? null : 0);
       onUpdate({ ...gara, capitolato: capData });
     } catch (err) {

@@ -27,22 +27,37 @@ public static class ContractParserService
             var w = page.Width;
             var h = page.Height;
 
-            // Raccoglie tutti i word items con coordinate
             var items = page.GetWords()
                 .Select(wd => new PdfItem
                 {
                     Text = wd.Text.Trim(),
-                    X = wd.BoundingBox.Left,
-                    Y = wd.BoundingBox.Bottom
+                    X    = wd.BoundingBox.Left,
+                    Y    = wd.BoundingBox.Bottom
                 })
                 .Where(x => !string.IsNullOrEmpty(x.Text))
                 .ToList();
 
-            // Identifica le righe-ID: numero 2-5 cifre nella colonna sinistra (<7% larghezza)
+            // ── Identifica colonna degli ID ──────────────────────────────────
+            // Cerca parole che siano numeri 2-5 cifre nella metà sinistra della pagina
+            // (range allargato: < 15% larghezza invece del vecchio < 7%)
             var ids = items
-                .Where(x => x.X / w < 0.07 && Regex.IsMatch(x.Text, @"^\d{2,5}$"))
+                .Where(x => x.X / w < 0.15 && Regex.IsMatch(x.Text, @"^\d{2,5}$"))
                 .OrderByDescending(x => x.Y)
                 .ToList();
+
+            if (ids.Count == 0) continue;
+
+            // ── Calcola la X mediana degli ID per calibrare la soglia ────────
+            double idXMedian = ids.Select(x => x.X).OrderBy(x => x).ElementAt(ids.Count / 2);
+            double idXThreshold = idXMedian + (w * 0.06); // soglia destra per la colonna ID
+
+            // Ri-filtra con soglia calibrata
+            ids = items
+                .Where(x => x.X <= idXThreshold && Regex.IsMatch(x.Text, @"^\d{2,5}$"))
+                .OrderByDescending(x => x.Y)
+                .ToList();
+
+            if (ids.Count == 0) continue;
 
             for (int i = 0; i < ids.Count; i++)
             {
@@ -56,26 +71,29 @@ public static class ContractParserService
 
                 var row = items.Where(x => x.Y <= top && x.Y > bottom).ToList();
 
-                // Prezzi: colonna >70% larghezza — usa IsMoneyToken per supportare tutti i formati
+                // Prezzi: colonna > 60% larghezza (allargato da 70%)
                 var prices = row
-                    .Where(x => x.X / w > 0.70 && IsMoneyToken(x.Text))
+                    .Where(x => x.X / w > 0.60 && IsMoneyToken(x.Text))
                     .OrderBy(x => x.X)
                     .Select(x => ParseMoney(x.Text))
                     .Take(6)
                     .ToList();
 
-                // Richiedi esattamente 6 prezzi come il parser JS originale (3 realizzazione + 3 modifica)
-                if (prices.Count < 6) continue;
+                // Accetta anche con meno di 6 prezzi (non scartiamo righe utili)
+                if (prices.Count == 0) continue;
 
-                var name = ZoneText(row, w * 0.09, w * 0.185)
+                // Padding a 6 elementi
+                while (prices.Count < 6) prices.Add(0);
+
+                var name = ZoneText(row, w * 0.09, w * 0.30)
                     .Replace("Nome Driver", "", StringComparison.OrdinalIgnoreCase).Trim();
-                var ambito = ZoneText(row, w * 0.057, w * 0.09)
+                if (string.IsNullOrEmpty(name))
+                    name = ZoneText(row, idXThreshold, w * 0.45).Trim();
+
+                var ambito = ZoneText(row, w * 0.04, w * 0.09)
                     .Replace("Ambito driver", "", StringComparison.OrdinalIgnoreCase).Trim();
-                var descrizione = ZoneText(row, w * 0.185, w * 0.40)
+                var descrizione = ZoneText(row, w * 0.30, w * 0.45)
                     .Replace("Descrizione Driver", "", StringComparison.OrdinalIgnoreCase).Trim();
-                var semplice = ZoneText(row, w * 0.40, w * 0.51);
-                var medio    = ZoneText(row, w * 0.51, w * 0.62);
-                var complesso = ZoneText(row, w * 0.62, w * 0.70);
 
                 if (string.IsNullOrEmpty(name)) continue;
 
@@ -86,25 +104,20 @@ public static class ContractParserService
                     Ambito      = ambito,
                     Nome        = name,
                     Descrizione = descrizione,
-                    Criteri = new CriteriEntry
-                    {
-                        Semplice  = semplice,
-                        Medio     = medio,
-                        Complesso = complesso
-                    },
+                    Criteri     = new CriteriEntry(),
                     Prezzi = new PrezziEntry
                     {
                         Realizzazione = new ComplexityPrices
                         {
-                            Semplice  = prices.Count > 0 ? prices[0] : 0,
-                            Medio     = prices.Count > 1 ? prices[1] : 0,
-                            Complesso = prices.Count > 2 ? prices[2] : 0,
+                            Semplice  = prices[0],
+                            Medio     = prices[1],
+                            Complesso = prices[2],
                         },
                         Modifica = new ComplexityPrices
                         {
-                            Semplice  = prices.Count > 3 ? prices[3] : 0,
-                            Medio     = prices.Count > 4 ? prices[4] : 0,
-                            Complesso = prices.Count > 5 ? prices[5] : 0,
+                            Semplice  = prices[3],
+                            Medio     = prices[4],
+                            Complesso = prices[5],
                         }
                     },
                     Pagina = page.Number

@@ -326,4 +326,44 @@ public class GareController : ControllerBase
 
         return Ok(new { ok = true, proposte = analysis });
     }
+
+    // POST /api/gare/debug-catalog-raw
+    // Mostra le prime N parole del PDF catalogo con coordinate, per diagnosticare il parser
+    [HttpPost("debug-catalog-raw")]
+    public IActionResult DebugCatalogRaw([FromQuery] int lot = 1)
+    {
+        if (!CanAccess()) return Forbid();
+        var file = Request.Form.Files.GetFile("file");
+        if (file == null || file.Length == 0) return BadRequest("Carica un file PDF (campo 'file')");
+
+        using var stream = file.OpenReadStream();
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(stream);
+
+        var result = new System.Text.Json.Nodes.JsonArray();
+        foreach (var page in doc.GetPages())
+        {
+            var w = page.Width;
+            var pageObj = new System.Text.Json.Nodes.JsonObject
+            {
+                ["page"] = page.Number,
+                ["width"] = w,
+                ["height"] = page.Height,
+            };
+            var wordsArr = new System.Text.Json.Nodes.JsonArray();
+            foreach (var wd in page.GetWords().Take(60))
+            {
+                wordsArr.Add(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["text"] = wd.Text,
+                    ["x"]    = Math.Round(wd.BoundingBox.Left, 1),
+                    ["xPct"] = Math.Round(wd.BoundingBox.Left / w * 100, 1),
+                    ["y"]    = Math.Round(wd.BoundingBox.Bottom, 1),
+                });
+            }
+            pageObj["words"] = wordsArr;
+            result.Add(pageObj);
+            if (result.Count >= 3) break; // prime 3 pagine bastano
+        }
+        return Ok(result);
+    }
 }
