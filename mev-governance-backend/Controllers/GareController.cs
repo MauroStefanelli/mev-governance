@@ -175,7 +175,8 @@ public class GareController : ControllerBase
                         ["id"]          = key,
                         ["descrizione"] = row?.Descrizione ?? "",
                         ["quantita"]    = row?.Quantita.HasValue == true ? JsonValue.Create(row.Quantita!.Value) : null,
-                        ["importo"]     = price > 0 ? JsonValue.Create(price) : (row?.Importo.HasValue == true ? JsonValue.Create(row.Importo!.Value) : null),
+                        ["pesoEffort"]  = row?.PesoEffort.HasValue == true ? JsonValue.Create(row.PesoEffort!.Value) : null,
+                        ["acatalogo"]   = row?.ACatalogo == true ? JsonValue.Create(true) : null,
                     };
                     towArr.Add(node);
                 }

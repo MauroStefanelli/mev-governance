@@ -447,7 +447,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         id: get(t,"id","Id","ID","codice") || null,
         descrizione: get(t,"descrizione","description","nome") || "",
         quantita:    get(t,"quantita","Quantita","qty") ?? null,
-        importo:     get(t,"importo","Importo","price","prezzo") ?? null,
+        pesoEffort:  get(t,"pesoEffort","peso_effort","peso","weight") ?? null,
+        acatalogo:   get(t,"acatalogo","ACatalogo","a_catalogo") ?? false,
       });
       const normCatalog = (c, i) => ({
         _id: i,
@@ -980,59 +981,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                             <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
                                               {isOpen ? "▲" : "▼"} {g.figli.length} sottosezioni
                                             </span>
-                          )}
-
-                          {/* Catalogo voci */}
-                          {(d.catalogo || []).length > 0 && (
-                            <div style={{ background: "#fff", borderRadius: 10, border: "2px solid #93c5fd", overflow: "hidden" }}>
-                              <div style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ fontSize: 16 }}>📦</span>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Voci di Catalogo ({d.catalogo.length})</div>
-                                <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal catalogo</span>
-                              </div>
-                              <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                                  <thead>
-                                    <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
-                                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", whiteSpace: "nowrap", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>ID</th>
-                                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>Ambito</th>
-                                      <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>Nome componente</th>
-                                      <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", borderBottom: "1px solid #bfdbfe" }}>Realizzazione</th>
-                                      <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderBottom: "1px solid #bfdbfe" }}>Modifica</th>
-                                    </tr>
-                                    <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
-                                      {["Semplice","Medio","Complesso"].map((l,i) => (
-                                        <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", borderRight: i===2 ? "1px solid #bfdbfe" : "none" }}>{l}</th>
-                                      ))}
-                                      {["Semplice","Medio","Complesso"].map(l => (
-                                        <th key={"m"+l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap" }}>{l}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {d.catalogo.map((c, i) => {
-                                      const fmt = v => v != null && v > 0 ? Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>;
-                                      return (
-                                        <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
-                                          <td style={{ padding: "7px 10px", whiteSpace: "nowrap", borderRight: "1px solid #f0f0f0" }}>
-                                            <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 6px", fontWeight: 700 }}>{c.id}</span>
-                                          </td>
-                                          <td style={{ padding: "7px 10px", color: "#374151", borderRight: "1px solid #f0f0f0" }}>{c.ambito || "—"}</td>
-                                          <td style={{ padding: "7px 10px", color: "#111827", fontWeight: 500, borderRight: "1px solid #f0f0f0" }}>{c.nome || "—"}</td>
-                                          <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right" }}>{fmt(c.prezziSemplice)}</td>
-                                          <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right" }}>{fmt(c.prezziMedio)}</td>
-                                          <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right", borderRight: "1px solid #f0f0f0" }}>{fmt(c.prezziComplesso)}</td>
-                                          <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modSemplice)}</td>
-                                          <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modMedio)}</td>
-                                          <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modComplesso)}</td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
+                                          )}
                                         </div>
                                         {/* Figli espandibili */}
                                         {hasFigli && isOpen && (
@@ -1106,7 +1055,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>ID/Cod.</th>
                                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase" }}>Descrizione</th>
                                       <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Quantità</th>
-                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Importo</th>
+                                      <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: AMBER_DARK, fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Peso Effort %</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1115,9 +1064,13 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                         <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>
                                           {t.id ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 7px", fontWeight: 700, fontSize: 11 }}>{t.id}</span> : <span style={{ color: "#d1d5db" }}>—</span>}
                                         </td>
-                                        <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>{t.descrizione || "—"}</td>
+                                        <td style={{ padding: "8px 12px", color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>
+                                          {t.acatalogo
+                                            ? <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>A catalogo</span>
+                                            : (t.descrizione || "—")}
+                                        </td>
                                         <td style={{ padding: "8px 12px", color: "#374151", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.quantita != null ? Number(t.quantita).toLocaleString("it-IT") : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                        <td style={{ padding: "8px 12px", color: "#111827", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.importo != null ? "€ " + Number(t.importo).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                                        <td style={{ padding: "8px 12px", color: "#111827", textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>{t.pesoEffort != null ? Number(t.pesoEffort).toLocaleString("it-IT", { minimumFractionDigits: 2 }) + "%" : <span style={{ color: "#d1d5db" }}>—</span>}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -1126,9 +1079,71 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                             </div>
                           )}
 
-                        </div>
-                      );
-                    })()}
+                          {/* Catalogo — riga collassabile con dettagli per ID */}
+                          {(d.catalogo || []).length > 0 && (() => {
+                            const catKey = "cat-" + (lottoAttivo ?? 0);
+                            const catOpen = !!dettagliOpen[catKey];
+                            return (
+                              <div style={{ background: "#fff", borderRadius: 10, border: "2px solid #93c5fd", overflow: "hidden" }}>
+                                {/* Header collassabile */}
+                                <div
+                                  onClick={() => toggleDettagli(catKey)}
+                                  style={{ background: "linear-gradient(135deg, #1e3a8a, #1d4ed8)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                                  <span style={{ fontSize: 16 }}>📦</span>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+                                    Catalogo {d.nome || `Lotto ${(lottoAttivo ?? 0) + 1}`}
+                                  </div>
+                                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", flex: 1 }}>{d.descrizione ? `— ${d.descrizione.slice(0, 60)}${d.descrizione.length > 60 ? "…" : ""}` : ""}</span>
+                                  <span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{d.catalogo.length} voci</span>
+                                  <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, marginLeft: 6 }}>{catOpen ? "▲" : "▼"}</span>
+                                </div>
+                                {/* Tabella dettagli — visibile solo se aperto */}
+                                {catOpen && (
+                                  <div style={{ overflowX: "auto" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                      <thead>
+                                        <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
+                                          <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", whiteSpace: "nowrap", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>ID</th>
+                                          <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>Ambito</th>
+                                          <th rowSpan={2} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", verticalAlign: "middle" }}>Nome componente</th>
+                                          <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderRight: "1px solid #bfdbfe", borderBottom: "1px solid #bfdbfe" }}>Realizzazione</th>
+                                          <th colSpan={3} style={{ padding: "6px 10px", textAlign: "center", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", borderBottom: "1px solid #bfdbfe" }}>Modifica</th>
+                                        </tr>
+                                        <tr style={{ background: "#eff6ff", borderBottom: "2px solid #93c5fd" }}>
+                                          {["Semplice","Medio","Complesso"].map((l,i) => (
+                                            <th key={l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap", borderRight: i===2 ? "1px solid #bfdbfe" : "none" }}>{l}</th>
+                                          ))}
+                                          {["Semplice","Medio","Complesso"].map(l => (
+                                            <th key={"m"+l} style={{ padding: "5px 8px", textAlign: "right", fontWeight: 600, color: "#1d4ed8", whiteSpace: "nowrap" }}>{l}</th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {d.catalogo.map((c, i) => {
+                                          const fmt = v => v != null && v > 0 ? Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>;
+                                          return (
+                                            <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
+                                              <td style={{ padding: "7px 10px", whiteSpace: "nowrap", borderRight: "1px solid #f0f0f0" }}>
+                                                <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 5, padding: "2px 6px", fontWeight: 700 }}>{c.id}</span>
+                                              </td>
+                                              <td style={{ padding: "7px 10px", color: "#374151", borderRight: "1px solid #f0f0f0" }}>{c.ambito || "—"}</td>
+                                              <td style={{ padding: "7px 10px", color: "#111827", fontWeight: 500, borderRight: "1px solid #f0f0f0" }}>{c.nome || "—"}</td>
+                                              <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right" }}>{fmt(c.prezziSemplice)}</td>
+                                              <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right" }}>{fmt(c.prezziMedio)}</td>
+                                              <td style={{ padding: "7px 10px", color: "#374151", textAlign: "right", borderRight: "1px solid #f0f0f0" }}>{fmt(c.prezziComplesso)}</td>
+                                              <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modSemplice)}</td>
+                                              <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modMedio)}</td>
+                                              <td style={{ padding: "7px 10px", color: "#6b7280", textAlign: "right" }}>{fmt(c.modComplesso)}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                     {cap.note && (
                       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e" }}>

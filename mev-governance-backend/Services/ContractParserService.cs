@@ -363,12 +363,27 @@ public static class ContractParserService
                             quantita = qv2;
                     }
 
+                    double? pesoEffort = null;
+                    if (!acatalogo)
+                    {
+                        var weightText = string.Join(" ", words
+                            .Where(w => w.X >= effortX && w.Y <= top && w.Y >= bottom && w.Text.Contains("%"))
+                            .OrderByDescending(w => w.Y).ThenBy(w => w.X)
+                            .Select(w => w.Text));
+                        var clean = weightText.Replace("%", "").Trim();
+                        if (decimal.TryParse(clean, System.Globalization.NumberStyles.Number,
+                            System.Globalization.CultureInfo.GetCultureInfo("it-IT"), out var pv))
+                            pesoEffort = (double)pv;
+                    }
+
                     if (!rows.Any(r => r.Id == c.Text))
                         rows.Add(new TowRow
                         {
                             Id          = c.Text.ToUpperInvariant(),
                             Descrizione = description,
                             Quantita    = quantita,
+                            PesoEffort  = pesoEffort,
+                            ACatalogo   = acatalogo,
                             Importo     = null,
                         });
                 }
@@ -490,5 +505,7 @@ public class TowRow
     public string Id          { get; set; } = "";
     public string Descrizione { get; set; } = "";
     public double? Quantita   { get; set; }
-    public double? Importo    { get; set; }
+    public double? PesoEffort { get; set; }  // % peso effort (es. 32.26)
+    public bool   ACatalogo   { get; set; }  // true se "A catalogo"
+    public double? Importo    { get; set; }  // deprecato, sempre null
 }
