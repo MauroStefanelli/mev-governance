@@ -1,46 +1,83 @@
 import React from "react";
 
-const summaryText = section => {
-  const value = section?.sintesi;
-  return typeof value === "string" ? value.trim() : "";
-};
-function SectionBody({ section }) {
-  const text = summaryText(section);
-  return <div style={{ fontSize: 13, color: text ? "#374151" : "#6b7280", lineHeight: 1.6, padding: "10px 14px" }}>
-    {text || "Sintesi non disponibile nell’analisi. Consulta questa sezione nel capitolato originale."}
-  </div>;
+const text = value => typeof value === "string" ? value.trim() : "";
+const sectionNumber = section => String(section?.numero ?? "").trim().match(/^(\d+(?:\.\d+)*)/)?.[1] ||
+  text(section?.titolo).match(/^(\d+(?:\.\d+)*)(?:\s|[—–:-])/)?.[1] || "";
+function sectionTitle(section, number) {
+  const title = text(section?.titolo);
+  if (!number) return title;
+  const escaped = number.replace(/\./g, "\\.");
+  return title.replace(new RegExp(`^${escaped}(?:\\s*[—–:-]\\s*|\\.\\s+|\\s+)`), "").trim();
 }
 
-export default function GaraSections({ sections = [] }) {
-  const groups = new Map();
+// I riferimenti recuperano solo gli antenati, senza aggiungere sezioni di altri lotti.
+export function buildSectionsTree(sections = [], referenceSections = []) {
+  const references = new Map();
+  for (const section of referenceSections) {
+    if (!section || typeof section !== "object") continue;
+    const number = sectionNumber(section);
+    if (number && sectionTitle(section, number)) references.set(number, section);
+  }
+  const nodes = new Map();
+  const ensure = number => {
+    if (!nodes.has(number)) {
+      const reference = references.get(number);
+      nodes.set(number, { key: number, number, section: reference || { numero: number }, children: [], inferred: !reference });
+    }
+    return nodes.get(number);
+  };
   sections.forEach((section, index) => {
-    const number = String(section.numero ?? "").trim();
-    const key = number ? number.split(".")[0] : `senza-numero-${index}`;
-    if (!groups.has(key)) groups.set(key, { number: number.split(".")[0], parent: null, children: [] });
-    const group = groups.get(key);
-    if (!number.includes(".") && !group.parent) group.parent = section;
-    else group.children.push(section);
+    if (!section || typeof section !== "object") return;
+    const number = sectionNumber(section);
+    if (!number) {
+      nodes.set(`unnumbered-${index}`, { key: `unnumbered-${index}`, number: "", section, children: [] });
+      return;
+    }
+    const node = ensure(number);
+    const previous = node.section;
+    node.section = { ...previous, ...section,
+      titolo: sectionTitle(section, number) || sectionTitle(previous, number),
+      sintesi: text(section.sintesi) || text(previous.sintesi),
+    };
+    node.inferred = false;
+    let parent = number;
+    while (parent.includes(".")) { parent = parent.slice(0, parent.lastIndexOf(".")); ensure(parent); }
   });
-  if (!sections.length) return null;
-  const compare = (a, b) => String(a ?? "").localeCompare(String(b ?? ""), "it", { numeric: true });
-  return <div>
-    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Sezioni ({sections.length})</div>
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {[...groups.values()].sort((a, b) => compare(a.number, b.number)).map((group, index) =>
-        <details key={index} style={{ borderRadius: 8, border: "1px solid #fcd34d", overflow: "hidden" }}>
-          <summary style={{ padding: "9px 12px", background: "#fffbeb", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-            {group.number && `${group.number} — `}{group.parent?.titolo || `Sezione ${group.number}`}
-            {group.children.length > 0 && ` (${group.children.length} sottosezioni)`}
-          </summary>
-          {group.parent && <SectionBody section={group.parent} />}
-          {[...group.children].sort((a, b) => compare(a.numero, b.numero)).map((child, childIndex) =>
-            <details key={childIndex} style={{ margin: "0 12px 8px 24px", borderTop: "1px solid #f0f0f0" }}>
-              <summary style={{ padding: "8px 0", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-                {child.numero} — {child.titolo}
-              </summary>
-              <SectionBody section={child} />
-            </details>)}
-        </details>)}
-    </div>
-  </div>;
+  const roots = [];
+  for (const node of nodes.values()) {
+    const parent = node.number.includes(".") ? node.number.slice(0, node.number.lastIndexOf(".")) : "";
+    if (parent && nodes.has(parent)) nodes.get(parent).children.push(node);
+    else roots.push(node);
+  }
+  const sort = list => {
+    list.sort((a, b) => a.number.localeCompare(b.number, "it", { numeric: true }));
+    list.forEach(node => sort(node.children));
+  };
+  sort(roots);
+  return roots;
+}
+
+function SectionNode({ node, depth = 0 }) {
+  const title = sectionTitle(node.section, node.number);
+  const summary = text(node.section.sintesi);
+  return <details style={{ margin: depth ? "0 12px 8px 18px" : "0 0 8px", borderRadius: 8, border: "1px solid #dce4ed", overflow: "hidden" }}>
+    <summary style={{ padding: "10px 12px", background: depth ? "#f8fafc" : "#eff6ff", color: "#20334a", cursor: "pointer", fontSize: 13, fontWeight: 600, overflowWrap: "anywhere" }}>
+      {node.number && `${node.number} — `}{title || (node.number ? "Titolo non disponibile" : "Sezione senza titolo")}
+    </summary>
+    {(!node.inferred || !node.children.length) && <div style={{ fontSize: 13, color: summary ? "#374151" : "#64748b", lineHeight: 1.7, padding: "10px 14px", whiteSpace: "pre-wrap" }}>
+      {summary && <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 4 }}>Sintesi del paragrafo</div>}
+      {summary || "Sintesi non disponibile nell’analisi. Rianalizza il capitolato per includere il contenuto del paragrafo, oppure consulta il documento originale."}
+    </div>}
+    {node.children.map(child => <SectionNode key={child.key} node={child} depth={depth + 1} />)}
+  </details>;
+}
+
+export default function GaraSections({ sections = [], referenceSections = [] }) {
+  const tree = buildSectionsTree(sections, referenceSections);
+  if (!tree.length) return null;
+  return <section aria-label="Sezioni del capitolato">
+    <div style={{ fontSize: 13, fontWeight: 700, color: "#20334a", marginBottom: 6 }}>Sezioni del capitolato</div>
+    <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 12px" }}>Apri i titoli per seguire la gerarchia e leggere la sintesi del paragrafo.</p>
+    {tree.map(node => <SectionNode key={node.key} node={node} />)}
+  </section>;
 }

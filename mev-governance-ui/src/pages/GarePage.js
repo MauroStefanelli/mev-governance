@@ -1185,6 +1185,8 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                 <div style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "2px solid " + AMBER_BORDER, paddingBottom: 6 }}>
                                   {lottoItem.nome}
                                 </div>
+                                <GaraSections sections={lottoItem.sezioni || []}
+                                  referenceSections={[...(cap.sezioni || []), ...lotti.flatMap(l => l.sezioni || [])]} />
                                 {(lottoItem.tow || []).length > 0 && (() => {
                                   const baseAsta = parseFloat(lottoItem.importoBase) || 0;
                                   return (
@@ -1226,7 +1228,8 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
                           {/* Sezioni */}
-                          <GaraSections key={lottoAttivo ?? "tutti"} sections={d.sezioni || []} />
+                          <GaraSections key={lottoAttivo ?? "tutti"} sections={d.sezioni || []}
+                            referenceSections={[...(cap.sezioni || []), ...lotti.flatMap(l => l.sezioni || [])]} />
 
                           {/* 3 colonne: requisiti, documenti, criteri */}
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>

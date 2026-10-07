@@ -133,6 +133,27 @@ var diagAi = analysis.Analysis["_sectionDiagnostics"]!;
 Check(diagAi["totale"]!.GetValue<int>() == 4 && diagAi["conSintesi"]!.GetValue<int>() == 1, "Conteggio sintesi AI");
 Check(diagAi["sintesiVuota"]!.GetValue<int>() == 1 && diagAi["sintesiAssente"]!.GetValue<int>() == 1 && diagAi["sintesiNonValida"]!.GetValue<int>() == 1, "Diagnostica sintesi vuota, assente, tipo errato");
 Check(analysis.Analysis["lotti"]![0]!["sezioni"]![1]!["sintesi"]!.GetValue<string>() == " ", "Sintesi mancante non inventata");
+var sectionPages = new List<(int Number, string Text)> {
+    (1, "Capitolato per gara con due lotti"),
+    (2, "1 Ambito di riferimento .......... 10 1.4 Contesto Applicativo .......... 27 1.4.1 Lotto 1 - Il contesto della tracciatura .......... 28 1.4.2 Lotto 2 - Il contesto della Logistica Integrata .......... 45 5 Requisiti .......... 195"),
+    (10, "1 Ambito di riferimento Descrizione dell'ambito dei servizi."),
+    (27, "1.4 Contesto Applicativo Descrizione degli applicativi."),
+    (28, "1.4.1 Lotto 1 – Il contesto della tracciatura Gestisce gli eventi degli invii postali nelle fasi di lavorazione."),
+    (45, "Continuazione precedente. 1.4.2 Lotto 2 – Il contesto della Logistica Integrata Gestisce prenotazione e accettazione degli invii."),
+    (195, "5 Requisiti Sono richieste competenze e certificazioni del team.")
+};
+var sectionContext = GaraSectionContext.Build(sectionPages, maxChars: 8000);
+Check(sectionContext.Contains("[Pag.28] Paragrafo 1.4.1") && sectionContext.Contains("Gestisce gli eventi"), "Sintesi riceve contenuto reale del paragrafo oltre l'indice");
+Check(sectionContext.Contains("[Pag.45] Paragrafo 1.4.2") && sectionContext.Contains("Gestisce prenotazione"), "Contenuto del Lotto 2 anche quando il titolo non apre la pagina");
+Check(sectionContext.Contains("[Pag.195] Paragrafo 5") && sectionContext.Contains("certificazioni"), "Include paragrafi nelle pagine finali");
+Check(sectionContext.Length <= 8000, "Budget di contesto rispettato");
+Check(sectionContext.Contains("Paragrafo 1 - Ambito di riferimento") && sectionContext.Contains("Paragrafo 1.4 - Contesto Applicativo"), "Titoli degli antenati presenti");
+var onlyIndex = GaraSectionContext.Build(sectionPages.Take(2).ToList());
+Check(onlyIndex.Contains("solo titolo nell'indice; contenuto non individuato") && !onlyIndex.Contains("Gestisce gli eventi"), "Indice senza contenuto dichiarato esplicitamente");
+var noIndex = GaraSectionContext.Build(new List<(int, string)> { (1, "Inizio documento"), (28, "Contenuto intermedio"), (195, "Requisiti finali") }, 4000);
+Check(noIndex.Contains("[Pag.195]") && noIndex.Contains("Requisiti finali"), "PDF senza indice include anche le pagine finali");
+var withFooter = GaraSectionContext.Build(new List<(int, string)> { (1, "Testo utile TIPO DOCUMENTO TITOLO Pagina 1 di 200 CAPITOLATO SPECIALE boilerplate CAPITOLATO TECNICO seguito utile") }, 4000);
+Check(withFooter.Contains("Testo utile") && withFooter.Contains("seguito utile") && !withFooter.Contains("boilerplate"), "Il riquadro editoriale non sostituisce il contenuto utile");
 checks += RealLayoutRegression.Run();
 Console.WriteLine($"PASS: {checks} verifiche backend.");
 

@@ -501,9 +501,11 @@ public class AiService
         "Per ogni lotto estrai: nome, descrizione, importoBase, requisitiTecnici, documentiRichiesti, criteriValutazione, sezioni. " +
         "importoBase deve essere il totale della base d'asta del singolo lotto, letto nel documento, in euro senza simboli o separatori delle migliaia (es. 14860949.00). Non usare il totale dell'intera gara o un prezzo offerto; se manca lascia la stringa vuota, senza stimare. " +
         "Scadenze in formato YYYY-MM-DD, solo se presenti nel testo. Per ogni documento richiesto includi dettagli operativi e allegatiRiferimento citati, senza inventare obblighi. " +
-        "Per ogni sezione includi SEMPRE numero, titolo e sintesi (breve descrizione del contenuto, max 200 caratteri). " +
+        "Per ogni sezione includi SEMPRE numero completo, titolo esatto del paragrafo senza ripetere il numero e sintesi dei dettagli del suo contenuto (max 600 caratteri). " +
+        "Mantieni tutti i livelli gerarchici in un array piatto: ad esempio 1 Ambito di riferimento, 1.4 Contesto Applicativo, 1.4.1 Lotto 1 - Il contesto della tracciatura. Sono solo esempi: riporta i titoli effettivamente presenti. " +
+        "Per ogni lotto includi i paragrafi pertinenti e tutti i loro antenati, anche se comuni a piu' lotti. Non appiattire 1.4.1 direttamente sotto 1 e non sostituire i titoli dei padri con etichette generiche. " +
         "Sintesi deve descrivere il contenuto disponibile, non ripetere il titolo. Se il testo include solo l'indice o il titolo, usa sintesi vuota senza inventare contenuti. " +
-        "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 200 caratteri. Max 8 sezioni per lotto. " +
+        "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 200 caratteri, eccetto sintesi delle sezioni (massimo 600). Non omettere gli antenati per limitare il numero di sezioni. " +
         "Rispondi ESCLUSIVAMENTE con JSON valido. Nessun markdown, nessun backtick, nessun testo extra.";
 
     public async Task<(JsonObject Analysis, string Provider, string Model, JsonObject? Usage)> AnalizzaGaraAsync(
@@ -718,10 +720,10 @@ public class AiService
                             ["additionalProperties"] = false,
                             ["required"] = new JsonArray { "numero", "titolo", "sintesi" },
                             ["properties"] = new JsonObject {
-                                ["numero"] = new JsonObject { ["type"] = "string" },
-                                ["titolo"] = new JsonObject { ["type"] = "string" },
-                                ["sintesi"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200,
-                                    ["description"] = "Sintesi del contenuto disponibile; vuota solo se manca il testo della sezione." }
+                                ["numero"] = new JsonObject { ["type"] = "string", ["description"] = "Numero gerarchico completo, ad esempio 1.4.1; includere anche le sezioni antenate 1 e 1.4." },
+                                ["titolo"] = new JsonObject { ["type"] = "string", ["description"] = "Titolo reale del paragrafo nel capitolato, senza prefisso numerico." },
+                                ["sintesi"] = new JsonObject { ["type"] = "string", ["maxLength"] = 600,
+                                    ["description"] = "Sintesi dei dettagli del paragrafo disponibile nel testo; vuota solo se manca il contenuto, senza ripetere il titolo." }
                             }
                         }},
                     }

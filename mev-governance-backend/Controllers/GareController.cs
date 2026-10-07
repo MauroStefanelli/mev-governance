@@ -67,9 +67,9 @@ public class GareController : ControllerBase
         List<TowRow> towRowsFromCapitolato;
         try
         {
-            // Prima passata: testo per l'AI — 4000 char come Gestione Contratti (max_tokens=4096)
+            // Distribuisce il contesto tra i paragrafi, includendo il contenuto oltre l'indice.
             using (var s = file.OpenReadStream())
-                fullText = ContractParserService.ExtractRelevantPages(s, maxChars: 4000);
+                fullText = GaraSectionContext.Extract(s);
             // Seconda passata: estrazione geometrica righe TOW (id+descrizione+quantita)
             using (var s2 = file.OpenReadStream())
                 towRowsFromCapitolato = ContractParserService.ExtractTowRows(s2);
