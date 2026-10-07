@@ -1,4 +1,5 @@
 import React from "react";
+import { numeroLotto } from "./lottoAmounts";
 
 export const FASCE = ["Semplice", "Medio", "Complesso"];
 export const euro = value => value == null ? "—" : Number(value).toLocaleString("it-IT", { style: "currency", currency: "EUR" });
@@ -30,10 +31,10 @@ export function aggiornaCatalogoModifica(offerta) {
   })) };
 }
 
-export default function OffertaCatalogo({ offertaLotti, lotti, onUpdate, gara }) {
+export default function OffertaCatalogo({ offertaLotti, lotti, onUpdate, gara, lottoSelezionato, onSelectLotto }) {
   const keys = Object.keys(offertaLotti);
   const [selected, setSelected] = React.useState(keys[0] || "1");
-  const lotto = keys.includes(selected) ? selected : keys[0];
+  const lotto = lottoSelezionato ?? (keys.includes(selected) ? selected : keys[0]);
   const offerta = offertaLotti[lotto];
   const rows = offerta?.offertaCatalogo || [];
 
@@ -55,9 +56,9 @@ export default function OffertaCatalogo({ offertaLotti, lotti, onUpdate, gara })
   return <div style={{ background: "white", borderRadius: 14, overflow: "hidden", border: "1px solid #e2e8f0" }}>
     <div style={{ background: "#1e3a8a", color: "white", padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       <strong>Offerta Catalogo</strong>
-      <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>{keys.map(num => <button key={num} onClick={() => setSelected(num)}
+      <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>{keys.map(num => <button key={num} onClick={() => { setSelected(num); onSelectLotto?.(num); }}
         style={{ border: 0, borderRadius: 7, padding: "6px 14px", cursor: "pointer", background: lotto === num ? "white" : "#3b5998", color: lotto === num ? "#1e3a8a" : "white" }}>
-        {lotti[Number(num) - 1]?.nome || `Lotto ${num}`}
+        {lotti.find((l, i) => numeroLotto(l, i) === num)?.nome || `Lotto ${num}`}
       </button>)}</div>
     </div>
     {rows.length > 0 && <div style={{ padding: "10px 20px", fontSize: 12, color: "#475569", background: "#f8fafc" }}>

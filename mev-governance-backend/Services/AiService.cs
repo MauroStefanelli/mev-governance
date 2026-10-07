@@ -499,6 +499,8 @@ public class AiService
         "Sei un esperto di gare d'appalto IT italiane. Analizza il capitolato e restituisci la struttura della gara. " +
         "Individua tutti i lotti presenti (Lotto 1, Lotto 2, ecc.). Se non ci sono lotti espliciti crea un unico lotto 'Gara'. " +
         "Per ogni lotto estrai: nome, descrizione, importoBase, requisitiTecnici, documentiRichiesti, criteriValutazione, sezioni. " +
+        "importoBase deve essere il totale della base d'asta del singolo lotto, letto nel documento, in euro senza simboli o separatori delle migliaia (es. 14860949.00). Non usare il totale dell'intera gara o un prezzo offerto; se manca lascia la stringa vuota, senza stimare. " +
+        "Scadenze in formato YYYY-MM-DD, solo se presenti nel testo. Per ogni documento richiesto includi dettagli operativi e allegatiRiferimento citati, senza inventare obblighi. " +
         "Per ogni sezione includi SEMPRE numero, titolo e sintesi (breve descrizione del contenuto, max 200 caratteri). " +
         "Sintesi deve descrivere il contenuto disponibile, non ripetere il titolo. Se il testo include solo l'indice o il titolo, usa sintesi vuota senza inventare contenuti. " +
         "IMPORTANTE: risposte brevi. Ogni campo stringa: massimo 200 caratteri. Max 8 sezioni per lotto. " +
@@ -701,7 +703,9 @@ public class AiService
                             ["properties"] = new JsonObject {
                                 ["nome"] = new JsonObject { ["type"] = "string" },
                                 ["tipo"] = new JsonObject { ["type"] = "string" },
-                                ["obbligatorio"] = new JsonObject { ["type"] = "boolean" }
+                                ["obbligatorio"] = new JsonObject { ["type"] = "boolean" },
+                                ["dettagli"] = new JsonObject { ["type"] = "string" },
+                                ["allegatiRiferimento"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } }
                             }
                         }},
                         ["criteriValutazione"]= new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object",

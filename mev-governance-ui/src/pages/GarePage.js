@@ -1,8 +1,11 @@
-import React, { useState, useRef } from "react";
+import React, { useRef } from "react";
 import OffertaCatalogo, { aggiornaCatalogoModifica } from "../components/gare/OffertaCatalogo";
 import LottoFilePicker from "../components/gare/LottoFilePicker";
+import LottiOverview from "../components/gare/LottiOverview";
+import LottoWorkspace from "../components/gare/LottoWorkspace";
+import { updateLotto, updateAttachment, lottoProgress, requisitoTesto, itemKey } from "../components/gare/garaWorkflow";
 import GaraSections from "../components/gare/GaraSections";
-import { lottiConBaseAsta, salvaBasiImportate } from "../components/gare/lottoAmounts";
+import { lottiConBaseAsta, salvaBasiImportate, numeroLotto } from "../components/gare/lottoAmounts";
 import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara, analizzaOffertaExcel } from "../services/mevService";
 
 const AMBER        = "#f59e0b";
@@ -39,16 +42,6 @@ function fmtData(iso) {
 }
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
-function PrioritaBadge({ p }) {
-  const map = {
-    Alta:  { bg: "#fef2f2", color: "#dc2626", border: "#fca5a5" },
-    Media: { bg: AMBER_BG,  color: AMBER_DARK, border: AMBER_BORDER },
-    Bassa: { bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
-  };
-  const c = map[p] || map.Media;
-  return <span style={{ background: c.bg, color: c.color, border: "1px solid " + c.border, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{p}</span>;
-}
-
 function StatoBadge({ s }) {
   const map = {
     "Bozza":         { bg: "#f9fafb", color: "#6b7280",  border: "#d1d5db" },
@@ -67,9 +60,9 @@ function ChecklistSidebar({ checklist, onToggle, lottoNome }) {
   const doneCount = checklist.filter(c => c.done).length;
   const pct = checklist.length ? Math.round(doneCount / checklist.length * 100) : 0;
   return (
-    <div style={{ width: 300, flexShrink: 0, position: "sticky", top: 20 }}>
+    <div className="gara-checklist-sidebar">
       <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", background: "linear-gradient(135deg, #78350f, " + AMBER_DARK + ")", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ padding: "16px 20px", background: "linear-gradient(135deg, #102a43, #1e3a5f)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Attivita' da fare{lottoNome ? ` — ${lottoNome}` : ""}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{doneCount} / {checklist.length} completate</div>
@@ -93,7 +86,7 @@ function ChecklistSidebar({ checklist, onToggle, lottoNome }) {
                   Priorita' {prio}
                 </div>
                 {items.map(item => (
-                  <div key={item.id} onClick={() => onToggle(item.id)} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "7px 9px", borderRadius: 8, cursor: "pointer", marginBottom: 4, background: item.done ? "#f0fdf4" : "#fafafa", border: "1px solid " + (item.done ? "#86efac" : "#f0f0f0"), transition: "all 0.15s" }}>
+                  <div key={item.id} role="checkbox" aria-checked={!!item.done} tabIndex={0} onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onToggle(item.id); } }} onClick={() => onToggle(item.id)} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "7px 9px", borderRadius: 8, cursor: "pointer", marginBottom: 4, background: item.done ? "#f0fdf4" : "#fafafa", border: "1px solid " + (item.done ? "#86efac" : "#f0f0f0"), transition: "all 0.15s" }}>
                     <div style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 1, border: "2px solid " + (item.done ? "#16a34a" : "#d1d5db"), background: item.done ? "#16a34a" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
                       {item.done && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>✓</span>}
                     </div>
@@ -121,7 +114,7 @@ function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
     <div style={{ background: "#f4f6f9", minHeight: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #78350f 0%, #92400e 40%, #b45309 100%)", padding: "28px 36px 24px", borderBottom: "3px solid " + AMBER }}>
+      <div style={{ background: "linear-gradient(135deg, #102a43, #1e3a5f)", padding: "28px 36px 24px", borderBottom: "3px solid " + AMBER }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🏆</div>
@@ -361,7 +354,7 @@ export function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
   const lottiGara = gara.capitolato?.lotti || [];
   const numLotti  = lottiGara.length > 0 ? lottiGara.length : 2;
   const lottiRows = Array.from({ length: numLotti }, (_, i) => ({
-    num: i + 1,
+    num: Number(numeroLotto(lottiGara[i], i)),
     nome: lottiGara[i]?.nome || `Lotto ${i + 1}`,
   }));
 
@@ -562,8 +555,10 @@ export function ModaleModificaGara({ gara, onSalva, onAnnulla }) {
 }
 
 // ── Tab Offerta Economica ─────────────────────────────────────────────────────
-function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara }) {
-  const [lottoSel, setLottoSel] = React.useState(Object.keys(offertaLotti)[0] || "1");
+function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara, lottoSelezionato, onSelectLotto }) {
+  const [localLotto, setLocalLotto] = React.useState(Object.keys(offertaLotti)[0] || "1");
+  const lottoSel = lottoSelezionato ?? localLotto;
+  const setLottoSel = num => { setLocalLotto(num); onSelectLotto?.(num); };
   const offerta = offertaLotti[lottoSel];
   const eco = offerta?.offertaEconomica;
 
@@ -594,7 +589,7 @@ function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara }) {
           {Object.keys(offertaLotti).map(num => (
             <button key={num} onClick={() => setLottoSel(num)}
               style={{ background: lottoSel === num ? "#fff" : "rgba(255,255,255,0.2)", color: lottoSel === num ? "#166534" : "#fff", border: "none", borderRadius: 7, padding: "4px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              {lotti[parseInt(num) - 1]?.nome || `Lotto ${num}`}
+              {lotti.find((l, i) => numeroLotto(l, i) === num)?.nome || `Lotto ${num}`}
             </button>
           ))}
         </div>
@@ -657,7 +652,7 @@ export function TabOffertaCatalogo(props) {
 }
 
 // ── Vista 3: Dettaglio Gara ───────────────────────────────────────────────────
-function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
+export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [activeTab,  setActiveTab]            = React.useState("documenti");
   const [analyzingCap, setAnalyzingCap]       = React.useState(false);
   const [capError,     setCapError]           = React.useState("");
@@ -689,12 +684,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   // aiResult: dal lotto attivo se disponibile, altrimenti dal livello radice
   const aiResult = (() => {
     const src = lottoCorr || cap;
-    if (src?.proposte) {
+    if (src && (src.proposte || Array.isArray(src.documentiRichiesti))) {
       return {
         documenti: src.documentiRichiesti || [],
-        tecnica:   src.proposte.tecnica   || [],
-        economica: src.proposte.economica || [],
-        piano:     src.proposte.piano     || [],
+        tecnica:   src.proposte?.tecnica   || [],
+        economica: src.proposte?.economica || [],
+        piano:     src.proposte?.piano     || [],
       };
     }
     if (gara.aiResult) {
@@ -731,6 +726,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         tipo: get(d,"tipo","type") || "",
         obbligatorio: get(d,"obbligatorio","required") ?? true,
         dettagli: get(d,"dettagli","details") || "",
+        allegatiRiferimento: getArr(d,"allegatiRiferimento","riferimenti"),
         _docAttachment: null,
       });
       const normTec = (s, i) => ({
@@ -781,6 +777,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
           nome: get(l,"nome","name","lotto","titolo") || `Lotto ${i+1}`,
           descrizione: get(l,"descrizione","description","sintesi") || "",
           importoBase: get(l,"importoBase","importo_base","importo","baseAsta") || "",
+          baseAstaFonte: file.name,
           sezioni: getArr(l,"sezioni","sections"),
           requisitiTecnici: getArr(l,"requisitiTecnici","requisiti_tecnici","requisiti","requirements"),
           tow: getArr(l,"tow","TOW","tows","transazioni").map(normTow),
@@ -847,11 +844,20 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       });
       console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase, tow0: l.tow[0] })) });
       // Preserva importoBase e catalogo già inseriti dall'utente nei lotti precedenti
-      const lottiPrecedenti = gara.capitolato?.lotti || [];
+      const lottiPrecedenti = latestGara.current.capitolato?.lotti || [];
       capData.lotti = capData.lotti.map((l, i) => {
-        const prev = lottiPrecedenti[i];
+        const identity = name => name?.match(/lotto\s*(\d+)/i)?.[1];
+        const prev = lottiPrecedenti.find(previous => previous.nome?.trim().toLowerCase() === l.nome?.trim().toLowerCase())
+          || lottiPrecedenti.find(previous => identity(l.nome) && identity(previous.nome) === identity(l.nome));
         return {
           ...l,
+          workflow: prev?.workflow || {},
+          checklist: prev?.checklist || l.checklist,
+          documentiRichiesti: l.documentiRichiesti.map((doc, index) => {
+            const oldDocs = prev?.documentiRichiesti || [];
+            const old = oldDocs.find((d, oldIndex) => itemKey(d, oldIndex, oldDocs) === itemKey(doc, index, l.documentiRichiesti));
+            return old?._docAttachment ? { ...doc, _docAttachment: old._docAttachment } : doc;
+          }),
           // Mantieni importoBase già inserito dall'utente se non arriva dall'AI
           importoBase: (prev?.importoBase && !l.importoBase) ? prev.importoBase : (l.importoBase || prev?.importoBase || ""),
           // Mantieni catalogo già parsato se la nuova analisi non ha portato un catalogo
@@ -864,7 +870,8 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       Object.entries(catalogFiles).forEach(([num, f]) => { if (f) catalogFileNamesUpd[num] = f.name; });
 
       setLottoAttivo(0);  // seleziona sempre il primo lotto dopo analisi
-      onUpdate({ ...gara, capitolato: capData, catalogFileNames: catalogFileNamesUpd });
+      capData.lotti = lottiConBaseAsta(capData.lotti, latestGara.current.offertaLotti);
+      onUpdate({ ...latestGara.current, capitolato: capData, catalogFileNames: catalogFileNamesUpd });
     } catch (err) {
       console.error("[GarePage] errore analisi capitolato:", err?.message || err);
       setCapError(err?.message || "Errore analisi capitolato");
@@ -907,8 +914,14 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
         economica: getArr(p,"economica","economic").map(normEco),
         piano:     getArr(p,"piano","plan"),
       };
-      const lottiUpd = lotti.map((l, i) => i === lottoIdx ? { ...l, proposte } : l);
-      onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
+      for (const [field, title] of [["tecnica", "sezione"], ["economica", "voce"]]) {
+        proposte[field] = proposte[field].map(item => {
+          const previous = lotto.proposte?.[field]?.find(old => old[title] === item[title]);
+          return previous?._docAttachment ? { ...item, _docAttachment: previous._docAttachment } : item;
+        });
+      }
+      const updated = updateLotto(latestGara.current, lottoIdx, current => ({ ...current, proposte }));
+      onUpdate(updated);
     } catch (err) {
       alert("Errore generazione proposte: " + (err?.message || err));
     } finally {
@@ -917,12 +930,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   };
 
   // Checklist: usa quella del lotto attivo se disponibile, altrimenti quella della gara
-  const checklistAttiva = lottoCorr?.checklist || checklist;
+  const checklistAttiva = lottoCorr ? (lottoCorr.checklist || DEFAULT_CHECKLIST.map(c => ({ ...c }))) : checklist;
   const toggleCheck = (id) => {
     if (lottoCorr && cap) {
       // Aggiorna checklist del lotto attivo
       const lottiUpd = lotti.map((l, i) => i === lottoAttivo
-        ? { ...l, checklist: l.checklist.map(c => c.id === id ? { ...c, done: !c.done } : c) }
+        ? { ...l, checklist: checklistAttiva.map(c => c.id === id ? { ...c, done: !c.done } : c) }
         : l);
       onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
     } else {
@@ -934,46 +947,33 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   // Apre/chiude il pannello Dettagli per una voce (key = "doc-0", "tec-1", "eco-2")
   const toggleDettagli = (key) => setDettagliOpen(prev => ({ ...prev, [key]: !prev[key] }));
 
-  // Collega un file (documento prodotto) a una voce di documentiRichiesti/tecnica/economica
-  // section: "doc" | "tec" | "eco" — idx: indice nell'array
+  // Gli allegati appartengono alla risposta del lotto selezionato.
+  const latestGara = React.useRef(gara);
+  latestGara.current = gara;
   const handleAttachDoc = (section, idx, file) => {
     if (!file || !gara.capitolato) return;
-    const cap = { ...gara.capitolato };
+    const targetLotto = lottoAttivo;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = ev => {
       const attachment = { name: file.name, size: file.size, dataUrl: ev.target.result, attachedAt: new Date().toISOString() };
-      if (section === "doc") {
-        cap.documentiRichiesti = cap.documentiRichiesti.map((d, i) => i === idx ? { ...d, _docAttachment: attachment } : d);
-      } else if (section === "tec") {
-        cap.proposte = { ...cap.proposte, tecnica: (cap.proposte?.tecnica || []).map((s, i) => i === idx ? { ...s, _docAttachment: attachment } : s) };
-      } else if (section === "eco") {
-        cap.proposte = { ...cap.proposte, economica: (cap.proposte?.economica || []).map((r, i) => i === idx ? { ...r, _docAttachment: attachment } : r) };
-      }
-      onUpdate({ ...gara, capitolato: cap });
+      onUpdate(updateAttachment(latestGara.current, targetLotto, section, idx, attachment));
     };
     reader.readAsDataURL(file);
   };
-
-  // Rimuove il documento allegato da una voce
   const handleRemoveDoc = (section, idx) => {
-    if (!gara.capitolato) return;
-    const cap = { ...gara.capitolato };
-    if (section === "doc") {
-      cap.documentiRichiesti = cap.documentiRichiesti.map((d, i) => i === idx ? { ...d, _docAttachment: null } : d);
-    } else if (section === "tec") {
-      cap.proposte = { ...cap.proposte, tecnica: (cap.proposte?.tecnica || []).map((s, i) => i === idx ? { ...s, _docAttachment: null } : s) };
-    } else if (section === "eco") {
-      cap.proposte = { ...cap.proposte, economica: (cap.proposte?.economica || []).map((r, i) => i === idx ? { ...r, _docAttachment: null } : r) };
-    }
-    onUpdate({ ...gara, capitolato: cap });
+    onUpdate(updateAttachment(gara, lottoAttivo, section, idx, null));
   };
+  const handleWorkflowChange = workflow => onUpdate(lottoAttivo != null ? updateLotto(gara, lottoAttivo, lotto => ({ ...lotto, workflow })) : { ...gara, capitolato: { ...cap, workflow } });
+  const deadline = gara.scadenza || cap?.scadenza || "";
+  const progressAttivo = lottoCorr ? lottoProgress(lottoCorr, deadline) : null;
 
-  const gg = giorni(gara.scadenza);
+  const gg = giorni(deadline);
   const offertaLotti = gara.offertaLotti || {};
   const hasOfferta = Object.keys(offertaLotti).length > 0;
 
   const tabs = [
     { id: "documenti", label: "Documenti da produrre" },
+    { id: "requisiti", label: "Verifica requisiti" },
     { id: "tecnica",   label: "Proposta tecnica" },
     { id: "economica", label: "Proposta economica" },
     { id: "piano",     label: "Piano di risposta" },
@@ -1004,9 +1004,9 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <StatoBadge s={gara.stato} />
-            {gara.scadenza && (
+            {deadline && (
               <span style={{ background: "rgba(255,255,255,0.15)", color: gg !== null && gg <= 7 ? AMBER_LIGHT : "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>
-                Scadenza: {fmtData(gara.scadenza)} {gg !== null && "(" + (gg <= 0 ? "scaduta" : gg + " gg") + ")"}
+                Scadenza: {fmtData(deadline)} {gg !== null && "(" + (gg <= 0 ? "scaduta" : gg + " gg") + ")"}
               </span>
             )}
             {gara.cig && <span style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 20, padding: "4px 12px", fontSize: 11 }}>CIG: {gara.cig}</span>}
@@ -1018,8 +1018,9 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       <div style={{ display: "flex", gap: 14, padding: "20px 36px 0", flexWrap: "wrap" }}>
         {[
           { label: "Documenti caricati", value: files.length, color: AMBER_DARK },
-          { label: "Analisi AI",         value: analyzed ? "Completata" : "Non eseguita", color: analyzed ? "#16a34a" : "#9ca3af" },
-          { label: "Attivita' completate", value: (checklist.filter(c=>c.done).length) + "/" + checklist.length, color: "#1d4ed8" },
+          { label: "Documenti approvati", value: progressAttivo ? `${progressAttivo.approved}/${progressAttivo.total}` : "Seleziona lotto", color: "#1d4ed8" },
+          { label: "Requisiti da verificare", value: progressAttivo ? progressAttivo.requirementsPending : "—", color: "#b45309" },
+          { label: "Attivita' completate", value: (checklistAttiva.filter(c=>c.done).length) + "/" + checklistAttiva.length, color: "#1d4ed8" },
         ].filter(Boolean).map((k, i) => (
           <div key={i} style={{ background: "#fff", borderRadius: 10, padding: "14px 20px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", minWidth: 140 }}>
             <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{k.label}</div>
@@ -1029,24 +1030,32 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       </div>
 
       {/* Body */}
-      <div style={{ display: "flex", gap: 20, padding: "20px 36px 40px", alignItems: "flex-start" }}>
+      <div className="gara-detail-body">
 
         {/* Colonna principale */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
 
+          <LottiOverview lotti={lotti} selected={lottoAttivo} deadline={deadline} onSelect={index => { setLottoAttivo(index); setDettagliOpen({}); }} />
+          {lottoCorr && <div className="gara-workspace" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <span>Risposta in preparazione: <strong>{lottoCorr.nome}</strong></span>
+            <button className="gara-button" disabled={analyzingCap || analyzingProposte[lottoAttivo]} onClick={() => handleGeneraProposte(lottoAttivo)}>
+              {analyzingProposte[lottoAttivo] ? "Generazione in corso…" : "Genera bozza di risposta per il lotto"}
+            </button>
+          </div>}
+
           {/* ── SEZIONE ANALISI CAPITOLATO ── */}
-          <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
-            <div style={{ padding: "16px 22px 12px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <details open={!cap} style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
+            <summary style={{ cursor: "pointer", listStyle: "none", padding: "16px 22px 12px", borderBottom: "1px solid #f5f5f5", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Analisi Capitolato AI</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>Carica il capitolato tecnico PDF: l'AI estrae sintesi, sezioni, requisiti e documenti richiesti</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Documenti e analisi del capitolato</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>Apri per consultare le fonti, importare documenti e verificare sezioni, TOW e cataloghi</div>
               </div>
               {gara.capitolato && (
                 <span style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #86efac", borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>
                   ✓ Analizzato: {gara.capitolato.fileName}
                 </span>
               )}
-            </div>
+            </summary>
             <div style={{ padding: "18px 22px" }}>
               {/* Upload PDF capitolato */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: gara.capitolato ? 16 : 0 }}>
@@ -1075,7 +1084,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                 const lottiNoti = (gara.capitolato?.lotti || []);
                 const numLotti = lottiNoti.length > 0 ? lottiNoti.length : 2;
                 const rows = Array.from({ length: numLotti }, (_, i) => ({
-                  num: i + 1,
+                  num: Number(numeroLotto(lottiNoti[i], i)),
                   nome: lottiNoti[i]?.nome || `Lotto ${i + 1}`,
                 }));
                 return (
@@ -1130,7 +1139,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
               {/* Risultati analisi capitolato */}
               {gara.capitolato && (() => {
                 const cap = gara.capitolato;
-                const lotti = cap.lotti || [];
+                const lotti = lottiConBaseAsta(cap.lotti || [], gara.offertaLotti);
                 const lotto = lottoAttivo != null ? lotti[lottoAttivo] : null;
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1161,104 +1170,6 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                       <div style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0", padding: "12px 16px" }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sintesi della gara</div>
                         <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{cap.sintesi}</div>
-                      </div>
-                    )}
-
-                    {/* ── SELETTORE LOTTI ── */}
-                    {lotti.length > 0 && (
-                      <div style={{ background: "#fff", borderRadius: 12, border: "2px solid " + AMBER_BORDER, overflow: "hidden" }}>
-                        <div style={{ background: "linear-gradient(135deg,#78350f," + AMBER_DARK + ")", padding: "12px 18px", display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 16 }}>🗂️</span>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>Lotti della gara</div>
-                          <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{lotti.length} lott{lotti.length === 1 ? "o" : "i"}</span>
-                        </div>
-                        <div style={{ padding: "14px 18px" }}>
-                          {lotti.length > 1 && (
-                            <div style={{ marginBottom: 12, fontSize: 12, color: "#6b7280" }}>
-                              Seleziona un lotto per filtrare tutte le sezioni, o visualizza tutti insieme.
-                            </div>
-                          )}
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {lotti.length > 1 && (
-                              <button
-                                onClick={() => setLottoAttivo(null)}
-                                style={{ padding: "8px 18px", borderRadius: 9, border: "2px solid " + (lottoAttivo === null ? AMBER : "#e5e7eb"), background: lottoAttivo === null ? AMBER_LIGHT : "#fff", color: lottoAttivo === null ? AMBER_DARK : "#374151", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}>
-                                Tutti i lotti
-                              </button>
-                            )}
-                            {lotti.map((l, i) => (
-                              <button
-                                key={i}
-                                onClick={() => setLottoAttivo(i)}
-                                style={{ padding: "8px 18px", borderRadius: 9, border: "2px solid " + (lottoAttivo === i ? AMBER : "#e5e7eb"), background: lottoAttivo === i ? AMBER : "#fff", color: lottoAttivo === i ? "#78350f" : "#374151", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", boxShadow: lottoAttivo === i ? "0 2px 8px rgba(245,158,11,0.3)" : "none" }}>
-                                {l.nome}
-                              </button>
-                            ))}
-                          </div>
-                          {lotto && (lotto.descrizione || lotto.importoBase != null) && (
-                            <div style={{ marginTop: 12, padding: "12px 14px", background: AMBER_BG, borderRadius: 8, border: "1px solid " + AMBER_BORDER, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
-                              {lotto.descrizione && <div style={{ marginBottom: lotto.importoBase != null ? 8 : 0 }}>{lotto.descrizione}</div>}
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, whiteSpace: "nowrap" }}>Base d'asta:</span>
-                                <input
-                                  type="number"
-                                  placeholder="es. 500000"
-                                  value={lotto.importoBase || ""}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const lottiUpd = lotti.map((l, i) => i === lottoAttivo ? { ...l, importoBase: val } : l);
-                                    onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
-                                  }}
-                                  style={{ flex: 1, padding: "5px 10px", border: "1px solid " + AMBER_BORDER, borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", minWidth: 0 }}
-                                />
-                                <span style={{ fontSize: 12, color: "#9ca3af" }}>€</span>
-                                {lotto.importoBase && (
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, whiteSpace: "nowrap" }}>
-                                    = {Number(lotto.importoBase).toLocaleString("it-IT", { maximumFractionDigits: 0 })} €
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {lotto && lottoAttivo != null && !lotto.importoBase && (
-                            <div style={{ marginTop: 10, padding: "10px 14px", background: "#fefce8", borderRadius: 8, border: "1px solid #fde68a", fontSize: 12, color: "#92400e" }}>
-                              <span style={{ fontWeight: 700 }}>Inserisci la base d'asta per questo lotto</span> — necessaria per calcolare gli importi TOW.
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                                <input
-                                  type="number"
-                                  placeholder="es. 500000"
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const lottiUpd = lotti.map((l, i) => i === lottoAttivo ? { ...l, importoBase: val } : l);
-                                    onUpdate({ ...gara, capitolato: { ...cap, lotti: lottiUpd } });
-                                  }}
-                                  style={{ flex: 1, padding: "5px 10px", border: "1px solid #fde68a", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", minWidth: 0 }}
-                                />
-                                <span style={{ fontSize: 12, color: "#9ca3af" }}>€</span>
-                              </div>
-                            </div>
-                          )}
-                          {/* Bottone genera proposte per lotto selezionato */}
-                          {lotto && lottoAttivo != null && (
-                            <div style={{ marginTop: 10 }}>
-                              {(() => {
-                                const haProp = (lotto.proposte?.tecnica?.length || 0) + (lotto.proposte?.economica?.length || 0) > 0;
-                                const isGen  = analyzingProposte[lottoAttivo];
-                                return (
-                                  <button
-                                    onClick={() => setTimeout(() => handleGeneraProposte(lottoAttivo), 0)}
-                                    disabled={isGen || analyzingCap}
-                                    style={{ background: haProp ? "#fff" : AMBER, color: haProp ? AMBER_DARK : "#78350f", border: "2px solid " + AMBER, borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: isGen ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: isGen ? 0.8 : 1 }}>
-                                    {isGen
-                                      ? <><span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid rgba(120,53,15,0.3)", borderTopColor: AMBER_DARK, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Generazione proposte...</>
-                                      : <><span>🤖</span>{haProp ? "Rigenera proposte AI" : "Genera proposte AI per questo lotto"}</>
-                                    }
-                                  </button>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </div>
                       </div>
                     )}
 
@@ -1323,7 +1234,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                               <div style={{ background: "#fafafa", borderRadius: 10, border: "1px solid #f0f0f0", padding: "12px 14px" }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Requisiti tecnici ({d.requisitiTecnici.length})</div>
                                 {d.requisitiTecnici.map((r, i) => (
-                                  <div key={i} style={{ fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < d.requisitiTecnici.length-1 ? "1px solid #f0f0f0" : "none" }}>• {r}</div>
+                                  <div key={i} style={{ fontSize: 12, color: "#475569", padding: "3px 0", borderBottom: i < d.requisitiTecnici.length-1 ? "1px solid #f0f0f0" : "none" }}>• {requisitoTesto(r)}</div>
                                 ))}
                               </div>
                             )}
@@ -1375,7 +1286,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                   <span style={{ fontSize: 16 }}>📋</span>
                                   <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({d.tow.length})</div>
                                   {!baseAsta && hasPeso && (
-                                    <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Inserisci base d'asta per calcolare importi</span>
+                                    <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Base d'asta non rilevata nei documenti importati</span>
                                   )}
                                   <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
                                 </div>
@@ -1535,7 +1446,7 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                 );
               })()}
             </div>
-          </div>
+          </details>
 
           {/* Risultati AI */}
           {analyzed && aiResult && (
@@ -1544,12 +1455,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                   <span style={{ fontSize: 18 }}>🤖</span>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Risultati analisi AI</div>
-                    <div style={{ fontSize: 12, color: "#9ca3af" }}>Estratti dai documenti caricati — revisiona e adatta</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Preparazione della risposta{lottoCorr ? ` · ${lottoCorr.nome}` : ""}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>Documenti richiesti, verifiche e bozze di risposta per il lotto selezionato</div>
                   </div>
                   <span style={{ marginLeft: "auto", background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700 }}>Bozza AI</span>
                 </div>
-                <div style={{ display: "flex", borderBottom: "2px solid #f0f0f0" }}>
+                <div style={{ display: "flex", overflowX: "auto", borderBottom: "2px solid #f0f0f0" }}>
                   {tabs.map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ padding: "9px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: activeTab === t.id ? 700 : 500, color: activeTab === t.id ? AMBER_DARK : "#9ca3af", borderBottom: activeTab === t.id ? "2px solid " + AMBER : "2px solid transparent", marginBottom: -2, transition: "all 0.15s", whiteSpace: "nowrap" }}>
                       {t.label}
@@ -1559,66 +1470,10 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
               </div>
               <div style={{ padding: "18px 22px" }}>
 
-                {/* ── TAB DOCUMENTI DA PRODURRE ── */}
-                {activeTab === "documenti" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {aiResult.documenti.map((d, i) => {
-                      const key = "doc-" + i;
-                      const open = !!dettagliOpen[key];
-                      const att = d._docAttachment;
-                      return (
-                        <div key={i} style={{ borderRadius: 10, background: "#fafafa", border: "1px solid #f0f0f0", overflow: "hidden" }}>
-                          {/* Riga principale */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
-                            <span style={{ fontSize: 17 }}>📄</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{d.nome || d.name}</div>
-                              <div style={{ fontSize: 11, color: "#9ca3af" }}>{d.tipo || d.type}</div>
-                            </div>
-                            {d.priorita && <PrioritaBadge p={d.priorita} />}
-                            {d.obbligatorio != null && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: d.obbligatorio ? "#dc2626" : "#9ca3af", border: "1px solid " + (d.obbligatorio ? "#fca5a5" : "#e5e7eb"), borderRadius: 6, padding: "1px 7px" }}>{d.obbligatorio ? "Obbligatorio" : "Facoltativo"}</span>
-                            )}
-                            {/* Tasto Dettagli */}
-                            {d.dettagli && (
-                              <button onClick={() => toggleDettagli(key)} style={{ background: open ? AMBER_LIGHT : "#f1f5f9", color: open ? AMBER_DARK : "#475569", border: "1px solid " + (open ? AMBER_BORDER : "#e2e8f0"), borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                                {open ? "Chiudi" : "Dettagli"}
-                              </button>
-                            )}
-                            {/* Tasto Documento */}
-                            <div style={{ position: "relative" }}>
-                              <input ref={el => docFileRefs.current[key] = el} type="file" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if (f) handleAttachDoc("doc", i, f); e.target.value = ""; }} />
-                              {att ? (
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={att.name}>✓ {att.name}</span>
-                                  <button onClick={() => handleRemoveDoc("doc", i)} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✕</button>
-                                </div>
-                              ) : (
-                                <button onClick={() => docFileRefs.current[key]?.click()} style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #86efac", borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                                  + Documento
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          {/* Pannello Dettagli */}
-                          {open && d.dettagli && (
-                            <div style={{ borderTop: "1px solid #f0e8d0", background: AMBER_BG, padding: "12px 16px 12px 42px" }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: AMBER_DARK, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Istruzioni operative</div>
-                              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>{d.dettagli}</div>
-                              {(d.allegatiRiferimento || []).length > 0 && (
-                                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                  <span style={{ fontSize: 11, color: AMBER_DARK, fontWeight: 700 }}>Allegati da consultare:</span>
-                                  {d.allegatiRiferimento.map((al, ai) => (
-                                    <span key={ai} style={{ background: "#fff", border: "1px solid " + AMBER_BORDER, color: "#92400e", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{al}</span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                {(activeTab === "documenti" || activeTab === "requisiti") && (
+                  <LottoWorkspace key={`${lottoAttivo}-${activeTab}`} lotto={lottoCorr || (lotti.length ? null : cap)} deadline={deadline}
+                    mode={activeTab} onChange={handleWorkflowChange}
+                    onAttach={(index, file) => handleAttachDoc("doc", index, file)} onRemove={index => handleRemoveDoc("doc", index)} />
                 )}
 
                 {/* ── TAB PROPOSTA TECNICA ── */}
@@ -1766,12 +1621,12 @@ function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
           {/* ── TAB OFFERTA ECONOMICA ── */}
           {activeTab === "offerta-eco" && (
-            <TabOffertaEconomica offertaLotti={offertaLotti} lotti={lotti} onUpdate={onUpdate} gara={gara} />
+            <TabOffertaEconomica offertaLotti={offertaLotti} lotti={lotti} onUpdate={onUpdate} gara={gara} lottoSelezionato={lottoAttivo != null ? numeroLotto(lottoCorr, lottoAttivo) : undefined} onSelectLotto={num => { const index = lotti.findIndex((l, i) => numeroLotto(l, i) === String(num)); if (index >= 0) setLottoAttivo(index); }} />
           )}
 
           {/* ── TAB OFFERTA CATALOGO ── */}
           {activeTab === "offerta-cat" && (
-            <TabOffertaCatalogo offertaLotti={offertaLotti} lotti={lotti} onUpdate={onUpdate} gara={gara} />
+            <TabOffertaCatalogo offertaLotti={offertaLotti} lotti={lotti} onUpdate={onUpdate} gara={gara} lottoSelezionato={lottoAttivo != null ? numeroLotto(lottoCorr, lottoAttivo) : undefined} onSelectLotto={num => { const index = lotti.findIndex((l, i) => numeroLotto(l, i) === String(num)); if (index >= 0) setLottoAttivo(index); }} />
           )}
 
           {/* Note */}
@@ -1855,15 +1710,27 @@ export default function GarePage({ onUnauthorized }) {
     }
   };
 
-  const handleUpdateGara = async (updated) => {
+  const saveQueue = React.useRef(Promise.resolve());
+  const pendingSaves = React.useRef(0);
+  const failedSave = React.useRef(null);
+  const handleUpdateGara = updated => {
     setGare(prev => prev.map(g => g.id === updated.id ? updated : g));
-    try { await putGara(updated); } catch (err) { setError("Errore salvataggio — riprova"); }
+    pendingSaves.current += 1;
+    setSaving(true);
+    saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+      try {
+        await putGara(updated);
+        if (failedSave.current?.id === updated.id) { failedSave.current = null; setError(""); }
+      }
+      catch (err) { failedSave.current = updated; setError("Salvataggio non riuscito: le ultime modifiche sono visibili solo in questa sessione. Riprova prima di uscire."); }
+      finally { pendingSaves.current -= 1; setSaving(pendingSaves.current > 0); }
+    });
+    return saveQueue.current;
   };
 
-  const handleModificaGara = async (updated) => {
+  const handleModificaGara = updated => {
     setModificaGara(null);
-    setGare(prev => prev.map(g => g.id === updated.id ? updated : g));
-    try { await putGara(updated); } catch (err) { setError("Errore salvataggio — riprova"); }
+    return handleUpdateGara(updated);
   };
 
   const handleDeleteGara = async (gara) => {
@@ -1889,7 +1756,9 @@ export default function GarePage({ onUnauthorized }) {
     <>
       {error && (
         <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 9999, background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 20px", fontSize: 13, color: "#dc2626", fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
-          {error} <button onClick={() => setError("")} style={{ marginLeft: 10, background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>×</button>
+          {error}
+          {failedSave.current && <button className="gara-button" disabled={saving} onClick={() => handleUpdateGara(gare.find(g => g.id === failedSave.current.id) || failedSave.current)}>Riprova salvataggio</button>}
+          <button onClick={() => setError("")} style={{ marginLeft: 10, background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>×</button>
         </div>
       )}
       {saving && (
