@@ -272,105 +272,118 @@ public static class ContractParserService
 
     public static List<TowRow> ExtractTowRows(Stream pdfStream)
     {
+        // Adattato da TowPdfExtractor (ChatGPT 2026-10-07).
+        // Usa l'intestazione "Type-of-Work" come ancora geometrica — non dipende da coordinate fisse.
+        var pdfBytes = ReadAllBytes(pdfStream);
+        using var pdf = PdfDocument.Open(pdfBytes);
         var rows = new List<TowRow>();
-        using var doc = PdfDocument.Open(pdfStream);
+        var codeRx = new Regex(@"^TOW(?<lot>\d+)\.(?<n>\d+)$", RegexOptions.IgnoreCase);
 
-        foreach (var page in doc.GetPages())
+        foreach (var page in pdf.GetPages())
         {
-            var allWords = page.GetWords()
-                .Select(wd => new PdfItem { Text = wd.Text.Trim(), X = wd.BoundingBox.Left, Y = wd.BoundingBox.Bottom })
-                .Where(x => !string.IsNullOrEmpty(x.Text))
+            // PdfPig: Y=0 in basso. ChatGPT usa Y = height - top (Y=0 in alto). Usiamo bottom direttamente.
+            var words = page.GetWords()
+                .Select(w => new { w.Text, X = w.BoundingBox.Left, Y = w.BoundingBox.Bottom, Right = w.BoundingBox.Right })
+                .Where(w => !string.IsNullOrWhiteSpace(w.Text))
                 .ToList();
 
-            if (allWords.Count == 0) continue;
-            var pageText = string.Join(" ", allWords.Select(w => w.Text));
-            if (!Regex.IsMatch(pageText, @"TOW\s*0?\d+\.\d+", RegexOptions.IgnoreCase)) continue;
+            // Trova intestazioni "Type-of-Work" — marcatore della tabella TOW
+            var headers = words.Where(w => w.Text.Equals("Type-of-Work", StringComparison.OrdinalIgnoreCase)).ToList();
+            if (headers.Count == 0) continue;
 
-            // Raggruppa per riga Y con tolleranza 3pt
-            var lineGroups = allWords
-                .GroupBy(w => (int)(Math.Round(w.Y / 3.0) * 3))
-                .OrderByDescending(g => g.Key)
-                .Select(g => g.OrderBy(w => w.X).ToList())
-                .ToList();
-
-            // Conta righe con codice TOW isolato (non in lista con virgola/parentesi)
-            var isolatedTowLines = lineGroups.Where(line =>
+            foreach (var header in headers)
             {
-                var towWords = line.Where(w =>
-                    Regex.IsMatch(w.Text, @"^TOW\s*0?\d+\.\d+$", RegexOptions.IgnoreCase)).ToList();
-                return towWords.Count == 1;
-            }).ToList();
+                // Parole sulla stessa riga dell'intestazione (±6pt)
+                var band = words.Where(w => Math.Abs(w.Y - header.Y) < 6).ToList();
+                var amb    = band.FirstOrDefault(w => w.Text == "Ambito");
+                var unit   = band.FirstOrDefault(w => w.Text == "Unità" || w.Text == "Unit\u00e0");
+                var qty    = band.FirstOrDefault(w => w.Text.StartsWith("Qt", StringComparison.OrdinalIgnoreCase));
+                var effort = band.FirstOrDefault(w => w.Text == "Peso");
+                if (amb == null || unit == null || qty == null || effort == null) continue;
 
-            // Serve almeno 3 righe con TOW isolati per essere una pagina-tabella
-            if (isolatedTowLines.Count < 3) continue;
-
-            // Colonna X dei TOW isolati = mediana
-            var towXs = isolatedTowLines
-                .Select(line => line.First(w => Regex.IsMatch(w.Text, @"^TOW\s*0?\d+\.\d+$", RegexOptions.IgnoreCase)).X)
-                .OrderBy(x => x).ToList();
-            double towColX = towXs[towXs.Count / 2];
-            double towColTol = 25;
-
-            // Colonna quantità: numeri interi a destra (x > 70% larghezza pagina)
-            double pageW = page.Width;
-            double qtaMinX = pageW * 0.70;
-
-            var towLines = new List<(string Id, string Descrizione, double? Quantita, double Y)>();
-
-            foreach (var line in lineGroups)
-            {
-                var towWord = line.FirstOrDefault(w =>
-                    Regex.IsMatch(w.Text, @"^TOW\s*0?\d+\.\d+$", RegexOptions.IgnoreCase) &&
-                    Math.Abs(w.X - towColX) <= towColTol);
-                if (towWord == null) continue;
-
-                var m = Regex.Match(towWord.Text, @"TOW\s*0?(\d+)\.(\d+)", RegexOptions.IgnoreCase);
-                if (!m.Success) continue;
-                var towId = $"TOW0{m.Groups[1].Value}.{m.Groups[2].Value}";
-
-                // Descrizione = parole a destra del TOW, prima della colonna quantità
-                var descWords = line
-                    .Where(w => w.X > towWord.X + 15 && w.X < qtaMinX)
-                    .Where(w => !Regex.IsMatch(w.Text, @"^[\d.,]+%?$"))
-                    .Where(w => w.Text.Length > 0)
-                    .Select(w => w.Text)
+                // Codici TOW sotto questa intestazione, fino alla prossima intestazione o fine pagina
+                var nextHeaderY = headers
+                    .Where(w => w.Y < header.Y - 10)   // Y decrescente verso il basso in PdfPig
+                    .Select(w => w.Y)
+                    .DefaultIfEmpty(0)
+                    .Max();
+                var codes = words
+                    .Where(w => codeRx.IsMatch(w.Text) && w.Y < header.Y - 5 && w.Y > nextHeaderY)
+                    .OrderByDescending(w => w.Y)   // dall'alto verso il basso
                     .ToList();
-                var descrizione = string.Join(" ", descWords).Trim();
+                if (codes.Count == 0) continue;
 
-                // Quantità = numero intero nella zona destra (colonna qtà)
-                var qtaWord = line
-                    .Where(w => w.X >= qtaMinX && Regex.IsMatch(w.Text, @"^\d+$"))
-                    .FirstOrDefault();
-                double? quantita = qtaWord != null && double.TryParse(qtaWord.Text, out var qv) ? qv : (double?)null;
+                // Confini colonne ricavati dalle intestazioni
+                double codeX  = codes.Min(w => w.X) - 2;
+                double descX  = codes.Max(w => w.Right) + 4;
+                double unitX  = (unit.X + unit.Right) / 2 - 24;
+                double qtyX   = ((unit.X + unit.Right) / 2 + (qty.X + qty.Right) / 2) / 2;
+                double effortX = ((qty.X + qty.Right) / 2 + (effort.X + effort.Right) / 2) / 2;
 
-                towLines.Add((towId, descrizione, quantita, line[0].Y));
-            }
+                // Limite inferiore tabella = riga "TOTALE" o fine pagina
+                double tableBottom = words
+                    .Where(w => w.Text == "TOTALE" && w.Y < codes[^1].Y - 5)
+                    .Select(w => w.Y)
+                    .DefaultIfEmpty(0)
+                    .Max();
 
-            if (towLines.Count == 0) continue;
+                // Separazione servizi a task / servizi a canone = prima riga "Totale" dentro la tabella
+                double taskEnd = words
+                    .Where(w => w.Text == "Totale" && w.Y < codes[0].Y - 2 && w.Y > codes[^1].Y)
+                    .Select(w => w.Y)
+                    .DefaultIfEmpty(codes[^1].Y + 2)
+                    .Max();
 
-            // Eredita descrizione dalla riga precedente se vuota (celle unite verticalmente)
-            // Scorrendo dall'alto verso il basso (Y decrescente = dall'alto)
-            var ordered = towLines.OrderByDescending(t => t.Y).ToList();
-            string lastDesc = "";
-            foreach (var (towId, desc, quantita, y) in ordered)
-            {
-                var finalDesc = string.IsNullOrWhiteSpace(desc) ? lastDesc : desc;
-                if (!string.IsNullOrWhiteSpace(desc)) lastDesc = desc;
+                string Cell(double left, double right, double top, double bottom) =>
+                    string.Join(" ", words
+                        .Where(w => w.X >= left && w.X < right && w.Y <= top && w.Y >= bottom)
+                        .OrderByDescending(w => w.Y).ThenBy(w => w.X)
+                        .Select(w => w.Text));
 
-                if (!rows.Any(r => r.Id == towId))
-                    rows.Add(new TowRow { Id = towId, Descrizione = finalDesc, Quantita = quantita, Importo = null });
+                for (int i = 0; i < codes.Count; i++)
+                {
+                    var c = codes[i];
+                    var match = codeRx.Match(c.Text);
+                    double top    = c.Y + (i == 0 ? 12 : 6);
+                    double bottom = i + 1 < codes.Count ? codes[i + 1].Y + 6 : tableBottom;
+                    bool isCanone = c.Y < taskEnd;
+
+                    var description = Cell(descX, unitX, top, bottom).Trim();
+                    bool acatalogo  = Cell(unitX, page.Width, top, bottom).Contains("catalogo", StringComparison.OrdinalIgnoreCase);
+
+                    double? quantita = null;
+                    if (!acatalogo)
+                    {
+                        var qtyText = Cell(qtyX, effortX, top, bottom).Trim();
+                        if (decimal.TryParse(qtyText, System.Globalization.NumberStyles.Number,
+                            System.Globalization.CultureInfo.GetCultureInfo("it-IT"), out var qv))
+                            quantita = (double)qv;
+                        else if (double.TryParse(qtyText, System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var qv2))
+                            quantita = qv2;
+                    }
+
+                    if (!rows.Any(r => r.Id == c.Text))
+                        rows.Add(new TowRow
+                        {
+                            Id          = c.Text.ToUpperInvariant(),
+                            Descrizione = description,
+                            Quantita    = quantita,
+                            Importo     = null,
+                        });
+                }
             }
         }
 
-        // Deduplication: mantieni prima occorrenza con descrizione non vuota
-        var seen = new HashSet<string>();
-        var result = new List<TowRow>();
-        foreach (var r in rows.OrderByDescending(r => string.IsNullOrWhiteSpace(r.Descrizione) ? 0 : 1))
-        {
-            if (seen.Add(r.Id))
-                result.Add(r);
-        }
-        return result.OrderBy(r => r.Id).ToList();
+        return rows.OrderBy(r => r.Id).ToList();
+    }
+
+    private static byte[] ReadAllBytes(Stream s)
+    {
+        if (s is MemoryStream ms) return ms.ToArray();
+        using var buf = new MemoryStream();
+        s.CopyTo(buf);
+        return buf.ToArray();
     }
     public static string ExtractFullText(Stream pdfStream, int maxChars = 80000)
     {
