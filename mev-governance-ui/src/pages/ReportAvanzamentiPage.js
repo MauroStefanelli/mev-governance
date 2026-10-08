@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
-import { getMevList, getReleaseSchedules, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
+import { getMevList, getReleaseSchedules, upsertReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -388,6 +388,11 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [importing, setImporting]         = useState(false);
   // Popup dettaglio riga
   const [detailRow, setDetailRow]         = useState(null); // { mevId, r } | null
+  // Nuova release
+  const [showNewRelease, setShowNewRelease] = useState(false);
+  const [newReleaseName, setNewReleaseName] = useState("");
+  const [savingRelease, setSavingRelease]   = useState(false);
+  const newReleaseInputRef = useRef(null);
 
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
@@ -552,16 +557,25 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     if (selectedRelease === "") return;
     setImporting(true);
     try {
-      // Su __ALL__ il parser riceve tutte le righe; la release è usata solo come label nel preview
       const releaseLabel = selectedRelease === "__ALL__" ? "Tutte le release" : selectedRelease;
       const result = await parseExcelToProgress(file, filteredRows, releaseLabel);
+      // Auto-crea release rilevate dall'Excel che non esistono ancora in lista
+      if (result?.detectedRelease && result.detectedRelease !== releaseLabel) {
+        const detected = result.detectedRelease.trim();
+        if (detected && !releases.includes(detected)) {
+          // Crea silenziosamente senza cambiare la selezione corrente
+          upsertReleaseSchedule(releaseContractId, { name: detected, createdAt: new Date().toISOString() })
+            .then(() => setReleases(prev => prev.includes(detected) ? prev : [...prev, detected].sort()))
+            .catch(() => {});
+        }
+      }
       setImportPreview(result);
     } catch (err) {
       setMsg({ type: "err", text: err.message || "File non valido." });
     } finally {
       setImporting(false);
     }
-  }, [filteredRows, selectedRelease]);
+  }, [filteredRows, selectedRelease, releases, releaseContractId]);
 
   // Applica i dati importati al progressData
   const applyImport = useCallback(() => {
@@ -584,6 +598,30 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   }, [importPreview]);
 
   const hasDirty = Object.keys(dirty).length > 0;
+
+  // Crea una nuova release nella lista
+  const handleCreateRelease = useCallback(async (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (releases.includes(trimmed)) {
+      setSelectedRelease(trimmed);
+      setShowNewRelease(false);
+      setNewReleaseName("");
+      return;
+    }
+    setSavingRelease(true);
+    try {
+      await upsertReleaseSchedule(releaseContractId, { name: trimmed, createdAt: new Date().toISOString() });
+      setReleases(prev => [...prev, trimmed].sort());
+      setSelectedRelease(trimmed);
+      setShowNewRelease(false);
+      setNewReleaseName("");
+    } catch {
+      setMsg({ type: "err", text: "Errore creazione release." });
+    } finally {
+      setSavingRelease(false);
+    }
+  }, [releases, releaseContractId]);
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: C.muted, fontSize: 15 }}>
@@ -627,7 +665,43 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
                 fontSize: 14, outline: "none", minWidth: 160 }} />
           )}
           {loadingProg && <span style={{ fontSize: 11, color: C.muted }}>…</span>}
+          {/* Bottone nuova release */}
+          {!showNewRelease && (
+            <button type="button" onClick={() => { setShowNewRelease(true); setTimeout(() => newReleaseInputRef.current?.focus(), 50); }}
+              title="Crea nuova release"
+              style={{ background: C.accentLt, border: `1px solid ${C.accent}`, color: C.accent,
+                borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                whiteSpace: "nowrap" }}>
+              + Nuova
+            </button>
+          )}
         </div>
+
+        {/* Form nuova release inline */}
+        {showNewRelease && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface,
+            border: `1px solid ${C.accent}`, borderRadius: 12, padding: "8px 14px",
+            boxShadow: "0 1px 4px rgba(26,110,189,0.15)" }}>
+            <input
+              ref={newReleaseInputRef}
+              value={newReleaseName}
+              onChange={e => setNewReleaseName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleCreateRelease(newReleaseName); if (e.key === "Escape") { setShowNewRelease(false); setNewReleaseName(""); } }}
+              placeholder="Es. R2025-07"
+              style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 10px",
+                fontSize: 13, outline: "none", minWidth: 140 }} />
+            <button type="button" onClick={() => handleCreateRelease(newReleaseName)}
+              disabled={savingRelease || !newReleaseName.trim()}
+              style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8,
+                padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                opacity: (savingRelease || !newReleaseName.trim()) ? 0.6 : 1 }}>
+              {savingRelease ? "…" : "Crea"}
+            </button>
+            <button type="button" onClick={() => { setShowNewRelease(false); setNewReleaseName(""); }}
+              style={{ background: "none", border: "none", color: C.muted, fontSize: 18,
+                cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>✕</button>
+          </div>
+        )}
 
         {hasDirty && (
           <button onClick={saveAll} disabled={globalSaving}

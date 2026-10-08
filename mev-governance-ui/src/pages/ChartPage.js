@@ -10,10 +10,26 @@ const TABS = [
 ];
 const PALETTE = ["#526DAB", "#C48A39", "#438579", "#8D78AB", "#A96A78", "#688B9C"];
 const STATUS_COLORS = {
-  approvato: "#526DAB", "in approvazione": "#C48A39", "in lavorazione": "#8D78AB", chiuso: "#438579",
+  approvato:              "#526DAB",
+  "in approvazione":      "#C48A39",
+  "in analisi / stima":   "#438579",
+  "in analisi":           "#438579",
+  "in lavorazione":       "#8D78AB",
+  chiuso:                 "#688B9C",
 };
-// Stati mostrati di default (gli altri sono nascosti ma selezionabili)
-const DEFAULT_VISIBLE = ["approvato", "in approvazione"];
+// Ordine di visualizzazione preferenziale (i primi 3 sono quelli principali)
+const STATUS_ORDER = [
+  "approvato",
+  "in approvazione",
+  "in analisi / stima",
+  "in analisi",
+  "in lavorazione",
+  "chiuso",
+];
+// Stati sempre esclusi dai grafici (non mostrati neanche con "Mostra tutti")
+const STATI_ESCLUSI = new Set(["eliminato", "sospeso"]);
+// Stati mostrati di default
+const DEFAULT_VISIBLE = ["approvato", "in approvazione", "in analisi / stima", "in analisi"];
 
 const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
 const compact = new Intl.NumberFormat("it-IT", { notation: "compact", maximumFractionDigits: 1 });
@@ -100,10 +116,16 @@ export default function ChartPage({ rows = [] }) {
   const [activeTab, setActiveTab] = useState("release");
   const [sort, setSort] = useState("name");
 
-  // Tutti gli stati presenti nei dati
+  // Tutti gli stati presenti nei dati — escluso Eliminato e Sospeso
   const safeRows = useMemo(() =>
     Array.isArray(rows)
-      ? rows.filter((row) => row && typeof row === "object" && row.stato && String(row.stato).trim() !== "")
+      ? rows.filter((row) => {
+          if (!row || typeof row !== "object") return false;
+          const s = String(row.stato || "").trim();
+          if (!s) return false;
+          if (STATI_ESCLUSI.has(s.toLocaleLowerCase("it-IT"))) return false;
+          return true;
+        })
       : [], [rows]);
 
   const allStates = useMemo(() => {
@@ -112,7 +134,14 @@ export default function ChartPage({ rows = [] }) {
       const key = normalize(row.stato);
       if (!seen.has(key)) seen.set(key, labelOf(row.stato));
     });
-    return [...seen.entries()].sort((a, b) => collator.compare(a[1], b[1]));
+    // Ordine fisso: prima STATUS_ORDER, poi eventuali altri stati alfabeticamente
+    const ordered = [];
+    STATUS_ORDER.forEach(k => { if (seen.has(k)) ordered.push([k, seen.get(k)]); });
+    [...seen.entries()]
+      .filter(([k]) => !STATUS_ORDER.includes(k))
+      .sort((a, b) => collator.compare(a[1], b[1]))
+      .forEach(e => ordered.push(e));
+    return ordered;
   }, [safeRows]);
 
   // Filtro stati attivi — default: solo Approvato e In Approvazione se presenti, altrimenti tutti
@@ -135,7 +164,6 @@ export default function ChartPage({ rows = [] }) {
   };
 
   const selectAll = () => setActiveStates(new Set(allStates.map(([k]) => k)));
-  const selectOnly = (key) => setActiveStates(new Set([key]));
 
   // Righe filtrate per stato
   const filteredRows = useMemo(() =>
@@ -143,12 +171,14 @@ export default function ChartPage({ rows = [] }) {
     [safeRows, resolvedActiveStates]);
 
   const kpis = useMemo(() => filteredRows.reduce((result, row) => {
-    if (normalize(row.stato) === "approvato") result.approved += amount(row.importoExcel);
-    if (normalize(row.stato) === "in approvazione") result.inApproval += amount(row.importoExcel);
-    result.ordered += amount(row.ordinatoBdo);
+    const s = normalize(row.stato);
+    if (s === "approvato")                                            result.approved   += amount(row.importoExcel);
+    if (s === "in approvazione")                                      result.inApproval += amount(row.importoExcel);
+    if (s === "in analisi / stima" || s === "in analisi")             result.inAnalisi  += amount(row.importoExcel);
+    result.ordered  += amount(row.ordinatoBdo);
     result.invoiced += amount(row.fatturato);
     return result;
-  }, { approved: 0, inApproval: 0, ordered: 0, invoiced: 0 }), [filteredRows]);
+  }, { approved: 0, inApproval: 0, inAnalisi: 0, ordered: 0, invoiced: 0 }), [filteredRows]);
 
   const summary = useMemo(() => aggregate(filteredRows, activeTab), [filteredRows, activeTab]);
   const data = useMemo(() => sort === "amount"
@@ -169,43 +199,43 @@ export default function ChartPage({ rows = [] }) {
           <span style={{ padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E3E8EF", borderRadius: 8, fontSize: 12, color: "#68758A" }}>{count.format(filteredRows.length)} MEV nel perimetro</span>
         </header>
 
-        {/* ── Filtro stati ── */}
-        {allStates.length > 0 && (
-          <div style={{ ...panel, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ ...muted, fontWeight: 600, fontSize: 12, marginRight: 4 }}>Visualizza:</span>
+        {/* ── KPI box — ordine: Approvato, In Approvazione, In Analisi/Stima, Ordinato, Fatturato ── */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
+          <KpiCard title="Approvato" value={kpis.approved} description="Importo fornitura · stato Approvato" accent="#526DAB" symbol="✓" />
+          <KpiCard title="In Approvazione" value={kpis.inApproval} description="Importo fornitura · stato In Approvazione" accent="#C48A39" symbol="⏳" />
+          <KpiCard title="In Analisi / Stima" value={kpis.inAnalisi} description="Importo fornitura · In Analisi / Stima" accent="#438579" symbol="◎" />
+          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · stati selezionati" accent="#687A99" symbol="≡" />
+          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · stati selezionati" accent="#688B9C" symbol="€" />
+        </div>
+
+        {/* ── Tab raggruppamento + Filtro Visualizza + Ordina ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
+          {/* Sinistra: tab + filtro stati inline */}
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <nav aria-label="Raggruppamento grafici" style={{ display: "flex", flexWrap: "wrap", padding: 4, border: "1px solid #E3E8EF", background: "#EAF0F5", borderRadius: 11, gap: 4 }}>
+              {TABS.map((tab) => (
+                <button key={tab.id} type="button" aria-pressed={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} style={{ fontFamily: "inherit", border: "1px solid transparent", cursor: "pointer", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: activeTab === tab.id ? "#FFFFFF" : "transparent", color: activeTab === tab.id ? "#263D63" : "#68758A", boxShadow: activeTab === tab.id ? "0 2px 5px rgba(24,39,63,0.07)" : "none" }}>{tab.label}</button>
+              ))}
+            </nav>
+            {/* Filtro stati accanto alle tab */}
             {allStates.map(([key, label]) => {
               const active = resolvedActiveStates.has(key);
               const color = STATUS_COLORS[key] || PALETTE[allStates.findIndex(([k]) => k === key) % PALETTE.length];
               return (
-                <label key={key} title={`Solo ${label}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 12px", borderRadius: 20, border: `1px solid ${active ? color : "#DCE3EC"}`, background: active ? `${color}14` : "#F8FAFC", fontSize: 12, fontWeight: 600, color: active ? color : "#8290A3", userSelect: "none" }}>
+                <label key={key} style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "8px 12px", borderRadius: 8, border: `1px solid ${active ? color : "#DCE3EC"}`, background: active ? `${color}14` : "#F8FAFC", fontSize: 12, fontWeight: 600, color: active ? color : "#8290A3", userSelect: "none" }}>
                   <input type="checkbox" checked={active} onChange={() => toggleState(key)}
-                    onDoubleClick={(e) => { e.preventDefault(); selectOnly(key); }}
-                    style={{ accentColor: color, width: 13, height: 13, cursor: "pointer" }} />
+                    style={{ accentColor: color, width: 12, height: 12, cursor: "pointer" }} />
                   {label}
                 </label>
               );
             })}
             {resolvedActiveStates.size < allStates.length && (
-              <button type="button" onClick={selectAll} style={{ background: "none", border: "none", color: "#526DAB", fontSize: 12, cursor: "pointer", padding: "4px 8px", fontWeight: 600 }}>
+              <button type="button" onClick={selectAll} style={{ background: "none", border: "1px solid #DCE3EC", color: "#526DAB", fontSize: 12, cursor: "pointer", padding: "8px 12px", fontWeight: 600, borderRadius: 8 }}>
                 Mostra tutti
               </button>
             )}
           </div>
-        )}
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
-          <KpiCard title="Totale approvato" value={kpis.approved} description="Importo fornitura · stato Approvato" accent="#526DAB" symbol="✓" />
-          <KpiCard title="In approvazione" value={kpis.inApproval} description="Importo fornitura · stato In Approvazione" accent="#C48A39" symbol="⏳" />
-          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · stati selezionati" accent="#687A99" symbol="≡" />
-          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · stati selezionati" accent="#438579" symbol="€" />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 18 }}>
-          <nav aria-label="Raggruppamento grafici" style={{ display: "flex", flexWrap: "wrap", padding: 4, border: "1px solid #E3E8EF", background: "#EAF0F5", borderRadius: 11, gap: 4 }}>
-            {TABS.map((tab) => (
-              <button key={tab.id} type="button" aria-pressed={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} style={{ fontFamily: "inherit", border: "1px solid transparent", cursor: "pointer", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: activeTab === tab.id ? "#FFFFFF" : "transparent", color: activeTab === tab.id ? "#263D63" : "#68758A", boxShadow: activeTab === tab.id ? "0 2px 5px rgba(24,39,63,0.07)" : "none" }}>{tab.label}</button>
-            ))}
-          </nav>
+          {/* Destra: ordina */}
           <label style={{ ...muted, display: "flex", gap: 10, alignItems: "center" }}>
             Ordina per
             <select value={sort} onChange={(event) => setSort(event.target.value)} style={{ fontFamily: "inherit", background: "#FFFFFF", border: "1px solid #DCE3EC", color: "#34445C", borderRadius: 8, padding: "9px 12px", fontSize: 13 }}>
