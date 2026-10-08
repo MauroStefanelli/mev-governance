@@ -366,7 +366,14 @@ function ProgressBar({ value, color = C.accent }) {
 export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [mevRows, setMevRows]           = useState([]);
   const [releases, setReleases]         = useState([]);
-  const [selectedRelease, setSelectedRelease] = useState("");
+  const LS_KEY = `reportAvanzamenti_release_${ambienteId || "default"}`;
+  const [selectedRelease, setSelectedReleaseState] = useState(() => {
+    try { return localStorage.getItem(LS_KEY) || ""; } catch { return ""; }
+  });
+  const setSelectedRelease = (val) => {
+    setSelectedReleaseState(val);
+    try { if (val) localStorage.setItem(LS_KEY, val); else localStorage.removeItem(LS_KEY); } catch {}
+  };
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
@@ -398,8 +405,12 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
       const rel = (relData.records || []).map(r => r.title || "").filter(Boolean).sort();
       setReleases(rel);
       setRtiRows(rti || []);
-      // Non preselezionare: l'utente deve scegliere esplicitamente
-      setSelectedRelease("");
+      // Ripristina l'ultima release visitata; se non è più disponibile usa __ALL__
+      setSelectedReleaseState(prev => {
+        if (!prev || prev === "") return "__ALL__";
+        if (prev === "__ALL__") return "__ALL__";
+        return rel.includes(prev) ? prev : "__ALL__";
+      });
     }).catch(e => {
       if (e?.status === 401) onUnauthorized?.();
     }).finally(() => setLoading(false));
