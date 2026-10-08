@@ -407,7 +407,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
 
   // Carica progressData quando cambia la release selezionata
   useEffect(() => {
-    if (!selectedRelease) { setProgressData({}); return; }
+    if (selectedRelease === "" || selectedRelease === "__ALL__") { setProgressData({}); return; }
     setLoadingProg(true);
     getReleaseProgress(contractId, selectedRelease)
       .then(records => {
@@ -424,7 +424,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   // Filtra righe MEV per la release selezionata
   // Esclude: stato "Eliminato"/vuoto; sistemi RECUPERO, Collaudo, Presidio
   const filteredRows = useMemo(() => {
-    if (!selectedRelease) return [];
+    if (selectedRelease === "") return [];
     const STATI_ESCLUSI   = new Set(["eliminato"]);
     const SISTEMI_ESCLUSI = new Set(["recupero", "collaudo", "presidio"]);
     return mevRows.filter(r => {
@@ -432,6 +432,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
       const sistema  = (r.applicativo|| "").trim().toLowerCase();
       if (!stato || STATI_ESCLUSI.has(stato))        return false;
       if (SISTEMI_ESCLUSI.has(sistema))              return false;
+      if (selectedRelease === "__ALL__") return true;
       return (
         (r.releaseExcel || "").trim() === selectedRelease ||
         (r.pRelease     || "").trim() === selectedRelease
@@ -474,8 +475,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
 
   // Salva tutto
   const saveAll = useCallback(async () => {
-    if (!selectedRelease) return;
-    setGlobalSaving(true);
+    if (selectedRelease === "" || selectedRelease === "__ALL__") return;
     try {
       await putReleaseProgress(contractId, selectedRelease, { rows: progressData });
       setDirty({});
@@ -494,8 +494,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!selectedRelease) {
-      setMsg({ type: "err", text: "Seleziona prima una release." });
+    if (selectedRelease === "") {
       return;
     }
     setImporting(true);
@@ -563,7 +562,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
               style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px",
                 fontSize: 14, fontWeight: 700, color: C.accent, background: C.accentLt,
                 cursor: "pointer", outline: "none", minWidth: 160 }}>
-              <option value="">— Tutte le release —</option>
+              <option value="__ALL__">— Tutte le release —</option>
               {releases.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           ) : (
@@ -585,7 +584,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
         )}
 
         {/* ── Importa da Excel ── */}
-        {selectedRelease && (
+        {selectedRelease && selectedRelease !== "__ALL__" && (
           <>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8,
               padding: "10px 18px", background: "#F0FDF4", border: `1px solid #86EFAC`,
@@ -614,7 +613,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
       </div>
 
       {/* ── KPI bar — visibile solo con release selezionata ── */}
-      {selectedRelease && (
+      {selectedRelease !== "" && (
       <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
         <KpiCard label="GoTo in release" value={kpis.total} sub="attività filtrate" accent={C.accent} />
         <KpiCard label="Approvati" value={kpis.approvati}
@@ -626,7 +625,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
       )}
 
       {/* ── Tabella ── */}
-      {!selectedRelease ? (
+      {selectedRelease === "" ? (
         <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.border}`,
           padding: "60px 24px", textAlign: "center", color: C.muted }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
