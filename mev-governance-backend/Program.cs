@@ -470,6 +470,26 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH UserRoles ERROR] {ex.Message}"); }
 
+        // Blocco separato: garantisce AppRolePermissions
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""AppRolePermissions"" (
+                    ""Id""      SERIAL  PRIMARY KEY,
+                    ""AppId""   TEXT    NOT NULL DEFAULT '',
+                    ""Role""    TEXT    NOT NULL DEFAULT '',
+                    ""CanView"" BOOLEAN NOT NULL DEFAULT TRUE,
+                    ""CanEdit"" BOOLEAN NOT NULL DEFAULT TRUE
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_AppRolePermissions_AppId_Role""
+                    ON ""{sch}"".""AppRolePermissions"" (""AppId"", ""Role"");
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] AppRolePermissions verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AppRolePermissions ERROR] {ex.Message}"); }
+
         // Blocco separato: colonna Theme (isolato per resistere a errori nel blocco principale)
         try
         {

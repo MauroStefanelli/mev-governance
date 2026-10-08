@@ -137,23 +137,31 @@ public class AppRolePermissionsController : BaseController
     // ── Seed defaults ─────────────────────────────────────────────────────────
     private void EnsureDefaults()
     {
-        bool changed = false;
-        foreach (var app in KnownApps)
-        foreach (var role in KnownRoles)
+        try
         {
-            if (!_db.AppRolePermissions.Any(x => x.AppId == app.Id && x.Role == role))
+            bool changed = false;
+            foreach (var app in KnownApps)
+            foreach (var role in KnownRoles)
             {
-                _db.AppRolePermissions.Add(new AppRolePermission
+                if (!_db.AppRolePermissions.Any(x => x.AppId == app.Id && x.Role == role))
                 {
-                    AppId   = app.Id,
-                    Role    = role,
-                    CanView = true,
-                    CanEdit = true,
-                });
-                changed = true;
+                    _db.AppRolePermissions.Add(new AppRolePermission
+                    {
+                        AppId   = app.Id,
+                        Role    = role,
+                        CanView = true,
+                        CanEdit = true,
+                    });
+                    changed = true;
+                }
             }
+            if (changed) _db.SaveChanges();
         }
-        if (changed) _db.SaveChanges();
+        catch (Exception ex)
+        {
+            // Se la tabella non esiste ancora (race condition al primo avvio), logga e continua
+            Console.Error.WriteLine($"[AppRolePermissions] EnsureDefaults error: {ex.Message}");
+        }
     }
 }
 
