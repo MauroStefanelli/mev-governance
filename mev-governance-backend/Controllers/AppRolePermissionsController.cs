@@ -92,7 +92,7 @@ public class AppRolePermissionsController : BaseController
             }
         }
         _db.SaveChanges();
-        return Ok();
+        return Ok(new { saved = true });
     }
 
     // ── GET /api/app-role-permissions/my ──────────────────────────────────────

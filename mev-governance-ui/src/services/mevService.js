@@ -1459,7 +1459,8 @@ export const putAppRolePermissions = async (perms) => {
     body: JSON.stringify(perms),
   });
   if (!r.ok) { const t = await r.text(); throw new Error(t); }
-  return r.json();
+  // Il backend ritorna { saved: true } — parsing sicuro
+  try { return await r.json(); } catch { return { saved: true }; }
 };
 
 /**
