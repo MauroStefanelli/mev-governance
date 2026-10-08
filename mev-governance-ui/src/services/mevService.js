@@ -596,7 +596,7 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
   }))));
   lots.forEach(l => {
     if (l.catalogFile) form.append(`catalogFile_${l.lotId}`, l.catalogFile);
-    form.append(`priceFile_${l.lotId}`, l.priceFile);
+    if (l.priceFile) form.append(`priceFile_${l.lotId}`, l.priceFile);
   });
 
   // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto per FormData

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import './contractArchive.css';
+import ContractMembers from '../components/contracts/ContractMembers';
 import {
   getConfiguratoreContracts,
   updateConfiguratoreLot,
@@ -96,6 +98,14 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
   const [impact, setImpact] = React.useState({});
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const dialogRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!modal) return;
+    const previous = document.activeElement;
+    dialogRef.current?.showModal();
+    return () => previous?.focus();
+  }, [!!modal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (modal?.type === 'tow') {
@@ -108,7 +118,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
           init[suffix] = modal.towImpact?.[suffix] ?? '';
       });
       setImpact(init);
-      setSaved(false);
+      setSaved(false); setError('');
     }
   }, [modal]);
 
@@ -129,21 +139,22 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
   const body = { overflowY: 'auto', padding: 'clamp(12px,3vw,28px)', minHeight: 0, flex: 1 };
 
   const hasImpactRows = modal.type === 'tow' && (modal.data || []).some(row => ['1','3','4'].includes(row[0]?.split?.('.')?.[1]));
-  const impactDirty = Object.values(impact).some(v => v !== '' && v !== null);
 
   const handleSave = async () => {
-    setSaving(true);
+    if (Object.values(impact).some(v => v !== '' && (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > 100))) { setError('Le percentuali devono essere comprese tra 0 e 100.'); return; }
+    setSaving(true); setError('');
     try {
       await onSaveTowImpact(modal.contractId, modal.lotId, impact);
       setSaved(true);
+    } catch (e) { setError(e.message || 'Impossibile salvare le percentuali.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-label={modal.title} style={box}>
+    <div style={overlay} onClick={e => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+      <dialog ref={dialogRef} aria-label={modal.title} style={{ ...box, padding: 0, border: 0 }} onCancel={e => { e.preventDefault(); if (!saving) onClose(); }}>
         <div style={head}>
           <div>
             <p style={{ margin: 0, color: '#1a73e8', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.1em' }}>
@@ -151,9 +162,10 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
             </p>
             <h2 style={{ margin: '2px 0 0', fontSize: 18, color: '#172b4d', fontWeight: 700 }}>{modal.title}</h2>
           </div>
-          <button aria-label="Chiudi dettaglio lotto" onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: 8, minWidth: 44, minHeight: 44, borderRadius: 10 }}>×</button>
+          <button aria-label="Chiudi dettaglio lotto" disabled={saving} onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: 8, minWidth: 44, minHeight: 44, borderRadius: 10 }}>×</button>
         </div>
         <div style={body}>
+          {error && <p className="ca-error" role="alert">{error}</p>}
           {modal.type === 'catalog' && (
             <div role="region" aria-label="Dati del lotto" tabIndex={0} style={{ overflowX: 'auto', border: '1px solid #dce5ef', borderRadius: 12 }}>
               <table style={{ ...S.table, fontSize: 13, minWidth: 560 }}>
@@ -198,7 +210,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                 <table style={{ ...S.table, fontSize: 13, minWidth: 560 }}>
                   <thead>
                     <tr>
-                      {['TOW', 'Ambito', 'Quantità contrattuale', 'Peso %', '% Impatto (Configuratore)'].map(h => (
+                      {['TOW', 'Ambito', modal.valueKind === 'price' ? 'Prezzo unitario' : 'Quantità contrattuale', 'Peso %', '% Impatto (Configuratore)'].map(h => (
                         <th scope="col" key={h} style={{ ...S.thead, padding: '12px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -249,7 +261,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
             </>
           )}
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }
@@ -257,7 +269,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
 // ── Pagina Sintesi Contratto ───────────────────────────────────────────────
 function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
   const summary = CONTRACT_SUMMARIES[contract.contractId];
-  const visibleLots = (contract.lots || []).filter(l => !l.deleted && l.active !== false);
+  const visibleLots = (contract.lots || []).filter(l => !l.deleted);
   const lot = (contract.lots || []).find(l => l.lotId === lotId) || {};
   const lotSummary = summary?.lots?.[lotId];
   const common = summary?.common;
@@ -445,8 +457,30 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
 }
 
 // ── Componente principale ──────────────────────────────────────────────────
-export default function ContractArchivePage({ ambienti = [] }) {
+export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
+  const archiveRef = React.useRef(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [selectedId, setSelectedId] = useState(null);
+  const [section, setSection] = useState('lots');
+  const [memberEnv, setMemberEnv] = useState('');
   const [view, setView]               = useState('contracts');
+  useEffect(() => {
+    const archive = archiveRef.current;
+    const summary = archive?.querySelector('.ca-fixed-summary');
+    if (!summary) return;
+    const navigation = archive.closest('.ca-admin-shell')?.querySelector('.ca-area-nav');
+    const updateHeight = () => {
+      archive.style.setProperty('--ca-summary-height', `${summary.getBoundingClientRect().height}px`);
+      archive.style.setProperty('--ca-nav-height', `${navigation?.getBoundingClientRect().height || 0}px`);
+    };
+    updateHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(summary);
+    if (navigation) observer.observe(navigation);
+    return () => observer.disconnect();
+  }, [view]);
   const [summaryContract, setSumCon]  = useState(null);
   const [summaryLotId, setSumLot]     = useState('1');
 
@@ -466,14 +500,22 @@ export default function ContractArchivePage({ ambienti = [] }) {
 
   // Modale importa da gara
   const [showGaraModal, setShowGaraModal] = useState(false);
+  const [garaError, setGaraError] = useState('');
+  const garaDialog = React.useRef(null);
+  useEffect(() => {
+    if (!showGaraModal) return;
+    const previous = document.activeElement;
+    garaDialog.current?.showModal();
+    return () => previous?.focus();
+  }, [showGaraModal]);
   const [gareList, setGareList]           = useState([]);
   const [gareLoading, setGareLoading]     = useState(false);
   const [garaSelected, setGaraSelected]   = useState(null);
   const [garaImporting, setGaraImporting] = useState(false);
 
   // Lotti — toggle / codice MEV
+  const [deleting, setDeleting] = useState(false);
   const [togglingLot, setToggling]    = useState({});
-  const [expandedCon, setExpanded]    = useState(null);
   const [lotCodes, setLotCodes]       = useState({});
   const [lotEnvSel, setLotEnvSel]     = useState({});
   const [savingLot, setSavingLot]     = useState({});
@@ -519,7 +561,6 @@ export default function ContractArchivePage({ ambienti = [] }) {
       });
       setLotCodes(codes);
       setLotEnvSel(envSel);
-      setMsg({ type: '', text: '' });
     } catch (e) {
       setMsg({ type: 'error', text: 'Errore caricamento: ' + (e.message || '') });
     } finally {
@@ -533,13 +574,14 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const handleOpenGaraModal = async () => {
     setGaraSelected(null);
     setShowGaraModal(true);
-    setGareLoading(true);
+    setGareLoading(true); setGaraError('');
     try {
       const records = await getGare();
       // Filtra solo gare che hanno almeno un lotto con capitolato analizzato
       const garaConLotti = records.filter(g => g.capitolato?.lotti?.length > 0);
       setGareList(garaConLotti);
-    } catch {
+    } catch (e) {
+      setGaraError(e.message || 'Impossibile caricare le gare.');
       setGareList([]);
     } finally {
       setGareLoading(false);
@@ -599,31 +641,30 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const handleDeleteLot = async (contractId, lotId) => {
     const contract = archContracts.find(c => c.contractId === contractId);
     const visible = (contract?.lots || []).filter(l => !l.deleted);
-    if (visible.length <= 1) {
-      setMsg({ type: 'error', text: 'Non puoi eliminare l\'unico Lotto.' });
+    if (visible.length <= 1 || (contract.lots.filter(l => !l.deleted && l.active !== false).length <= 1 && contract.lots.find(l => l.lotId === lotId)?.active !== false)) {
+      setMsg({ type: 'error', text: 'Non puoi eliminare l’ultimo lotto o l’ultimo lotto attivo.' });
       return;
     }
     if (!window.confirm('Eliminare il Lotto ' + lotId + ' dal contratto?')) return;
-    // Aggiornamento ottimistico immediato
-    updateLotLocal(contractId, lotId, { deleted: true, active: false });
+    setDeleting(true);
     try {
       await updateConfiguratoreLot(contractId, lotId, { deleted: true, active: false });
+      updateLotLocal(contractId, lotId, { deleted: true, active: false });
     } catch (e) {
-      // Rollback
-      updateLotLocal(contractId, lotId, { deleted: false, active: true });
       setMsg({ type: 'error', text: 'Errore eliminazione lotto: ' + (e.message || '') });
-    }
+    } finally { setDeleting(false); }
   };
 
   const handleDeleteContract = async (contractId) => {
     if (!window.confirm('Eliminare questa configurazione contrattuale?')) return;
+    setDeleting(true);
     try {
       await deleteConfiguratoreContract(contractId);
       setContracts(prev => prev.filter(c => c.contractId !== contractId));
       setMsg({ type: 'ok', text: 'Contratto eliminato.' });
     } catch (e) {
       setMsg({ type: 'error', text: 'Errore eliminazione: ' + (e.message || '') });
-    }
+    } finally { setDeleting(false); }
   };
 
   const handleSaveLotCode = async (contractId, lotId) => {
@@ -634,7 +675,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
     try {
       await updateConfiguratoreLot(contractId, lotId, { codiceContratto: finalCode });
       setMsg({ type: 'ok', text: 'Codice Contratto salvato per Lotto ' + lotId });
-      await loadContracts();
+      updateLotLocal(contractId, lotId, { codiceContratto: finalCode });
     } catch (e) {
       setMsg({ type: 'error', text: 'Errore salvataggio: ' + (e.message || '') });
     } finally {
@@ -649,6 +690,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
       setMsg({ type: 'error', text: 'Lotto ' + lot.lotId + ': carica almeno un file (catalogo, listino TOW o capitolato).' });
       return;
     }
+    if (!Number.isFinite(Number(up.tow5Share ?? lot.tow5Share ?? 65)) || Number(up.tow5Share ?? lot.tow5Share ?? 65) < 0 || Number(up.tow5Share ?? lot.tow5Share ?? 65) > 100 || up.tow5Share === '') { setMsg({ type: 'error', text: 'La quota TOW .5 deve essere compresa tra 0 e 100.' }); return; }
     setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], uploading: true } }));
     setMsg({ type: '', text: '' });
     try {
@@ -675,14 +717,6 @@ export default function ContractArchivePage({ ambienti = [] }) {
     }
   };
 
-  const handleShowSummary = (contract) => {    const visibleLots = (contract.lots || []).filter(l => !l.deleted);
-    if (!visibleLots.length) return;
-    setSumCon(contract);
-    setSumLot(visibleLots[0].lotId);
-    setView('summary');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const handleShowSummaryLot = (contract, lotId) => {
     setSumCon(contract);
     setSumLot(lotId);
@@ -695,8 +729,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
     const count = Math.max(1, Math.min(6, ncLots));
     for (let i = 1; i <= count; i++) {
       const id = String(i);
-      if (!ncLotFiles[id]?.priceFile) {
-        setMsg({ type: 'error', text: 'Lotto ' + id + ': file Listino TOW obbligatorio.' });
+      if (!ncLotFiles[id]?.priceFile && !ncRulesFile) {
+        setMsg({ type: 'error', text: 'Lotto ' + id + ': carica il listino TOW oppure un capitolato da cui estrarre i prezzi.' });
         return;
       }
     }
@@ -726,6 +760,14 @@ export default function ContractArchivePage({ ambienti = [] }) {
     }
   };
 
+  const filteredContracts = archContracts.filter(c => {
+    const lots = (c.lots || []).filter(l => !l.deleted);
+    const linked = lots.every(l => ambienti.some(a => a.codiceContratto === l.codiceContratto));
+    return (filter !== 'unlinked' || !linked) &&
+      [c.name, c.contractId, ...lots.flatMap(l => [l.name, l.codiceContratto])].join(' ').toLocaleLowerCase('it').includes(search.toLocaleLowerCase('it'));
+  });
+  const selectedContract = filteredContracts.find(c => c.contractId === selectedId) || filteredContracts[0];
+
   // ── View: SINTESI ─────────────────────────────────────────────────────────
   if (view === 'summary' && summaryContract) {
     return (
@@ -747,20 +789,21 @@ export default function ContractArchivePage({ ambienti = [] }) {
     {showGaraModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
         onClick={e => { if (e.target === e.currentTarget && !garaImporting) setShowGaraModal(false); }}>
-        <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 620, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+        <dialog ref={garaDialog} aria-label="Importa un contratto da gara" onCancel={e => { e.preventDefault(); if (!garaImporting) setShowGaraModal(false); }} style={{ border: 0, background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 620, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
             <div>
               <p style={S.eyebrow}>Risposte di Gara</p>
               <h2 style={S.h2}>Seleziona una gara da importare</h2>
               <p style={{ margin: '4px 0 0', color: '#52657d', fontSize: 13 }}>
-                I dati del capitolato (nome, lotti, TOW) verranno precompilati nel form.
+                Importa un contratto completo con i lotti, i prezzi TOW e il catalogo disponibili nella gara.
               </p>
             </div>
-            <button type="button" onClick={() => setShowGaraModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#52657d', lineHeight: 1, padding: 4 }} disabled={garaImporting}>✕</button>
+            <button type="button" aria-label="Chiudi importazione gara" onClick={() => setShowGaraModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#52657d', lineHeight: 1, padding: 4 }} disabled={garaImporting}>✕</button>
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {(gareLoading || garaImporting) && <p style={{ color: '#52657d', textAlign: 'center', padding: 32 }}>{garaImporting ? 'Importazione in corso…' : 'Caricamento gare…'}</p>}
-            {!gareLoading && !garaImporting && gareList.length === 0 && (
+            {garaError && <div className="ca-error" role="alert">{garaError}<button onClick={handleOpenGaraModal}>Riprova</button></div>}
+            {!garaError && !gareLoading && !garaImporting && gareList.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: '#52657d' }}>
                 <p style={{ fontSize: 15, fontWeight: 600 }}>Nessuna gara disponibile</p>
                 <p style={{ fontSize: 13 }}>Aggiungi e analizza una gara in <strong>Risposte di Gara</strong> prima di importarla.</p>
@@ -769,10 +812,10 @@ export default function ContractArchivePage({ ambienti = [] }) {
             {!gareLoading && !garaImporting && gareList.map(g => {
               const lotti = g.capitolato?.lotti || [];
               return (
-                <div key={g.id} style={{ border: '1px solid #dce5ef', borderRadius: 10, padding: '14px 16px', marginBottom: 10, cursor: garaImporting ? 'default' : 'pointer', transition: 'border-color 0.15s', background: '#fafbfc', opacity: garaImporting ? 0.6 : 1 }}
+                <div key={g.id} style={{ border: '1px solid #dce5ef', borderRadius: 10, padding: '14px 16px', marginBottom: 10, cursor: garaImporting ? 'default' : 'pointer', transition: 'border-color 0.15s', background: garaSelected?.id === g.id ? '#edf4ff' : '#fafbfc', opacity: garaImporting ? 0.6 : 1 }}
                   onMouseEnter={e => { if (!garaImporting) e.currentTarget.style.borderColor = '#1a73e8'; }}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#dce5ef'}
-                  onClick={() => { if (!garaImporting) handleApplicaGara(g); }}>
+                  role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setGaraSelected(g); } }} onClick={() => { if (!garaImporting) setGaraSelected(g); }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                     <div>
                       <strong style={{ fontSize: 14, color: '#172b4d' }}>{g.nome}</strong>
@@ -809,23 +852,25 @@ export default function ContractArchivePage({ ambienti = [] }) {
                     </div>
                   )}
                   <p style={{ margin: '6px 0 0', fontSize: 11, color: '#52657d' }}>
-                    Clicca per importare capitolato{g.offertaLotti ? ', prezzi TOW e catalogo offerta' : ' (aggiungi offerta Excel per importare anche i prezzi)'}.
+                    Seleziona per importare capitolato{g.offertaLotti ? ', prezzi TOW e catalogo offerta' : ' (aggiungi offerta Excel per importare anche i prezzi)'}.
                   </p>
                 </div>
               );
             })}
           </div>
-        </div>
+          <div style={S.panelActions}><button style={S.btnPrimary} disabled={!garaSelected || garaImporting || gareLoading} onClick={() => handleApplicaGara(garaSelected)}>{garaImporting ? 'Importazione…' : 'Importa gara selezionata'}</button></div>
+        </dialog>
       </div>
     )}
-    <div style={S.page}>
+    <div ref={archiveRef} className="contract-archive" style={S.page}>
+      <div className="ca-fixed-summary">
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
           <p style={S.eyebrow}>Archivio contrattuale</p>
-          <h2 style={{ margin: '6px 0 0', fontSize: 'clamp(22px,3vw,30px)', letterSpacing: '-0.7px', fontWeight: 750 }}>Gestione Contratti</h2>
+          <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px,3vw,30px)', letterSpacing: '-0.7px', fontWeight: 750 }}>Contratti e accessi</h1>
           <p style={{ margin: '4px 0 0', color: '#52657d', fontSize: 13 }}>
-            Cataloghi, prezzi e regole vengono mantenuti separati per ciascun Lotto.
+            Ogni contratto, i suoi lotti e le persone che possono accedervi. Tutto in un unico spazio.
           </p>
         </div>
         <button aria-expanded={showForm} style={S.btnPrimary} onClick={() => setShowForm(f => !f)}>
@@ -836,7 +881,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
         </button>
       </div>
 
-      <div aria-label="Riepilogo archivio" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,180px),1fr))', gap: 12, marginBottom: 28 }}>
+      <div className="ca-archive-stats" aria-label="Riepilogo archivio" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,180px),1fr))', gap: 12, marginBottom: 28 }}>
         <div style={{ ...S.card, marginBottom: 0, padding: '18px 20px' }}>
           <span style={S.muted}>Contratti configurati</span>
           <strong style={{ display: 'block', fontSize: 30, letterSpacing: '-1px', color: '#174ea6' }}>{archLoading ? '…' : archContracts.length}</strong>
@@ -849,6 +894,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
           <span style={S.muted}>Lotti disattivati</span>
           <strong style={{ display: 'block', fontSize: 30, letterSpacing: '-1px', color: '#52657d' }}>{archLoading ? '…' : archContracts.reduce((total, c) => total + (c.lots || []).filter(l => !l.deleted && l.active === false).length, 0)}</strong>
         </div>
+      </div>
+
       </div>
 
       {/* Messaggio */}
@@ -867,19 +914,6 @@ export default function ContractArchivePage({ ambienti = [] }) {
               </div>
               <button type="button" style={S.btnGhost} onClick={() => setShowForm(false)}>Annulla</button>
             </div>
-
-            {/* Banner gara importata */}
-            {garaSelected && (
-              <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span>
-                  <strong>Dati precompilati da:</strong> {garaSelected.nome}
-                  {garaSelected.ente ? ` — ${garaSelected.ente}` : ''}
-                  {garaSelected.cig ? ` · CIG ${garaSelected.cig}` : ''}
-                  {' · '}Per importare TOW e catalogo usa il bottone "Importa da Gara" senza aprire il form.
-                </span>
-                <button type="button" onClick={() => setGaraSelected(null)} style={{ background: 'none', border: 'none', color: '#1d4ed8', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
-              </div>
-            )}
 
             {/* Campi principali */}
             <div style={S.mainFields}>
@@ -940,7 +974,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                       TOW .5 %
                       <input type="number" min={0} max={100} step={0.01}
                         value={ncLotShares[id] ?? 65}
-                        onChange={e => setNcLotShares(p => ({ ...p, [id]: parseFloat(e.target.value) || 65 }))}
+                        onChange={e => setNcLotShares(p => ({ ...p, [id]: e.target.value === '' ? '' : Number(e.target.value) }))}
                         style={S.inputStyle} />
                     </label>
                   </div>
@@ -964,15 +998,29 @@ export default function ContractArchivePage({ ambienti = [] }) {
       {archLoading && archContracts.length === 0
         ? <div role="status" style={{ ...S.card, textAlign: 'center', padding: 40 }}><strong>Caricamento dell’archivio…</strong><p style={S.muted}>Recupero dei contratti e dei lotti configurati.</p></div>
         : archContracts.length === 0
-          ? <div style={{ ...S.card, textAlign: 'center', padding: 40, borderStyle: 'dashed' }}><h3 style={S.h2}>L’archivio è vuoto</h3><p style={S.muted}>Usa «Nuovo contratto» per aggiungere i dati, i lotti e i documenti economici.</p></div>
+          ? <div style={{ ...S.card, textAlign: 'center', padding: 40, border: '1px dashed #dce5ef' }}><h3 style={S.h2}>L’archivio è vuoto</h3><p style={S.muted}>Usa «Nuovo contratto» per aggiungere i dati, i lotti e i documenti economici.</p></div>
           : (
-            <div style={S.contractList}>
-              {archContracts.map(c => {
+            <div className="ca-workspace">
+              <aside className="ca-directory" aria-label="Elenco contratti">
+                <div className="ca-directory-head"><strong>Archivio</strong><span>{filteredContracts.length} contratti</span></div>
+                <label className="ca-search">Cerca contratto<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Nome, lotto o codice MEV" /></label>
+                <label className="ca-search">Mostra<select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Tutti i contratti</option><option value="unlinked">Da collegare a MEV</option></select></label>
+                <div className="ca-contracts">
+                  {filteredContracts.map(c => {
+                    const lots = (c.lots || []).filter(l => !l.deleted);
+                    return <button key={c.contractId} className={'ca-contract-choice' + (selectedContract?.contractId === c.contractId ? ' is-selected' : '')} aria-pressed={selectedContract?.contractId === c.contractId} onClick={() => { setSelectedId(c.contractId); setMemberEnv(''); }}>
+                      <span className="ca-contract-icon" aria-hidden="true">▤</span><span><strong>{c.name || c.contractId}</strong><small>{lots.length} lotti · {lots.filter(l => l.active !== false).length} attivi</small><small>{c.builtin ? 'Configurazione di sistema' : 'Configurazione personalizzata'}</small></span>
+                    </button>;
+                  })}
+                  {!filteredContracts.length && <p className="ca-empty">Nessun contratto trovato. Prova un altro nome o rimuovi il filtro.</p>}
+                </div>
+              </aside>
+              <div className="ca-detail">
+              {(selectedContract ? [selectedContract] : []).map(c => {
                 const visible = (c.lots || []).filter(l => !l.deleted);
                 const active = visible.filter(l => l.active !== false);
-                const isExpanded = expandedCon === c.contractId;
                 return (
-                  <article key={c.contractId} style={S.contractCard}>
+                  <article key={c.contractId} className="ca-contract-detail" style={S.contractCard}>
                     {/* Intestazione */}
                     <div>
                       <p style={S.eyebrow}>{c.builtin ? 'Contratto di sistema' : 'Contratto personalizzato'}</p>
@@ -981,8 +1029,20 @@ export default function ContractArchivePage({ ambienti = [] }) {
                       <p style={{ ...S.muted, marginTop: 10 }}>{visible.length} lotti · {active.length} attivi</p>
                     </div>
 
+                    <nav className="ca-section-nav" aria-label="Sezioni del contratto">
+                      { [['lots', 'Lotti e prezzi'], ['documents', 'Documenti'], ['links', 'Collegamenti MEV'], ['users', 'Utenti e ruoli']].map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} className={section === id ? 'is-active' : ''} onClick={() => setSection(id)}>{label}</button>) }
+                    </nav>
+                    {section === 'users' && (() => {
+                      const linked = ambienti.filter(a => visible.some(l => l.codiceContratto === a.codiceContratto));
+                      const environment = linked.find(a => String(a.id) === memberEnv) || linked[0];
+                      return <section><h3>Accessi al contratto</h3><p className="ca-caption">I permessi appartengono al contratto MEV collegato al lotto. I lotti con lo stesso codice condividono gli utenti.</p>
+                        {linked.length > 1 && <label className="ca-search">Contratto MEV<select value={environment?.id || ''} onChange={e => setMemberEnv(e.target.value)}>{linked.map(a => <option key={a.id} value={a.id}>{a.codiceContratto} — {a.descrizione}</option>)}</select></label>}
+                        {visible.some(l => !ambienti.some(a => a.codiceContratto === l.codiceContratto)) && <p className="ca-notice">Alcuni lotti non sono collegati a un contratto MEV. Completa i collegamenti per gestirne gli accessi.</p>}
+                        {environment ? <ContractMembers key={environment.id} ambiente={environment} allUsers={allUsers} /> : <div className="ca-empty"><h3>Collega prima un contratto MEV</h3><p>Associa un codice ai lotti per definire chi può accedere.</p><button onClick={() => setSection('links')}>Configura collegamenti</button></div>}
+                      </section>;
+                    })()}
                     {/* Lotti */}
-                    <div style={S.lotManager}>
+                    {section === 'lots' && <div className="ca-lot-manager" style={S.lotManager}>
                       {visible.map(l => {
                         const isActive = l.active !== false;
                         const key = c.contractId + '|' + l.lotId;
@@ -1004,6 +1064,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                                         onClick={() => setModal({
                                           type: 'tow',
                                           title: `Lotto ${l.lotId} – Prezzi TOW`,
+                                          valueKind: 'price',
                                           contractId: c.contractId,
                                           lotId: l.lotId,
                                           towImpact: l.towImpact || {},
@@ -1071,12 +1132,10 @@ export default function ContractArchivePage({ ambienti = [] }) {
                               {isActive ? 'Attivo' : 'Disattivato'}
                             </span>
                             {(() => {
-                              const lotSum = CONTRACT_SUMMARIES[c.contractId]?.lots?.[l.lotId];
-                              const hasSummary = lotSum && Array.isArray(lotSum.tow) && lotSum.tow.length > 0;
                               return (
                                 <button
-                                  style={{ ...S.btnGhost, ...S.btnCompact, ...(hasSummary ? {} : { opacity: 0.5 }) }}
-                                  title={hasSummary ? `Apri sintesi Lotto ${l.lotId}` : 'Nessuna sintesi disponibile per questo lotto'}
+                                  style={{ ...S.btnGhost, ...S.btnCompact }}
+                                  title={`Apri sintesi Lotto ${l.lotId}`}
                                   onClick={() => handleShowSummaryLot(c, l.lotId)}>
                                   Sintesi
                                 </button>
@@ -1084,13 +1143,13 @@ export default function ContractArchivePage({ ambienti = [] }) {
                             })()}
                             <button
                               style={{ ...S.btnGhost, ...S.btnCompact }}
-                              disabled={!!togglingLot[key]}
+                              disabled={deleting || Object.values(togglingLot).some(Boolean)}
                               onClick={() => handleToggleLot(c.contractId, l.lotId, isActive)}>
                               {togglingLot[key] ? '...' : isActive ? 'Disattiva' : 'Riattiva'}
                             </button>
                             <button
                               style={S.btnDanger}
-                              onClick={() => handleDeleteLot(c.contractId, l.lotId)}>
+                              disabled={deleting || Object.values(togglingLot).some(Boolean)} onClick={() => handleDeleteLot(c.contractId, l.lotId)}>
                               Elimina
                             </button>
                             </div>
@@ -1099,8 +1158,9 @@ export default function ContractArchivePage({ ambienti = [] }) {
                       })}
                     </div>
 
+                    }
                     {/* Aggiornamento file per lotto (collassabile) */}
-                    {visible.map(l => {
+                    {section === 'documents' && visible.map(l => {
                       const key = c.contractId + '|' + l.lotId;
                       const up = lotUpload[key] || {};
                       return (
@@ -1136,7 +1196,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                               TOW .5 %
                               <input type="number" min={0} max={100} step={0.01}
                                 value={up.tow5Share ?? l.tow5Share ?? 65}
-                                onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], tow5Share: parseFloat(e.target.value) || 65 } }))}
+                                onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], tow5Share: e.target.value === '' ? '' : Number(e.target.value) } }))}
                                 style={{ ...S.inputStyle, fontSize: 12, padding: '6px 8px', marginTop: 4, width: 90 }} />
                             </label>
                             <button
@@ -1150,34 +1210,19 @@ export default function ContractArchivePage({ ambienti = [] }) {
                       );
                     })}
 
-                    {/* Azioni */}
-                    <div style={S.cardActions}>
-                      <button
-                        style={{ ...S.btnPrimary, ...(active.length === 0 ? S.btnDisabled : {}) }}
-                        disabled={active.length === 0}
-                        onClick={() => setExpanded(isExpanded ? null : c.contractId)}>
-                        {isExpanded ? 'Chiudi' : 'Usa contratto'}
-                      </button>
-                      {!c.builtin && (
-                        <button style={{ ...S.btnGhost, color: '#a81832', borderColor: '#f1b9c0' }} onClick={() => handleDeleteContract(c.contractId)}>
-                          Elimina contratto
-                        </button>
-                      )}
-                    </div>
-
                     {/* Pannello associazione Codice MEV */}
-                    {isExpanded && (
+                    {section === 'links' && (
                       <div style={{ border: '1px solid #cbdcf3', background: '#f5f9ff', borderRadius: 14, padding: 16, display: 'grid', gap: 16, minWidth: 0 }}>
                         <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: '#29415e' }}>
                           Associa Codice Contratto MEV per Lotto
                         </p>
-                        {active.map(l => {
+                        {visible.map(l => {
                           const key = c.contractId + '|' + l.lotId;
                           return (
                             <div key={l.lotId} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span style={{ width: 62, fontSize: 13, fontWeight: 700, color: '#172b4d' }}>Lotto {l.lotId}</span>
                               <span style={{ width: 110, fontSize: 12, color: '#52657d' }}>{l.name}</span>
-                              <select
+                              <select aria-label={`Contratto MEV lotto ${l.lotId}`}
                                 value={lotEnvSel[key] || ''}
                                 onChange={e => {
                                   const env = ambienti.find(a => a.id === parseInt(e.target.value, 10));
@@ -1192,7 +1237,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
                               </select>
                               <input
                                 value={lotCodes[key] || ''}
-                                onChange={e => setLotCodes(p => ({ ...p, [key]: e.target.value }))}
+                                aria-label={`Codice MEV lotto ${l.lotId}`} onChange={e => { setLotEnvSel(p => ({ ...p, [key]: '' })); setLotCodes(p => ({ ...p, [key]: e.target.value })); }}
                                 placeholder="Codice contratto"
                                 style={{ padding: '8px 10px', border: '1px solid #bac8da', borderRadius: 8, fontSize: 12, width: 160, maxWidth: '100%', boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 38 }} />
                               <button
@@ -1206,9 +1251,19 @@ export default function ContractArchivePage({ ambienti = [] }) {
                         })}
                       </div>
                     )}
+                    {/* Azioni */}
+                    <div style={S.cardActions}>
+                      {!c.builtin && (
+                        <button style={{ ...S.btnGhost, color: '#a81832', borderColor: '#f1b9c0' }} disabled={deleting || Object.values(togglingLot).some(Boolean)} onClick={() => handleDeleteContract(c.contractId)}>
+                          Elimina contratto
+                        </button>
+                      )}
+                    </div>
+
                   </article>
                 );
               })}
+              </div>
             </div>
           )
       }
