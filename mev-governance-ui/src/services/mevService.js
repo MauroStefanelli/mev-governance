@@ -822,6 +822,25 @@ export const deleteGara = async (recordId) => {
   return deleteConfiguratoreRecord(recordId);
 };
 
+// Importa una gara come contratto nell'Archivio Contrattuale.
+// Mappa capitolato, TOW (dall'offerta Excel) e catalogo (dall'offerta catalogo) senza file upload.
+// { garaId, contractId, contractName }
+export const importaGaraComContratto = async ({ garaId, contractId, contractName }) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/importa-come-contratto`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ garaId, contractId, contractName }),
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
+  return response.json();
+};
+
 // ── Release schedule per contratto ──────────────────────────────────────────
 export const getReleaseSchedules = async (contractId) => {
   const params = new URLSearchParams({ entity_type: "release_calendar", contract_id: contractId });

@@ -6,6 +6,7 @@ import {
   importConfiguratoreContract,
   uploadConfiguratoreContractLot,
   getGare,
+  importaGaraComContratto,
 } from '../services/mevService';
 import { CONTRACT_SUMMARIES } from '../configuratore/contractSummaries';
 
@@ -468,6 +469,7 @@ export default function ContractArchivePage({ ambienti = [] }) {
   const [gareList, setGareList]           = useState([]);
   const [gareLoading, setGareLoading]     = useState(false);
   const [garaSelected, setGaraSelected]   = useState(null);
+  const [garaImporting, setGaraImporting] = useState(false);
 
   // Lotti — toggle / codice MEV
   const [togglingLot, setToggling]    = useState({});
@@ -544,30 +546,23 @@ export default function ContractArchivePage({ ambienti = [] }) {
     }
   };
 
-  // Applica i dati della gara selezionata al form nuovo contratto
-  const handleApplicaGara = (gara) => {
-    const lotti = gara.capitolato?.lotti || [];
-    const nLotti = Math.max(1, Math.min(6, lotti.length || 1));
-    // Nome: preferisce titolo capitolato, fallback nome gara
-    const nomeContratto = gara.capitolato?.titolo || gara.nome || '';
-    const nomiLotti = {};
-    const sharesLotti = {};
-    lotti.slice(0, 6).forEach((lotto, i) => {
-      const id = String(i + 1);
-      nomiLotti[id] = lotto.nome || ('Lotto ' + id);
-      // Cerca TOW con suffisso .5 per ricavare tow5Share (default 65)
-      const tow5 = (lotto.tow || []).find(t => String(t.id || '').match(/\.5$/i));
-      sharesLotti[id] = tow5?.pesoEffort != null ? Math.round(tow5.pesoEffort * 100) : 65;
-    });
-    setNcName(nomeContratto);
-    setNcLots(nLotti);
-    setNcLotNames(nomiLotti);
-    setNcLotShares(sharesLotti);
-    setNcLotFiles({});
-    setNcRules(null);
-    setShowGaraModal(false);
-    setShowForm(true);
-    setGaraSelected(gara);
+  // Importa la gara selezionata come contratto completo (TOW + catalogo inclusi)
+  const handleApplicaGara = async (gara) => {
+    setGaraImporting(true);
+    setMsg({ type: '', text: '' });
+    try {
+      const contractId   = 'contract-' + Date.now();
+      const contractName = gara.capitolato?.titolo || gara.nome || 'Contratto da gara';
+      const result = await importaGaraComContratto({ garaId: gara.id, contractId, contractName });
+      const avvisi = result.warnings?.length ? ' Avvisi: ' + result.warnings.join('; ') : '';
+      setMsg({ type: avvisi ? 'error' : 'ok', text: result.message + avvisi });
+      setShowGaraModal(false);
+      await loadContracts();
+    } catch (e) {
+      setMsg({ type: 'error', text: 'Errore import da gara: ' + (e.message || '') });
+    } finally {
+      setGaraImporting(false);
+    }
   };
 
   // ── Helpers: aggiornamento ottimistico locale (come l'app standalone) ─────
@@ -750,8 +745,8 @@ export default function ContractArchivePage({ ambienti = [] }) {
     <>
     {/* ── Modale selezione gara ── */}
     {showGaraModal && (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-        onClick={e => { if (e.target === e.currentTarget) setShowGaraModal(false); }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        onClick={e => { if (e.target === e.currentTarget && !garaImporting) setShowGaraModal(false); }}>
         <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 620, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
             <div>
@@ -761,23 +756,23 @@ export default function ContractArchivePage({ ambienti = [] }) {
                 I dati del capitolato (nome, lotti, TOW) verranno precompilati nel form.
               </p>
             </div>
-            <button type="button" onClick={() => setShowGaraModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#52657d', lineHeight: 1, padding: 4 }}>✕</button>
+            <button type="button" onClick={() => setShowGaraModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#52657d', lineHeight: 1, padding: 4 }} disabled={garaImporting}>✕</button>
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {gareLoading && <p style={{ color: '#52657d', textAlign: 'center', padding: 32 }}>Caricamento gare…</p>}
-            {!gareLoading && gareList.length === 0 && (
+            {(gareLoading || garaImporting) && <p style={{ color: '#52657d', textAlign: 'center', padding: 32 }}>{garaImporting ? 'Importazione in corso…' : 'Caricamento gare…'}</p>}
+            {!gareLoading && !garaImporting && gareList.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: '#52657d' }}>
                 <p style={{ fontSize: 15, fontWeight: 600 }}>Nessuna gara disponibile</p>
                 <p style={{ fontSize: 13 }}>Aggiungi e analizza una gara in <strong>Risposte di Gara</strong> prima di importarla.</p>
               </div>
             )}
-            {!gareLoading && gareList.map(g => {
+            {!gareLoading && !garaImporting && gareList.map(g => {
               const lotti = g.capitolato?.lotti || [];
               return (
-                <div key={g.id} style={{ border: '1px solid #dce5ef', borderRadius: 10, padding: '14px 16px', marginBottom: 10, cursor: 'pointer', transition: 'border-color 0.15s', background: '#fafbfc' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = '#1a73e8'}
+                <div key={g.id} style={{ border: '1px solid #dce5ef', borderRadius: 10, padding: '14px 16px', marginBottom: 10, cursor: garaImporting ? 'default' : 'pointer', transition: 'border-color 0.15s', background: '#fafbfc', opacity: garaImporting ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (!garaImporting) e.currentTarget.style.borderColor = '#1a73e8'; }}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#dce5ef'}
-                  onClick={() => handleApplicaGara(g)}>
+                  onClick={() => { if (!garaImporting) handleApplicaGara(g); }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                     <div>
                       <strong style={{ fontSize: 14, color: '#172b4d' }}>{g.nome}</strong>
@@ -797,14 +792,25 @@ export default function ContractArchivePage({ ambienti = [] }) {
                   </div>
                   {lotti.length > 0 && (
                     <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {lotti.slice(0, 6).map((l, i) => (
-                        <span key={i} style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 5, padding: '1px 7px', fontSize: 11 }}>
-                          {l.nome || ('Lotto ' + (i + 1))}
-                          {l.importoBase > 0 ? ' · ' + euro.format(l.importoBase) : ''}
-                        </span>
-                      ))}
+                      {lotti.slice(0, 6).map((l, i) => {
+                        const lotNum = String(i + 1);
+                        const offerta = g.offertaLotti?.[lotNum];
+                        const hasTow = offerta?.offertaEconomica?.righe?.length > 0;
+                        const hasCat = offerta?.offertaCatalogo?.length > 0 || l.catalogo?.length > 0;
+                        return (
+                          <span key={i} style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 5, padding: '1px 7px', fontSize: 11 }}>
+                            {l.nome || ('Lotto ' + (i + 1))}
+                            {l.importoBase > 0 ? ' · ' + euro.format(l.importoBase) : ''}
+                            {hasTow ? ' · TOW' : ''}
+                            {hasCat ? ' · Catalogo' : ''}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
+                  <p style={{ margin: '6px 0 0', fontSize: 11, color: '#52657d' }}>
+                    Clicca per importare capitolato{g.offertaLotti ? ', prezzi TOW e catalogo offerta' : ' (aggiungi offerta Excel per importare anche i prezzi)'}.
+                  </p>
                 </div>
               );
             })}
@@ -866,11 +872,12 @@ export default function ContractArchivePage({ ambienti = [] }) {
             {garaSelected && (
               <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <span>
-                  <strong>Dati importati da:</strong> {garaSelected.nome}
+                  <strong>Dati precompilati da:</strong> {garaSelected.nome}
                   {garaSelected.ente ? ` — ${garaSelected.ente}` : ''}
                   {garaSelected.cig ? ` · CIG ${garaSelected.cig}` : ''}
+                  {' · '}Per importare TOW e catalogo usa il bottone "Importa da Gara" senza aprire il form.
                 </span>
-                <button type="button" onClick={() => setGaraSelected(null)} style={{ background: 'none', border: 'none', color: '#1d4ed8', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕ Rimuovi</button>
+                <button type="button" onClick={() => setGaraSelected(null)} style={{ background: 'none', border: 'none', color: '#1d4ed8', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
               </div>
             )}
 

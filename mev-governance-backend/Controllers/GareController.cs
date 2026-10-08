@@ -4,6 +4,7 @@ using MevGovernanceBackend.Services;
 using MevGovernanceBackend.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Npgsql;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -396,4 +397,281 @@ public class GareController : ControllerBase
         }
         return Ok(result);
     }
+
+    // ── POST /api/gare/importa-come-contratto ─────────────────────────────
+    // Importa una gara (con capitolato, TOW e catalogo offerta) come nuovo contratto
+    // nel Archivio Contrattuale, senza richiedere file fisici.
+    // Body JSON: { garaId, contractId, contractName }
+    [HttpPost("importa-come-contratto")]
+    public async Task<IActionResult> ImportaComContratto([FromBody] ImportaGaraRequest req)
+    {
+        if (!CanAccess()) return Forbid();
+        if (string.IsNullOrWhiteSpace(req.GaraId) || string.IsNullOrWhiteSpace(req.ContractId) || string.IsNullOrWhiteSpace(req.ContractName))
+            return BadRequest(new { message = "garaId, contractId e contractName sono obbligatori." });
+        if (!System.Text.RegularExpressions.Regex.IsMatch(req.ContractId, @"^[a-zA-Z0-9_\-]+$"))
+            return BadRequest(new { message = "contractId deve contenere solo lettere, numeri, trattini e underscore." });
+
+        // Ricava schema e connection string (stesso pattern di ConfiguratoreController)
+        var rawSchema = (_config["DB_SCHEMA"] ?? "").Trim().ToLower();
+        var sch = rawSchema.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(rawSchema, @"^[a-zA-Z0-9_]+$") ? rawSchema : "public";
+        var cs = _config["DB_CONNECTION_STRING"] ?? _config["DATABASE_DIRECT_URL"] ?? _config["DATABASE_URL"] ?? "";
+        if (string.IsNullOrWhiteSpace(cs))
+            return StatusCode(500, new { message = "DB non configurato." });
+
+        // 1. Carica il payload della gara dal DB
+        string garaJson;
+        try
+        {
+            await using var conn = new NpgsqlConnection(cs);
+            await conn.OpenAsync();
+            var rk = $"gara|{req.GaraId}";
+            await using var cmd = new NpgsqlCommand(
+                $@"SELECT ""payload""::text FROM ""{sch}"".""PC_DataRecords"" WHERE ""record_key"" = @rk LIMIT 1", conn);
+            cmd.Parameters.AddWithValue("rk", rk);
+            var raw = await cmd.ExecuteScalarAsync();
+            if (raw == null) return NotFound(new { message = $"Gara '{req.GaraId}' non trovata." });
+            garaJson = raw.ToString()!;
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Errore lettura gara: " + ex.Message });
+        }
+
+        // 2. Deserializza e mappa i dati
+        JsonObject gara;
+        try { gara = JsonNode.Parse(garaJson)!.AsObject(); }
+        catch { return StatusCode(500, new { message = "Payload gara non valido." }); }
+
+        var capitolato = gara["capitolato"]?.AsObject();
+        var lottiNode  = capitolato?["lotti"]?.AsArray() ?? new JsonArray();
+        var offertaLottiNode = gara["offertaLotti"]?.AsObject();
+
+        var createdAt = DateTime.UtcNow.ToString("o");
+        var warnings  = new List<string>();
+        var lottiCreati = new List<object>();
+
+        // 3. Salva il record contratto header
+        var contractPayload = new JsonObject
+        {
+            ["name"]      = req.ContractName,
+            ["rulesFile"] = capitolato?["fileName"]?.GetValue<string>() ?? "",
+            ["ente"]      = gara["ente"]?.GetValue<string>() ?? "",
+            ["cig"]       = gara["cig"]?.GetValue<string>() ?? "",
+            ["garaId"]    = req.GaraId,
+            ["builtin"]   = false,
+            ["createdAt"] = createdAt,
+        };
+
+        try
+        {
+            await UpsertRecord(cs, sch, $"{req.ContractId}|contract", "contract", req.ContractId, "", req.ContractName, contractPayload.ToJsonString());
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Errore creazione contratto: " + ex.Message });
+        }
+
+        // 4. Per ogni lotto, costruisci towPrices e catalog dai dati offerta
+        for (int i = 0; i < lottiNode.Count && i < 6; i++)
+        {
+            var lotto     = lottiNode[i]?.AsObject();
+            if (lotto == null) continue;
+            var lottoNum  = i + 1;
+            var lotId     = String(lottoNum);
+            var lotNome   = lotto["nome"]?.GetValue<string>() ?? $"Lotto {lotId}";
+
+            // towPrices: preferisce offerta Excel, fallback a tow dal capitolato (quantita×prezzoUnitario non disponibile → skip)
+            var towPrices = new JsonObject();
+            var offertaLotto = offertaLottiNode?[lotId]?.AsObject();
+            var righeOfferta = offertaLotto?["offertaEconomica"]?["righe"]?.AsArray();
+            if (righeOfferta != null)
+            {
+                foreach (var riga in righeOfferta)
+                {
+                    var codice = riga?["codice"]?.GetValue<string>();
+                    var prezzoVal = riga?["prezzoUnitario"];
+                    if (!string.IsNullOrWhiteSpace(codice) && prezzoVal != null)
+                    {
+                        double prezzo = 0;
+                        try { prezzo = prezzoVal.GetValue<double>(); } catch { try { prezzo = double.Parse(prezzoVal.ToString()!); } catch { } }
+                        if (prezzo > 0) towPrices[codice!] = prezzo;
+                    }
+                }
+            }
+            if (towPrices.Count == 0)
+                warnings.Add($"Lotto {lotId}: nessun prezzo TOW dall'offerta Excel. Carica il listino manualmente.");
+
+            // catalog: preferisce offerta catalogo, fallback alle voci catalogo del capitolato
+            var catalogArray = new JsonArray();
+            var offertaCatalogo = offertaLotto?["offertaCatalogo"]?.AsArray();
+            if (offertaCatalogo != null && offertaCatalogo.Count > 0)
+            {
+                foreach (var voce in offertaCatalogo)
+                {
+                    if (voce == null) continue;
+                    var entry = new JsonObject
+                    {
+                        ["id"]          = voce["id"]?.DeepClone(),
+                        ["nome"]        = voce["nome"]?.DeepClone(),
+                        ["ambito"]      = voce["ambito"]?.DeepClone(),
+                        ["descrizione"] = voce["descrizione"]?.DeepClone() ?? "",
+                        ["prezzi"] = new JsonObject
+                        {
+                            ["REALIZZAZIONE"] = new JsonObject
+                            {
+                                ["Semplice"]  = voce["prezziSemplice"]?.DeepClone(),
+                                ["Medio"]     = voce["prezziMedio"]?.DeepClone(),
+                                ["Complesso"] = voce["prezziComplesso"]?.DeepClone(),
+                            },
+                            ["MODIFICA"] = new JsonObject
+                            {
+                                ["Semplice"]  = voce["modSemplice"]?.DeepClone(),
+                                ["Medio"]     = voce["modMedio"]?.DeepClone(),
+                                ["Complesso"] = voce["modComplesso"]?.DeepClone(),
+                            }
+                        }
+                    };
+                    catalogArray.Add(entry);
+                }
+            }
+            else
+            {
+                // Fallback: voci catalogo dal capitolato (struttura diversa ma usabile)
+                var capCatalogo = lotto["catalogo"]?.AsArray();
+                if (capCatalogo != null)
+                {
+                    foreach (var voce in capCatalogo)
+                    {
+                        if (voce == null) continue;
+                        var entry = new JsonObject
+                        {
+                            ["id"]          = voce["id"]?.DeepClone(),
+                            ["nome"]        = voce["nome"]?.DeepClone(),
+                            ["ambito"]      = voce["ambito"]?.DeepClone(),
+                            ["descrizione"] = voce["descrizione"]?.DeepClone() ?? "",
+                            ["prezzi"] = new JsonObject
+                            {
+                                ["REALIZZAZIONE"] = new JsonObject
+                                {
+                                    ["Semplice"]  = voce["prezziSemplice"]?.DeepClone(),
+                                    ["Medio"]     = voce["prezziMedio"]?.DeepClone(),
+                                    ["Complesso"] = voce["prezziComplesso"]?.DeepClone(),
+                                },
+                                ["MODIFICA"] = new JsonObject
+                                {
+                                    ["Semplice"]  = voce["modSemplice"]?.DeepClone(),
+                                    ["Medio"]     = voce["modMedio"]?.DeepClone(),
+                                    ["Complesso"] = voce["modComplesso"]?.DeepClone(),
+                                }
+                            }
+                        };
+                        catalogArray.Add(entry);
+                    }
+                }
+                if (catalogArray.Count == 0)
+                    warnings.Add($"Lotto {lotId}: nessuna voce catalogo trovata. Carica il PDF catalogo manualmente.");
+            }
+
+            // tow5Share: cerca TOW con suffisso .5 e legge pesoEffort
+            int tow5Share = 65;
+            var towList = lotto["tow"]?.AsArray();
+            if (towList != null)
+            {
+                foreach (var t in towList)
+                {
+                    var tid = t?["id"]?.GetValue<string>() ?? "";
+                    if (tid.EndsWith(".5", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pe = t?["pesoEffort"];
+                        if (pe != null) { try { tow5Share = (int)Math.Round(pe.GetValue<double>() * 100); } catch { } }
+                        break;
+                    }
+                }
+            }
+
+            // towImpact: da pesoEffort dei TOW con peso
+            var towImpact = new JsonObject();
+            if (towList != null)
+            {
+                foreach (var t in towList)
+                {
+                    var tid  = t?["id"]?.GetValue<string>() ?? "";
+                    var pe   = t?["pesoEffort"];
+                    if (pe != null && !tid.EndsWith(".5", StringComparison.OrdinalIgnoreCase) && !tid.EndsWith(".6", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { towImpact[tid] = Math.Round(pe.GetValue<double>() * 100, 2); } catch { }
+                    }
+                }
+            }
+
+            var lotPayload = new JsonObject
+            {
+                ["name"]             = lotNome,
+                ["catalogFile"]      = $"(importato da gara {req.GaraId})",
+                ["priceFile"]        = $"(importato da gara {req.GaraId})",
+                ["tow5Share"]        = tow5Share,
+                ["active"]           = true,
+                ["deleted"]          = false,
+                ["codiceContratto"]  = "",
+                ["garaId"]           = req.GaraId,
+                ["garaLottoIndex"]   = i,
+                ["importoBase"]      = lotto["importoBase"]?.DeepClone(),
+                ["towPrices"]        = towPrices,
+                ["towImpact"]        = towImpact,
+                ["catalog"]          = catalogArray,
+            };
+
+            try
+            {
+                await UpsertRecord(cs, sch, $"{req.ContractId}|{lotId}|contract-lot", "contract_lot", req.ContractId, lotId, $"{req.ContractName} — {lotNome}", lotPayload.ToJsonString());
+                lottiCreati.Add(new { lotId, nome = lotNome, towEntries = towPrices.Count, catalogEntries = catalogArray.Count });
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Lotto {lotId}: errore salvataggio — {ex.Message}");
+            }
+        }
+
+        return Ok(new
+        {
+            ok         = true,
+            contractId = req.ContractId,
+            lotti      = lottiCreati,
+            warnings,
+            message    = $"Contratto '{req.ContractName}' creato con {lottiCreati.Count} lott{(lottiCreati.Count == 1 ? "o" : "i")}."
+        });
+    }
+
+    private static string String(int n) => n.ToString();
+
+    private static async Task UpsertRecord(string cs, string sch, string recordKey, string entityType, string contractId, string lotId, string title, string payloadJson)
+    {
+        await using var conn = new NpgsqlConnection(cs);
+        await conn.OpenAsync();
+        var sql = $@"
+            INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload"")
+            VALUES (@rk, @et, @cid, @lid, @title, @pl::jsonb)
+            ON CONFLICT (""record_key"") DO UPDATE SET
+                ""entity_type"" = EXCLUDED.""entity_type"",
+                ""contract_id"" = EXCLUDED.""contract_id"",
+                ""lot_id""      = EXCLUDED.""lot_id"",
+                ""title""       = EXCLUDED.""title"",
+                ""payload""     = EXCLUDED.""payload"",
+                ""updated_at""  = now()";
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("rk",    recordKey);
+        cmd.Parameters.AddWithValue("et",    entityType);
+        cmd.Parameters.AddWithValue("cid",   contractId);
+        cmd.Parameters.AddWithValue("lid",   lotId);
+        cmd.Parameters.AddWithValue("title", title);
+        cmd.Parameters.AddWithValue("pl",    payloadJson);
+        await cmd.ExecuteNonQueryAsync();
+    }
 }
+
+// ── DTO per importa-come-contratto ────────────────────────────────────────
+public record ImportaGaraRequest(
+    string GaraId,
+    string ContractId,
+    string ContractName
+);
