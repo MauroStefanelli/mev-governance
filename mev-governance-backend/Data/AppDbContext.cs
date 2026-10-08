@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<UserClientContratto> UserClientContratti => Set<UserClientContratto>();
     public DbSet<UserPagePermission> UserPagePermissions => Set<UserPagePermission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<AppRolePermission> AppRolePermissions => Set<AppRolePermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

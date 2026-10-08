@@ -14,7 +14,7 @@ import ConfiguratorePage from "./pages/ConfiguratorePage";
 import GarePage from "./pages/GarePage";
 import ReportAvanzamentiPage from "./pages/ReportAvanzamentiPage";
 import HomePage from "./pages/HomePage";
-import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages, getMyAppPermissions } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -71,6 +71,10 @@ function App() {
 
   // Permessi pagine per ruolo Client
   const [clientPages, setClientPages] = useState(null); // null = non ancora caricato / non Client
+
+  // Permessi per-app per-ruolo (matrice caricata al login per tutti i ruoli)
+  // { [appId]: { canView: bool, canEdit: bool } }
+  const [appPerms, setAppPerms] = useState(null); // null = ancora da caricare
 
   // Modifica descrizione ambiente inline
   const [editingDesc, setEditingDesc]   = useState(false);
@@ -133,6 +137,14 @@ function App() {
         if (restoredRole === "Client") {
           getMyPages().then(pages => setClientPages(pages)).catch(() => setClientPages([]));
         }
+        // Per tutti: carica permessi per-app
+        getMyAppPermissions()
+          .then(list => {
+            const map = {};
+            list.forEach(p => { map[p.appId] = { canView: p.canView, canEdit: p.canEdit }; });
+            setAppPerms(map);
+          })
+          .catch(() => setAppPerms({}));
       };
 
       if (savedJwt && !isExpired(savedJwt)) {
@@ -410,6 +422,19 @@ function App() {
     return wanted.some(r => myRoles.includes(r));
   }, [roles, role]);
 
+  // Helper: verifica permesso su un'app (default aperto se non ancora caricato o SuperAdmin)
+  const canViewApp = useCallback((appId) => {
+    if (hasRole("SuperAdmin")) return true;
+    if (!appPerms) return true; // non ancora caricato → non blocca
+    return appPerms[appId]?.canView !== false;
+  }, [appPerms, hasRole]);
+
+  const canEditApp = useCallback((appId) => {
+    if (hasRole("SuperAdmin")) return true;
+    if (!appPerms) return true;
+    return appPerms[appId]?.canEdit !== false;
+  }, [appPerms, hasRole]);
+
   /*const navItems = [
     { id: "mev",               label: "MEV" },
     { id: "contratti",         label: "Contratti" },
@@ -501,6 +526,7 @@ function App() {
             }).catch(() => {});
           }}
           clientPages={clientPages}
+          appPerms={appPerms}
           lastAlign={lastAlign}
           userTheme={userTheme}
         />
@@ -559,7 +585,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_150</span>
+            }}>DEV_Rel_151</span>
             {page !== "gara" && ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -887,19 +913,27 @@ function App() {
       {page !== "home" && (
       <div style={{ background: "#ffffff", color: "#1a1a1a", minHeight: "calc(100vh - 48px)" }}>
       <main style={{ padding: "0" }}>
-        {page === "mev"               && <MevPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
-        {page === "mevcap"            && <MevCapPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
-        {page === "contratti"         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "chart"             && <ChartPage rows={filteredRows.length > 0 ? filteredRows : rows} />}
-        {page === "contratti_interni" && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "reportavanzamenti" && <ReportAvanzamentiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "mev"               && canViewApp("mev")               && <MevPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "mevcap"            && canViewApp("mevcap")            && <MevCapPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
+        {page === "contratti"         && canViewApp("contratti")         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "chart"             && canViewApp("chart")             && <ChartPage rows={filteredRows.length > 0 ? filteredRows : rows} />}
+        {page === "contratti_interni" && canViewApp("contratti_interni") && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "reportavanzamenti" && canViewApp("reportavanzamenti") && <ReportAvanzamentiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); }} />}
         {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
-        {page === "tools"             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
-        {page === "consumotow"        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "tools"             && canViewApp("tools")             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
+        {page === "consumotow"        && canViewApp("consumotow")        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
-        {page === "configuratore"     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} />}
-        {page === "gara"              && hasRole("Bid Manager", "SuperAdmin") && <GarePage onUnauthorized={handleUnauthorized} />}
+        {page === "configuratore"     && canViewApp("configuratore")     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} />}
+        {page === "gara"              && canViewApp("gara")              && hasRole("Bid Manager", "SuperAdmin") && <GarePage onUnauthorized={handleUnauthorized} />}
+        {/* Accesso negato */}
+        {page !== "home" && !["admin","dbconfig","superadmin"].includes(page) && !canViewApp(page) && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 300, gap: 12, color: "#68758A" }}>
+            <span style={{ fontSize: 40 }}>🔒</span>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Accesso non autorizzato</div>
+            <div style={{ fontSize: 13 }}>Il tuo ruolo non ha il permesso di visualizzare questa sezione.</div>
+          </div>
+        )}
       </main>
       </div>
       )}

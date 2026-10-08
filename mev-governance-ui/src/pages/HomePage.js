@@ -249,6 +249,7 @@ export default function HomePage({
   ambienti = [], ambienteId, onSwitchAmbiente,
   onNavigate, onLogout, onOpenProfile,
   clientPages = null,
+  appPerms = null,
   lastAlign,
   userTheme = "light",
 }) {
@@ -319,10 +320,19 @@ export default function HomePage({
 
   // Calcola le card visibili per questo utente
   const visibleCards = PAGE_DEFS.filter(p => {
+    // Controllo ruolo
+    let roleOk;
     if (role === "Client") {
-      return clientPages !== null && p.clientPage && clientPages.includes(p.clientPage);
+      roleOk = clientPages !== null && p.clientPage && clientPages.includes(p.clientPage);
+    } else {
+      roleOk = p.roles.some(r => hasRole(r));
     }
-    return p.roles.some(r => hasRole(r));
+    if (!roleOk) return false;
+    // Controllo permesso app (SuperAdmin bypassa sempre)
+    if (hasRole("SuperAdmin")) return true;
+    if (appPerms === null) return true; // non ancora caricato → mostra tutto
+    const perm = appPerms[p.id];
+    return perm?.canView !== false;
   });
 
   const ambienteAttivo = ambienti.find(a => a.id === ambienteId);

@@ -1433,3 +1433,43 @@ export const putReleaseProgress = async (contractId, release, payload) => {
   if (!r.ok) { const t = await r.text(); throw new Error(t); }
   return r.json();
 };
+
+// ── App Role Permissions ─────────────────────────────────────────────────────
+
+/**
+ * Restituisce la matrice completa { appId, appLabel, role, canView, canEdit }.
+ * Solo Admin/SuperAdmin la usano per modificarla.
+ */
+export const getAppRolePermissions = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/app-role-permissions`, {
+    headers: authHeaders(),
+  });
+  if (!r.ok) return [];
+  return r.json();
+};
+
+/**
+ * Salva l'intera matrice modificata.
+ * @param {Array<{appId,role,canView,canEdit}>} perms
+ */
+export const putAppRolePermissions = async (perms) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/app-role-permissions`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(perms),
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  return r.json();
+};
+
+/**
+ * Restituisce i permessi dell'utente corrente: [{ appId, canView, canEdit }].
+ * Chiamato al login per applicare le guard alle route.
+ */
+export const getMyAppPermissions = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/app-role-permissions/my`, {
+    headers: authHeaders(),
+  });
+  if (!r.ok) return [];
+  return r.json();
+};
