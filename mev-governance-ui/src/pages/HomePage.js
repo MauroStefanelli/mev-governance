@@ -320,19 +320,20 @@ export default function HomePage({
 
   // Calcola le card visibili per questo utente
   const visibleCards = PAGE_DEFS.filter(p => {
-    // Controllo ruolo
-    let roleOk;
-    if (role === "Client") {
-      roleOk = clientPages !== null && p.clientPage && clientPages.includes(p.clientPage);
-    } else {
-      roleOk = p.roles.some(r => hasRole(r));
+    // ── Gate 1: appPerms (per ruolo) — SuperAdmin bypassa sempre ──
+    if (!hasRole("SuperAdmin")) {
+      if (appPerms !== null) {
+        // Se il ruolo non ha canView per questa app → nascosta per tutti gli utenti con quel ruolo
+        if (appPerms[p.id]?.canView === false) return false;
+      }
     }
-    if (!roleOk) return false;
-    // Controllo permesso app (SuperAdmin bypassa sempre)
-    if (hasRole("SuperAdmin")) return true;
-    if (appPerms === null) return true; // non ancora caricato → mostra tutto
-    const perm = appPerms[p.id];
-    return perm?.canView !== false;
+
+    // ── Gate 2: visibilità per ruolo / per-utente ──
+    if (role === "Client") {
+      // Per Client: deve essere anche in clientPages (assegnazione per-utente)
+      return clientPages !== null && p.clientPage && clientPages.includes(p.clientPage);
+    }
+    return p.roles.some(r => hasRole(r));
   });
 
   const ambienteAttivo = ambienti.find(a => a.id === ambienteId);

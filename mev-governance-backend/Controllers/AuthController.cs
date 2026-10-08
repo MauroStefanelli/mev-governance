@@ -757,6 +757,12 @@ public class AuthController : ControllerBase
         foreach (var role in ContractRoles.ForUser(_db, user, ambienteId))
             claims.Add(new Claim(ClaimTypes.Role, role));
 
+        // Aggiunge sempre il ruolo primario (es. "Client") se non già presente tra i claim
+        // — necessario per il configuratore app-role-permissions che discrimina per ruolo primario
+        if (!string.IsNullOrWhiteSpace(user.Role) &&
+            !claims.Any(c => c.Type == ClaimTypes.Role && c.Value == user.Role))
+            claims.Add(new Claim(ClaimTypes.Role, user.Role));
+
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
