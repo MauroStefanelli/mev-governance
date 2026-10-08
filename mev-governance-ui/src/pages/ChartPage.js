@@ -10,8 +10,11 @@ const TABS = [
 ];
 const PALETTE = ["#526DAB", "#C48A39", "#438579", "#8D78AB", "#A96A78", "#688B9C"];
 const STATUS_COLORS = {
-  approvato: "#526DAB", "in lavorazione": "#C48A39", chiuso: "#438579",
+  approvato: "#526DAB", "in approvazione": "#C48A39", "in lavorazione": "#8D78AB", chiuso: "#438579",
 };
+// Stati mostrati di default (gli altri sono nascosti ma selezionabili)
+const DEFAULT_VISIBLE = ["approvato", "in approvazione"];
+
 const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
 const compact = new Intl.NumberFormat("it-IT", { notation: "compact", maximumFractionDigits: 1 });
 const count = new Intl.NumberFormat("it-IT");
@@ -96,18 +99,58 @@ function KpiCard({ title, value, description, accent, symbol }) {
 export default function ChartPage({ rows = [] }) {
   const [activeTab, setActiveTab] = useState("release");
   const [sort, setSort] = useState("name");
+
+  // Tutti gli stati presenti nei dati
   const safeRows = useMemo(() =>
     Array.isArray(rows)
       ? rows.filter((row) => row && typeof row === "object" && row.stato && String(row.stato).trim() !== "")
       : [], [rows]);
-  const kpis = useMemo(() => safeRows.reduce((result, row) => {
-    // Approved uses the supply amount, consistently with the chart measure.
+
+  const allStates = useMemo(() => {
+    const seen = new Map();
+    safeRows.forEach(row => {
+      const key = normalize(row.stato);
+      if (!seen.has(key)) seen.set(key, labelOf(row.stato));
+    });
+    return [...seen.entries()].sort((a, b) => collator.compare(a[1], b[1]));
+  }, [safeRows]);
+
+  // Filtro stati attivi — default: solo Approvato e In Approvazione se presenti, altrimenti tutti
+  const [activeStates, setActiveStates] = useState(null); // null = non ancora inizializzato
+  const resolvedActiveStates = useMemo(() => {
+    if (activeStates !== null) return activeStates;
+    // Inizializzazione lazy: seleziona DEFAULT_VISIBLE se presenti, altrimenti tutti
+    const defaults = allStates.filter(([key]) => DEFAULT_VISIBLE.includes(key)).map(([key]) => key);
+    return defaults.length > 0 ? new Set(defaults) : new Set(allStates.map(([key]) => key));
+  }, [activeStates, allStates]);
+
+  const toggleState = (key) => {
+    setActiveStates(prev => {
+      const current = prev ?? resolvedActiveStates;
+      const next = new Set(current);
+      if (next.has(key)) { if (next.size > 1) next.delete(key); } // almeno 1 sempre attivo
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAll = () => setActiveStates(new Set(allStates.map(([k]) => k)));
+  const selectOnly = (key) => setActiveStates(new Set([key]));
+
+  // Righe filtrate per stato
+  const filteredRows = useMemo(() =>
+    safeRows.filter(row => resolvedActiveStates.has(normalize(row.stato))),
+    [safeRows, resolvedActiveStates]);
+
+  const kpis = useMemo(() => filteredRows.reduce((result, row) => {
     if (normalize(row.stato) === "approvato") result.approved += amount(row.importoExcel);
+    if (normalize(row.stato) === "in approvazione") result.inApproval += amount(row.importoExcel);
     result.ordered += amount(row.ordinatoBdo);
     result.invoiced += amount(row.fatturato);
     return result;
-  }, { approved: 0, ordered: 0, invoiced: 0 }), [safeRows]);
-  const summary = useMemo(() => aggregate(safeRows, activeTab), [safeRows, activeTab]);
+  }, { approved: 0, inApproval: 0, ordered: 0, invoiced: 0 }), [filteredRows]);
+
+  const summary = useMemo(() => aggregate(filteredRows, activeTab), [filteredRows, activeTab]);
   const data = useMemo(() => sort === "amount"
     ? [...summary.data].sort((a, b) => b.total - a.total || collator.compare(a.group, b.group))
     : summary.data, [summary.data, sort]);
@@ -121,15 +164,40 @@ export default function ChartPage({ rows = [] }) {
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.8px", color: "#718097", marginBottom: 10 }}>MEV / ANALISI ECONOMICA</div>
             <h1 style={{ fontSize: 30, letterSpacing: "-0.8px", margin: "0 0 8px", fontWeight: 700 }}>Grafici</h1>
-            <p style={{ ...muted, margin: 0 }}>Una vista d’insieme su forniture, ordini e fatturazione.</p>
+            <p style={{ ...muted, margin: 0 }}>Una vista d'insieme su forniture, ordini e fatturazione.</p>
           </div>
-          <span style={{ padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E3E8EF", borderRadius: 8, fontSize: 12, color: "#68758A" }}>{count.format(safeRows.length)} MEV nel perimetro</span>
+          <span style={{ padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E3E8EF", borderRadius: 8, fontSize: 12, color: "#68758A" }}>{count.format(filteredRows.length)} MEV nel perimetro</span>
         </header>
+
+        {/* ── Filtro stati ── */}
+        {allStates.length > 0 && (
+          <div style={{ ...panel, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <span style={{ ...muted, fontWeight: 600, fontSize: 12, marginRight: 4 }}>Visualizza:</span>
+            {allStates.map(([key, label]) => {
+              const active = resolvedActiveStates.has(key);
+              const color = STATUS_COLORS[key] || PALETTE[allStates.findIndex(([k]) => k === key) % PALETTE.length];
+              return (
+                <label key={key} title={`Solo ${label}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 12px", borderRadius: 20, border: `1px solid ${active ? color : "#DCE3EC"}`, background: active ? `${color}14` : "#F8FAFC", fontSize: 12, fontWeight: 600, color: active ? color : "#8290A3", userSelect: "none" }}>
+                  <input type="checkbox" checked={active} onChange={() => toggleState(key)}
+                    onDoubleClick={(e) => { e.preventDefault(); selectOnly(key); }}
+                    style={{ accentColor: color, width: 13, height: 13, cursor: "pointer" }} />
+                  {label}
+                </label>
+              );
+            })}
+            {resolvedActiveStates.size < allStates.length && (
+              <button type="button" onClick={selectAll} style={{ background: "none", border: "none", color: "#526DAB", fontSize: 12, cursor: "pointer", padding: "4px 8px", fontWeight: 600 }}>
+                Mostra tutti
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
           <KpiCard title="Totale approvato" value={kpis.approved} description="Importo fornitura · stato Approvato" accent="#526DAB" symbol="✓" />
-          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · tutti gli stati" accent="#687A99" symbol="≡" />
-          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · tutti gli stati" accent="#438579" symbol="€" />
+          <KpiCard title="In approvazione" value={kpis.inApproval} description="Importo fornitura · stato In Approvazione" accent="#C48A39" symbol="⏳" />
+          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · stati selezionati" accent="#687A99" symbol="≡" />
+          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · stati selezionati" accent="#438579" symbol="€" />
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 18 }}>
@@ -160,8 +228,8 @@ export default function ChartPage({ rows = [] }) {
           </div>
           {!data.length ? (
             <div role="status" style={{ textAlign: "center", padding: "72px 24px" }}>
-              <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>Nessun dato disponibile</div>
-              <div style={muted}>I grafici saranno visibili quando saranno presenti righe MEV nel perimetro selezionato.</div>
+              <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>Nessun dato per i filtri selezionati</div>
+              <div style={muted}>{safeRows.length > 0 ? "Seleziona almeno uno stato nel filtro sopra." : "Nessuna riga MEV disponibile per questo ambiente."}</div>
             </div>
           ) : (
             <>

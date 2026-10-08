@@ -762,7 +762,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
 
   const filteredContracts = archContracts.filter(c => {
     const lots = (c.lots || []).filter(l => !l.deleted);
-    const linked = lots.every(l => ambienti.some(a => a.codiceContratto === l.codiceContratto));
+    const linked = lots.some(l => ambienti.some(a => a.codiceContratto === l.codiceContratto));
     return (filter !== 'unlinked' || !linked) &&
       [c.name, c.contractId, ...lots.flatMap(l => [l.name, l.codiceContratto])].join(' ').toLocaleLowerCase('it').includes(search.toLocaleLowerCase('it'));
   });
@@ -1030,7 +1030,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                     </div>
 
                     <nav className="ca-section-nav" aria-label="Sezioni del contratto">
-                      { [['lots', 'Lotti e prezzi'], ['documents', 'Documenti'], ['links', 'Collegamenti MEV'], ['users', 'Utenti e ruoli']].map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} className={section === id ? 'is-active' : ''} onClick={() => setSection(id)}>{label}</button>) }
+                      { [['lots', 'Lotti e prezzi'], ['documents', 'Documenti'], ['links', 'Collegamenti MEV'], ['users', 'Contratti e Accessi']].map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} className={section === id ? 'is-active' : ''} onClick={() => setSection(id)}>{label}</button>) }
                     </nav>
                     {section === 'users' && (() => {
                       const linked = ambienti.filter(a => visible.some(l => l.codiceContratto === a.codiceContratto));

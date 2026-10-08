@@ -12,6 +12,7 @@ const ambienti = [{ id: 10, codiceContratto: 'MEV-A', descrizione: 'Ambiente A' 
 const contracts = [
   { contractId: 'a', name: 'Contratto Alpha', builtin: true, lots: [{ lotId: '1', name: 'Sviluppo', active: true, codiceContratto: 'MEV-A' }, { lotId: '2', name: 'Supporto', active: false }] },
   { contractId: 'b', name: 'Contratto Beta', builtin: true, lots: [{ lotId: '1', name: 'Manutenzione', active: true, codiceContratto: 'MEV-A' }] },
+  { contractId: 'c', name: 'Contratto Gamma', builtin: true, lots: [{ lotId: '1', name: 'Nuovi servizi', active: true }] },
 ];
 beforeEach(() => { jest.clearAllMocks(); service.getConfiguratoreContracts.mockResolvedValue(contracts); service.updateConfiguratoreLot.mockResolvedValue({}); service.getAmbientiUtenti.mockResolvedValue([]); window.confirm = jest.fn(() => true); });
 const open = async () => { render(<ContractArchivePage ambienti={ambienti} />); return await screen.findByRole('heading', { name: 'Contratto Alpha' }); };
@@ -34,7 +35,7 @@ test('manual code replaces selected environment and success stays visible', asyn
   fireEvent.click(screen.getAllByRole('button', { name: 'Salva', exact: true })[0]);
   await waitFor(() => expect(service.updateConfiguratoreLot).toHaveBeenCalledWith('a', '1', { codiceContratto: 'MEV-NEW' }));
   expect(await screen.findByRole('status')).toHaveTextContent('Codice Contratto salvato');
-  fireEvent.click(screen.getByRole('button', { name: 'Utenti e ruoli' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Contratti e Accessi' }));
   expect(screen.getByRole('button', { name: 'Configura collegamenti' })).toBeInTheDocument();
 });
 test('uses saved MEV links for members and filters unlinked configurations', async () => {
@@ -42,7 +43,8 @@ test('uses saved MEV links for members and filters unlinked configurations', asy
   await waitFor(() => expect(service.getAmbientiUtenti).toHaveBeenCalledWith(10));
   fireEvent.change(screen.getByLabelText('Mostra'), { target: { value: 'unlinked' } });
   const directory = screen.getByRole('complementary', { name: 'Elenco contratti' });
-  expect(within(directory).getByText('Contratto Alpha')).toBeInTheDocument();
+  expect(within(directory).queryByText('Contratto Alpha')).not.toBeInTheDocument();
+  expect(within(directory).getByText('Contratto Gamma')).toBeInTheDocument();
   expect(within(directory).queryByText('Contratto Beta')).not.toBeInTheDocument();
 });
 test('selecting a gara requires a separate import action and keeps the result visible', async () => {
