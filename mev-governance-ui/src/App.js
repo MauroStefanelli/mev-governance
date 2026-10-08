@@ -307,6 +307,16 @@ function App() {
     setEditorAlerts([]); setAmbienti([]); setAmbienteId(0);
   };
 
+  useEffect(() => {
+    const update = event => {
+      const data = event.detail;
+      setToken(data.token); setRoles(data.roles); setRole(data.role || '');
+      setAmbienteId(data.ambienteId || 0); setRows([]); setFilteredRows([]);
+    };
+    window.addEventListener('mev-auth-context', update);
+    return () => window.removeEventListener('mev-auth-context', update);
+  }, []);
+
   // ── Cambio ambiente ──────────────────────────────────────────────────────────
   const handleSwitchAmbiente = async (id) => {
     if (id === ambienteId || switchingAmbiente) return;
@@ -320,6 +330,10 @@ function App() {
       localStorage.setItem("ambienteId", String(data.ambienteId));
       setToken(data.token);
       setAmbienteId(data.ambienteId);
+      if (Array.isArray(data.roles)) {
+        setRoles(data.roles); setRole(data.role || '');
+        localStorage.setItem('roles', JSON.stringify(data.roles)); localStorage.setItem('role', data.role || '');
+      }
       getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {});
     } catch (e) {
       alert("Errore cambio ambiente: " + e.message);
@@ -545,8 +559,8 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_145</span>
-            {ambienteAttivo && (
+            }}>DEV_Rel_146</span>
+            {page !== "gara" && ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
                 borderLeft: "1px solid rgba(255,255,255,0.2)", paddingLeft: 10,

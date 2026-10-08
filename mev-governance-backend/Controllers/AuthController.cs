@@ -1,3 +1,4 @@
+using MevGovernanceBackend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +53,7 @@ public class AuthController : ControllerBase
         var ambienti = GetAmbientiForUser(user);
         var defaultAmbienteId = ambienti.FirstOrDefault()?.Id ?? 0;
 
-        var roles = GetUserRoles(user.Id);
+        var roles = ContractRoles.ForUser(_db, user, defaultAmbienteId);
         var token = GenerateToken(user, defaultAmbienteId, roles);
 
         var refreshToken = GenerateRefreshToken();
@@ -80,7 +81,7 @@ public class AuthController : ControllerBase
             refreshToken,
             username = user.Username,
             fullName = user.FullName,
-            role = user.Role,
+            role = roles.FirstOrDefault() ?? "",
             roles,
             ambienti,
             ambienteId = defaultAmbienteId,
@@ -119,14 +120,15 @@ public class AuthController : ControllerBase
             return Forbid();
 
         var newToken = GenerateToken(user, request.AmbienteId, GetUserRoles(user.Id));
-        return Ok(new { token = newToken, ambienteId = request.AmbienteId });
+        var roles = ContractRoles.ForUser(_db, user, request.AmbienteId);
+        return Ok(new { token = newToken, ambienteId = request.AmbienteId, roles, role = roles.FirstOrDefault() ?? "" });
     }
 
     // Helper: restituisce gli ambienti visibili all'utente
     private List<AmbienteDto> GetAmbientiForUser(AppUser user)
     {
         // SuperAdmin vede tutti gli ambienti attivi
-        if (user.Role == "SuperAdmin")
+        if (user.Role == "SuperAdmin" || GetUserRoles(user.Id).Contains("SuperAdmin"))
         {
             return _db.Ambienti
                 .Where(a => a.IsActive)
@@ -171,7 +173,9 @@ public class AuthController : ControllerBase
             catch { /* ignora token malformato */ }
         }
 
-        var newJwt = GenerateToken(user, currentAmbienteId, GetUserRoles(user.Id));
+        if (!GetAmbientiForUser(user).Any(a => a.Id == currentAmbienteId)) currentAmbienteId = 0;
+        var effectiveRoles = ContractRoles.ForUser(_db, user, currentAmbienteId);
+        var newJwt = GenerateToken(user, currentAmbienteId, effectiveRoles);
         var newRefresh = GenerateRefreshToken();
 
         user.RefreshToken = newRefresh;
@@ -182,7 +186,8 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             token = newJwt,
-            refreshToken = newRefresh
+            refreshToken = newRefresh,
+            roles = effectiveRoles, role = effectiveRoles.FirstOrDefault() ?? "", ambienteId = currentAmbienteId
         });
     }
 
@@ -734,7 +739,7 @@ public class AuthController : ControllerBase
     // ============================================================
     // GENERATE JWT
     // ============================================================
-    private string GenerateToken(AppUser user, int ambienteId = 0, List<string>? extraRoles = null)
+    private string GenerateToken(AppUser user, int ambienteId = 0, IEnumerable<string>? extraRoles = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -745,17 +750,12 @@ public class AuthController : ControllerBase
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, user.Role),
             new Claim("fullName", user.FullName),
             new Claim("ambienteId", ambienteId.ToString())
         };
 
-        // Ruoli multipli: emette un claim Role aggiuntivo per ogni ruolo extra
-        if (extraRoles != null)
-        {
-            foreach (var r in extraRoles.Where(r => !string.IsNullOrEmpty(r) && r != user.Role))
-                claims.Add(new Claim(ClaimTypes.Role, r));
-        }
+        foreach (var role in ContractRoles.ForUser(_db, user, ambienteId))
+            claims.Add(new Claim(ClaimTypes.Role, role));
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

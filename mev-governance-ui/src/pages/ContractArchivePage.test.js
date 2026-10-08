@@ -81,3 +81,13 @@ test('documents show saved names and imported data independently of new file sel
   expect(screen.getByText('1 prezzi disponibili')).toBeInTheDocument();
   expect(screen.getByText('1 voci disponibili')).toBeInTheDocument();
 });
+
+test('catalog displays separate saved Realizzazione and Modifica auction prices', async () => {
+  HTMLDialogElement.prototype.showModal = jest.fn();
+  service.getConfiguratoreContracts.mockResolvedValue([{ ...contracts[0], lots: [{ lotId: '2', name: 'Logistica', catalog: [{ id: 'app', nome: 'Driver', prezzi: { REALIZZAZIONE: { Semplice: 100, Medio: 200, Complesso: 300 }, MODIFICA: { Semplice: 10, Medio: 20, Complesso: 30 } } }] }] }]);
+  await open(); fireEvent.click(screen.getByRole('button', { name: '1 voci catalogo' }));
+  const dialog = within(screen.getByRole('dialog'));
+  expect(dialog.getByText('Base d’asta REALIZZAZIONE')).toBeInTheDocument();
+  expect(dialog.getByText('Base d’asta MODIFICA')).toBeInTheDocument();
+  [100, 200, 300, 10, 20, 30].forEach(value => expect(dialog.getByText(new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value).replace(/\s/g, ' '))).toBeInTheDocument());
+});

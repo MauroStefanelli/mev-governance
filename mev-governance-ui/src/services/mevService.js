@@ -24,6 +24,12 @@ export const tryRefreshToken = async () => {
     const data = await res.json();
     localStorage.setItem("jwt", data.token);
     localStorage.setItem("refreshToken", data.refreshToken);
+    if (Array.isArray(data.roles)) {
+      localStorage.setItem("roles", JSON.stringify(data.roles));
+      localStorage.setItem("role", data.role || "");
+      localStorage.setItem("ambienteId", String(data.ambienteId || 0));
+      window.dispatchEvent(new CustomEvent('mev-auth-context', { detail: data }));
+    }
     return true;
   } catch {
     return false;
@@ -1179,7 +1185,7 @@ export const addUtenteAmbiente = async (ambienteId, userId, ruolo) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ userId, ruolo })
+    body: JSON.stringify(Array.isArray(ruolo) ? { userId, ruoli: ruolo } : { userId, ruolo })
   });
   if (!response.ok) {
     const text = await response.text();
@@ -1201,7 +1207,7 @@ export const updateUtenteAmbienteRuolo = async (ambienteId, userId, ruolo) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti/${userId}`, {
     method: "PUT",
     headers: authHeaders(),
-    body: JSON.stringify({ ruolo })
+    body: JSON.stringify(Array.isArray(ruolo) ? { ruoli: ruolo } : { ruolo })
   });
   if (!response.ok) {
     const text = await response.text();

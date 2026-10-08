@@ -25,8 +25,7 @@ public class GareController : ControllerBase
     }
 
     private bool CanAccess() =>
-        User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager") ||
-        User.IsInRole("Admin")      || User.IsInRole("Developer");
+        User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager");
 
     private (string? key, string? endpoint, string? model, string? style, string? authMode) GetUserAiSettings()
     {
@@ -519,15 +518,15 @@ public class GareController : ControllerBase
                         {
                             ["REALIZZAZIONE"] = new JsonObject
                             {
-                                ["Semplice"]  = voce["prezziSemplice"]?.DeepClone(),
-                                ["Medio"]     = voce["prezziMedio"]?.DeepClone(),
-                                ["Complesso"] = voce["prezziComplesso"]?.DeepClone(),
+                                ["Semplice"]  = voce["prezzoRealizzazioneSemplice"]?.DeepClone() ?? voce["prezziSemplice"]?.DeepClone(),
+                                ["Medio"]     = voce["prezzoRealizzazioneMedio"]?.DeepClone() ?? voce["prezziMedio"]?.DeepClone(),
+                                ["Complesso"] = voce["prezzoRealizzazioneComplesso"]?.DeepClone() ?? voce["prezziComplesso"]?.DeepClone(),
                             },
                             ["MODIFICA"] = new JsonObject
                             {
-                                ["Semplice"]  = voce["modSemplice"]?.DeepClone(),
-                                ["Medio"]     = voce["modMedio"]?.DeepClone(),
-                                ["Complesso"] = voce["modComplesso"]?.DeepClone(),
+                                ["Semplice"]  = voce["prezzoModificaSemplice"]?.DeepClone() ?? voce["modSemplice"]?.DeepClone(),
+                                ["Medio"]     = voce["prezzoModificaMedio"]?.DeepClone() ?? voce["modMedio"]?.DeepClone(),
+                                ["Complesso"] = voce["prezzoModificaComplesso"]?.DeepClone() ?? voce["modComplesso"]?.DeepClone(),
                             }
                         }
                     };
@@ -553,15 +552,15 @@ public class GareController : ControllerBase
                             {
                                 ["REALIZZAZIONE"] = new JsonObject
                                 {
-                                    ["Semplice"]  = voce["prezziSemplice"]?.DeepClone(),
-                                    ["Medio"]     = voce["prezziMedio"]?.DeepClone(),
-                                    ["Complesso"] = voce["prezziComplesso"]?.DeepClone(),
+                                    ["Semplice"]  = voce["prezzoRealizzazioneSemplice"]?.DeepClone() ?? voce["prezziSemplice"]?.DeepClone(),
+                                    ["Medio"]     = voce["prezzoRealizzazioneMedio"]?.DeepClone() ?? voce["prezziMedio"]?.DeepClone(),
+                                    ["Complesso"] = voce["prezzoRealizzazioneComplesso"]?.DeepClone() ?? voce["prezziComplesso"]?.DeepClone(),
                                 },
                                 ["MODIFICA"] = new JsonObject
                                 {
-                                    ["Semplice"]  = voce["modSemplice"]?.DeepClone(),
-                                    ["Medio"]     = voce["modMedio"]?.DeepClone(),
-                                    ["Complesso"] = voce["modComplesso"]?.DeepClone(),
+                                    ["Semplice"]  = voce["prezzoModificaSemplice"]?.DeepClone() ?? voce["modSemplice"]?.DeepClone(),
+                                    ["Medio"]     = voce["prezzoModificaMedio"]?.DeepClone() ?? voce["modMedio"]?.DeepClone(),
+                                    ["Complesso"] = voce["prezzoModificaComplesso"]?.DeepClone() ?? voce["modComplesso"]?.DeepClone(),
                                 }
                             }
                         };

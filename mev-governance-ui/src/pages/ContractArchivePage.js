@@ -168,32 +168,27 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
           {error && <p className="ca-error" role="alert">{error}</p>}
           {modal.type === 'catalog' && (
             <div role="region" aria-label="Dati del lotto" tabIndex={0} style={{ overflowX: 'auto', border: '1px solid #dce5ef', borderRadius: 12 }}>
-              <table style={{ ...S.table, fontSize: 13, minWidth: 560 }}>
+              <table style={{ ...S.table, fontSize: 13, minWidth: 950 }}>
                 <thead>
                   <tr>
-                    {['ID', 'Ambito', 'Nome componente', 'Semplice (€)', 'Medio (€)', 'Complesso (€)'].map(h => (
-                      <th scope="col" key={h} style={{ ...S.thead, padding: '12px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
+                    {['ID', 'Ambito', 'Nome componente'].map(h => <th rowSpan={2} scope="col" key={h} style={{ ...S.thead, padding: '12px 14px', textAlign: 'left' }}>{h}</th>)}
+                    {["Base d’asta REALIZZAZIONE", "Base d’asta MODIFICA"].map(h => <th colSpan={3} scope="colgroup" key={h} style={{ ...S.thead, padding: '12px 14px' }}>{h}</th>)}
                   </tr>
+                  <tr>{['Realizzazione', 'Modifica'].flatMap(type => ['Semplice', 'Medio', 'Complesso'].map(f => <th scope="col" key={`${type}-${f}`} style={{ ...S.thead, padding: '12px 14px' }}>{f} (€)</th>))}</tr>
                 </thead>
                 <tbody>
                   {(modal.data || []).map((v, i) => {
                     const pr = v.prezzi || {};
-                    const real = pr.REALIZZAZIONE || {};
+                    const prices = { Realizzazione: pr.REALIZZAZIONE || pr.Realizzazione || pr.realizzazione || {}, Modifica: pr.MODIFICA || pr.Modifica || pr.modifica || {} };
                     return (
                       <tr key={i} style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
                         <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{v.id}</td>
                         <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', color: '#475569' }}>{v.ambito}</td>
                         <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5' }}>{v.nome}</td>
-                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
-                          {real.Semplice != null ? euro.format(real.Semplice) : '–'}
-                        </td>
-                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
-                          {real.Medio != null ? euro.format(real.Medio) : '–'}
-                        </td>
-                        <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right' }}>
-                          {real.Complesso != null ? euro.format(real.Complesso) : '–'}
-                        </td>
+                        {['Realizzazione', 'Modifica'].flatMap(type => ['Semplice', 'Medio', 'Complesso'].map(f => {
+                          const value = prices[type][f] ?? prices[type][f.toLowerCase()] ?? v[`prezzo${type}${f}`];
+                          return <td key={`${type}-${f}`} style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right', whiteSpace: 'nowrap' }}>{value != null ? euro.format(value) : '–'}</td>;
+                        }))}
                       </tr>
                     );
                   })}
@@ -1059,7 +1054,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                       const linked = ambienti.filter(a => visible.some(l => l.codiceContratto === a.codiceContratto));
                       const environment = linked.find(a => String(a.id) === memberEnv) || linked[0];
                       return <section><h3>Accessi al contratto</h3><p className="ca-caption">I permessi appartengono al contratto MEV collegato al lotto. I lotti con lo stesso codice condividono gli utenti.</p>
-                        {linked.length > 1 && <label className="ca-search">Contratto MEV<select value={environment?.id || ''} onChange={e => setMemberEnv(e.target.value)}>{linked.map(a => <option key={a.id} value={a.id}>{a.codiceContratto} — {a.descrizione}</option>)}</select></label>}
+                        {linked.length > 1 && <label className="ca-search">Contratto MEV<select value={environment?.id || ''} onChange={e => setMemberEnv(e.target.value)}>{linked.map(a => <option key={a.id} value={a.id}>{a.codiceContratto} · {a.descrizione}</option>)}</select></label>}
                         {visible.some(l => !ambienti.some(a => a.codiceContratto === l.codiceContratto)) && <p className="ca-notice">Alcuni lotti non sono collegati a un contratto MEV. Completa i collegamenti per gestirne gli accessi.</p>}
                         {environment ? <ContractMembers key={environment.id} ambiente={environment} allUsers={allUsers} /> : <div className="ca-empty"><h3>Collega prima un contratto MEV</h3><p>Associa un codice ai lotti per definire chi può accedere.</p><button onClick={() => setSection('links')}>Configura collegamenti</button></div>}
                       </section>;
@@ -1265,7 +1260,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                                 style={{ padding: '8px 10px', border: '1px solid #bac8da', borderRadius: 8, fontSize: 12, width: '100%', maxWidth: 240, minWidth: 0, boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 38 }}>
                                 <option value="">-- scegli contratto MEV --</option>
                                 {ambienti.map(a => (
-                                  <option key={a.id} value={a.id}>{a.codiceContratto} — {a.descrizione}</option>
+                                  <option key={a.id} value={a.id}>{a.codiceContratto} · {a.descrizione}</option>
                                 ))}
                               </select>
                               <input

@@ -1,3 +1,4 @@
+using MevGovernanceBackend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using MevGovernanceBackend.Data;
@@ -159,7 +160,7 @@ public class AmbienteController : ControllerBase
                           u.FullName,
                           u.Email,
                           ua.Ruolo
-                      }).ToList();
+                      }).ToList().Select(x => new { x.Id, x.UserId, x.Username, x.FullName, x.Email, ruolo = ContractRoles.Read(x.Ruolo).FirstOrDefault(), ruoli = ContractRoles.Read(x.Ruolo) }).ToList();
 
         return Ok(result);
     }
@@ -183,15 +184,18 @@ public class AmbienteController : ControllerBase
         if (_db.UserAmbienti.Any(ua => ua.UserId == req.UserId && ua.AmbienteId == id))
             return BadRequest("L'utente è già associato a questo ambiente.");
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer", "Bid Manager" };
-        if (!validRoles.Contains(req.Ruolo))
+        if (_db.Users.Any(u => u.Id == req.UserId && u.Role == "SuperAdmin") || _db.UserRoles.Any(u => u.UserId == req.UserId && u.Role == "SuperAdmin"))
+            return BadRequest("SuperAdmin ha già accesso a tutti i contratti.");
+
+        var selectedRoles = req.Ruoli ?? (req.Ruolo == null ? Array.Empty<string>() : new[] { req.Ruolo });
+        if (selectedRoles.Length == 0 || selectedRoles.Any(role => !ContractRoles.Allowed.Contains(role)))
             return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client, Developer, Bid Manager");
 
-        var ua = new UserAmbiente { UserId = req.UserId, AmbienteId = id, Ruolo = req.Ruolo };
+        var ua = new UserAmbiente { UserId = req.UserId, AmbienteId = id, Ruolo = ContractRoles.Store(selectedRoles) };
         _db.UserAmbienti.Add(ua);
         _db.SaveChanges();
 
-        return Ok(new { ua.Id, ua.UserId, ua.AmbienteId, ua.Ruolo });
+        return Ok(new { ua.Id, ua.UserId, ua.AmbienteId, ruolo = selectedRoles[0], ruoli = selectedRoles.Distinct() });
     }
 
     // ----------------------------------------------------------------
@@ -203,17 +207,19 @@ public class AmbienteController : ControllerBase
         if (!User.IsInRole("SuperAdmin"))
             return Forbid();
 
-        var validRoles = new[] { "Admin", "Editor", "SuperAdmin", "Client", "Developer", "Bid Manager" };
-        if (!validRoles.Contains(req.Ruolo))
+        if (_db.Users.Any(u => u.Id == userId && u.Role == "SuperAdmin") || _db.UserRoles.Any(u => u.UserId == userId && u.Role == "SuperAdmin"))
+            return BadRequest("SuperAdmin ha già accesso a tutti i contratti.");
+        var selectedRoles = req.Ruoli ?? (req.Ruolo == null ? Array.Empty<string>() : new[] { req.Ruolo });
+        if (selectedRoles.Length == 0 || selectedRoles.Any(role => !ContractRoles.Allowed.Contains(role)))
             return BadRequest("Ruolo non valido. Valori accettati: Admin, Editor, Client, Developer, Bid Manager");
 
         var ua = _db.UserAmbienti.FirstOrDefault(x => x.AmbienteId == id && x.UserId == userId);
         if (ua == null) return NotFound();
 
-        ua.Ruolo = req.Ruolo;
+        ua.Ruolo = ContractRoles.Store(selectedRoles);
         _db.SaveChanges();
 
-        return Ok(new { ua.Id, ua.UserId, ua.AmbienteId, ua.Ruolo });
+        return Ok(new { ua.Id, ua.UserId, ua.AmbienteId, ruolo = selectedRoles[0], ruoli = selectedRoles.Distinct() });
     }
 
     // ----------------------------------------------------------------
@@ -239,6 +245,6 @@ public class AmbienteController : ControllerBase
 // DTOs
 // ----------------------------------------------------------------
 public record AmbienteRequest(string CodiceContratto, string Descrizione, bool? IsActive = null);
-public record UserAmbienteRequest(int UserId, string Ruolo);
-public record UpdateRuoloRequest(string Ruolo);
+public record UserAmbienteRequest(int UserId, string? Ruolo = null, string[]? Ruoli = null);
+public record UpdateRuoloRequest(string? Ruolo = null, string[]? Ruoli = null);
 public record DescrizioneRequest(string? Descrizione);

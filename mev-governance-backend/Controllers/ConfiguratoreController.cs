@@ -41,6 +41,8 @@ public class ConfiguratoreController : ControllerBase
             || User.IsInRole("Bid Manager");
     }
 
+    private bool CanAccessGare() => User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager");
+
     private static readonly string[] ValidEntities =
     {
         "initiative_evaluation", "release_calendar", "implementation_plan",
@@ -545,10 +547,11 @@ public class ConfiguratoreController : ControllerBase
     [HttpGet("records")]
     public async Task<IActionResult> GetRecords([FromQuery] string? entity_type, [FromQuery] string? contract_id, [FromQuery] string? lot_id, [FromQuery] string? q)
     {
-
+        if (entity_type == "gara" && !CanAccessGare()) return Forbid();
         var (sch, cs) = GetDbTarget();
         var sql = $@"SELECT id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at"" FROM ""{sch}"".""PC_DataRecords"" WHERE 1 = 1";
         var ps = new List<NpgsqlParameter>();
+        if (!CanAccessGare()) sql += " AND \"entity_type\" <> 'gara'";
 
         if (!string.IsNullOrWhiteSpace(entity_type))
         {
@@ -590,7 +593,7 @@ public class ConfiguratoreController : ControllerBase
     [HttpPost("records")]
     public async Task<IActionResult> UpsertRecord([FromBody] PcRecordRequest req)
     {
-        if (!CanAccessRecords()) return Forbid();
+        if (req.EntityType == "gara" ? !CanAccessGare() : !CanAccessRecords()) return Forbid();
         if (string.IsNullOrWhiteSpace(req.RecordKey) || string.IsNullOrWhiteSpace(req.EntityType))
             return BadRequest("record_key e entity_type sono obbligatori");
         if (!ValidEntities.Contains(req.EntityType))
@@ -614,6 +617,7 @@ public class ConfiguratoreController : ControllerBase
                 ""title""       = EXCLUDED.""title"",
                 ""payload""     = EXCLUDED.""payload"",
                 ""updated_at""  = now()
+            WHERE ""PC_DataRecords"".""entity_type"" = EXCLUDED.""entity_type""
             RETURNING id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at""";
 
         try
@@ -622,8 +626,8 @@ public class ConfiguratoreController : ControllerBase
             {
                 new("rk", req.RecordKey),
                 new("et", req.EntityType),
-                new("cid", req.ContractId ?? ""),
-                new("lid", req.LotId ?? ""),
+                new("cid", req.EntityType == "gara" ? "" : req.ContractId ?? ""),
+                new("lid", req.EntityType == "gara" ? "" : req.LotId ?? ""),
                 new("title", req.Title ?? ""),
                 new("pl", payloadJson),
             }, sch);
@@ -646,7 +650,7 @@ public class ConfiguratoreController : ControllerBase
             return BadRequest("Id non valido");
 
         var (sch, cs) = GetDbTarget();
-        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid";
+        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid AND (""entity_type"" <> 'gara' OR @canGare)";
 
         try
         {
@@ -654,6 +658,7 @@ public class ConfiguratoreController : ControllerBase
             await conn.OpenAsync();
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", gid);
+            cmd.Parameters.AddWithValue("canGare", CanAccessGare());
             var affected = await cmd.ExecuteNonQueryAsync();
             return Ok(new { deleted = affected > 0 });
         }
