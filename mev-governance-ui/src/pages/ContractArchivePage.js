@@ -460,6 +460,12 @@ function ContractSummaryView({ contract, lotId, onLotChange, onBack }) {
 export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
   const archiveRef = React.useRef(null);
   const [search, setSearch] = useState('');
+  const [contractOrder, setContractOrder] = useState(() => {
+    try { const order = JSON.parse(localStorage.getItem('mev-contract-archive-order') || '[]'); return Array.isArray(order) ? order.filter(id => typeof id === 'string') : []; } catch { return []; }
+  });
+  const draggedContract = React.useRef(null);
+  const [dragTarget, setDragTarget] = useState(null);
+  const [orderNotice, setOrderNotice] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
   const [section, setSection] = useState('lots');
@@ -760,7 +766,22 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
     }
   };
 
-  const filteredContracts = archContracts.filter(c => {
+  const orderedContracts = [...archContracts].sort((a, b) => {
+    const rank = id => contractOrder.includes(id) ? contractOrder.indexOf(id) : contractOrder.length;
+    return rank(a.contractId) - rank(b.contractId);
+  });
+  const moveContract = (source, target) => {
+    if (!source || source === target) return;
+    const ids = orderedContracts.map(c => c.contractId);
+    if (!ids.includes(source) || !ids.includes(target)) return;
+    const reordered = ids.filter(id => id !== source);
+    reordered.splice(reordered.indexOf(target), 0, source);
+    setSelectedId(selectedContract?.contractId || null);
+    setContractOrder(reordered);
+    try { localStorage.setItem('mev-contract-archive-order', JSON.stringify(reordered)); setOrderNotice('Ordine salvato in questo browser.'); }
+    catch { setOrderNotice('Ordine aggiornato. Il browser non consente di salvarlo per le prossime visite.'); }
+  };
+  const filteredContracts = orderedContracts.filter(c => {
     const lots = (c.lots || []).filter(l => !l.deleted);
     const linked = lots.some(l => ambienti.some(a => a.codiceContratto === l.codiceContratto));
     return (filter !== 'unlinked' || !linked) &&
@@ -1005,11 +1026,13 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                 <div className="ca-directory-head"><strong>Archivio</strong><span>{filteredContracts.length} contratti</span></div>
                 <label className="ca-search">Cerca contratto<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Nome, lotto o codice MEV" /></label>
                 <label className="ca-search">Mostra<select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Tutti i contratti</option><option value="unlinked">Da collegare a MEV</option></select></label>
+                <p id="ca-order-hint" className="ca-order-hint">Trascina i contratti per riordinarli. Da tastiera: Alt + ↑ / ↓.</p>
+                {orderNotice && <p role="status" className="ca-order-hint">{orderNotice}</p>}
                 <div className="ca-contracts">
                   {filteredContracts.map(c => {
                     const lots = (c.lots || []).filter(l => !l.deleted);
-                    return <button key={c.contractId} className={'ca-contract-choice' + (selectedContract?.contractId === c.contractId ? ' is-selected' : '')} aria-pressed={selectedContract?.contractId === c.contractId} onClick={() => { setSelectedId(c.contractId); setMemberEnv(''); }}>
-                      <span className="ca-contract-icon" aria-hidden="true">▤</span><span><strong>{c.name || c.contractId}</strong><small>{lots.length} lotti · {lots.filter(l => l.active !== false).length} attivi</small><small>{c.builtin ? 'Configurazione di sistema' : 'Configurazione personalizzata'}</small></span>
+                    return <button key={c.contractId} draggable aria-describedby="ca-order-hint" onDragStart={e => { draggedContract.current = c.contractId; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.contractId); }} onDragOver={e => { if (draggedContract.current) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragTarget(c.contractId); } }} onDrop={e => { e.preventDefault(); moveContract(draggedContract.current, c.contractId); draggedContract.current = null; setDragTarget(null); }} onDragEnd={() => { draggedContract.current = null; setDragTarget(null); }} onKeyDown={e => { if (e.altKey && ['ArrowUp', 'ArrowDown'].includes(e.key)) { e.preventDefault(); const index = filteredContracts.findIndex(item => item.contractId === c.contractId); const target = filteredContracts[index + (e.key === 'ArrowUp' ? -1 : 1)]; if (target) { if (e.key === 'ArrowUp') moveContract(c.contractId, target.contractId); else moveContract(target.contractId, c.contractId); } } }} className={'ca-contract-choice' + (dragTarget === c.contractId ? ' is-drop-target' : '') + (selectedContract?.contractId === c.contractId ? ' is-selected' : '')} aria-pressed={selectedContract?.contractId === c.contractId} onClick={() => { setSelectedId(c.contractId); setMemberEnv(''); }}>
+                      <span className="ca-contract-icon ca-drag-handle" aria-hidden="true">⠿</span><span><strong>{c.name || c.contractId}</strong><small>{lots.length} lotti · {lots.filter(l => l.active !== false).length} attivi</small><small>{c.builtin ? 'Configurazione di sistema' : 'Configurazione personalizzata'}</small></span>
                     </button>;
                   })}
                   {!filteredContracts.length && <p className="ca-empty">Nessun contratto trovato. Prova un altro nome o rimuovi il filtro.</p>}
@@ -1164,32 +1187,41 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                       const key = c.contractId + '|' + l.lotId;
                       const up = lotUpload[key] || {};
                       return (
-                        <details key={'up-' + l.lotId} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', background: '#fbfcfe', minWidth: 0 }}>
+                        <section key={'docs-' + l.lotId} className="ca-lot-documents">
+                          <h3>Lotto {l.lotId} — {l.name}</h3>
+                          <p className="ca-caption">Documenti e dati già importati</p>
+                          <ul className="ca-saved-documents">
+                            <li><strong>Capitolato</strong><span>{l.rulesFile || c.rulesFile || 'Nome del documento non disponibile'}</span></li>
+                            <li><strong>Listino TOW</strong><span>{l.priceFile || (Object.keys(l.towPrices || {}).length ? 'Prezzi importati · file di origine non indicato' : 'Nessun listino importato')}</span><small>{Object.keys(l.towPrices || {}).length} prezzi disponibili</small></li>
+                            <li><strong>Catalogo</strong><span>{l.catalogFile || ((l.catalog || []).length ? 'Catalogo importato · file di origine non indicato' : 'Nessun catalogo importato')}</span><small>{(l.catalog || []).length} voci disponibili</small></li>
+                          </ul>
+                        <details style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', background: '#fbfcfe', minWidth: 0 }}>
                           <summary style={{ fontSize: 12, color: '#29415e', cursor: 'pointer', fontWeight: 700, userSelect: 'none', padding: '4px 2px' }}>
-                            ↻ Aggiorna file Lotto {l.lotId} — {l.name}
+                            Carica documenti nuovi o sostitutivi
                           </summary>
+                          <p className="ca-caption">Scegli nuovi file solo per aggiornare i documenti importati riepilogati sopra.</p>
                           <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 8, alignItems: 'end', paddingBottom: 8 }}>
                             <label style={{ ...S.labelStyle, fontSize: 12 }}>
                               Listino TOW <span style={{ color: '#52657d', fontWeight: 400 }}>(opzionale)</span>
-                              <input type="file"
+                              <span className="ca-file-picker"><input className="ca-file-input" aria-label={`Nuovo listino TOW lotto ${l.lotId}`} type="file"
                                 accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], priceFile: e.target.files[0] || null } }))}
-                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4, borderColor: '#bac8da' }} />
+ /><span>{up.priceFile?.name || 'Scegli nuovo file'}</span></span>
                               {up.priceFile && <span style={{ fontSize: 10, color: '#1a73e8' }}>{up.priceFile.name}</span>}
                               {!up.priceFile && <span style={{ fontSize: 10, color: '#52657d' }}>Se omesso, i prezzi TOW vengono riletti dal capitolato</span>}
                             </label>
                             <label style={{ ...S.labelStyle, fontSize: 12 }}>
                               Capitolato PDF <span style={{ color: '#52657d', fontWeight: 400 }}>(per rileggere i TOW)</span>
-                              <input type="file" accept=".pdf,application/pdf"
+                              <span className="ca-file-picker"><input className="ca-file-input" aria-label={`Nuovo capitolato lotto ${l.lotId}`} type="file" accept=".pdf,application/pdf"
                                 onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], rulesFile: e.target.files[0] || null } }))}
-                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4 }} />
+ /><span>{up.rulesFile?.name || 'Scegli nuovo file'}</span></span>
                               {up.rulesFile && <span style={{ fontSize: 10, color: '#1a73e8' }}>{up.rulesFile.name}</span>}
                             </label>
                             <label style={{ ...S.labelStyle, fontSize: 12 }}>
                               Catalogo PDF (opzionale)
-                              <input type="file" accept=".pdf,application/pdf"
+                              <span className="ca-file-picker"><input className="ca-file-input" aria-label={`Nuovo catalogo lotto ${l.lotId}`} type="file" accept=".pdf,application/pdf"
                                 onChange={e => setLotUpload(prev => ({ ...prev, [key]: { ...prev[key], catalogFile: e.target.files[0] || null } }))}
-                                style={{ ...S.inputStyle, fontSize: 11, padding: '6px 8px', marginTop: 4 }} />
+ /><span>{up.catalogFile?.name || 'Scegli nuovo file'}</span></span>
                               {up.catalogFile && <span style={{ fontSize: 10, color: '#1a73e8' }}>{up.catalogFile.name}</span>}
                             </label>
                             <label style={{ ...S.labelStyle, fontSize: 12 }}>
@@ -1207,6 +1239,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                             </button>
                           </div>
                         </details>
+                        </section>
                       );
                     })}
 
