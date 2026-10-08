@@ -418,18 +418,36 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
 
   // Carica progressData quando cambia la release selezionata
   useEffect(() => {
-    if (selectedRelease === "" || selectedRelease === "__ALL__") { setProgressData({}); return; }
+    if (selectedRelease === "") { setProgressData({}); return; }
     setLoadingProg(true);
-    getReleaseProgress(contractId, selectedRelease)
-      .then(records => {
-        const found = records?.[0];
-        const payload = found?.payload || found?.Payload || {};
-        // payload.rows = { [mevId]: { ...campi } }
-        setProgressData(payload.rows || {});
-        setDirty({});
-      })
-      .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
-      .finally(() => setLoadingProg(false));
+    if (selectedRelease === "__ALL__") {
+      // Carica tutti i record progress e li fonde in un unico oggetto
+      getReleaseProgress(contractId, "")
+        .then(records => {
+          const merged = {};
+          (records || []).forEach(rec => {
+            const rows = rec?.payload?.rows || rec?.Payload?.rows || {};
+            Object.entries(rows).forEach(([mevId, fields]) => {
+              // In caso di duplicato per lo stesso MEV, la release più recente vince
+              merged[mevId] = { ...(merged[mevId] || {}), ...fields };
+            });
+          });
+          setProgressData(merged);
+          setDirty({});
+        })
+        .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
+        .finally(() => setLoadingProg(false));
+    } else {
+      getReleaseProgress(contractId, selectedRelease)
+        .then(records => {
+          const found = records?.[0];
+          const payload = found?.payload || found?.Payload || {};
+          setProgressData(payload.rows || {});
+          setDirty({});
+        })
+        .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
+        .finally(() => setLoadingProg(false));
+    }
   }, [selectedRelease]); // eslint-disable-line
 
   // Filtra righe MEV per la release selezionata
@@ -451,6 +469,15 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     });
   }, [mevRows, selectedRelease]);
 
+  // Mappa mevId → release di appartenenza (usata per salvare su __ALL__)
+  const mevReleaseMap = useMemo(() => {
+    const map = {};
+    mevRows.forEach(r => {
+      map[String(r.id)] = (r.releaseExcel || r.pRelease || "").trim();
+    });
+    return map;
+  }, [mevRows]);
+
   // KPI
   const kpis = useMemo(() => ({
     total: filteredRows.length,
@@ -469,11 +496,13 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
 
   // Salva riga singola
   const saveRow = useCallback(async (mevId) => {
+    // Su __ALL__ determina la release di appartenenza dalla mappa
+    const targetRelease = selectedRelease === "__ALL__" ? (mevReleaseMap[mevId] || "") : selectedRelease;
+    if (!targetRelease) { setMsg({ type: "err", text: "Release non determinabile per la riga " + mevId }); return; }
     setSaving(prev => ({ ...prev, [mevId]: true }));
     try {
-      // Ricostruisce payload completo con tutte le righe
       const allRows = { ...progressData, [mevId]: progressData[mevId] || {} };
-      await putReleaseProgress(contractId, selectedRelease, { rows: allRows });
+      await putReleaseProgress(contractId, targetRelease, { rows: allRows });
       setDirty(prev => { const n = { ...prev }; delete n[mevId]; return n; });
       setSavedOk(prev => ({ ...prev, [mevId]: true }));
       setTimeout(() => setSavedOk(prev => { const n = { ...prev }; delete n[mevId]; return n; }), 2000);
@@ -482,13 +511,28 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     } finally {
       setSaving(prev => { const n = { ...prev }; delete n[mevId]; return n; });
     }
-  }, [progressData, selectedRelease, contractId]);
+  }, [progressData, selectedRelease, mevReleaseMap, contractId]);
 
   // Salva tutto
   const saveAll = useCallback(async () => {
-    if (selectedRelease === "" || selectedRelease === "__ALL__") return;
+    if (selectedRelease === "") return;
+    setGlobalSaving(true);
     try {
-      await putReleaseProgress(contractId, selectedRelease, { rows: progressData });
+      if (selectedRelease === "__ALL__") {
+        // Raggruppa le righe dirty per release e salva ciascun gruppo
+        const byRelease = {};
+        Object.keys(dirty).forEach(mevId => {
+          const rel = mevReleaseMap[mevId] || "";
+          if (!rel) return;
+          if (!byRelease[rel]) byRelease[rel] = {};
+          byRelease[rel][mevId] = progressData[mevId] || {};
+        });
+        await Promise.all(Object.entries(byRelease).map(([rel, rows]) =>
+          putReleaseProgress(contractId, rel, { rows })
+        ));
+      } else {
+        await putReleaseProgress(contractId, selectedRelease, { rows: progressData });
+      }
       setDirty({});
       setMsg({ type: "ok", text: "Tutti gli avanzamenti salvati." });
       setTimeout(() => setMsg(null), 3000);
@@ -497,20 +541,20 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
     } finally {
       setGlobalSaving(false);
     }
-  }, [progressData, selectedRelease, contractId]);
+  }, [progressData, dirty, selectedRelease, mevReleaseMap, contractId]);
 
   // Import Excel: parsing e anteprima
-  // Usa filteredRows (GoTo della release selezionata) come sorgente per il join
+  // Su __ALL__ usa tutte le righe filtrate e passa una release descrittiva
   const handleImportFile = useCallback(async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (selectedRelease === "") {
-      return;
-    }
+    if (selectedRelease === "") return;
     setImporting(true);
     try {
-      const result = await parseExcelToProgress(file, filteredRows, selectedRelease);
+      // Su __ALL__ il parser riceve tutte le righe; la release è usata solo come label nel preview
+      const releaseLabel = selectedRelease === "__ALL__" ? "Tutte le release" : selectedRelease;
+      const result = await parseExcelToProgress(file, filteredRows, releaseLabel);
       setImportPreview(result);
     } catch (err) {
       setMsg({ type: "err", text: err.message || "File non valido." });
@@ -595,7 +639,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
         )}
 
         {/* ── Importa da Excel ── */}
-        {selectedRelease && selectedRelease !== "__ALL__" && (
+        {selectedRelease !== "" && (
           <>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8,
               padding: "10px 18px", background: "#F0FDF4", border: `1px solid #86EFAC`,
