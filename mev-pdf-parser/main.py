@@ -2,9 +2,18 @@ import re
 import io
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 
 app = FastAPI(title="PDF Parser – Ordini di Consegna")
+
+# CORS: permette chiamate da qualsiasi origine onrender.com e localhost
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 
 # ============================================================

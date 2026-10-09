@@ -49,36 +49,25 @@ const fetchAuth = async (url, options = {}) => {
  */
 const waitForParser = async (onProgress, maxWaitMs = 270000) => {
   const pollInterval = 5000;   // riprova ogni 5s
-  const fetchTimeout = 70000;  // 70s per tentativo: copre il cold start Render free
+  const fetchTimeout = 35000;  // 35s per tentativo (backend ha timeout 30s interno)
   const started = Date.now();
   let elapsed = 0;
 
-  // Se non riusciamo a derivare l'URL del parser, fallback al backend come proxy
-  const useDirectUrl = PDF_PARSER_URL && PDF_PARSER_URL !== API_BASE_URL;
-
+  // Usa sempre il proxy backend: evita problemi CORS con chiamata diretta al parser
   while (elapsed < maxWaitMs) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), fetchTimeout);
-      let ok = false;
 
-      if (useDirectUrl) {
-        // Chiamata diretta al parser — nessun JWT necessario
-        const res = await fetch(`${PDF_PARSER_URL}/health`, { signal: controller.signal });
-        ok = res.ok;
-      } else {
-        // Fallback: proxy via backend
-        const res = await fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
-          headers: authHeaders(), signal: controller.signal,
-        });
-        if (res.ok) {
-          const data = await res.json();
-          ok = data.status === "ok";
-        }
-      }
-
+      const res = await fetchAuth(`${API_BASE_URL}/api/tools/parser-warmup`, {
+        signal: controller.signal,
+      });
       clearTimeout(timeoutId);
-      if (ok) return; // parser pronto
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "ok") return; // parser pronto
+      }
     } catch { /* timeout o rete — riprova */ }
 
     elapsed = Date.now() - started;
