@@ -111,6 +111,23 @@ const PAGE_DEFS = [
     ),
   },
   {
+    id: "reportavanzamenti",
+    label: "Report Avanzamenti",
+    description: "Stato di avanzamento attività per release: requisito, analisi, sviluppo, date chiave e documenti.",
+    accent: "#0891b2",
+    accentDark: "#0e7490",
+    roles: ["Admin","SuperAdmin","Editor","Developer","Manager"],
+    clientPage: "reportavanzamenti",
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/>
+      </svg>
+    ),
+  },
+  {
     id: "tools",
     label: "Gestione Ordini",
     description: "Caricamento e gestione degli ordini e delle forniture.",
@@ -173,6 +190,23 @@ const PAGE_DEFS = [
     ),
   },
   {
+    id: "gara",
+    label: "Risposte di Gara",
+    description: "Analisi documenti di gara con AI: deliverable, proposta tecnico-economica e piano di risposta.",
+    accent: "#f59e0b",
+    accentDark: "#b45309",
+    roles: ["Bid Manager","SuperAdmin"],
+    clientPage: null,
+    badge: "AI",
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    ),
+  },
+  {
     id: "admin",
     label: "Gestione Utenti",
     description: "Amministrazione account, ruoli, permessi e accessi.",
@@ -215,6 +249,7 @@ export default function HomePage({
   ambienti = [], ambienteId, onSwitchAmbiente,
   onNavigate, onLogout, onOpenProfile,
   clientPages = null,
+  appPerms = null,
   lastAlign,
   userTheme = "light",
 }) {
@@ -285,7 +320,17 @@ export default function HomePage({
 
   // Calcola le card visibili per questo utente
   const visibleCards = PAGE_DEFS.filter(p => {
+    // ── Gate 1: appPerms (per ruolo) — SuperAdmin bypassa sempre ──
+    if (!hasRole("SuperAdmin")) {
+      if (appPerms !== null) {
+        // Se il ruolo non ha canView per questa app → nascosta per tutti gli utenti con quel ruolo
+        if (appPerms[p.id]?.canView === false) return false;
+      }
+    }
+
+    // ── Gate 2: visibilità per ruolo / per-utente ──
     if (role === "Client") {
+      // Per Client: deve essere anche in clientPages (assegnazione per-utente)
       return clientPages !== null && p.clientPage && clientPages.includes(p.clientPage);
     }
     return p.roles.some(r => hasRole(r));
@@ -472,8 +517,16 @@ export default function HomePage({
                 </div>
 
                 {/* Testo */}
-                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: T.titleColor, marginBottom: 4, letterSpacing: "-0.2px" }}>
+                <div style={{ fontWeight: 700, fontSize: "clamp(13px,1.1vw,15px)", color: T.titleColor, marginBottom: 4, letterSpacing: "-0.2px", display: "flex", alignItems: "center", gap: 6 }}>
                   {card.label}
+                  {card.badge && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+                      padding: "2px 6px", borderRadius: 4,
+                      background: `linear-gradient(135deg, ${card.accent}, ${card.accentDark})`,
+                      color: "#fff", lineHeight: 1.4,
+                    }}>{card.badge}</span>
+                  )}
                 </div>
                 <div style={{ fontSize: "clamp(11px,0.85vw,12px)", color: T.textMuted, lineHeight: 1.5, flex: 1 }}>
                   {card.description}

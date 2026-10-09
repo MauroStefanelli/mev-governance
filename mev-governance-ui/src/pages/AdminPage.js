@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 import { 
   getUsers, 
@@ -19,6 +19,8 @@ import {
   getClientContratti,
   setClientContratti,
   getConsumoTow,
+  getAppRolePermissions,
+  putAppRolePermissions,
 } from "../services/mevService";
 
 
@@ -28,6 +30,7 @@ const roleColors = {
   Client: { background: "#faf5ff", color: "#7e22ce" },
   SuperAdmin: { background: "#fef2f2", color: "#b91c1c" },
   Developer: { background: "#f0fdf4", color: "#15803d" },
+  "Bid Manager": { background: "#fefce8", color: "#854d0e" },
 };
 
 const actionStyle = {
@@ -173,6 +176,7 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
   const [editSaving, setEditSaving] = useState(false);
   const [savingTheme, setSavingTheme] = useState({}); // { [userId]: true/false }
   const [savingAiKey, setSavingAiKey] = useState({}); // { [userId]: true/false }
+  const [adminTab, setAdminTab] = useState("utenti"); // "utenti" | "funzioni"
 
   const formatDateTime = (iso) => {
 
@@ -405,8 +409,8 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
       <header className="mev-admin-hero">
         <div>
           <div className="mev-admin-eyebrow"><span /> AMMINISTRAZIONE</div>
-          <h3>Gestione Utenti</h3>
-          <p>Persone, ruoli e accessi. Tutto sotto controllo.</p>
+          <h3>Gestione Utenti e Funzioni</h3>
+          <p>Persone, ruoli, accessi e permessi applicativi.</p>
         </div>
         <div className="mev-admin-hero-icon" aria-hidden="true">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -415,6 +419,26 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
           </svg>
         </div>
       </header>
+
+      {/* ── Tab bar ── */}
+      <div style={{ display: "flex", gap: 4, background: "#EAF0F5", border: "1px solid #E3E8EF", borderRadius: 11, padding: 4, marginBottom: 24, width: "fit-content" }}>
+        {[
+          { id: "utenti",   label: "Utenti e Ruoli" },
+          { id: "funzioni", label: "Funzioni e Permessi App" },
+        ].map(t => (
+          <button key={t.id} type="button" onClick={() => setAdminTab(t.id)}
+            style={{ border: "1px solid transparent", cursor: "pointer", padding: "10px 22px", borderRadius: 8,
+              fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+              background: adminTab === t.id ? "#fff" : "transparent",
+              color: adminTab === t.id ? "#263D63" : "#68758A",
+              boxShadow: adminTab === t.id ? "0 2px 5px rgba(24,39,63,0.07)" : "none" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {adminTab === "funzioni" && <AppPermissionsPanel />}
+      {adminTab === "utenti" && (<>
 
       {error && (
         <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderLeft: "4px solid #e11d48", color: "#9f1239", padding: "14px 18px", borderRadius: "12px", marginBottom: "16px", fontSize: "14px", fontWeight: 500, overflowWrap: "anywhere" }}>
@@ -531,9 +555,10 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
                   <option value="Client">Client</option>
                   <option value="SuperAdmin">SuperAdmin</option>
                   <option value="Developer">Developer</option>
+                  <option value="Bid Manager">Bid Manager</option>
                 </select>
                 <div className="mev-admin-extra-roles" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "11px", color: "#526079" }}>
-                  {["Developer", "Admin", "Editor", "Client"].filter(r => r !== u.role).map(r => (
+                  {["Developer", "Admin", "Editor", "Client", "Bid Manager"].filter(r => r !== u.role).map(r => (
                     <label key={r} style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", padding: "4px 7px", borderRadius: "7px", border: "1px solid #dce3ec", background: "#fff", fontWeight: 500 }}>
                       <input
                         type="checkbox"
@@ -854,6 +879,7 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }
@@ -970,6 +996,182 @@ function PermessiClientModal({ user, onClose }) {
             {saving ? "Salvataggio..." : "Salva Permessi"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pannello configurazione permessi per app per ruolo ─────────────────────────
+
+const KNOWN_APPS = [
+  { id: "mev",               label: "MEV" },
+  { id: "mevcap",            label: "MEV-CAP" },
+  { id: "contratti",         label: "Contratti TOW" },
+  { id: "contratti_interni", label: "Contratti Interni" },
+  { id: "chart",             label: "Grafici" },
+  { id: "reportavanzamenti", label: "Report Avanzamenti" },
+  { id: "ordini",            label: "Ordini Consegna" },
+  { id: "consumotow",        label: "Consumo TOW" },
+  { id: "tools",             label: "Tools" },
+  { id: "gara",              label: "Gare" },
+  { id: "configuratore",     label: "Configuratore" },
+];
+const KNOWN_ROLES = ["Admin", "Editor", "Client", "Developer", "Bid Manager"];
+
+const ROLE_COLORS = {
+  Admin:         { bg: "#fff7ed", fg: "#c2410c", border: "#fed7aa" },
+  Editor:        { bg: "#eff6ff", fg: "#1d4ed8", border: "#bfdbfe" },
+  Client:        { bg: "#faf5ff", fg: "#7e22ce", border: "#e9d5ff" },
+  Developer:     { bg: "#f0fdf4", fg: "#15803d", border: "#bbf7d0" },
+  "Bid Manager": { bg: "#fefce8", fg: "#854d0e", border: "#fde68a" },
+};
+
+function AppPermissionsPanel() {
+  // matrix[appId][role] = { canView, canEdit }
+  const [matrix, setMatrix]   = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [err, setErr]         = useState("");
+
+  useEffect(() => {
+    getAppRolePermissions().then(rows => {
+      const m = {};
+      for (const app of KNOWN_APPS) {
+        m[app.id] = {};
+        for (const role of KNOWN_ROLES) {
+          const r = rows.find(x => x.appId === app.id && x.role === role);
+          m[app.id][role] = { canView: r?.canView ?? true, canEdit: r?.canEdit ?? true };
+        }
+      }
+      setMatrix(m);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const toggle = useCallback((appId, role, field) => {
+    setMatrix(prev => {
+      const cur = prev[appId]?.[role] ?? { canView: true, canEdit: true };
+      let next = { ...cur, [field]: !cur[field] };
+      // canEdit implica canView
+      if (field === "canEdit" && next.canEdit) next.canView = true;
+      // se canView=false, canEdit deve essere false
+      if (field === "canView" && !next.canView) next.canEdit = false;
+      return { ...prev, [appId]: { ...prev[appId], [role]: next } };
+    });
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true); setErr(""); setSaved(false);
+    const perms = [];
+    for (const app of KNOWN_APPS)
+      for (const role of KNOWN_ROLES) {
+        const p = matrix[app.id]?.[role] ?? { canView: true, canEdit: true };
+        perms.push({ appId: app.id, role, canView: p.canView, canEdit: p.canEdit });
+      }
+    try {
+      await putAppRolePermissions(perms);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setErr(e.message || "Errore salvataggio.");
+    } finally {
+      setSaving(false);
+    }
+  }, [matrix]);
+
+  if (loading) return (
+    <div style={{ padding: 40, color: "#68758A", fontSize: 14 }}>Caricamento permessi…</div>
+  );
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #E3E8EF", borderRadius: 16, padding: 28, boxShadow: "0 2px 12px rgba(30,50,80,0.04)" }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.4px", color: "#718097", marginBottom: 8 }}>PERMESSI APPLICATIVI</div>
+        <h4 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#243247" }}>Configurazione accessi per sotto-applicazione</h4>
+        <p style={{ margin: "6px 0 0", color: "#68758A", fontSize: 13 }}>
+          Definisci quale ruolo può <strong>visualizzare</strong> (accedere ai dati) e <strong>modificare</strong> (salvare dati) in ogni app.
+          SuperAdmin ha sempre accesso completo e non è configurabile. Disattivare "Visualizza" disattiva anche "Modifica".
+        </p>
+      </div>
+
+      {err && (
+        <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderLeft: "4px solid #e11d48", color: "#9f1239", padding: "12px 16px", borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+          {err}
+        </div>
+      )}
+      {saved && (
+        <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderLeft: "4px solid #059669", color: "#065f46", padding: "12px 16px", borderRadius: 10, marginBottom: 16, fontSize: 13 }}>
+          Permessi salvati con successo.
+        </div>
+      )}
+
+      {/* Tabella matrice */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", padding: "10px 14px", color: "#526079", fontWeight: 700, fontSize: 12, borderBottom: "2px solid #E3E8EF", background: "#F8FAFC", minWidth: 160 }}>
+                App / Funzione
+              </th>
+              {KNOWN_ROLES.map(role => {
+                const c = ROLE_COLORS[role] || { bg: "#f8f9fa", fg: "#526079", border: "#e2e8f0" };
+                return (
+                  <th key={role} colSpan={2} style={{ textAlign: "center", padding: "8px 10px", borderBottom: "2px solid #E3E8EF", background: "#F8FAFC" }}>
+                    <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: c.bg, color: c.fg, border: `1px solid ${c.border}` }}>
+                      {role}
+                    </span>
+                  </th>
+                );
+              })}
+            </tr>
+            <tr>
+              <th style={{ padding: "4px 14px 10px", background: "#F8FAFC" }} />
+              {KNOWN_ROLES.map(role => (
+                <>
+                  <th key={`${role}-v`} style={{ padding: "4px 8px 10px", background: "#F8FAFC", textAlign: "center", color: "#526DAB", fontSize: 11, fontWeight: 600 }}>Vista</th>
+                  <th key={`${role}-e`} style={{ padding: "4px 8px 10px", background: "#F8FAFC", textAlign: "center", color: "#C48A39", fontSize: 11, fontWeight: 600 }}>Modifica</th>
+                </>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {KNOWN_APPS.map((app, idx) => (
+              <tr key={app.id} style={{ background: idx % 2 === 0 ? "#FAFBFD" : "#fff" }}>
+                <td style={{ padding: "12px 14px", fontWeight: 600, color: "#243247", borderBottom: "1px solid #EDF0F5" }}>
+                  {app.label}
+                </td>
+                {KNOWN_ROLES.map(role => {
+                  const p = matrix[app.id]?.[role] ?? { canView: true, canEdit: true };
+                  return (
+                    <>
+                      <td key={`${role}-v`} style={{ textAlign: "center", padding: "12px 8px", borderBottom: "1px solid #EDF0F5" }}>
+                        <input type="checkbox" checked={p.canView}
+                          onChange={() => toggle(app.id, role, "canView")}
+                          style={{ width: 16, height: 16, accentColor: "#526DAB", cursor: "pointer" }} />
+                      </td>
+                      <td key={`${role}-e`} style={{ textAlign: "center", padding: "12px 8px", borderBottom: "1px solid #EDF0F5" }}>
+                        <input type="checkbox" checked={p.canEdit} disabled={!p.canView}
+                          onChange={() => toggle(app.id, role, "canEdit")}
+                          style={{ width: 16, height: 16, accentColor: "#C48A39", cursor: p.canView ? "pointer" : "default",
+                            opacity: p.canView ? 1 : 0.35 }} />
+                      </td>
+                    </>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
+        <button type="button" onClick={handleSave} disabled={saving}
+          style={{ padding: "11px 28px", background: saving ? "#7ca8d8" : "#1A6EBD", color: "#fff", border: "none",
+            borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: saving ? "wait" : "pointer",
+            boxShadow: "0 2px 8px rgba(26,110,189,0.2)" }}>
+          {saving ? "Salvataggio…" : "Salva permessi"}
+        </button>
       </div>
     </div>
   );

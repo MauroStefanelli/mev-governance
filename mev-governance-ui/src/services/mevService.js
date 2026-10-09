@@ -24,6 +24,12 @@ export const tryRefreshToken = async () => {
     const data = await res.json();
     localStorage.setItem("jwt", data.token);
     localStorage.setItem("refreshToken", data.refreshToken);
+    if (Array.isArray(data.roles)) {
+      localStorage.setItem("roles", JSON.stringify(data.roles));
+      localStorage.setItem("role", data.role || "");
+      localStorage.setItem("ambienteId", String(data.ambienteId || 0));
+      window.dispatchEvent(new CustomEvent('mev-auth-context', { detail: data }));
+    }
     return true;
   } catch {
     return false;
@@ -596,14 +602,13 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
   }))));
   lots.forEach(l => {
     if (l.catalogFile) form.append(`catalogFile_${l.lotId}`, l.catalogFile);
-    form.append(`priceFile_${l.lotId}`, l.priceFile);
+    if (l.priceFile) form.append(`priceFile_${l.lotId}`, l.priceFile);
   });
 
-  // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  // Non impostare Content-Type manualmente: il browser aggiunge il boundary corretto per FormData
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };
@@ -618,18 +623,18 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
  * Carica/aggiorna i file PDF/Excel di un singolo lotto esistente.
  * Riusa l'endpoint /import passando solo quel lotto (sovrascrive il lotto nel DB senza toccare gli altri).
  */
-export const uploadConfiguratoreContractLot = async ({ contractId, contractName, lotId, lotName, tow5Share, catalogFile, priceFile }) => {
+export const uploadConfiguratoreContractLot = async ({ contractId, contractName, lotId, lotName, tow5Share, catalogFile, priceFile, rulesFile }) => {
   const form = new FormData();
   form.append("contractId", contractId);
   form.append("name", contractName);
   form.append("lotsJson", JSON.stringify([{ lotId, name: lotName, tow5Share: tow5Share ?? 65 }]));
-  form.append(`catalogFile_${lotId}`, catalogFile);
-  form.append(`priceFile_${lotId}`, priceFile);
+  if (catalogFile) form.append(`catalogFile_${lotId}`, catalogFile);
+  if (priceFile)   form.append(`priceFile_${lotId}`, priceFile);
+  if (rulesFile)   form.append("rulesFile", rulesFile);
 
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/import`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };
@@ -683,6 +688,162 @@ export const deleteConfiguratoreRecord = async (id) => {
   });
   if (response.status === 401 || response.status === 403) throw { status: response.status };
   if (!response.ok) throw new Error("Errore eliminazione record configuratore");
+  return response.json();
+};
+
+// ── Applicativi condivisi (shared_applications) ──────────────────────────────
+// Salva/recupera la lista applicativi in DB così tutti i Developer/Admin del
+// contratto lavorano sullo stesso set (invece di localStorage locale).
+// Per il contratto builtin "poste-tet-2025" gli applicativi sono condivisi tra
+// tutti i lotti: si usa sempre lot_id="all" così non si perdono cambiando lotto.
+
+const sharedAppsLotKey = (contractId, lot) =>
+  contractId === "poste-tet-2025" ? "all" : String(lot);
+
+export const getSharedApplications = async (contractId, lot) => {
+  const lotKey = sharedAppsLotKey(contractId, lot);
+  const params = new URLSearchParams({
+    entity_type: "shared_applications",
+    contract_id: String(contractId),
+    lot_id: lotKey,
+  });
+  const response = await fetchWithRefresh(
+    `${API_BASE_URL}/api/configuratore/records?${params}`,
+    { headers: authHeaders() }
+  );
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) return null;
+  const data = await response.json();
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  if (!records.length) return null;
+  const payload = records[0].payload || records[0].Payload || {};
+  return Array.isArray(payload.applications) ? payload.applications : null;
+};
+
+export const putSharedApplications = async (contractId, lot, applications) => {
+  const lotKey = sharedAppsLotKey(contractId, lot);
+  return upsertConfiguratoreRecord({
+    record_key:  `${contractId}|${lotKey}|shared_applications`,
+    entity_type: "shared_applications",
+    contract_id: String(contractId),
+    lot_id:      lotKey,
+    title:       `Applicativi condivisi — contratto ${contractId}`,
+    payload:     { applications, updatedAt: new Date().toISOString() },
+  });
+};
+
+// ── Gare (Risposte di Gara) — condivise tra tutti i Bid Manager dell'ambiente ─
+// Ogni gara è un record separato con entity_type="gara" e record_key="gara|{id}"
+// contract_id e lot_id sono null perché le gare sono trasversali all'ambiente.
+
+// Analizza un PDF di capitolato/bando con AI e restituisce sintesi + sezioni.
+// towFiles:     { 1: File, 2: File } — listini prezzi TOW per lotto (opzionali)
+// catalogFiles: { 1: File, 2: File } — PDF catalogo per lotto (opzionali)
+export const analizzaCapitolatoGara = async (file, towFiles = {}, catalogFiles = {}) => {
+  const form = new FormData();
+  form.append("file", file);
+  // Allega i file TOW e Catalogo per ogni lotto
+  Object.entries(towFiles).forEach(([lotNum, f]) => { if (f) form.append(`towFile_${lotNum}`, f); });
+  Object.entries(catalogFiles).forEach(([lotNum, f]) => { if (f) form.append(`catalogFile_${lotNum}`, f); });
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/analizza-capitolato`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
+  return response.json();
+};
+
+// Genera proposte (tecnica/economica/piano) per un singolo lotto — JSON context, no PDF upload
+export const analizzaProposteGara = async (context) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/analizza-proposte`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
+  return response.json();
+};
+
+// Parsa un file Excel offerta (protetto da password) per un lotto specifico
+export const analizzaOffertaExcel = async (file, lot, password) => {
+  const form = new FormData();
+  form.append("file", file);
+  if (password) form.append("password", password);
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/parse-offerta-excel?lot=${lot}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
+    body: form,
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
+  return response.json();
+};
+
+export const getGare = async () => {
+  const params = new URLSearchParams({ entity_type: "gara" });
+  const response = await fetchWithRefresh(
+    `${API_BASE_URL}/api/configuratore/records?${params}`,
+    { headers: authHeaders() }
+  );
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) return [];
+  const data = await response.json();
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  return records.map(r => {
+    const p = r.payload || r.Payload || {};
+    return { ...p, _recordId: r.Id || r.id };
+  });
+};
+
+export const putGara = async (gara) => {
+  return upsertConfiguratoreRecord({
+    record_key:  `gara|${gara.id}`,
+    entity_type: "gara",
+    contract_id: null,
+    lot_id:      null,
+    title:       gara.nome || "Gara senza nome",
+    payload:     { ...gara, updatedAt: new Date().toISOString() },
+  });
+};
+
+export const deleteGara = async (recordId) => {
+  return deleteConfiguratoreRecord(recordId);
+};
+
+// Importa una gara come contratto nell'Archivio Contrattuale.
+// Mappa capitolato, TOW (dall'offerta Excel) e catalogo (dall'offerta catalogo) senza file upload.
+// { garaId, contractId, contractName }
+export const importaGaraComContratto = async ({ garaId, contractId, contractName }) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/gare/importa-come-contratto`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ garaId, contractId, contractName }),
+  });
+  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (!response.ok) {
+    const text = await response.text();
+    let errMsg = text;
+    try { const j = JSON.parse(text); errMsg = j.message || j.error || text; } catch {}
+    throw new Error(errMsg);
+  }
   return response.json();
 };
 
@@ -1024,7 +1185,7 @@ export const addUtenteAmbiente = async (ambienteId, userId, ruolo) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ userId, ruolo })
+    body: JSON.stringify(Array.isArray(ruolo) ? { userId, ruoli: ruolo } : { userId, ruolo })
   });
   if (!response.ok) {
     const text = await response.text();
@@ -1046,7 +1207,7 @@ export const updateUtenteAmbienteRuolo = async (ambienteId, userId, ruolo) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/ambienti/${ambienteId}/utenti/${userId}`, {
     method: "PUT",
     headers: authHeaders(),
-    body: JSON.stringify({ ruolo })
+    body: JSON.stringify(Array.isArray(ruolo) ? { ruoli: ruolo } : { ruolo })
   });
   if (!response.ok) {
     const text = await response.text();
@@ -1249,6 +1410,67 @@ export const getMyPages = async () => {
 export const getMyContratti = async () => {
   const r = await fetchWithRefresh(`${API_BASE_URL}/api/client-permissions/my-contratti`, { headers: authHeaders() });
   if (r.status === 401) throw new Error('401');
+  if (!r.ok) return [];
+  return r.json();
+};
+
+// ── Report Avanzamenti ────────────────────────────────────────────────────────
+export const getReleaseProgress = async (contractId, release) => {
+  const qs = new URLSearchParams({ contractId, ...(release ? { release } : {}) }).toString();
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/release-progress?${qs}`, { headers: authHeaders() });
+  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (!r.ok) throw new Error("Errore lettura avanzamenti");
+  return r.json();
+};
+
+export const putReleaseProgress = async (contractId, release, payload) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/release-progress`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ contractId, release, payload }),
+  });
+  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  return r.json();
+};
+
+// ── App Role Permissions ─────────────────────────────────────────────────────
+
+/**
+ * Restituisce la matrice completa { appId, appLabel, role, canView, canEdit }.
+ * Solo Admin/SuperAdmin la usano per modificarla.
+ */
+export const getAppRolePermissions = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/app-role-permissions`, {
+    headers: authHeaders(),
+  });
+  if (!r.ok) return [];
+  return r.json();
+};
+
+/**
+ * Salva l'intera matrice modificata.
+ * @param {Array<{appId,role,canView,canEdit}>} perms
+ */
+export const putAppRolePermissions = async (perms) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/app-role-permissions`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(perms),
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  // Il backend ritorna { saved: true } — parsing sicuro
+  try { return await r.json(); } catch { return { saved: true }; }
+};
+
+/**
+ * Restituisce i permessi dell'utente corrente: [{ appId, canView, canEdit }].
+ * Chiamato al login per applicare le guard alle route.
+ */
+export const getMyAppPermissions = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/app-role-permissions/my`, {
+    headers: authHeaders(),
+  });
   if (!r.ok) return [];
   return r.json();
 };

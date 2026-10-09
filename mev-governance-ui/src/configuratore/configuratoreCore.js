@@ -274,18 +274,26 @@ export function scoreIntervention({ intervention, detailText, catalog, applicati
 // ============================================================
 
 export function defaultPrice(it, { catalog, priceMode, builtin }) {
-  const c = catalog.find((x) => x.id === it.id);
+  const c = catalog.find((x) => String(x.id) === String(it.id));
   const base = c?.prezzi?.[it.type]?.[it.complexity] ?? 0;
-  const hist = builtin ? APP_DATA.historical_offered_prices?.[`${it.id}|${it.type}|${it.complexity}`] : null;
+  const histKey = `${String(it.id)}|${it.type}|${it.complexity}`;
+  const hist = builtin ? APP_DATA.historical_offered_prices?.[histKey] : null;
   return priceMode === "historical" && hist != null ? hist : base;
 }
 
 export const itemPrice = (it, ctx) => it.unit ?? defaultPrice(it, ctx);
 
-export function calc({ items, lot, contractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin }) {
+export function calc({ items, lot, contractId, archiveContractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin }) {
   const ctx = { catalog, priceMode, builtin };
   const cat = items.reduce((a, it) => a + itemPrice(it, ctx) * it.qty, 0);
-  const allocationBase = cat * (1 + (100 - tow5Share) / 100);
+  // Formula TOW automatici (TOW02.1, 02.3, 02.4):
+  //   base = cat × multiplier  (es. cat × 1.53716 per poste-tet-2025 lotto 2)
+  //   TOW02.N = base × pct%
+  // Il moltiplicatore è fisso da capitolato; tow5Share descrive la quota catalogo
+  // sul totale offerta ma non entra nel calcolo dei TOW automatici.
+  const tow5 = cat * (tow5Share / 100);   // informativo — usato nell'UI
+  const towMultiplier = contractTowMultiplier(archiveContractId ?? contractId, lot) ?? 1;
+  const allocationBase = cat * towMultiplier;
   const prefix = `TOW0${lot}.`;
   const pct = towPercentages?.[contractId]?.[lot] || { 1: 0, 3: 0, 4: 0 };
   const autoTow = {};
@@ -299,11 +307,18 @@ export function calc({ items, lot, contractId, tow5Share = 65, towPercentages, t
   const base = cat + oth;
   const disc = base * (Number(discount) || 0) / 100;
   const cont = (base - disc) * (Number(contingency) || 0) / 100;
-  return { cat, tow5Share, allocationBase, autoTow, autoTotal, manualTotal, oth, base, disc, cont, total: base - disc + cont };
+  return { cat, tow5, tow5Share, towMultiplier, allocationBase, autoTow, autoTotal, manualTotal, oth, base, disc, cont, total: base - disc + cont };
 }
 
 export function towPrices() {
   return APP_DATA.tow_prices || {};
+}
+
+// Restituisce il moltiplicatore fisso (da capitolato) per la base di allocazione TOW automatici.
+// null = usa il calcolo dinamico 100/tow5Share.
+export function contractTowMultiplier(contractId, lot) {
+  if (contractId === "poste-tet-2025" && String(lot) === "2") return 1.53716;
+  return null;
 }
 
 export function defaultLotPct(contractId, lot) {
@@ -440,7 +455,7 @@ export async function parseInitiativeWorkbook(file, catalog) {
       }
       const driverName = String(read(r, "nomedriver") || "").trim();
       const catalogId = Number(read(r, "iddicatalogo", "idcatalogo")) || 0;
-      const component = catalog.find((x) => x.id === catalogId) || catalog.find((x) => appNorm(x.nome) === appNorm(driverName));
+      const component = catalog.find((x) => String(x.id) === String(catalogId)) || catalog.find((x) => appNorm(x.nome) === appNorm(driverName));
       if (!component) continue;
       const rawType = String(read(r, "tipointervento2", "tipointervento") || "MODIFICA").toUpperCase();
       const type = rawType.includes("REALIZZ") ? "REALIZZAZIONE" : "MODIFICA";
@@ -543,81 +558,173 @@ export const evaluationApplicationCodes = (payload) => {
 
 export function codeChangePrompt(request) {
   const i = request.initiative;
-  const approved = request.approvedInterventions;
+  const approved = request.approvedInterventions || [];
+  const excelInterventions = request.excelInterventions || [];
+  const techProfile = request.techProfile || null;
   const toolLabel = { vscode: "Visual Studio Code", codex: "Codex", other: "lo strumento di sviluppo scelto" }[request.targetTool] || "Visual Studio Code";
   const start =
     request.targetTool === "vscode"
-      ? "Apri in Visual Studio Code la cartella principale del repository. Crea o seleziona il branch indicato, quindi usa questo documento come checklist di implementazione. Se utilizzi un'estensione AI, fornisci anche il JSON e il piano allegati."
+      ? "Apri in Visual Studio Code la cartella principale del repository. Crea o seleziona il branch indicato, quindi usa questo documento come checklist di implementazione."
       : request.targetTool === "codex"
         ? "Apri il repository sorgente nello stesso workspace di Codex e allega questo pacchetto alla richiesta."
         : "Apri la cartella principale del repository nello strumento scelto e usa questo documento come checklist di implementazione.";
-  return `# Richiesta di modifica codice – ${i.code || ""} ${i.title || ""}
 
-**Strumento previsto:** ${toolLabel}
+  const lines = [];
+  lines.push(`# Richiesta di modifica codice – ${i.code || ""} ${i.title || ""}`);
+  lines.push("");
+  lines.push(`**Strumento previsto:** ${toolLabel}`);
+  lines.push("");
+  lines.push(start);
+  lines.push("");
+  lines.push("## Obiettivo");
+  lines.push("Analizza il repository reale e realizza esclusivamente gli interventi approvati descritti di seguito. Verifica che siano necessari e sufficienti rispetto alla richiesta funzionale, senza introdurre funzionalità non autorizzate.");
+  lines.push("");
+  lines.push("## Regole obbligatorie");
+  lines.push("1. Prima di modificare, ispeziona architettura, convenzioni, test e stato Git del repository.");
+  lines.push("2. Non sovrascrivere modifiche preesistenti e non lavorare direttamente sul branch principale.");
+  lines.push("3. Confronta ogni intervento con i file candidati e individua anche dipendenze tecniche non evidenti.");
+  lines.push("4. Se manca un'informazione che cambia materialmente la soluzione, fermati e chiedi conferma.");
+  lines.push(`5. Applica soltanto gli interventi approvati (${approved.length}).`);
+  lines.push("6. Esegui test e compilazione disponibili; non dichiarare superato ciò che non hai eseguito.");
+  lines.push("7. Al termine registra: file modificati, spiegazione puntuale, test eseguiti, esiti, rischi e attività residue.");
+  lines.push("");
+  lines.push("## Dati principali");
+  lines.push(`- Contratto: ${request.contractName}`);
+  lines.push(`- Lotto: ${request.lot}`);
+  lines.push(`- Sistema/applicazione: ${(request.systems || []).join(", ") || "non indicato"}`);
+  lines.push(`- Branch suggerito: ${request.branch || "da creare"}`);
+  lines.push(`- Repository: ${request.repository?.folderName || "non indicata"}`);
+  lines.push("");
 
-${start}
+  // ── Profilo tecnico applicativo ──
+  if (techProfile) {
+    lines.push("## Profilo tecnico dell'applicativo");
+    if (techProfile.technologies?.length)  lines.push(`- **Linguaggi:** ${techProfile.technologies.join(", ")}`);
+    if (techProfile.frameworks?.length)    lines.push(`- **Framework:** ${techProfile.frameworks.join(", ")}`);
+    if (techProfile.databases?.length)     lines.push(`- **Dati/persistenza:** ${techProfile.databases.join(", ")}`);
+    if (techProfile.integrations?.length)  lines.push(`- **Integrazioni:** ${techProfile.integrations.join(", ")}`);
+    if (techProfile.interfaces?.length)    lines.push(`- **Interfacce:** ${techProfile.interfaces.join(", ")}`);
+    if (techProfile.infrastructure?.length) lines.push(`- **Infrastruttura:** ${techProfile.infrastructure.join(", ")}`);
+    if (techProfile.testing?.length)       lines.push(`- **Test:** ${techProfile.testing.join(", ")}`);
+    if (techProfile.summary)               lines.push(`- **Sintesi:** ${techProfile.summary}`);
+    lines.push("");
+  }
 
-## Obiettivo
-Analizza il repository reale e realizza esclusivamente gli interventi approvati descritti nei file allegati. Verifica che siano necessari e sufficienti rispetto alla richiesta funzionale, senza introdurre funzionalità non autorizzate.
+  // ── Interventi da Excel ──
+  if (excelInterventions.length > 0) {
+    lines.push("## Interventi richiesti dal cliente (da Excel)");
+    lines.push("Questi sono gli interventi originali richiesti dal cliente. Ogni intervento approvato è collegato a una o più voci di catalogo nella sezione successiva.");
+    lines.push("");
+    excelInterventions.forEach((x, n) => {
+      lines.push(`### Intervento ${n + 1} — ID_INTERVENTO ${x.id}`);
+      if (x.title || x.titolo)        lines.push(`**Titolo:** ${x.title || x.titolo}`);
+      if (x.sistema)                  lines.push(`**Sistema:** ${x.sistema}`);
+      if (x.componente)               lines.push(`**Componente:** ${x.componente}`);
+      if (x.description || x.descrizione) lines.push(`**Descrizione:** ${x.description || x.descrizione}`);
+      if (x.activity || x.attivita)   lines.push(`**Attività:** ${x.activity || x.attivita}`);
+      if (x.tow5 != null && x.tow5 !== 0) lines.push(`**TOW .5:** ${x.tow5}`);
+      lines.push("");
+    });
+  }
 
-## Regole obbligatorie
-1. Prima di modificare, ispeziona architettura, convenzioni, test e stato Git del repository.
-2. Non sovrascrivere modifiche preesistenti e non lavorare direttamente sul branch principale.
-3. Confronta ogni intervento con i file candidati e individua anche dipendenze tecniche non evidenti.
-4. Se manca un'informazione che cambia materialmente la soluzione, fermati e chiedi conferma.
-5. Applica soltanto gli interventi approvati (${approved.length}).
-6. Esegui test e compilazione disponibili; non dichiarare superato ciò che non hai eseguito.
-7. Al termine registra: file modificati, spiegazione puntuale, test eseguiti, esiti, rischi e attività residue.
+  // ── Interventi approvati (voci catalogo) con collegamento ──
+  lines.push("## Voci di catalogo approvate (da realizzare)");
+  lines.push("Per ogni voce: nome, tipo, motivazione, file candidati e dettaglio dell'intervento Excel collegato.");
+  lines.push("");
+  approved.forEach((x, n) => {
+    lines.push(`### ${n + 1}. [ID ${x.catalogId || x.id}] ${x.name}`);
+    lines.push(`- **Tipo:** ${x.type || ""} · **Complessità:** ${x.complexity || ""} · **Quantità:** ${x.quantity || 1}`);
+    if (x.reason)           lines.push(`- **Motivazione:** ${x.reason}`);
+    if (x.sharedRationale || x.additionalInfo) lines.push(`- **Razionale:** ${x.sharedRationale || x.additionalInfo}`);
+    if (x.areas?.length)    lines.push(`- **Aree di intervento:** ${x.areas.join("; ")}`);
+    if (x.files?.length)    lines.push(`- **File candidati:** ${x.files.join("; ")}`);
+    if (x.interventionId)   lines.push(`- **Intervento Excel collegato:** ID_INTERVENTO ${x.interventionId}`);
+    // Recupera dettaglio intervento Excel collegato
+    const linked = excelInterventions.find((e) => String(e.id) === String(x.interventionId));
+    if (linked) {
+      if (linked.title || linked.titolo)           lines.push(`  - Titolo: ${linked.title || linked.titolo}`);
+      if (linked.description || linked.descrizione) lines.push(`  - Descrizione: ${linked.description || linked.descrizione}`);
+      if (linked.activity || linked.attivita)       lines.push(`  - Attività: ${linked.activity || linked.attivita}`);
+    }
+    lines.push("");
+  });
 
-## Dati principali
-- Contratto: ${request.contractName}
-- Lotto: ${request.lot}
-- Sistema/applicazione: ${(request.systems || []).join(", ") || "non indicato"}
-- Applicativi AP: ${(request.applicationCodes || []).join(", ") || "non indicati"}
-- Branch suggerito: ${request.branch || "da creare"}
-- Cartella selezionata: ${request.repository?.folderName || "non indicata"}
+  lines.push("---");
+  lines.push("Consulta `richiesta_modifica_codice.json` per tutti i dati strutturati e `piano_sviluppo.md` per il piano leggibile completo.");
 
-Consulta richiesta_modifica_codice.json per tutti i dati strutturati e piano_sviluppo.md per il dettaglio leggibile.`;
+  return lines.join("\n");
 }
 
-export function implementationDocument({ record, proposals, branch, approvalNotes, tests }) {
+export function implementationDocument({ record, proposals, branch, approvalNotes, tests, excelInterventions, techProfile }) {
   const p = record?.payload || {};
   const i = p.initiative || {};
-  const selected = proposals;
+  const selected = proposals || [];
+  const excels = excelInterventions || [];
   const lines = [
     `# Piano di sviluppo – ${i.code || ""} ${i.title || record?.title || ""}`,
     "",
-    `- Contratto: ${p.contractName || record?.contract_id || ""}`,
-    `- Lotto: ${record?.lot_id || p.lot || ""}`,
-    `- Sistema: ${evaluationSystems(p).join(", ")}`,
-    `- Branch: ${branch || "da definire"}`,
-    "",
-    "## Approvazione",
-    `- Data: ${new Date().toLocaleString("it-IT")}`,
-    `- Note: ${approvalNotes || "nessuna"}`,
+    `- **Contratto:** ${p.contractName || record?.contract_id || ""}`,
+    `- **Lotto:** ${record?.lot_id || p.lot || ""}`,
+    `- **Sistema:** ${evaluationSystems(p).join(", ")}`,
+    `- **Branch:** ${branch || "da definire"}`,
+    `- **Data approvazione:** ${new Date().toLocaleString("it-IT")}`,
+    `- **Note:** ${approvalNotes || "nessuna"}`,
     "",
   ];
+
+  // ── Profilo tecnico ──
+  if (techProfile) {
+    lines.push("## Profilo tecnico applicativo");
+    if (techProfile.technologies?.length)  lines.push(`- **Linguaggi:** ${techProfile.technologies.join(", ")}`);
+    if (techProfile.frameworks?.length)    lines.push(`- **Framework:** ${techProfile.frameworks.join(", ")}`);
+    if (techProfile.databases?.length)     lines.push(`- **Dati/persistenza:** ${techProfile.databases.join(", ")}`);
+    if (techProfile.integrations?.length)  lines.push(`- **Integrazioni:** ${techProfile.integrations.join(", ")}`);
+    if (techProfile.infrastructure?.length) lines.push(`- **Infrastruttura:** ${techProfile.infrastructure.join(", ")}`);
+    if (techProfile.testing?.length)       lines.push(`- **Test:** ${techProfile.testing.join(", ")}`);
+    if (techProfile.summary)               lines.push(`- **Sintesi:** ${techProfile.summary}`);
+    lines.push("");
+  }
+
+  // ── Interventi Excel ──
+  if (excels.length > 0) {
+    lines.push("## Interventi richiesti dal cliente");
+    lines.push("");
+    excels.forEach((x, n) => {
+      lines.push(`### ${n + 1}. ID_INTERVENTO ${x.id}${x.title || x.titolo ? ` — ${x.title || x.titolo}` : ""}`);
+      if (x.sistema)                           lines.push(`- **Sistema:** ${x.sistema}`);
+      if (x.componente)                        lines.push(`- **Componente:** ${x.componente}`);
+      if (x.description || x.descrizione)      lines.push(`- **Descrizione:** ${x.description || x.descrizione}`);
+      if (x.activity || x.attivita)            lines.push(`- **Attività:** ${x.activity || x.attivita}`);
+      lines.push("");
+    });
+  }
+
+  // ── Voci catalogo approvate ──
+  lines.push("## Voci di catalogo approvate");
+  lines.push("");
   selected.forEach((x, n) => {
-    lines.push(
-      `## ${n + 1}. ID ${x.catalogId || x.id} – ${x.name}`,
-      "",
-      `**Motivazione:** ${x.reason || ""}`,
-      "",
-      `**Informazioni aggiuntive e razionale condiviso:** ${x.sharedRationale || x.additionalInfo || "non indicati"}`,
-      "",
-      `**Interventi necessari:** ${(x.areas || []).join("; ") || (x.activity || "")}`,
-      "",
-      `**File candidati:** ${(x.files || []).join("; ") || "da individuare"}`,
-      "",
-      `**Stato:** ${x.executionStatus || "Da avviare"}`,
-      "",
-      `**File modificati:** ${x.actualFiles || "non indicati"}`,
-      "",
-      `**Attività effettuate:** ${x.workDone || "non indicate"}`,
-      ""
-    );
+    lines.push(`### ${n + 1}. [ID ${x.catalogId || x.id}] ${x.name}`);
+    lines.push(`- **Tipo:** ${x.type || ""} · **Complessità:** ${x.complexity || ""} · **Q.tà:** ${x.quantity || 1}`);
+    if (x.reason)                        lines.push(`- **Motivazione:** ${x.reason}`);
+    if (x.sharedRationale || x.additionalInfo) lines.push(`- **Razionale:** ${x.sharedRationale || x.additionalInfo}`);
+    if (x.areas?.length)                 lines.push(`- **Aree di intervento:** ${x.areas.join("; ")}`);
+    if (x.files?.length)                 lines.push(`- **File candidati:** ${x.files.join("; ")}`);
+    if (x.interventionId)                lines.push(`- **Intervento Excel collegato:** ID_INTERVENTO ${x.interventionId}`);
+    const linked = excels.find((e) => String(e.id) === String(x.interventionId));
+    if (linked) {
+      if (linked.title || linked.titolo)            lines.push(`  - Titolo: ${linked.title || linked.titolo}`);
+      if (linked.description || linked.descrizione) lines.push(`  - Descrizione: ${linked.description || linked.descrizione}`);
+      if (linked.activity || linked.attivita)       lines.push(`  - Attività: ${linked.activity || linked.attivita}`);
+    }
+    lines.push(`- **Stato:** ${x.executionStatus || "Da avviare"}`);
+    if (x.actualFiles)  lines.push(`- **File modificati:** ${x.actualFiles}`);
+    if (x.workDone)     lines.push(`- **Attività effettuate:** ${x.workDone}`);
+    lines.push("");
   });
-  lines.push("## Compilazione e test", "", tests || "Non indicati");
+
+  lines.push("## Compilazione e test");
+  lines.push("");
+  lines.push(tests || "Non indicati");
   return lines.join("\n");
 }
 

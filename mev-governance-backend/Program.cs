@@ -195,6 +195,19 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Events = new JwtBearerEvents {
+            OnTokenValidated = context => {
+                var db = context.HttpContext.RequestServices.GetRequiredService<MevGovernanceBackend.Data.AppDbContext>();
+                var identity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
+                if (identity == null || !int.TryParse(context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)) { context.Fail("Utente non valido"); return Task.CompletedTask; }
+                var user = db.Users.FirstOrDefault(u => u.Id == userId && u.IsActive);
+                if (user == null) { context.Fail("Utente non attivo"); return Task.CompletedTask; }
+                int.TryParse(context.Principal?.FindFirst("ambienteId")?.Value, out var ambienteId);
+                foreach (var claim in identity.FindAll(identity.RoleClaimType).ToList()) identity.RemoveClaim(claim);
+                foreach (var role in MevGovernanceBackend.Services.ContractRoles.ForUser(db, user, ambienteId)) identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, role));
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer           = true,
@@ -217,7 +230,7 @@ builder.Services.AddAuthorization(options =>
      options.AddPolicy("AnyAuthenticated", policy =>
          policy.RequireAuthenticatedUser());
 });
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<MevGovernanceBackend.Services.ContractAccessFilter>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<EmailService>();
@@ -225,7 +238,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
 builder.Services.AddHttpClient("ConfiguratoreAi", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(95);
+    client.Timeout = TimeSpan.FromSeconds(360);
 });
 
 var app = builder.Build();
@@ -457,6 +470,26 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH UserRoles ERROR] {ex.Message}"); }
 
+        // Blocco separato: garantisce AppRolePermissions
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""AppRolePermissions"" (
+                    ""Id""      SERIAL  PRIMARY KEY,
+                    ""AppId""   TEXT    NOT NULL DEFAULT '',
+                    ""Role""    TEXT    NOT NULL DEFAULT '',
+                    ""CanView"" BOOLEAN NOT NULL DEFAULT TRUE,
+                    ""CanEdit"" BOOLEAN NOT NULL DEFAULT TRUE
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_AppRolePermissions_AppId_Role""
+                    ON ""{sch}"".""AppRolePermissions"" (""AppId"", ""Role"");
+            ");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] AppRolePermissions verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AppRolePermissions ERROR] {ex.Message}"); }
+
         // Blocco separato: colonna Theme (isolato per resistere a errori nel blocco principale)
         try
         {
@@ -648,11 +681,7 @@ using (var scope = app.Services.CreateScope())
                 WHERE ua.""UserId""=u.""Id"" AND ua.""AmbienteId""=a.""Id""
             );
 
-            -- Associa SUPERADMIN a tutti gli ambienti attivi (come fallback — è SuperAdmin quindi vede tutto via codice)
-            -- Assicura che MSTEFANE abbia il ruolo corretto in UserAmbienti
-            UPDATE ""{sch}"".""UserAmbienti""
-            SET ""Ruolo"" = 'Admin'
-            WHERE ""UserId"" = (SELECT ""Id"" FROM ""{sch}"".""Users"" WHERE ""Username""='MSTEFANE' LIMIT 1);
+            -- Le assegnazioni esistenti sono gestite dall'amministratore e non vengono sovrascritte al riavvio.
         ", adminHash, saHash);
         Console.WriteLine("[SEED] Utenti e Ambiente pronti.");
     }

@@ -1,299 +1,47 @@
-import React, { useState, useEffect } from "react";
-import {
-  getAllAmbienti, createAmbiente,
-  getUsers, getAmbientiUtenti, addUtenteAmbiente, removeUtenteAmbiente, updateUtenteAmbienteRuolo,
-} from "../services/mevService";
-import ContractArchivePage from "./ContractArchivePage";
+import React, { useState, useEffect } from 'react';
+import { getAllAmbienti, createAmbiente, getUsers } from '../services/mevService';
+import ContractArchivePage from './ContractArchivePage';
+import ContractMembers from '../components/contracts/ContractMembers';
+import './contractArchive.css';
 
 export default function SuperAdminPage() {
-  const [ambienti, setAmbienti]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState("");
-
-  // Nuovo ambiente
-  const [newCodice, setNewCodice]     = useState("");
-  const [newDesc, setNewDesc]         = useState("");
-  const [creating, setCreating]       = useState(false);
-
-  // Utenti di un ambiente selezionato
-  const [selectedAmbiente, setSelectedAmbiente] = useState(null);
-  const [utentiAmbiente, setUtentiAmbiente]     = useState([]);
-  const [allUsers, setAllUsers]                 = useState([]);
-  const [addUserId, setAddUserId]               = useState("");
-  const [addRuolo, setAddRuolo]                 = useState("Editor");
-  const [addingUtente, setAddingUtente]         = useState(false);
-  const [editingRuolo, setEditingRuolo]         = useState({}); // { [userId]: ruolo } — righe in modifica
-
+  const [ambienti, setAmbienti] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [view, setView] = useState('archive');
+  const [selected, setSelected] = useState(null);
+  const [query, setQuery] = useState('');
+  const [newCode, setNewCode] = useState('');
+  const [description, setDescription] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [a, u] = await Promise.all([getAllAmbienti(), getUsers()]);
-      setAmbienti(a);
-      setAllUsers(u);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError('');
+    try { const [a, u] = await Promise.all([getAllAmbienti(), getUsers()]); setAmbienti(a); setAllUsers(u); }
+    catch (e) { setError(e.message || 'Impossibile caricare i contratti.'); }
+    finally { setLoading(false); }
   };
-
   useEffect(() => { load(); }, []);
-
-  const loadUtenti = async (amb) => {
-    setSelectedAmbiente(amb);
+  const create = async e => {
+    e.preventDefault(); if (!newCode.trim()) return;
+    setCreating(true); setError('');
     try {
-      const u = await getAmbientiUtenti(amb.id);
-      setUtentiAmbiente(u);
-    } catch (e) {
-      setUtentiAmbiente([]);
-    }
+      const created = await createAmbiente(newCode.trim(), description.trim());
+      const data = await getAllAmbienti(); setAmbienti(data);
+      setSelected(created.id); setNewCode(''); setDescription(''); setShowCreate(false);
+    } catch (e) { setError(e.message); }
+    finally { setCreating(false); }
   };
-
-  const handleCreateAmbiente = async () => {
-    if (!newCodice.trim()) return;
-    setCreating(true);
-    try {
-      await createAmbiente(newCodice.trim(), newDesc.trim());
-      setNewCodice(""); setNewDesc("");
-      await load();
-    } catch (e) {
-      alert("Errore creazione ambiente: " + e.message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleAddUtente = async () => {
-    if (!addUserId || !selectedAmbiente) return;
-    setAddingUtente(true);
-    try {
-      await addUtenteAmbiente(selectedAmbiente.id, parseInt(addUserId), addRuolo);
-      const u = await getAmbientiUtenti(selectedAmbiente.id);
-      setUtentiAmbiente(u);
-      setAddUserId("");
-    } catch (e) {
-      alert("Errore: " + e.message);
-    } finally {
-      setAddingUtente(false);
-    }
-  };
-
-  const handleRemoveUtente = async (userId) => {
-    if (!selectedAmbiente) return;
-    try {
-      await removeUtenteAmbiente(selectedAmbiente.id, userId);
-      const u = await getAmbientiUtenti(selectedAmbiente.id);
-      setUtentiAmbiente(u);
-    } catch (e) {
-      alert("Errore: " + e.message);
-    }
-  };
-
-  const handleUpdateRuolo = async (userId, ruolo) => {
-    if (!selectedAmbiente) return;
-    try {
-      await updateUtenteAmbienteRuolo(selectedAmbiente.id, userId, ruolo);
-      const u = await getAmbientiUtenti(selectedAmbiente.id);
-      setUtentiAmbiente(u);
-      setEditingRuolo(prev => { const n = { ...prev }; delete n[userId]; return n; });
-    } catch (e) {
-      alert("Errore: " + e.message);
-    }
-  };
-
-  const card = { background: "white", borderRadius: 10, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", marginBottom: 20 };
-  const th = { padding: "8px 12px", textAlign: "left", fontSize: 12, fontWeight: 700, color: "#555", borderBottom: "2px solid #e8eaf6" };
-  const td = { padding: "8px 12px", fontSize: 13, color: "#333", borderBottom: "1px solid #f1f3f4", verticalAlign: "middle" };
-
-  if (loading) return <div style={{ padding: 32, color: "#666" }}>Caricamento...</div>;
-  if (error)   return <div style={{ padding: 32, color: "#ea4335" }}>{error}</div>;
-
-  return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1a73e8", marginBottom: 20 }}>Gestione Contratti</h2>
-
-      {/* ── Archivio configurazioni (ContractArchivePage) ── */}
-      <ContractArchivePage ambienti={ambienti} />
-
-      {/* Lista contratti MEV */}
-      <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 12 }}>Contratti MEV Esistenti</div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={th}>ID</th>
-              <th style={th}>Codice Contratto</th>
-              <th style={th}>Descrizione</th>
-              <th style={th}>Stato</th>
-              <th style={th}>Creato il</th>
-              <th style={th}>Utenti</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ambienti.map(a => (
-              <tr key={a.id}>
-                <td style={td}>{a.id}</td>
-                <td style={{ ...td, fontWeight: 600 }}>{a.codiceContratto}</td>
-                <td style={td}>{a.descrizione}</td>
-                <td style={td}>
-                  <span style={{
-                    padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600,
-                    background: a.isActive ? "#e6f4ea" : "#fce8e6",
-                    color: a.isActive ? "#137333" : "#c5221f",
-                  }}>
-                    {a.isActive ? "Attivo" : "Disattivato"}
-                  </span>
-                </td>
-                <td style={td}>{new Date(a.createdAt).toLocaleDateString("it-IT")}</td>
-                <td style={td}>
-                  <button
-                    onClick={() => loadUtenti(a)}
-                    style={{
-                      padding: "4px 12px", background: "#e8f0fe", color: "#1a73e8",
-                      border: "1px solid #c5d8fb", borderRadius: 6, fontSize: 12,
-                      cursor: "pointer", fontWeight: 600,
-                    }}
-                  >
-                    Gestisci
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Gestione utenti di un ambiente */}
-      {selectedAmbiente && (
-        <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 4 }}>
-            Utenti — <span style={{ color: "#1a73e8" }}>{selectedAmbiente.codiceContratto}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>{selectedAmbiente.descrizione}</div>
-
-          {/* Aggiungi utente */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div>
-              <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Utente</div>
-              <select
-                value={addUserId}
-                onChange={e => setAddUserId(e.target.value)}
-                style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13 }}
-              >
-                <option value="">-- seleziona --</option>
-                {allUsers
-                  .filter(u => !utentiAmbiente.some(ua => ua.userId === u.id))
-                  .map(u => (
-                    <option key={u.id} value={u.id}>{u.username} — {u.fullName}</option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Ruolo</div>
-              <select
-                value={addRuolo}
-                onChange={e => setAddRuolo(e.target.value)}
-                style={{ padding: "7px 10px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 13 }}
-              >
-                <option>Admin</option>
-                <option>Editor</option>
-                <option>Client</option>
-                <option>Developer</option>
-                <option>SuperAdmin</option>
-              </select>
-            </div>
-            <button
-              onClick={handleAddUtente}
-              disabled={addingUtente || !addUserId}
-              style={{
-                padding: "7px 20px", background: "#1a73e8", color: "white",
-                border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-                cursor: addingUtente ? "wait" : "pointer", opacity: addingUtente ? 0.7 : 1,
-              }}
-            >
-              Aggiungi
-            </button>
-          </div>
-
-          {/* Lista utenti */}
-          {utentiAmbiente.length === 0
-            ? <div style={{ color: "#888", fontSize: 13 }}>Nessun utente associato a questo ambiente.</div>
-            : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={th}>Username</th>
-                    <th style={th}>Nome</th>
-                    <th style={th}>Email</th>
-                    <th style={th}>Ruolo Ambiente</th>
-                    <th style={th}>Azioni</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {utentiAmbiente.map(ua => {
-                    const isEditing = editingRuolo[ua.userId] !== undefined;
-                    const ruoloColor = ua.ruolo === "Admin" ? { bg: "#e8f0fe", fg: "#1a73e8" }
-                      : ua.ruolo === "Client" ? { bg: "#eff6ff", fg: "#2563eb" }
-                      : { bg: "#f1f3f4", fg: "#555" };
-                    return (
-                      <tr key={ua.id}>
-                        <td style={{ ...td, fontWeight: 600 }}>{ua.username}</td>
-                        <td style={td}>{ua.fullName}</td>
-                        <td style={td}>{ua.email}</td>
-                        <td style={td}>
-                          {isEditing ? (
-                            <select
-                              value={editingRuolo[ua.userId]}
-                              onChange={e => setEditingRuolo(prev => ({ ...prev, [ua.userId]: e.target.value }))}
-                              style={{ padding: "4px 8px", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12 }}
-                            >
-                              <option>Admin</option>
-                              <option>Editor</option>
-                              <option>Client</option>
-                              <option>Developer</option>
-                              <option>SuperAdmin</option>
-                            </select>
-                          ) : (
-                            <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: ruoloColor.bg, color: ruoloColor.fg }}>
-                              {ua.ruolo}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ ...td, display: "flex", gap: 6 }}>
-                          {isEditing ? (
-                            <>
-                              <button
-                                onClick={() => handleUpdateRuolo(ua.userId, editingRuolo[ua.userId])}
-                                style={{ padding: "3px 10px", background: "#e6f4ea", color: "#137333", border: "1px solid #a8d5b5", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
-                              >Salva</button>
-                              <button
-                                onClick={() => setEditingRuolo(prev => { const n = { ...prev }; delete n[ua.userId]; return n; })}
-                                style={{ padding: "3px 10px", background: "#f1f3f4", color: "#555", border: "1px solid #dadce0", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
-                              >Annulla</button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => setEditingRuolo(prev => ({ ...prev, [ua.userId]: ua.ruolo }))}
-                                style={{ padding: "3px 10px", background: "#e8f0fe", color: "#1a73e8", border: "1px solid #c5d8fb", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
-                              >Modifica</button>
-                              <button
-                                onClick={() => handleRemoveUtente(ua.userId)}
-                                style={{ padding: "3px 10px", background: "#fce8e6", color: "#c5221f", border: "1px solid #f5c6c2", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
-                              >Rimuovi</button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-        </div>
-      )}
-
-    </div>
-  );
+  const filtered = ambienti.filter(a => [a.codiceContratto, a.descrizione].join(' ').toLocaleLowerCase('it').includes(query.toLocaleLowerCase('it')));
+  const current = filtered.find(a => a.id === selected) || filtered[0];
+  return <div className="ca-admin-shell">
+    <nav className="ca-area-nav" aria-label="Gestione contratti"><button className={view === 'archive' ? 'is-active' : ''} aria-current={view === 'archive' ? 'page' : undefined} onClick={() => setView('archive')}>Archivio e configurazioni</button><button className={view === 'access' ? 'is-active' : ''} aria-current={view === 'access' ? 'page' : undefined} onClick={() => setView('access')}>Contratti MEV e accessi</button></nav>
+    {error && <div role="alert" className="ca-error">{error} <button onClick={load} disabled={loading || creating}>Riprova</button></div>}
+    {loading ? <p role="status" className="ca-empty">Caricamento dei contratti…</p> : view === 'archive' ? <ContractArchivePage ambienti={ambienti} allUsers={allUsers} /> : <div className="contract-archive ca-access-page">
+      <header className="ca-member-heading"><div><p className="ca-eyebrow">AUTORIZZAZIONI</p><h1>Contratti MEV e accessi</h1><p className="ca-caption">Gestisci gli utenti anche per i contratti senza una configurazione in archivio.</p></div><button className="ca-primary" aria-expanded={showCreate} onClick={() => setShowCreate(v => !v)}>{showCreate ? 'Annulla' : '+ Nuovo contratto MEV'}</button></header>
+      {showCreate && <form className="ca-member-form" onSubmit={create}><label>Codice contratto<input required value={newCode} onChange={e => setNewCode(e.target.value)} disabled={creating} /></label><label>Descrizione<input value={description} onChange={e => setDescription(e.target.value)} disabled={creating} /></label><button className="ca-primary" disabled={creating || !newCode.trim()}>{creating ? 'Creazione…' : 'Crea contratto MEV'}</button></form>}
+      <div className="ca-workspace"><aside className="ca-directory"><div className="ca-directory-head"><strong>Contratti MEV</strong><span>{filtered.length}</span></div><label className="ca-search">Cerca contratto<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Codice o descrizione" /></label><div className="ca-contracts">{filtered.map(a => <button key={a.id} className={'ca-contract-choice' + (current?.id === a.id ? ' is-selected' : '')} aria-pressed={current?.id === a.id} onClick={() => setSelected(a.id)}><span className="ca-contract-icon" aria-hidden="true">▤</span><span><strong>{a.codiceContratto}</strong><small>{a.descrizione || 'Nessuna descrizione'}</small><small>{a.isActive ? 'Attivo' : 'Disattivato'}</small></span></button>)}{!filtered.length && <p className="ca-empty">Nessun contratto trovato.</p>}</div></aside><section className="ca-detail ca-access-detail">{current ? <ContractMembers key={current.id} ambiente={current} allUsers={allUsers} /> : <div className="ca-empty"><h2>Nessun contratto MEV</h2><p>Crea un contratto oppure modifica la ricerca.</p></div>}</section></div>
+    </div>}
+  </div>;
 }

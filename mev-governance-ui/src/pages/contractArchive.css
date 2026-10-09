@@ -1,0 +1,93 @@
+.ca-admin-shell{max-width:1480px;margin:0 auto;padding:16px 20px 40px;color:#172b4d;font-family:inherit}
+.ca-area-nav{display:flex;gap:8px;border-bottom:1px solid #dce5ef;padding:4px 0 16px;margin-bottom:8px;flex-wrap:wrap}
+.ca-area-nav button,.contract-archive button{font-family:inherit;transition:background .15s,border-color .15s,box-shadow .15s}
+.ca-area-nav button{border:0;border-radius:8px;background:transparent;color:#52657d;padding:12px 18px;font-weight:600;cursor:pointer}
+.ca-area-nav .is-active{background:#e8effa;color:#174ea6}
+.ca-workspace{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;align-items:start}
+.ca-directory{background:#fff;border:1px solid #dce5ef;border-radius:16px;overflow:hidden;position:sticky;top:20px}
+.ca-directory-head{display:flex;justify-content:space-between;align-items:center;padding:20px 18px 10px;font-size:14px}
+.ca-directory-head span{color:#65758a;font-size:12px}
+.ca-search{display:grid;gap:7px;font-size:12px;font-weight:600;color:#52657d;margin:12px 18px}
+.contract-archive input,.contract-archive select{font-family:inherit}
+.ca-search input,.ca-search select,.ca-member-form input,.ca-member-form select,.ca-table select{width:100%;box-sizing:border-box;background:#fff;border:1px solid #bac8da;border-radius:8px;padding:10px 12px;color:#172b4d;font-size:13px;min-height:42px;font-family:inherit;min-width:0}
+.ca-contracts{padding:10px;display:grid;gap:6px;max-height:65vh;overflow:auto}
+.ca-contract-choice{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;border:1px solid transparent;border-radius:10px;padding:15px 12px;background:transparent;color:#172b4d;cursor:pointer;overflow-wrap:anywhere}
+.ca-contract-choice:hover{background:#f5f8fc}
+.ca-contract-choice.is-selected{background:#edf4ff;border-color:#b7cff1;box-shadow:inset 3px 0 #174ea6}
+.ca-contract-choice strong{display:block;font-size:14px;line-height:1.45}
+.ca-contract-choice small{display:block;margin-top:5px;color:#52657d;font-size:11px;line-height:1.5}
+.ca-contract-icon{display:grid;place-items:center;background:#eff3f8;border:1px solid #dce5ef;width:34px;height:38px;border-radius:8px;font-size:22px;flex-shrink:0;color:#174ea6}
+.ca-detail{min-width:0}
+.ca-section-nav{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid #dce5ef;padding-bottom:8px}
+.ca-section-nav button{padding:11px 13px;border:0;background:transparent;border-radius:8px;color:#52657d;font-size:13px;font-weight:600;cursor:pointer}
+.ca-section-nav .is-active{background:#e8effa;color:#174ea6}
+.ca-members h3{margin:8px 0;font-size:18px;line-height:1.4}
+.ca-member-heading{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:20px}
+.ca-member-heading>span{color:#52657d;font-size:13px}
+.ca-tag{display:inline-block;background:#edf4ff;color:#174ea6;border:1px solid #cbdcf3;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700}
+.ca-member-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.6fr) auto;gap:14px;align-items:end;background:#f5f8fc;border:1px solid #dce5ef;padding:18px;border-radius:12px;margin:20px 0}
+.ca-member-form label{display:grid;gap:8px;font-size:12px;font-weight:600;min-width:0}
+.ca-members button,.ca-access-page button,.ca-error button{min-height:40px;border:1px solid #bac8da;border-radius:8px;background:white;color:#29415e;padding:9px 12px;cursor:pointer;font-family:inherit;font-weight:600;font-size:12px}
+.ca-members .ca-primary,.ca-access-page .ca-primary{background:#174ea6;border-color:#174ea6;color:white}
+.ca-members .ca-danger{color:#a81832;border-color:#f1b9c0}
+.ca-caption{color:#52657d;font-size:13px;line-height:1.65;margin:8px 0 16px}
+.ca-notice,.ca-success,.ca-error{padding:12px 16px;border-radius:9px;font-size:13px;line-height:1.6;margin:12px 0}
+.ca-notice{background:#fff8e8;border:1px solid #efdbac;color:#79580d}
+.ca-success{background:#e8f6ef;color:#166534;border:1px solid #bbf7d0}
+.ca-error{background:#fff1f2;color:#a81832;border:1px solid #f1b9c0}
+.ca-empty{text-align:center;color:#52657d;padding:30px 18px;font-size:13px;line-height:1.7}
+.ca-table-wrap{max-width:100%;overflow:auto;border:1px solid #dce5ef;border-radius:12px}
+.ca-table{width:100%;border-collapse:collapse;min-width:570px;font-size:13px;text-align:left}
+.ca-table th{background:#f4f7fb;padding:12px 16px;font-weight:600;color:#52657d;font-size:12px}
+.ca-table td{padding:16px;border-top:1px solid #e7edf5;vertical-align:middle}
+.ca-table td strong{display:block}
+.ca-table td small{display:block;color:#52657d;margin-top:5px}
+.ca-row-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ca-access-page{padding:24px 12px}
+.ca-access-detail{background:white;border:1px solid #dce5ef;border-radius:16px;padding:24px}
+.ca-eyebrow{color:#174ea6;font-size:11px;font-weight:800;letter-spacing:.12em}
+.ca-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.contract-archive :focus-visible,.ca-admin-shell :focus-visible{outline:3px solid #4285f4;outline-offset:3px}
+.contract-archive button:disabled,.ca-admin-shell button:disabled{opacity:.5;cursor:not-allowed}
+@media(min-width:1100px){.ca-lot-manager{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1100px){.ca-workspace{grid-template-columns:250px minmax(0,1fr);gap:16px}.ca-member-form{grid-template-columns:1fr 1fr}.ca-member-form button{grid-column:1/-1}}
+@media(max-width:780px){.ca-admin-shell{padding:8px 8px 24px}.ca-workspace{grid-template-columns:1fr}.ca-directory{position:static}.ca-contracts{max-height:240px}.ca-member-form{grid-template-columns:1fr}.ca-section-nav button{flex:1 1 auto}.ca-access-detail{padding:16px}}
+.contract-archive dialog::backdrop{background:rgba(16,42,71,.5)}
+
+.ca-contract-detail{grid-template-columns:minmax(0,1fr)}
+.ca-contract-detail>*{min-width:0}
+.ca-directory{min-width:0}
+@media(max-width:780px){.ca-workspace{grid-template-columns:minmax(0,1fr)}}
+dialog::backdrop{background:rgba(16,42,71,.5)}
+
+.ca-fixed-summary{position:sticky;top:48px;z-index:90;background:#f4f7fb;padding-top:12px;box-shadow:0 10px 12px -12px rgba(24,48,78,.22)}
+.contract-archive .ca-directory{top:calc(48px + var(--ca-summary-height,260px) + 16px)}
+@media(max-width:780px){
+  .ca-fixed-summary{padding-top:8px}
+  .ca-fixed-summary>div:first-child{gap:10px!important;margin-bottom:12px!important}
+  .ca-archive-stats{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;margin-bottom:16px!important}
+  .ca-archive-stats>div{padding:12px 8px!important;border-radius:10px!important}
+  .ca-archive-stats>div>span{font-size:11px!important;display:block;min-height:32px}
+  .ca-archive-stats strong{font-size:24px!important}
+}
+
+.ca-area-nav{position:sticky;top:48px;z-index:91;background:#f4f7fb}
+.ca-fixed-summary{top:calc(48px + var(--ca-nav-height,0px));padding-bottom:1px}
+.contract-archive .ca-directory{top:calc(48px + var(--ca-nav-height,0px) + var(--ca-summary-height,260px) + 16px)}
+
+.ca-order-hint{font-size:11px;line-height:1.6;color:#52657d;margin:8px 18px}
+.ca-drag-handle{cursor:grab}
+.ca-contract-choice.is-drop-target{border-top:3px solid #174ea6;background:#edf4ff}
+.ca-contract-choice:active .ca-drag-handle{cursor:grabbing}
+.ca-lot-documents{border:1px solid #dce5ef;border-radius:12px;padding:18px;background:#fff}
+.ca-lot-documents h3{margin:0;font-size:16px}
+.ca-saved-documents{display:grid;gap:12px;list-style:none;margin:16px 0;padding:0}
+.ca-saved-documents li{padding:12px;background:#f5f8fc;border-radius:8px;display:grid;gap:4px;font-size:13px;overflow-wrap:anywhere}
+.ca-saved-documents small{color:#52657d;font-size:12px}
+.ca-file-picker{position:relative;display:block;background:white;border:1px solid #bac8da;border-radius:8px;padding:10px 12px;font-size:12px;color:#174ea6;cursor:pointer;overflow-wrap:anywhere;min-height:42px}
+.ca-file-picker:focus-within{outline:3px solid #4285f4;outline-offset:3px}
+.ca-file-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0}
+.ca-role-picker{border:1px solid #dce5ef;border-radius:8px;padding:10px;min-width:0;display:flex;flex-wrap:wrap;gap:10px;margin:0}
+.ca-role-picker legend{font-size:12px;font-weight:600;color:#52657d;padding:0 4px}
+.ca-role-picker label{display:flex;gap:6px;align-items:center;font-size:12px;white-space:nowrap}
+.ca-role-picker input{width:16px;height:16px;min-height:0;accent-color:#174ea6;margin:0}

@@ -37,22 +37,25 @@ public class ConfiguratoreController : ControllerBase
     private bool CanAccessRecords()
     {
         return User.IsInRole("SuperAdmin") || User.IsInRole("Developer")
-            || User.IsInRole("Admin") || User.IsInRole("Manager");
+            || User.IsInRole("Admin") || User.IsInRole("Manager")
+            || User.IsInRole("Bid Manager");
     }
+
+    private bool CanAccessGare() => User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager");
 
     private static readonly string[] ValidEntities =
     {
         "initiative_evaluation", "release_calendar", "implementation_plan",
         "code_change_request", "implementation_report", "tow_percentages",
         "technical_analysis", "application", "contract", "contract_lot",
-        "setting", "other"
+        "shared_applications", "setting", "other", "gara"
     };
 
     private (string Schema, string ConStr) GetDbTarget()
     {
         var rawSchema = (_config["DB_SCHEMA"] ?? "").Trim().ToLower();
         var sch = rawSchema.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(rawSchema, @"^[a-zA-Z0-9_]+$")
-            ? rawSchema : "dev";
+            ? rawSchema : "public";
         // Se DB_CONNECTION_STRING manca, prova le variabili che Render/Supabase espongono.
         var cs = _config["DB_CONNECTION_STRING"] ?? "";
         if (string.IsNullOrWhiteSpace(cs))
@@ -275,15 +278,12 @@ public class ConfiguratoreController : ControllerBase
 
             var catalogFile = form.Files.GetFile($"catalogFile_{lotId}");
             var priceFile   = form.Files.GetFile($"priceFile_{lotId}");
-
-            if (priceFile == null)
-            {
-                errors.Add($"Lotto {lotId}: file listino TOW mancante");
-                continue;
-            }
+            // Se non è stato caricato un listino separato, usa il capitolato (rulesFile)
+            // come sorgente dei prezzi TOW — i valori si trovano in esso (es. pag. 66).
+            var towSourceFile = priceFile ?? rfFile;
 
             List<CatalogEntry> catalog = new();
-            Dictionary<string, double> towPrices;
+            Dictionary<string, double> towPrices = new();
 
             // Il catalogo PDF è opzionale — può essere caricato in un secondo momento
             if (catalogFile != null)
@@ -301,25 +301,33 @@ public class ConfiguratoreController : ControllerBase
                 }
             }
 
-            try
+            if (towSourceFile != null)
             {
-                await using var priceStream = priceFile.OpenReadStream();
-                var isExcel = priceFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
-                towPrices = isExcel
-                    ? ContractParserService.ParseTowPriceExcel(priceStream, lotNum)
-                    : ContractParserService.ParseTowPricePdf(priceStream, lotNum);
+                try
+                {
+                    await using var priceStream = towSourceFile.OpenReadStream();
+                    var isExcel = towSourceFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+                    towPrices = isExcel
+                        ? ContractParserService.ParseTowPriceExcel(priceStream, lotNum)
+                        : ContractParserService.ParseTowPricePdf(priceStream, lotNum);
+                    if (towPrices.Count == 0)
+                        errors.Add($"Lotto {lotId}: nessun prezzo TOW trovato in '{towSourceFile.FileName}'");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Lotto {lotId} listino: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+            else
             {
-                errors.Add($"Lotto {lotId} listino: {ex.Message}");
-                towPrices = new Dictionary<string, double>();
+                errors.Add($"Lotto {lotId}: nessun file disponibile per i prezzi TOW (carica un listino o il capitolato)");
             }
 
             var lotPayload = new Dictionary<string, object?>
             {
                 ["name"]        = meta.Name ?? $"Lotto {lotId}",
                 ["catalogFile"] = catalogFile?.FileName ?? "",
-                ["priceFile"]   = priceFile.FileName,
+                ["priceFile"]   = towSourceFile?.FileName ?? "",
                 ["tow5Share"]   = meta.Tow5Share ?? 65,
                 ["active"]      = true,
                 ["codiceContratto"] = "",
@@ -539,10 +547,11 @@ public class ConfiguratoreController : ControllerBase
     [HttpGet("records")]
     public async Task<IActionResult> GetRecords([FromQuery] string? entity_type, [FromQuery] string? contract_id, [FromQuery] string? lot_id, [FromQuery] string? q)
     {
-
+        if (entity_type == "gara" && !CanAccessGare()) return Forbid();
         var (sch, cs) = GetDbTarget();
         var sql = $@"SELECT id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at"" FROM ""{sch}"".""PC_DataRecords"" WHERE 1 = 1";
         var ps = new List<NpgsqlParameter>();
+        if (!CanAccessGare()) sql += " AND \"entity_type\" <> 'gara'";
 
         if (!string.IsNullOrWhiteSpace(entity_type))
         {
@@ -584,7 +593,7 @@ public class ConfiguratoreController : ControllerBase
     [HttpPost("records")]
     public async Task<IActionResult> UpsertRecord([FromBody] PcRecordRequest req)
     {
-        if (!CanAccessRecords()) return Forbid();
+        if (req.EntityType == "gara" ? !CanAccessGare() : !CanAccessRecords()) return Forbid();
         if (string.IsNullOrWhiteSpace(req.RecordKey) || string.IsNullOrWhiteSpace(req.EntityType))
             return BadRequest("record_key e entity_type sono obbligatori");
         if (!ValidEntities.Contains(req.EntityType))
@@ -608,6 +617,7 @@ public class ConfiguratoreController : ControllerBase
                 ""title""       = EXCLUDED.""title"",
                 ""payload""     = EXCLUDED.""payload"",
                 ""updated_at""  = now()
+            WHERE ""PC_DataRecords"".""entity_type"" = EXCLUDED.""entity_type""
             RETURNING id AS ""Id"", ""record_key"", ""entity_type"", ""contract_id"", ""lot_id"", ""title"", ""payload""::text AS ""payload"", ""created_at"", ""updated_at""";
 
         try
@@ -616,8 +626,8 @@ public class ConfiguratoreController : ControllerBase
             {
                 new("rk", req.RecordKey),
                 new("et", req.EntityType),
-                new("cid", req.ContractId ?? ""),
-                new("lid", req.LotId ?? ""),
+                new("cid", req.EntityType == "gara" ? "" : req.ContractId ?? ""),
+                new("lid", req.EntityType == "gara" ? "" : req.LotId ?? ""),
                 new("title", req.Title ?? ""),
                 new("pl", payloadJson),
             }, sch);
@@ -640,7 +650,7 @@ public class ConfiguratoreController : ControllerBase
             return BadRequest("Id non valido");
 
         var (sch, cs) = GetDbTarget();
-        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid";
+        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid AND (""entity_type"" <> 'gara' OR @canGare)";
 
         try
         {
@@ -648,6 +658,7 @@ public class ConfiguratoreController : ControllerBase
             await conn.OpenAsync();
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", gid);
+            cmd.Parameters.AddWithValue("canGare", CanAccessGare());
             var affected = await cmd.ExecuteNonQueryAsync();
             return Ok(new { deleted = affected > 0 });
         }
@@ -658,8 +669,56 @@ public class ConfiguratoreController : ControllerBase
     }
 
     // ============================================================
-    // Helper query generica
+    // GET  /api/configuratore/release-progress?contractId=&release=
+    // PUT  /api/configuratore/release-progress
+    // Body PUT: { contractId, release, rows: [ { mevId, ...campi } ] }
+    // Dati di avanzamento attività per release — entity_type 'release_progress'
+    // record_key = "{contractId}|{release}|release-progress"
     // ============================================================
+    [HttpGet("release-progress")]
+    public async Task<IActionResult> GetReleaseProgress([FromQuery] string? contractId, [FromQuery] string? release)
+    {
+        if (!CanAccessRecords()) return Forbid();
+        var (sch, cs) = GetDbTarget();
+        try
+        {
+            var conditions = new List<string> { $@"""entity_type"" = 'release_progress'" };
+            var ps = new List<NpgsqlParameter>();
+            if (!string.IsNullOrWhiteSpace(contractId))
+            { conditions.Add($@"""contract_id"" = @cid"); ps.Add(new("cid", contractId)); }
+            if (!string.IsNullOrWhiteSpace(release))
+            { conditions.Add($@"""title"" = @rel"); ps.Add(new("rel", release)); }
+            var sql = $@"SELECT ""record_key"",""contract_id"",""title"",""payload"" FROM ""{sch}"".""PC_DataRecords"" WHERE {string.Join(" AND ", conditions)} ORDER BY ""title""";
+            var records = await QueryAsync(cs, sql, ps, sch);
+            return Ok(records);
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Errore lettura avanzamenti", error = ex.Message }); }
+    }
+
+    [HttpPut("release-progress")]
+    public async Task<IActionResult> UpsertReleaseProgress([FromBody] ReleaseProgressRequest req)
+    {
+        if (!CanAccessRecords()) return Forbid();
+        if (string.IsNullOrWhiteSpace(req.ContractId) || string.IsNullOrWhiteSpace(req.Release))
+            return BadRequest("contractId e release sono obbligatori");
+        var (sch, cs) = GetDbTarget();
+        var rk = $"{req.ContractId}|{req.Release}|release-progress";
+        var payload = req.Payload.HasValue ? req.Payload.Value.GetRawText() : "{}";
+        var sql = $@"INSERT INTO ""{sch}"".""PC_DataRecords"" (""record_key"",""entity_type"",""contract_id"",""lot_id"",""title"",""payload"")
+            VALUES (@rk,'release_progress',@cid,'',@rel,@pl::jsonb)
+            ON CONFLICT (""record_key"") DO UPDATE SET ""payload""=EXCLUDED.""payload"",""updated_at""=now()";
+        try
+        {
+            await ExecuteAsync(cs, sql, new List<NpgsqlParameter>
+            {
+                new("rk", rk), new("cid", req.ContractId), new("rel", req.Release), new("pl", payload)
+            });
+            return Ok(new { message = "Avanzamento salvato", release = req.Release });
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Errore salvataggio avanzamento", error = ex.Message }); }
+    }
+
+
     private async Task<List<Dictionary<string, object?>>> QueryAsync(string cs, string sql, List<NpgsqlParameter> ps, string schema)
     {
         var result = new List<Dictionary<string, object?>>();
@@ -870,3 +929,9 @@ public class BuiltinLotData
     public System.Text.Json.JsonElement? Catalog   { get; set; }
     public System.Text.Json.JsonElement? TowPrices { get; set; }
 }
+
+public record ReleaseProgressRequest(
+    [property: JsonPropertyName("contractId")] string ContractId,
+    [property: JsonPropertyName("release")]    string Release,
+    [property: JsonPropertyName("payload")]    System.Text.Json.JsonElement? Payload
+);

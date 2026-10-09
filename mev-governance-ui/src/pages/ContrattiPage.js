@@ -669,7 +669,7 @@ function ConsumoTowSection({ towRows, ambienteId }) {
               </thead>
               <tbody>
                 {(serviziSections.length + canoneSections.length) === 0 ? (
-                  <tr><td colSpan={7} style={{ padding: "16px", textAlign: "center", color: "#888", fontSize: "13px" }}>
+                  <tr><td colSpan={6} style={{ padding: "16px", textAlign: "center", color: "#888", fontSize: "13px" }}>
                     Nessun dato per questo tipo di contratto.
                   </td></tr>
 
@@ -714,8 +714,6 @@ function ConsumoTowSection({ towRows, ambienteId }) {
                                   <span>{sec.label}</span>
                                 </div>
                               </td>
-
-
                               {/* Valore Totale: vuoto per Task e Collaudo */}
                               <td style={TD("right")} />
                               {sec.key === "collaudo" ? (
@@ -749,7 +747,7 @@ function ConsumoTowSection({ towRows, ambienteId }) {
                               <tr key={`${sec.key}-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
                                 <td style={TD("left", { fontSize: "12px", paddingLeft: "60px", color: "#555" })}>{row.tow}</td>
 
-                                 {sec.key !== "collaudo" && (
+                                {sec.key !== "collaudo" && (
                                   <td style={TD("right", { fontSize: "12px" })}>
                                     {formatEuro(row.valoreTotale)}
                                   </td>
@@ -858,6 +856,131 @@ function ConsumoTowSection({ towRows, ambienteId }) {
               </tbody >
             </table>
           </div>
+
+          {/* ── Tabella dettaglio TOW per sottocontratto selezionato ── */}
+          {(() => {
+            // Righe del sottocontratto attivo (es. "BASE", "OPZIONE1" …)
+            const towRows = filtered.filter(r => r.towContratto === selectedTipo);
+            if (towRows.length === 0) return null;
+
+            const fmtNum = n => (n ?? 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const safeDiv = (a, b) => (b && b !== 0 ? a / b : null);
+            // QTA contrattuale fissa = ValoreTotale / ValoreUnitario (non il campo TowApprovati che è dinamico)
+            const getQta = r => !r.isCatalogo && r.valoreUnitario > 0 ? r.valoreTotale / r.valoreUnitario : null;
+
+            // Totali riga blu (escludo isCatalogo per le colonne TOW calcolate)
+            const totVt  = towRows.reduce((s, r) => s + (r.valoreTotale || 0), 0);
+            const totApp = towRows.reduce((s, r) => s + (r.approvato || 0), 0);
+            const totOrd = towRows.reduce((s, r) => s + (r.ordinatiRda || 0), 0);
+            const totImp = towRows.reduce((s, r) => s + (r.impegnato || 0), 0);
+            const totRes = towRows.reduce((s, r) => s + (r.residuo || 0), 0);
+
+            // stili per la sezione TOW raggruppata
+            const TOW_BG       = "#f0f7ff";
+            const TOW_BORDER   = "3px solid #3b82f6";
+            const TOW_HDR_BG   = "#1e40af";
+            const tdTow = (extra = {}) => ({
+              ...TD("right", extra),
+              borderLeft: "none",
+              background: TOW_BG,
+              fontSize: "14px",
+              fontWeight: 700,
+            });
+            const tdTowFirst = (extra = {}) => ({
+              ...tdTow(extra),
+              borderLeft: TOW_BORDER,
+            });
+
+            return (
+              <div style={{ borderRadius: "0px", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    {/* Riga 1: titoli colonne normali + intestazione TOW raggruppata */}
+                    <tr>
+                      <th style={TH()} rowSpan={2}>TOW — {selectedTipo}</th>
+                      <th style={TH("right")} rowSpan={2}>Val. Unitario</th>
+                      <th style={TH("right")} rowSpan={2}>Val. Totale</th>
+                      <th style={TH("right")} rowSpan={2}>Approvato</th>
+                      <th style={TH("right")} rowSpan={2}>Ordinato</th>
+                      <th style={TH("right")} rowSpan={2}>Impegnato</th>
+                      <th style={TH("right")} rowSpan={2}>Residuo</th>
+                      {/* Intestazione gruppo TOW */}
+                      <th colSpan={3} style={{
+                        ...TH("center"),
+                        background: TOW_HDR_BG,
+                        color: "#fff",
+                        borderLeft: TOW_BORDER,
+                        letterSpacing: "0.08em",
+                        fontSize: "12px",
+                        textTransform: "uppercase",
+                        padding: "6px 12px",
+                      }}>TOW</th>
+                    </tr>
+                    {/* Riga 2: sub-colonne TOW */}
+                    <tr>
+                      <th style={{ ...TH("right"), background: "#dbeafe", borderLeft: TOW_BORDER, color: "#1e40af", fontSize: "12px" }}>QTA</th>
+                      <th style={{ ...TH("right"), background: "#dbeafe", color: "#1e40af", fontSize: "12px" }}>Approvati</th>
+                      <th style={{ ...TH("right"), background: "#dbeafe", color: "#1e40af", fontSize: "12px" }}>Residui</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Riga totali blu */}
+                    <tr style={{ background: "#DCEEFF", borderBottom: "1px solid #BFDFFF" }}>
+                      <td style={TD("left", { fontWeight: 700, color: "#0F4C81" })}>Totale</td>
+                      <td />{/* Val. Unitario — non aggregabile */}
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(totVt)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(totApp)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(totOrd)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(totImp)}</td>
+                      <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>{formatEuro(totRes)}</td>
+                      {/* TOW section totale — vuote */}
+                      <td style={{ ...TD("right"), borderLeft: TOW_BORDER, background: "#e8f1ff" }} />
+                      <td style={{ background: "#e8f1ff" }} />
+                      <td style={{ background: "#e8f1ff" }} />
+                    </tr>
+                    {/* Righe per TOW */}
+                    {towRows.map((row, ri) => {
+                      const qta          = getQta(row);
+                      const towApprovati = !row.isCatalogo ? safeDiv(row.approvato, row.valoreUnitario) : null;
+                      const towResidui   = !row.isCatalogo ? safeDiv((row.valoreTotale || 0) - (row.approvato || 0), row.valoreUnitario) : null;
+                      const rowBg        = ri % 2 === 0 ? "white" : "#fafafa";
+                      return (
+                        <tr key={`tow-det-${ri}`} style={{ background: rowBg, borderBottom: "1px solid #f0f0f0" }}>
+                          <td style={TD("left", { fontSize: "12px", paddingLeft: "20px", color: "#334155", fontWeight: 600 })}>
+                            {row.tow}
+                            {row.isCatalogo && (
+                              <span style={{ marginLeft: 6, fontSize: "10px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 4, padding: "1px 5px", color: "#64748b" }}>CAT.</span>
+                            )}
+                          </td>
+                          <td style={TD("right", { fontSize: "12px" })}>
+                            {row.valoreUnitario > 0 ? formatEuro(row.valoreUnitario) : <span style={{ color: "#cbd5e1" }}>—</span>}
+                          </td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.valoreTotale)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.approvato)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.ordinatiRda)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.impegnato)}</td>
+                          <td style={TD("right", { fontSize: "12px" })}>{formatEuro(row.residuo)}</td>
+                          {/* ── sezione TOW evidenziata ── */}
+                          {/* QTA */}
+                          <td style={tdTowFirst({ color: "#1e3a8a" })}>
+                            {qta != null ? fmtNum(qta) : <span style={{ color: "#93c5fd", fontWeight: 400 }}>—</span>}
+                          </td>
+                          {/* Approvati */}
+                          <td style={tdTow({ color: "#166534" })}>
+                            {towApprovati != null ? fmtNum(towApprovati) : <span style={{ color: "#93c5fd", fontWeight: 400 }}>—</span>}
+                          </td>
+                          {/* Residui */}
+                          <td style={tdTow({ color: "#1e40af" })}>
+                            {towResidui != null ? fmtNum(towResidui) : <span style={{ color: "#93c5fd", fontWeight: 400 }}>—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
 
           {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>

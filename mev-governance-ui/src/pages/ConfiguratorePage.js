@@ -8,6 +8,8 @@ import {
   analyzeInitiativeWithAi,
   getReleaseSchedules,
   getTowImpatto,
+  getSharedApplications,
+  putSharedApplications,
 } from "../services/mevService";
 import JSZip from "jszip";
 import {
@@ -41,7 +43,7 @@ import {
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
-function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
+export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
   const [lot, setLot] = useState("1");
@@ -62,23 +64,27 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [contingency, setContingency] = useState(0);
   const [tow, setTow] = useState({});
   const [towPercentages, setTowPercentages] = useState({});
-  const [priceMode] = useState("historical");
+  const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
   const [showDescModal, setShowDescModal] = useState(false);
-  const [releaseList, setReleaseList] = useState([]); // release del contratto selezionato
-  const [towImpattoDb, setTowImpattoDb] = useState({}); // { "BASE": { "TOW01.1": 30, ... }, "QDO": {...} }
-  const [towImpattoSrc, setTowImpattoSrc] = useState(""); // contratto sorgente % impatto scelto dall'utente
+  const [releaseList, setReleaseList] = useState([]);
+  const [towImpattoDb, setTowImpattoDb] = useState({});
+  const [towImpattoSrc, setTowImpattoSrc] = useState("");
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
   const [mappedLoading, setMappedLoading] = useState(false);
+  const [expandedOfferGroups, setExpandedOfferGroups] = useState(new Set()); // gruppi aperti in step 3
 
   // ── Sviluppo ──
   const [implementationFiles, setImplementationFiles] = useState([]);
   const [techProfile, setTechProfile] = useState(null);
   const [techProfileBusy, setTechProfileBusy] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState("");
+  const [selectedAppIds, setSelectedAppIds] = useState([]);
   const [codeChangeTool, setCodeChangeTool] = useState("vscode");
   const [implementationBranch, setImplementationBranch] = useState("");
   const [implementationApprovalNotes, setImplementationApprovalNotes] = useState("");
@@ -89,7 +95,17 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [applicationSearch, setApplicationSearch] = useState("");
   const [applicationDraft, setApplicationDraft] = useState(null);
   const [applications, setApplications] = useState([]);
-  const [showApplicativi, setShowApplicativi] = useState(false); // collassato per default
+  const [showApplicativi, setShowApplicativi] = useState(false);
+  const [appSyncBusy, setAppSyncBusy] = useState(false);     // salvataggio DB applicativi
+  const [aiAppBusy, setAiAppBusy]     = useState(false);     // scheda AI per applicativo
+  const [aiAppTarget, setAiAppTarget] = useState(null);      // applicativo selezionato per scheda AI
+  const [openAppSheet, setOpenAppSheet] = useState(null);    // { id, type: 'ai'|'tech' } — pannello scheda aperto
+
+  // Utente con ruolo Admin E Developer → può generare schede AI applicativi
+  const myRoles = (roles && roles.length > 0) ? roles : (role ? [role] : []);
+  const isAdminDeveloper = myRoles.includes("Admin") && myRoles.includes("Developer");
+  // SuperAdmin ha sempre accesso completo
+  const canAiApp = isAdminDeveloper || myRoles.includes("SuperAdmin");
 
   const toastTimer = useRef(null);
   const toast = (m) => {
@@ -121,11 +137,44 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [codiceContratto]); // eslint-disable-line
 
   useEffect(() => {
-    const current = applicationsFor(selectedContractId, lot, !!activeContract?.builtin);
-    setApplications(current);
-    setApplicationDraft(null);
+    // Carica gli applicativi dal DB (condiviso) o localStorage.
+    // Per il contratto builtin "poste-tet-2025" gli applicativi sono indipendenti
+    // dal lotto attivo (lot_id="all" in DB) — il useEffect non dipende da `lot`.
+    let alive = true;
+    const isBuiltin = selectedContractId === "poste-tet-2025";
+    // Per il builtin usa sempre "all" come lotKey (indipendente dal lotto attivo)
+    const lotKey = isBuiltin ? "all" : lot;
+
+    getSharedApplications(selectedContractId, lotKey)
+      .then(dbApps => {
+        if (!alive) return;
+        if (dbApps && dbApps.length > 0) {
+          setApplications(dbApps);
+          setApplicationDraft(null);
+          saveApplications(selectedContractId, lotKey, dbApps);
+        } else {
+          // Fallback: localStorage (prova lotto corrente, poi l'altro, poi DEFAULT)
+          let local = applicationsFor(selectedContractId, lot, isBuiltin);
+          if (!local.length && isBuiltin) {
+            local = applicationsFor(selectedContractId, lot === "1" ? "2" : "1", true);
+          }
+          // Non sovrascrivere mai se abbiamo già dati in stato e il fallback è vuoto/peggiore
+          setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : (local.length > 0 ? local : prev));
+          setApplicationDraft(null);
+        }
+      })
+      .catch(() => {
+        if (!alive) return;
+        let local = applicationsFor(selectedContractId, lot, isBuiltin);
+        if (!local.length && isBuiltin) {
+          local = applicationsFor(selectedContractId, lot === "1" ? "2" : "1", true);
+        }
+        setApplications(prev => (prev && prev.length > 0 && local.length === 0) ? prev : (local.length > 0 ? local : prev));
+        setApplicationDraft(null);
+      });
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedContractId, lot]);
+  }, [selectedContractId]); // ← NON dipende da `lot`: per il builtin gli applicativi sono condivisi tra lotti
 
   useEffect(() => {
     let alive = true;
@@ -226,6 +275,8 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
   const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
+  // isBuiltin: sincrono, non dipende da activeContract (che può essere null durante il caricamento)
+  const isBuiltin = selectedContractId === "poste-tet-2025" || !!(activeContract?.builtin);
 
   // initiativeContractId: contract_id usato nel DB per le iniziative.
   // Usa il codiceContratto passato da App.js (es. "4490015980") — mai "poste-tet-2025".
@@ -392,6 +443,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         economicNotes: economyNotes,
         savedAt: new Date().toISOString(),
         systems,
+        selectedAppIds,
+        // Risultato del secondo parere AI (se presente, per non perderlo navigando)
+        aiProposals: aiProposals || null,
+        suggestions,
       },
     };
     try {
@@ -427,6 +482,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     // Scheda tecnica / sviluppo
     setTechProfile(null);
     setImplementationFiles([]);
+    setSelectedAppId("");
+    setSelectedAppIds([]);
+    setAnalyzeBusy(false);
     setImplementationBranch("");
     setImplementationApprovalNotes("");
     setImplementationTests("");
@@ -523,6 +581,16 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
   // ── Step 2: analyze (port da analyze r.328) ──
   const analyze = async () => {
+    setAnalyzeBusy(true);
+    try {
+    // Se ci sono interventi importati dal workbook, usa runGapAnalysis
+    // per ottenere il raggruppamento per ID_INTERVENTO (come in "Mostra dettaglio importato")
+    if (importedInterventions.length > 0) {
+      await runGapAnalysis(importedInterventions, items);
+      setStep(2);
+      return;
+    }
+    // Senza interventi importati: analisi testuale generica (suggestions senza interventionId)
     const source = [initiative.title, initiative.system, initiative.description, applicationsText(applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]))].join(" ").toLowerCase();
     if (source.replace(/\s/g, "").length < 20) {
       toast("Inserisci una descrizione più dettagliata");
@@ -553,6 +621,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       }))
     );
     setStep(2);
+    } finally {
+      setAnalyzeBusy(false);
+    }
   };
 
   // ── AI: secondo parere (port da aiAnalysisContext + analyzeWithAi) ──
@@ -561,15 +632,15 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   const readSourceSnippets = async () => {
     if (!implementationFiles.length) return [];
     const CODE_EXTS = /\.(js|jsx|ts|tsx|java|py|cs|go|rb|php|vue|html|css|xml|json|yaml|yml|md|sql)$/i;
-    const relevant = [...implementationFiles].filter(f => CODE_EXTS.test(f.name)).slice(0, 30);
-    const MAX_TOTAL = 40000; // ~40KB
+    const relevant = [...implementationFiles].filter(f => CODE_EXTS.test(f.name)).slice(0, 15);
+    const MAX_TOTAL = 15000; // ~15KB — sufficiente come campione per l'AI
     let total = 0;
     const snippets = [];
     for (const f of relevant) {
       if (total >= MAX_TOTAL) break;
       try {
         const text = await f.text();
-        const slice = text.slice(0, Math.min(3000, MAX_TOTAL - total));
+        const slice = text.slice(0, Math.min(1000, MAX_TOTAL - total));
         snippets.push({ file: f.webkitRelativePath || f.name, content: slice, truncated: text.length > slice.length });
         total += slice.length;
       } catch { /* skip unreadable */ }
@@ -579,38 +650,90 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
   const buildAiContext = async () => {
     const sourceSnippets = await readSourceSnippets();
+
+    // ── Contesto applicativi: usa la lista corrente (dal DB, con schede AI) ──
+    // Cerca prima gli applicativi che matchano il sistema dell'iniziativa,
+    // poi include tutti se non trova match specifici.
+    const initSystem = appNorm(initiative.system || "");
+    const matchingApps = applications.filter(a =>
+      initSystem && (
+        appNorm(a.name).includes(initSystem) ||
+        initSystem.includes(appNorm(a.name)) ||
+        (a.systemAliases || []).some(alias => appNorm(alias).includes(initSystem) || initSystem.includes(appNorm(alias)))
+      )
+    );
+    const appsForContext = matchingApps.length > 0 ? matchingApps : applications;
+
+    const applicationContext = appsForContext.map(a => ({
+      code:            a.code || "",
+      name:            a.name,
+      systemAliases:   a.systemAliases || [],
+      technologies:    [
+        ...(a.languages         || []),
+        ...(a.databases         || []),
+        ...(a.extraTechnologies || []),
+        // Aggiungi dal profilo tecnico generato con AI se presente
+        ...(a.techProfile?.technologies  || []),
+        ...(a.techProfile?.frameworks    || []),
+        ...(a.techProfile?.databases     || []),
+        ...(a.techProfile?.integrations  || []),
+      ].filter((v, i, arr) => v && arr.indexOf(v) === i), // deduplica
+      notes:           a.notes || "",
+      codeUrl:         a.codeUrl || "",
+      codeLoadedAt:    a.codeLoadedAt || null,
+      // Scheda tecnica da analisi codice sorgente
+      techProfile:     a.techProfile ? {
+        technologies:  a.techProfile.technologies  || [],
+        frameworks:    a.techProfile.frameworks    || [],
+        databases:     a.techProfile.databases     || [],
+        integrations:  a.techProfile.integrations  || [],
+        security:      a.techProfile.security      || [],
+        infrastructure:a.techProfile.infrastructure|| [],
+        totalFiles:    a.techProfile.totalFiles    || 0,
+        readFiles:     a.techProfile.readFiles     || 0,
+      } : null,
+      // Scheda AI: tipi intervento tipici, mappature catalogo, rischi
+      aiProfile:       a.aiProfile ? {
+        interventionTypes: a.aiProfile.interventionTypes || [],
+        catalogMappings:   a.aiProfile.catalogMappings   || [],
+        risks:             a.aiProfile.risks             || [],
+        techSummary:       a.aiProfile.techSummary       || "",
+      } : null,
+    }));
+
     return {
       contract: { id: selectedContractId, name: activeContract?.name || "" },
       lot,
       initiative,
-      catalog: catalog.map((c) => ({ id: c.id, name: c.nome, area: c.ambito, description: c.descrizione || "", prices: c.prezzi || c.price || {} })),
+      catalog: catalog.map((c) => ({
+        id:          c.id,
+        name:        c.nome,
+        area:        c.ambito,
+        description: c.descrizione || "",
+        prices:      c.prezzi || c.price || {},
+      })),
       excelInterventions: importedInterventions.map((x) => ({
-        id: x.interventionId || x.id,
-        title: x.titolo || x.title || "",
+        id:          x.interventionId || x.id,
+        title:       x.titolo || x.title || "",
         description: x.descrizione || x.description || "",
-        activity: x.attivita || x.activity || "",
-        quantity: x.qty || x.quantity || 1,
-        catalogId: x.catalogId || x.idCatalogo || null,
-        notes: x.notes || "",
+        activity:    x.attivita || x.activity || "",
+        quantity:    x.qty || x.quantity || 1,
+        catalogId:   x.catalogId || x.idCatalogo || null,
+        notes:       x.notes || "",
       })),
       currentSuggestions: suggestions.map((s) => ({
-        catalogId: s.id,
-        selected: s.selected,
-        type: s.type,
-        complexity: s.complexity,
-        quantity: s.qty,
-        rationale: s.reason,
+        catalogId:      s.id,
+        selected:       s.selected,
+        type:           s.type,
+        complexity:     s.complexity,
+        quantity:       s.qty,
+        rationale:      s.reason,
         additionalInfo: s.additionalInfo || "",
-        notes: s.notes || "",
+        notes:          s.notes || "",
       })),
-      applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]).map((a) => ({
-        code: a.code,
-        name: a.name,
-        technologies: [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])],
-        notes: a.notes || "",
-        codeUrl: a.codeUrl || "",
-      })),
-      // Snippets del codice sorgente per verifica tecnica
+      // Applicativi con schede AI complete
+      applicationContext,
+      // Snippet codice sorgente per verifica tecnica
       sourceCode: sourceSnippets,
       priorEvaluations: [],
     };
@@ -725,19 +848,21 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       calc({
         items: items.map((it) => ({
           ...it,
-          unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }),
+          unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }),
         })),
         lot,
-        contractId: initiativeContractId,   // chiave in towPercentages (per contratto/ambiente)
+        contractId: initiativeContractId,
+        archiveContractId: selectedContractId,
+        tow5Share,
         towPercentages,
         tow,
         discount,
         contingency,
         catalog,
         priceMode,
-        builtin: !!activeContract?.builtin,
+        builtin: isBuiltin,
       }),
-    [items, lot, initiativeContractId, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
+    [items, lot, initiativeContractId, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -764,12 +889,14 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   }, [initiativeContractId]);
 
   // Carica le release del contratto selezionato per il campo Release in Step 1
+  // Le release_calendar sono salvate con contract_id = ambienteId (es. "1"), non selectedContractId
   useEffect(() => {
-    if (!selectedContractId) return;
-    getReleaseSchedules(selectedContractId)
-      .then(d => setReleaseList((d.records || []).map(r => r.title || "")))
+    const cid = ambienteId ? String(ambienteId) : selectedContractId;
+    if (!cid) return;
+    getReleaseSchedules(cid)
+      .then(d => setReleaseList((d.records || []).map(r => r.title || "").filter(Boolean).sort()))
       .catch(() => setReleaseList([]));
-  }, [selectedContractId]);
+  }, [ambienteId, selectedContractId]); // eslint-disable-line
 
   const deleteArchiveRecord = async (id) => {
     if (!window.confirm("Eliminare definitivamente questa iniziativa memorizzata?")) return;
@@ -784,19 +911,33 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
-  const reworkInitiative = (record) => {
+   const reworkInitiative = (record) => {
     const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
-    setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
+    // NON cambiare selectedContractId: è usato per caricare gli applicativi (sempre "poste-tet-2025").
+    // Il contract_id del record è solo per identificare l'iniziativa nel DB — già gestito da
+    // initiativeContractId (calcolato da codiceContratto/ambienteId) e da editingRecordKey.
+    // setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
     setLot(String(record.lot_id || payload.lot || lot));
     if (payload.initiative) setInitiative(payload.initiative);
     if (payload.importedInterventions) setImportedInterventions(payload.importedInterventions);
     if (payload.items) setItems(payload.items);
+    if (payload.suggestions) setSuggestions(payload.suggestions);
     if (payload.tow) setTow(payload.tow);
     if (payload.towPercentages) setTowPercentages(payload.towPercentages);
     if (payload.discount != null) setDiscount(payload.discount);
     if (payload.contingency != null) setContingency(payload.contingency);
     if (payload.economicNotes) setEconomyNotes(payload.economicNotes);
     if (payload.sourceWorkbookName) setSourceWorkbookName(payload.sourceWorkbookName);
+    // Ripristina il risultato del secondo parere AI (se presente nel payload)
+    setAiProposals(payload.aiProposals || null);
+    // Ripristina app selezionate e techProfile
+    if (payload.selectedAppIds?.length) {
+      setSelectedAppIds(payload.selectedAppIds);
+      setSelectedAppId(payload.selectedAppIds[0] || "");
+      // Ricarica techProfile dalla prima app selezionata
+      const firstApp = applications.find(a => String(a.id) === String(payload.selectedAppIds[0]));
+      if (firstApp?.techProfile) setTechProfile(firstApp.techProfile);
+    }
     // Memorizza la chiave del record esistente per sovrascrivere al salvataggio
     setEditingRecordKey(record.record_key || null);
     setStep(1);
@@ -805,6 +946,20 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   };
 
   // ── Applicativi (port da addApplicationV39/saveApplication/delete r.159-160) ──
+
+  // Salva applicativi sia in localStorage (offline) sia in DB (condivisione)
+  const persistApplications = useCallback(async (contractId, lotId, apps) => {
+    saveApplications(contractId, lotId, apps); // localStorage immediato
+    setAppSyncBusy(true);
+    try {
+      await putSharedApplications(contractId, lotId, apps);
+    } catch {
+      toast("Attenzione: applicativi salvati solo in locale. Controlla la connessione.");
+    } finally {
+      setAppSyncBusy(false);
+    }
+  }, []); // eslint-disable-line
+
   const addApplicationV39 = () => {
     const name = window.prompt("Nome dell'applicativo (es. NPSO)");
     if (!name) return;
@@ -817,7 +972,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     const app = { id: "application-" + Date.now(), code: "", name: name.trim(), codeUrl: "", codeLoadedAt: null, systemAliases: [name.trim()], ambiti: [], components: [], operatingSystems: [], databases: [], languages: [], extraTechnologies: [], notes: "" };
     const next = [...applications, app];
     setApplications(next);
-    saveApplications(selectedContractId, lot, next);
+    persistApplications(selectedContractId, lot, next);
     setApplicationDraft(app);
     toast("Applicativo creato: associa ora codice AP e repository");
   };
@@ -829,7 +984,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     const next = [...applications];
     if (idx >= 0) next[idx] = applicationDraft; else next.push(applicationDraft);
     setApplications(next);
-    saveApplications(selectedContractId, lot, next);
+    persistApplications(selectedContractId, lot, next);
     setApplicationDraft(null);
     toast(`Applicativo ${applicationDraft.name} salvato${applicationDraft.code ? " con " + applicationDraft.code : ""}`);
   };
@@ -838,12 +993,152 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     if (!window.confirm(`Eliminare l'applicativo ${a.name}?`)) return;
     const next = applications.filter((x) => applicationIdentity(x) !== applicationIdentity(a));
     setApplications(next);
-    saveApplications(selectedContractId, lot, next);
+    persistApplications(selectedContractId, lot, next);
     setApplicationDraft(null);
     toast("Applicativo eliminato");
   };
 
   const safeAppUrl = (url) => { try { const u = new URL(url, window.location.origin); return (u.protocol === "http:" || u.protocol === "https:") ? u.href : ""; } catch { return ""; } };
+
+  // ── Feature 2: Genera scheda AI applicativo (solo Admin+Developer / SuperAdmin) ──
+  // Carica codice sorgente + documentazione dell'applicativo selezionato,
+  // chiama l'AI e aggiorna il profilo tecnico dell'applicativo in DB condiviso.
+  const buildAiApplicationProfile = useCallback(async (targetApp) => {
+    if (!targetApp) return;
+    setAiAppBusy(true);
+    setAiAppTarget(targetApp.id);
+    try {
+      // 1. Seleziona cartella sorgente
+      const files = await new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.setAttribute("webkitdirectory", "");
+        input.setAttribute("directory", "");
+        input.onchange = () => resolve(input.files.length ? [...input.files] : []);
+        input.oncancel = () => resolve([]);
+        input.click();
+      });
+      if (!files.length) { setAiAppBusy(false); setAiAppTarget(null); return; }
+
+      toast(`Analisi codice sorgente di ${targetApp.name} (${files.length} file)…`);
+
+      // 2. Costruisce scheda tecnica locale (buildTechnicalProfile)
+      const profile = await buildTechnicalProfile(
+        files,
+        {
+          name: targetApp.name,
+          applicationCode: targetApp.code || "",
+          repositoryUrl: targetApp.codeUrl || "",
+          systemAliases: targetApp.systemAliases || [targetApp.name],
+        },
+        catalog
+      );
+
+      // 3. Prepara snippet di codice per il contesto AI (max 15KB, 15 file)
+      // Il profilo tecnico già estrae tutto — gli snippet servono solo come campione per l'AI
+      const CODE_EXTS = /\.(js|jsx|ts|tsx|java|py|cs|go|rb|php|vue|html|css|xml|json|yaml|yml|md|sql)$/i;
+      const relevant = files.filter(f => CODE_EXTS.test(f.name)).slice(0, 15);
+      const MAX_TOTAL = 15000;
+      let total = 0;
+      const snippets = [];
+      for (const f of relevant) {
+        if (total >= MAX_TOTAL) break;
+        try {
+          const text = await f.text();
+          const slice = text.slice(0, Math.min(1000, MAX_TOTAL - total));
+          snippets.push({ file: f.webkitRelativePath || f.name, content: slice });
+          total += slice.length;
+        } catch {}
+      }
+
+      // 4. Chiama AI per arricchire la scheda con contesto dominio/interventi
+      const aiCtx = {
+        contract: { id: selectedContractId, name: activeContract?.name || "" },
+        lot,
+        initiative: { title: targetApp.name, system: targetApp.name, description: targetApp.notes || "" },
+        // Catalogo ridotto: solo id + nome + ambito (niente descrizioni lunghe)
+        catalog: catalog.slice(0, 40).map(c => ({ id: c.id, name: c.nome, area: c.ambito })),
+        excelInterventions: [],
+        currentSuggestions: [],
+        sourceSnippets: snippets,
+        techProfile: {
+          // Manda solo i campi essenziali del profilo — niente filePaths o catalogSignals lunghi
+          technologies:   profile.technologies   || [],
+          frameworks:     profile.frameworks     || [],
+          databases:      profile.databases      || [],
+          integrations:   profile.integrations   || [],
+          interfaces:     profile.interfaces     || [],
+          infrastructure: profile.infrastructure || [],
+          testing:        profile.testing        || [],
+          totalFiles:     profile.totalFiles     || 0,
+          summary:        profile.summary        || "",
+        },
+        task: "application_profile",
+        instruction: `Analizza l'applicativo "${targetApp.name}" (codice ${targetApp.code || "N/A"}).
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun testo fuori dal JSON):
+{
+  "interventionTypes": [ { "id": "IT-001", "title": "...", "description": "...", "catalogCategories": ["..."] } ],
+  "catalogMappings": [ { "catalogId": 239, "name": "...", "type": "MODIFICA", "complexity": "Medio", "rationale": "..." } ],
+  "risks": [ "rischio 1", "rischio 2" ],
+  "techSummary": "sintesi tecnica in 2-3 frasi"
+}`,
+      };
+
+      let aiEnrichment = null;
+      try {
+        const aiData = await analyzeInitiativeWithAi(aiCtx);
+        console.log("[AI App Profile] aiData completo:", JSON.stringify(aiData));
+        // L'AI può restituire il profilo in formati diversi — normalizziamo tutto
+        const raw = aiData?.analysis || aiData;
+        console.log("[AI App Profile] raw:", JSON.stringify(raw)?.slice(0, 500));
+        console.log("[AI App Profile] tipo raw:", typeof raw, "keys:", raw && typeof raw === "object" ? Object.keys(raw) : "N/A");
+        if (raw && typeof raw === "object") {
+          // Normalizza campi alternativi che l'AI usa talvolta
+          aiEnrichment = {
+            interventionTypes: raw.interventionTypes || raw.intervention_types || raw.tipiIntervento || [],
+            catalogMappings:   raw.catalogMappings   || raw.catalog_mappings   || raw.mappaturaCatalogo || [],
+            risks:             raw.risks             || raw.rischi             || [],
+            techSummary:       raw.techSummary       || raw.tech_summary       || raw.summary           || raw.sintesi || "",
+          };
+          // Se tutti i campi array sono vuoti e techSummary è vuoto → risposta inutile
+          if (!aiEnrichment.interventionTypes.length && !aiEnrichment.catalogMappings.length && !aiEnrichment.risks.length && !aiEnrichment.techSummary) {
+            console.warn("[AI App Profile] Risposta AI vuota dopo normalizzazione:", JSON.stringify(raw)?.slice(0, 300));
+            aiEnrichment = null;
+            toast(`Scheda tecnica di "${targetApp.name}" salvata — profilo AI vuoto`);
+          }
+        }
+        if (!aiEnrichment) {
+          console.warn("[AI App Profile] Risposta AI non riconosciuta:", JSON.stringify(aiData)?.slice(0, 300));
+        }
+      } catch (aiErr) {
+        console.warn("[AI App Profile] Errore chiamata AI:", aiErr.message);
+        toast(`Scheda tecnica di "${targetApp.name}" salvata. AI non disponibile: ${aiErr.message}`);
+      }
+
+      // 5. Aggiorna l'applicativo con il profilo generato
+      const updatedApp = {
+        ...targetApp,
+        techProfile:   profile,
+        aiProfile:     aiEnrichment,
+        codeLoadedAt:  new Date().toISOString(),
+        languages:     profile.technologies?.length     ? profile.technologies     : targetApp.languages,
+        databases:     profile.databases?.length        ? profile.databases        : targetApp.databases,
+        extraTechnologies: profile.frameworks?.length   ? [...(profile.frameworks || []), ...(profile.integrations || [])] : targetApp.extraTechnologies,
+      };
+
+      const next = applications.map(a => a.id === targetApp.id ? updatedApp : a);
+      setApplications(next);
+      await persistApplications(selectedContractId, lot, next);
+
+      toast(`Scheda AI di "${targetApp.name}" generata e condivisa con il team.`);
+    } catch (err) {
+      toast("Errore generazione scheda AI: " + (err.message || String(err)));
+    } finally {
+      setAiAppBusy(false);
+      setAiAppTarget(null);
+    }
+  }, [applications, catalog, selectedContractId, lot, activeContract, persistApplications]); // eslint-disable-line
 
   // ── Analisi codice sorgente (scheda tecnica) ─────────────────────────────────
   const selectSourceFolder = () => {
@@ -913,19 +1208,27 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       toast("Approva prima almeno un intervento");
       return;
     }
-    if (!implementationFiles.length) {
-      toast("Seleziona prima il repository di questa iniziativa");
+    if (!implementationFiles.length && !techProfile) {
+      toast("Seleziona prima un applicativo in 'Applicativi e tecnologie'");
       return;
     }
     setDevBusy(true);
     try {
       const systems = evaluationSystems({ initiative, systems: [initiative.system], importedInterventions });
       const applicationCodes = evaluationApplicationCodes({ applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]) });
-      const allPaths = [...implementationFiles].map((f) => f.webkitRelativePath || f.name);
-      const sourcePaths = [...implementationFiles]
-        .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
-        .map((f) => f.webkitRelativePath || f.name);
-      const folderName = (allPaths[0] || "").split("/")[0] || "repository";
+      // Se ci sono file fisici li uso, altrimenti uso i dati del profilo tecnico
+      const hasFiles = implementationFiles.length > 0;
+      const allPaths = hasFiles
+        ? [...implementationFiles].map((f) => f.webkitRelativePath || f.name)
+        : (techProfile?.filePaths || []);
+      const sourcePaths = hasFiles
+        ? [...implementationFiles]
+            .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
+            .map((f) => f.webkitRelativePath || f.name)
+        : (techProfile?.filePaths || []).filter((p) => sourceFileAllowed(p) && !ignoredSourcePath(p));
+      const folderName = hasFiles
+        ? ((allPaths[0] || "").split("/")[0] || "repository")
+        : (techProfile?.name || initiative.system || "repository");
       const request = {
         formatVersion: 3,
         generatedAt: new Date().toISOString(),
@@ -942,12 +1245,37 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         approvalNotes: implementationApprovalNotes,
         branch: implementationBranch,
         approvedInterventions: selected,
+        excelInterventions: importedInterventions.map((x) => ({
+          id:          x.id,
+          title:       x.titolo || x.title || "",
+          sistema:     x.sistema || "",
+          componente:  x.componente || "",
+          description: x.descrizione || x.description || "",
+          activity:    x.attivita || x.activity || "",
+          tow5:        x.tow5 || 0,
+        })),
+        techProfile: techProfile || null,
         repository: { folderName, totalFiles: allPaths.length, sourceFiles: sourcePaths.length, filePaths: allPaths, sourceFilePaths: sourcePaths },
       };
       const zip = new JSZip();
       zip.file("README_MODIFICA_CODICE.md", codeChangePrompt(request));
       zip.file("richiesta_modifica_codice.json", JSON.stringify(request, null, 2));
-      zip.file("piano_sviluppo.md", implementationDocument({ record: { payload, lot_id: lot, contract_id: selectedContractId, title: initiative.title }, proposals: selected, branch: implementationBranch, approvalNotes: implementationApprovalNotes, tests: implementationTests }));
+      zip.file("piano_sviluppo.md", implementationDocument({
+        record: { payload, lot_id: lot, contract_id: selectedContractId, title: initiative.title },
+        proposals: selected,
+        branch: implementationBranch,
+        approvalNotes: implementationApprovalNotes,
+        tests: implementationTests,
+        excelInterventions: importedInterventions.map((x) => ({
+          id:          x.id,
+          title:       x.titolo || x.title || "",
+          sistema:     x.sistema || "",
+          componente:  x.componente || "",
+          description: x.descrizione || x.description || "",
+          activity:    x.attivita || x.activity || "",
+        })),
+        techProfile: techProfile || null,
+      }));
       zip.file("elenco_file_repository.txt", allPaths.join("\n"));
       zip.file("VERIFICA_SELEZIONE.txt", [
         `Codice iniziativa: ${initiative.code || ""}`,
@@ -976,6 +1304,15 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       branch: implementationBranch,
       approvalNotes: implementationApprovalNotes,
       tests: implementationTests,
+      excelInterventions: importedInterventions.map((x) => ({
+        id:          x.id,
+        title:       x.titolo || x.title || "",
+        sistema:     x.sistema || "",
+        componente:  x.componente || "",
+        description: x.descrizione || x.description || "",
+        activity:    x.attivita || x.activity || "",
+      })),
+      techProfile: techProfile || null,
     });
     downloadBlob(`piano_sviluppo_${code}.md`, new Blob([doc], { type: "text/markdown;charset=utf-8" }));
   };
@@ -991,7 +1328,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       sourceWorkbookName,
       initiative,
       importedInterventions,
-      items: items.map((it) => ({ ...it, unit: defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin }) })),
+      items: items.map((it) => ({ ...it, unit: defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }) })),
       tow,
       discount,
       contingency,
@@ -1006,7 +1343,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     const sep = ";";
     const header = ["ID Catalogo", "Tipo", "Complessità", "Quantità", "Prezzo unitario", "Importo", "Intervento", "Razionale"].join(sep);
     const rows = items.map((it) => {
-      const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+      const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
       return [it.id, it.type, it.complexity, it.qty, unit, unit * it.qty, it.interventionId || "", (it.reason || "").replace(/\n/g, " ")].join(sep);
     });
     downloadBlob(`offerta_${appNorm(initiative.code || "iniziativa")}.csv`, new Blob(["\uFEFF" + [header, ...rows].join("\n")], { type: "text/csv;charset=utf-8" }));
@@ -1073,94 +1410,246 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
   };
 
   return (
-    <div style={{ padding: "clamp(12px, 3vw, 32px)", fontFamily: "inherit", background: "#f4f7fb", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1440, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
+    <div style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 28, paddingBottom: 24, borderBottom: "1px solid #dce3eb" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "clamp(22px, 3vw, 30px)", letterSpacing: "-0.7px", fontWeight: 750 }}>Configuratore Offerta TOW</h2>
-          <p style={{ margin: "4px 0 0", color: "#666", fontSize: 13 }}>
-            Contratto {initiativeContractId} · {catalog.length} voci di catalogo
-          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+            <span style={styles.badge}>Contratto {initiativeContractId}</span>
+            <span style={styles.badge}>Lotto {lot}</span>
+            <span style={styles.badge}>Catalogo · {catalog.length} voci</span>
+          </div>
         </div>
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}
         </button>
       </div>
 
-      {/* Stepper */}
-      <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "24px 0", flexWrap: "wrap", alignItems: "stretch", padding: 10, background: "#fff", border: "1px solid #dce5ef", borderRadius: 16 }}>
-        {STEPS.map((s, i) => (
-          <button aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
-            <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: step === i + 1 ? "#fff" : "#edf2f8", color: "#174ea6", marginRight: 8 }}>{i + 1}</span>{s}
-          </button>
-        ))}
-        <button
-          style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
-          onClick={async () => {
-            await persistInitiativeEvaluation(true);
-            resetInitiative();
-            setEditingRecordKey(null);
-            setStep(1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}>
-          Salva e Chiudi
-        </button>
-      </nav>
+      <div style={styles.eyebrow}>Contesto di lavoro</div>
+      <section aria-label="Applicativi e archivio" style={{ background: "#edf1f6", padding: 12, borderRadius: 18, border: "1px solid #dce3eb", marginBottom: 28 }}>
+      {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
+      <div style={{ ...styles.card, marginTop: 0, marginBottom: 10, padding: 18 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, cursor: "pointer", userSelect: "none" }}
+          onClick={() => setShowApplicativi(v => !v)}
+        >
+          <h3 style={{ margin: 0 }}>
+            {showApplicativi ? "▾" : "▸"} Applicativi e tecnologie · Lotto {lot}
+            {!showApplicativi && applications.length > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 400, color: "#64748b", marginLeft: 8 }}>({applications.length} configurati)</span>
+            )}
+          </h3>
+          {showApplicativi && (
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+               <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
+               <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
+               {appSyncBusy && (
+                 <span style={{ fontSize: 11, color: "#1A6EBD", fontStyle: "italic" }}>⟳ Sincronizzazione DB…</span>
+               )}
+             </div>
+           )}
+        </div>
+        {showApplicativi && (
+        <>
+        {applications.length === 0 ? (
+          <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 12, marginTop: 16 }}>
+            {applications
+              .filter((a) => !appNorm(applicationSearch) || appNorm([a.name, a.code, (a.systemAliases || []).join(" "), (a.ambiti || []).join(" ")].join(" ")).includes(appNorm(applicationSearch)))
+              .map((a, i) => {
+                const tag = (props, arr) =>
+                  (arr || []).length
+                    ? `${props}: ${[...arr].join(" · ")}`
+                    : "";
+                const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
+                const sheetKey = applicationIdentity(a);
+                const isTechOpen = openAppSheet?.id === sheetKey && openAppSheet?.type === "tech";
+                const isAiOpen   = openAppSheet?.id === sheetKey && openAppSheet?.type === "ai";
+                const toggleSheet = (type) => setOpenAppSheet(prev =>
+                  prev?.id === sheetKey && prev?.type === type ? null : { id: sheetKey, type }
+                );
+                const tp = a.techProfile || {};
+                const ai = a.aiProfile  || {};
+                return (
+                  <div key={applicationIdentity(a) + "-" + i} style={{ ...styles.suggestion, flexDirection: "column", gap: 12 }}>
+                    {/* ── intestazione card ── */}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
+                      {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
+                      {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+                        {[...(a.languages || []), ...(a.databases || []), ...(a.operatingSystems || []), ...(a.extraTechnologies || [])].slice(0, 5).map((technology, ti) => <span key={ti} style={styles.badge}>{technology}</span>)}
+                        {!tags && <span style={styles.hint}>Nessuna tecnologia indicata</span>}
+                        {a.techProfile
+                          ? <span
+                              title="Clicca per vedere i dettagli della scheda tecnica"
+                              onClick={() => toggleSheet("tech")}
+                              style={{ ...styles.badge, background: isTechOpen ? "#bbf7d0" : "#ecfdf3", color: "#167347", cursor: "pointer", userSelect: "none", border: "1px solid #86efac" }}>
+                              {isTechOpen ? "▾" : "▸"} Scheda tecnica
+                            </span>
+                          : null}
+                        {a.aiProfile
+                          ? <span
+                              title="Clicca per vedere i dettagli della scheda AI"
+                              onClick={() => toggleSheet("ai")}
+                              style={{ ...styles.badge, background: isAiOpen ? "#ddd6fe" : "#ede9fe", color: "#5b21b6", cursor: "pointer", userSelect: "none", border: "1px solid #c4b5fd" }}>
+                              {isAiOpen ? "▾" : "▸"} Scheda AI
+                            </span>
+                          : a.techProfile
+                            ? <span style={{ ...styles.badge, background: "#f1f5f9", color: "#64748b" }}>○ Scheda AI non generata</span>
+                            : <span style={{ ...styles.badge, background: "#f1f3f6", color: "#667085" }}>○ Nessuna scheda</span>}
+                      </div>
+                      {a.codeLoadedAt && (
+                        <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
+                          ✓ Scheda tecnica aggiornata il {new Date(a.codeLoadedAt).toLocaleDateString("it-IT")}
+                          {a.aiProfile && <span style={{ marginLeft: 6, color: "#1A6EBD" }}>· AI: {(a.aiProfile?.interventionTypes?.length || 0)} tipi intervento rilevati</span>}
+                        </div>
+                      )}
+                    </div>
 
-      {error && (
-        <p role="alert" style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
-          {error}
-          <button style={{ marginLeft: 8, border: "none", background: "none", cursor: "pointer" }} onClick={() => setError("")}>✕</button>
-        </p>
-      )}
+                    {/* ── PANNELLO SCHEDA TECNICA ── */}
+                    {isTechOpen && (
+                      <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "12px 14px", fontSize: 13 }}>
+                        <div style={{ fontWeight: 700, color: "#166534", marginBottom: 8 }}>Scheda tecnica — {a.name}</div>
+                        {tp.summary && <p style={{ margin: "0 0 10px", color: "#374151", lineHeight: 1.5 }}>{tp.summary}</p>}
+                        {[
+                          { label: "Linguaggi",       values: tp.languages      },
+                          { label: "Framework",        values: tp.frameworks     },
+                          { label: "Database",         values: tp.databases      },
+                          { label: "Integrazioni",     values: tp.integrations   },
+                          { label: "Interfacce",       values: tp.interfaces     },
+                          { label: "Infrastruttura",   values: tp.infrastructure },
+                          { label: "Testing",          values: tp.testing        },
+                        ].filter(r => (r.values || []).length > 0).map(row => (
+                          <div key={row.label} style={{ display: "flex", gap: 8, marginBottom: 6, flexWrap: "wrap", alignItems: "baseline" }}>
+                            <span style={{ fontWeight: 600, color: "#166534", minWidth: 110, fontSize: 12 }}>{row.label}</span>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {row.values.map((v, vi) => <span key={vi} style={{ ...styles.badge, background: "#dcfce7", color: "#166534" }}>{v}</span>)}
+                            </div>
+                          </div>
+                        ))}
+                        {tp.totalFiles > 0 && <div style={{ fontSize: 11, color: "#4b7a5f", marginTop: 4 }}>File analizzati: {tp.totalFiles}</div>}
+                      </div>
+                    )}
 
-      {/* Form contratto */}
-      {showContractForm && (
-        <form onSubmit={saveContract} style={{ ...styles.card, marginBottom: 20 }}>
-          <h3 style={{ margin: "0 0 12px" }}>Importa nuovo contratto</h3>
-          <label style={styles.label}>
-            Nome contratto
-            <input style={styles.input} value={contractForm.name} onChange={(e) => setContractForm((f) => ({ ...f, name: e.target.value }))} required />
-          </label>
-          <label style={styles.label}>
-            File regole (facoltativo)
-            <input style={styles.input} type="file" accept=".pdf,.doc,.docx" onChange={(e) => setContractForm((f) => ({ ...f, rulesFile: e.target.files[0] }))} />
-          </label>
-          {contractForm.lots.map((l, idx) => (
-            <div key={idx} style={{ ...styles.card, background: "#fafafa", marginTop: 10 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                <strong>Lotto {l.id}</strong>
-                <input style={{ ...styles.input, width: 180 }} placeholder="Nome lotto" value={l.name} onChange={(e) => updateContractLotField(idx, { name: e.target.value })} />
-                <label style={styles.label}>
-                  % TOW .5
-                  <input style={{ ...styles.input, width: 80 }} type="number" value={l.tow5Share} onChange={(e) => updateContractLotField(idx, { tow5Share: Number(e.target.value) })} />
-                </label>
-              </div>
-              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-                <label style={styles.label}>
-                  Catalogo PDF (obbligatorio)
-                  <input style={styles.input} type="file" accept=".pdf" onChange={(e) => updateContractLotField(idx, { catalogFile: e.target.files[0] })} />
-                </label>
-                <label style={styles.label}>
-                  Listino TOW (PDF o XLSX, obbligatorio)
-                  <input style={styles.input} type="file" accept=".pdf,.xlsx" onChange={(e) => updateContractLotField(idx, { priceFile: e.target.files[0] })} />
-                </label>
-              </div>
-              <button type="button" style={{ marginTop: 8, ...btnStyles.danger }} onClick={() => setContractForm((f) => ({ ...f, lots: f.lots.filter((_, i) => i !== idx) }))} disabled={contractForm.lots.length <= 1}>
-                Rimuovi lotto
-              </button>
+                    {/* ── PANNELLO SCHEDA AI ── */}
+                    {isAiOpen && (
+                      <div style={{ background: "#faf5ff", border: "1px solid #c4b5fd", borderRadius: 10, padding: "12px 14px", fontSize: 13 }}>
+                        <div style={{ fontWeight: 700, color: "#5b21b6", marginBottom: 8 }}>Scheda AI — {a.name}</div>
+                        {ai.techSummary && <p style={{ margin: "0 0 10px", color: "#374151", lineHeight: 1.5 }}>{ai.techSummary}</p>}
+
+                        {(ai.interventionTypes || []).length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontWeight: 600, color: "#5b21b6", marginBottom: 5, fontSize: 12 }}>Tipi di intervento rilevati</div>
+                            {ai.interventionTypes.map((it, idx) => (
+                              <div key={idx} style={{ background: "#ede9fe", borderRadius: 7, padding: "6px 10px", marginBottom: 5 }}>
+                                <div style={{ fontWeight: 600 }}>{it.id} — {it.title}</div>
+                                {it.description && <div style={{ color: "#4c1d95", fontSize: 12, marginTop: 2 }}>{it.description}</div>}
+                                {(it.catalogCategories || []).length > 0 && (
+                                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+                                    {it.catalogCategories.map((c, ci) => <span key={ci} style={{ ...styles.badge, background: "#ddd6fe", color: "#4c1d95", fontSize: 11 }}>{c}</span>)}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {(ai.risks || []).length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontWeight: 600, color: "#5b21b6", marginBottom: 5, fontSize: 12 }}>Rischi rilevati</div>
+                            <ul style={{ margin: 0, paddingLeft: 18, color: "#374151" }}>
+                              {ai.risks.map((r, ri) => <li key={ri} style={{ marginBottom: 3, fontSize: 12 }}>{r}</li>)}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(ai.catalogMappings || []).length > 0 && (
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#5b21b6", marginBottom: 5, fontSize: 12 }}>Mapping catalogo suggerito</div>
+                            {ai.catalogMappings.map((m, mi) => (
+                              <div key={mi} style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 4, fontSize: 12 }}>
+                                <span style={{ ...styles.badge, background: "#ddd6fe", color: "#4c1d95" }}>#{m.catalogId}</span>
+                                <span style={{ fontWeight: 500 }}>{m.name}</span>
+                                {m.type && <span style={{ ...styles.badge, fontSize: 11 }}>{m.type}</span>}
+                                {m.complexity && <span style={{ ...styles.badge, fontSize: 11 }}>{m.complexity}</span>}
+                                {m.rationale && <span style={{ color: "#64748b", fontStyle: "italic" }}>— {m.rationale}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── pulsanti azione ── */}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {canAiApp && (
+                        <button
+                          style={{ ...btnStyles.secondary,
+                            background: aiAppTarget === a.id ? "#FEF3C7" : a.aiProfile ? "#F0FDF4" : "#EFF6FF",
+                            borderColor: aiAppTarget === a.id ? "#FCD34D" : a.aiProfile ? "#86EFAC" : "#93C5FD",
+                            color: aiAppTarget === a.id ? "#92400E" : a.aiProfile ? "#166534" : "#1A6EBD",
+                            opacity: (aiAppBusy && aiAppTarget !== a.id) ? 0.4 : 1,
+                          }}
+                          disabled={aiAppBusy}
+                          title="Genera scheda AI: carica codice sorgente e documentazione per analisi intelligente"
+                          onClick={() => buildAiApplicationProfile(a)}>
+                          {aiAppTarget === a.id ? "⏳ Analisi AI…" : a.aiProfile ? "✓ Rigenera scheda AI" : "✨ Genera scheda AI"}
+                        </button>
+                      )}
+                      <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
+                      <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {applicationDraft && (
+          <div style={{ border: "1px solid #d7dce1", borderRadius: 8, padding: 12, marginTop: 12, background: "#fbfbfc" }}>
+            <h4 style={{ margin: "0 0 8px" }}>Modifica applicativo</h4>
+            <div style={styles.grid2}>
+              <label style={styles.label}>Nome applicativo<input style={styles.input} value={applicationDraft.name || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, name: e.target.value })} /></label>
+              <label style={styles.label}>Codice AP<input style={styles.input} value={applicationDraft.code || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, code: e.target.value.toUpperCase() })} placeholder="AP-00226" /></label>
             </div>
-          ))}
-          <button type="button" style={{ margin: "10px 10px 0 0", ...btnStyles.secondary }} onClick={() => setContractForm((f) => ({ ...f, lots: [...f.lots, { id: String(f.lots.length + 1), name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] }))}>
-            + Aggiungi lotto
-          </button>
-          <button type="submit" style={{ marginTop: 10, ...btnStyles.primary }} disabled={saving}>
-            {saving ? "Elaborazione documenti…" : "Importa e salva contratto"}
-          </button>
-        </form>
-      )}
+            <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+            <label style={styles.label}>Link al codice o repository
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
+                <input style={{ ...styles.input, marginTop: 0, flex: 1 }} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} placeholder="https://github.com/..." />
+                <button type="button" style={{ ...btnStyles.secondary, whiteSpace: "nowrap", padding: "8px 12px" }}
+                  onClick={() => {
+                    const inp = document.createElement("input");
+                    inp.type = "file"; inp.multiple = true;
+                    inp.setAttribute("webkitdirectory", ""); inp.setAttribute("directory", "");
+                    inp.onchange = () => {
+                      if (!inp.files.length) return;
+                      const rel = inp.files[0].webkitRelativePath || "";
+                      const folder = rel.split("/")[0] || "cartella";
+                      setApplicationDraft((d) => ({ ...d, codeUrl: folder + " (" + inp.files.length + " file)" }));
+                      toast("Cartella collegata: " + folder + " — " + inp.files.length + " file");
+                    };
+                    inp.click();
+                  }}>
+                  Seleziona cartella
+                </button>
+              </div>
+            </label>
+            <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
+             <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+               <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
+               <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
+             </div>
+           </div>
+         )}
+         </>
+        )}
+       </div>
 
       {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
-      <div style={{ ...styles.card, marginBottom: 16, padding: "14px 18px" }}>
+      <div style={{ ...styles.card, marginBottom: 0, padding: "16px 18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
@@ -1236,6 +1725,88 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         )}
       </div>
 
+       </section>
+       <div style={styles.eyebrow}>Preparazione offerta</div>
+       {/* Stepper */}
+       <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "12px 0 20px", flexWrap: "wrap", alignItems: "stretch", padding: 12, background: "#fff", border: "1px solid #dce3eb", borderRadius: 14 }}>
+         {STEPS.map((s, i) => {
+           const complete = [Boolean((initiative.code || initiative.title) && initiative.system), suggestions.some((entry) => entry.selected) || items.length > 0, items.length > 0, false][i];
+           return (
+           <button aria-label={`${i + 1}. ${s}${complete ? ", dati presenti" : ""}`} aria-current={step === i + 1 ? "step" : undefined} key={s} onClick={() => go(i + 1)} style={step === i + 1 ? styles.stepActive : styles.step}>
+             <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 26, height: 26, borderRadius: "50%", background: complete && step !== i + 1 ? "#dcfce7" : step === i + 1 ? "#1a73e8" : "#edf2f8", color: complete && step !== i + 1 ? "#167347" : step === i + 1 ? "#fff" : "#64748b", marginRight: 8 }}>{complete && step !== i + 1 ? "✓" : i + 1}</span>{s}
+           </button>
+         ); })}
+         <button
+           style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
+           onClick={async () => {
+             await persistInitiativeEvaluation(true);
+             resetInitiative();
+             setEditingRecordKey(null);
+             setStep(1);
+             window.scrollTo({ top: 0, behavior: "smooth" });
+           }}>
+           Salva e Chiudi
+         </button>
+       </nav>
+
+      {error && (
+        <p role="alert" style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>
+          {error}
+          <button style={{ marginLeft: 8, border: "none", background: "none", cursor: "pointer" }} onClick={() => setError("")}>✕</button>
+        </p>
+      )}
+
+      <main style={{ minWidth: 0 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
+        <p style={styles.hint}>{["Definisci il contesto dell’iniziativa e collega i dati del cliente.", "Valuta gli interventi e integra le proposte del catalogo.", "Componi la valorizzazione e verifica il totale dell’offerta.", "Verifica il riepilogo e prepara i documenti finali."][step - 1]}</p>
+      </div>
+      {/* Form contratto */}
+      {showContractForm && (
+        <form onSubmit={saveContract} style={{ ...styles.card, marginBottom: 20 }}>
+          <h3 style={{ margin: "0 0 12px" }}>Importa nuovo contratto</h3>
+          <label style={styles.label}>
+            Nome contratto
+            <input style={styles.input} value={contractForm.name} onChange={(e) => setContractForm((f) => ({ ...f, name: e.target.value }))} required />
+          </label>
+          <label style={styles.label}>
+            File regole (facoltativo)
+            <input style={styles.input} type="file" accept=".pdf,.doc,.docx" onChange={(e) => setContractForm((f) => ({ ...f, rulesFile: e.target.files[0] }))} />
+          </label>
+          {contractForm.lots.map((l, idx) => (
+            <div key={idx} style={{ ...styles.card, background: "#fafafa", marginTop: 10 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <strong>Lotto {l.id}</strong>
+                <input style={{ ...styles.input, width: 180 }} placeholder="Nome lotto" value={l.name} onChange={(e) => updateContractLotField(idx, { name: e.target.value })} />
+                <label style={styles.label}>
+                  % TOW .5
+                  <input style={{ ...styles.input, width: 80 }} type="number" value={l.tow5Share} onChange={(e) => updateContractLotField(idx, { tow5Share: Number(e.target.value) })} />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <label style={styles.label}>
+                  Catalogo PDF (obbligatorio)
+                  <input style={styles.input} type="file" accept=".pdf" onChange={(e) => updateContractLotField(idx, { catalogFile: e.target.files[0] })} />
+                </label>
+                <label style={styles.label}>
+                  Listino TOW (PDF o XLSX, obbligatorio)
+                  <input style={styles.input} type="file" accept=".pdf,.xlsx" onChange={(e) => updateContractLotField(idx, { priceFile: e.target.files[0] })} />
+                </label>
+              </div>
+              <button type="button" style={{ marginTop: 8, ...btnStyles.danger }} onClick={() => setContractForm((f) => ({ ...f, lots: f.lots.filter((_, i) => i !== idx) }))} disabled={contractForm.lots.length <= 1}>
+                Rimuovi lotto
+              </button>
+            </div>
+          ))}
+          <button type="button" style={{ margin: "10px 10px 0 0", ...btnStyles.secondary }} onClick={() => setContractForm((f) => ({ ...f, lots: [...f.lots, { id: String(f.lots.length + 1), name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] }))}>
+            + Aggiungi lotto
+          </button>
+          <button type="submit" style={{ marginTop: 10, ...btnStyles.primary }} disabled={saving}>
+            {saving ? "Elaborazione documenti…" : "Importa e salva contratto"}
+          </button>
+        </form>
+      )}
+
       {/* STEP 1: INIZIATIVA */}
       {step === 1 && (
         <div>
@@ -1267,8 +1838,69 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                 <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
               </label>
               <label style={styles.label}>Sistema / applicazione
-                <input style={styles.input} value={initiative.system} onChange={(e) => setInitiative((i) => ({ ...i, system: e.target.value }))} />
-              </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {/* Valore da Excel — read-only */}
+                  {initiative.system && (
+                    <input
+                      style={{ ...styles.input, background: "#f4f7fb", color: "#334155" }}
+                      value={initiative.system}
+                      readOnly
+                      title="Valorizzato dal file Excel importato"
+                    />
+                  )}
+                  {/* App selezionate come badge rimovibili */}
+                  {selectedAppIds.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {selectedAppIds.map(aid => {
+                        const app = applications.find(a => String(a.id) === aid);
+                        if (!app) return null;
+                        return (
+                          <span key={aid} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 600 }}>
+                            {app.name}{app.code ? ` (${app.code})` : ""}
+                            <button
+                              type="button"
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#1d4ed8", fontWeight: 700, padding: 0, lineHeight: 1, fontSize: 13 }}
+                              onClick={() => {
+                                const next = selectedAppIds.filter(id => id !== aid);
+                                setSelectedAppIds(next);
+                                if (next.length === 0) { setTechProfile(null); setSelectedAppId(""); }
+                                else {
+                                  setSelectedAppId(next[0]);
+                                  const firstApp = applications.find(a => String(a.id) === next[0]);
+                                  if (firstApp?.techProfile) setTechProfile(firstApp.techProfile);
+                                }
+                              }}>×</button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Selettore multi — aggiunge senza sostituire */}
+                  <select
+                    style={{ ...styles.input }}
+                    value=""
+                    onChange={(e) => {
+                      const appId = e.target.value;
+                      if (!appId) return;
+                      if (selectedAppIds.includes(appId)) return;
+                      const app = applications.find((a) => String(a.id) === appId);
+                      if (!app) return;
+                      const next = [...selectedAppIds, appId];
+                      setSelectedAppIds(next);
+                      setSelectedAppId(appId);
+                      if (app.techProfile) setTechProfile(app.techProfile);
+                      setImplementationFiles([]);
+                      toast(`Applicativo "${app.name}" aggiunto`);
+                    }}>
+                    <option value="">+ Aggiungi applicativo…</option>
+                    {applications
+                      .filter(a => !selectedAppIds.includes(String(a.id)))
+                      .map((a) => (
+                        <option key={a.id} value={String(a.id)}>{a.name}{a.code ? ` (${a.code})` : ""}</option>
+                      ))}
+                   </select>
+                 </div>
+               </label>
                <label style={styles.label}>Tipo contratto
                  <select style={styles.input}
                    value={initiative.contractType || ""}
@@ -1290,21 +1922,34 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                    }
                  </select>
                </label>
-               <label style={styles.label}>Release
-                 {releaseList.length > 0 ? (
-                   <select style={styles.input}
-                     value={initiative.release}
-                     onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))}>
-                     <option value="">— nessuna —</option>
-                     <option value="Da pianificare">Da pianificare</option>
-                     {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
-                   </select>
-                 ) : (
-                   <input style={styles.input} value={initiative.release}
-                     placeholder="es. R2025-04 (opzionale)"
-                     onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
-                 )}
-               </label>
+                <label style={styles.label}>Release
+                  {releaseList.length > 0 ? (
+                    <>
+                      <select style={styles.input}
+                        value={releaseList.includes(initiative.release) || initiative.release === "" || initiative.release === "Da pianificare" || initiative.release === "TBD" ? initiative.release : "__altro__"}
+                        onChange={(e) => {
+                          if (e.target.value !== "__altro__") setInitiative((i) => ({ ...i, release: e.target.value }));
+                          else setInitiative((i) => ({ ...i, release: "" }));
+                        }}>
+                        <option value="">— nessuna —</option>
+                        <option value="Da pianificare">Da pianificare</option>
+                        <option value="TBD">TBD (To Be Defined)</option>
+                        {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
+                        <option value="__altro__">Altro (testo libero)…</option>
+                      </select>
+                      {(!releaseList.includes(initiative.release) && initiative.release !== "" && initiative.release !== "Da pianificare" && initiative.release !== "TBD") && (
+                        <input style={{ ...styles.input, marginTop: 4 }}
+                          value={initiative.release}
+                          placeholder="Inserisci release (es. TBD, R2025-09…)"
+                          onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                      )}
+                    </>
+                  ) : (
+                    <input style={styles.input} value={initiative.release}
+                      placeholder="es. R2025-04 oppure TBD (opzionale)"
+                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                  )}
+                </label>
               <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
                 <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
               </label>
@@ -1343,109 +1988,127 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <button style={btnStyles.primary} onClick={analyze}>Analizza e suggerisci</button>
+              <button style={{ ...btnStyles.primary, opacity: analyzeBusy ? 0.7 : 1 }} onClick={analyze} disabled={analyzeBusy}>
+                {analyzeBusy
+                  ? "⟳ Analisi in corso…"
+                  : importedInterventions.length > 0
+                    ? `Analizza integrazioni (${importedInterventions.length} interventi)`
+                    : "Analizza e suggerisci"}
+              </button>
               <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
             </div>
           </div>
 
-          {/* ── Codice sorgente: selettore + scheda tecnica ── */}
-          <div style={styles.card}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Codice sorgente</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>Carica la cartella del repository per generare la scheda tecnica dell'applicativo</div>
-              </div>
-              <button
-                style={{ ...btnStyles.secondary, marginLeft: "auto" }}
-                disabled={techProfileBusy}
-                onClick={selectSourceFolder}>
-                {techProfileBusy ? "Analisi in corso…" : techProfile ? `↻ Rianalizza (${techProfile.totalFiles} file)` : "Seleziona cartella sorgente…"}
-              </button>
-            </div>
-
-            {techProfile && (() => {
-              const TagList = ({ items }) => items?.length ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 6px", marginTop: 4 }}>
-                  {items.map((t) => (
-                    <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600 }}>{t}</span>
-                  ))}
-                </div>
-              ) : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>;
-
-              const Section = ({ title, items }) => items?.length ? (
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 12, color: "#475569", marginBottom: 2 }}>{title}</div>
-                  <TagList items={items} />
-                </div>
-              ) : null;
-
-              return (
-                <div style={{ marginTop: 16 }}>
-                  {/* Header scheda */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>Scheda tecnica memorizzata</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: "#102a47" }}>{techProfile.name} · {techProfile.applicationCode}</div>
-                      <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{techProfile.summary}</div>
-                    </div>
-                    <span style={{ background: "#dcfce7", color: "#16a34a", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>Disponibile per le stime</span>
+          {/* ── Codice sorgente: una riga per app selezionata ── */}
+          <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#102a47", marginBottom: selectedAppIds.length > 0 ? 10 : 0 }}>⌘ Codice sorgente</div>
+            {selectedAppIds.length === 0 ? (
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>Nessun profilo tecnico — seleziona un applicativo nel campo "Sistema / applicazione" sopra</span>
+            ) : (() => {
+              const AppProfileRow = ({ appId }) => {
+                const app = applications.find(a => String(a.id) === appId);
+                const tp = app?.techProfile || (appId === selectedAppId ? techProfile : null);
+                if (!app) return null;
+                if (!tp) return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #dbe9fb" }}>
+                    <span style={{ fontSize: 18 }}>📂</span>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: "#102a47" }}>{app.name}</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>— nessun profilo tecnico caricato</span>
                   </div>
+                );
+                const langs   = tp.technologies || [];
+                const ifaces  = tp.interfaces   || [];
+                const integr  = tp.integrations || [];
+                const dbs     = tp.databases    || [];
+                const testing = tp.testing      || [];
+                const langStr = langs.slice(0, 4).join(", ") + (langs.length > 4 ? ` +${langs.length - 4}` : "");
+                const counts  = [
+                  ifaces.length  ? `${ifaces.length} interfacce` : null,
+                  integr.length  ? `${integr.length} integrazioni` : null,
+                  dbs.length     ? `${dbs.length} sorgenti dati` : null,
+                  testing.length ? "test rilevati" : null,
+                ].filter(Boolean).join(" · ");
+                return (
+                  <details style={{ borderBottom: "1px solid #dbe9fb" }}>
+                    <summary style={{ cursor: "pointer", listStyle: "none", userSelect: "none", padding: "9px 4px", display: "flex", alignItems: "center", gap: 10 }}>
+                      {/* icona toggle */}
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 22, height: 22, borderRadius: 6,
+                        background: "linear-gradient(135deg,#1a73e8,#0d47a1)",
+                        color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
+                        boxShadow: "0 1px 4px rgba(26,115,232,0.3)"
+                      }}>▾</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: "#102a47", minWidth: 80 }}>{app.name}</span>
+                      {app.code && <span style={{ fontSize: 11, color: "#64748b", background: "#e2e8f0", borderRadius: 4, padding: "1px 6px" }}>{app.code}</span>}
+                      <span style={{ fontSize: 12, color: "#475569", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {langStr ? `${langStr}` : ""}
+                        {counts ? <span style={{ color: "#94a3b8", marginLeft: 6 }}>· {counts}</span> : null}
+                      </span>
+                      {tp.totalFiles > 0 && (
+                        <span style={{ fontSize: 11, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 7px", flexShrink: 0, fontWeight: 600 }}>
+                          {tp.totalFiles} file
+                        </span>
+                      )}
+                    </summary>
 
-                  {/* Metriche */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 8, marginBottom: 14 }}>
-                    {[
-                      ["File nella cartella",  techProfile.totalFiles],
-                      ["Sorgenti analizzati",  techProfile.readFiles],
-                      ["File di test",         techProfile.testFiles],
-                      ["Configurazioni",       techProfile.configFiles],
-                    ].map(([label, val]) => (
-                      <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "8px 10px", textAlign: "center" }}>
-                        <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: "#102a47" }}>{val}</div>
+                    <div style={{ padding: "12px 4px 4px" }}>
+                      {/* metriche */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(100px,1fr))", gap: 6, marginBottom: 12 }}>
+                        {[["File totali", tp.totalFiles], ["Analizzati", tp.readFiles], ["Test", tp.testFiles], ["Config", tp.configFiles]]
+                          .filter(([, v]) => v != null)
+                          .map(([label, val]) => (
+                            <div key={label} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "6px 8px", textAlign: "center" }}>
+                              <div style={{ fontSize: 10, color: "#64748b" }}>{label}</div>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: "#1d4ed8" }}>{val}</div>
+                            </div>
+                          ))}
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Sezioni tecniche */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 200px), 1fr))", gap: "10px 16px", marginBottom: 12 }}>
-                    <Section title="Linguaggi"              items={techProfile.technologies} />
-                    <Section title="Framework e piattaforme" items={techProfile.frameworks} />
-                    <Section title="Dati e persistenza"     items={techProfile.databases} />
-                    <Section title="Integrazioni"           items={techProfile.integrations} />
-                    <Section title="Interfacce e processi"  items={techProfile.interfaces} />
-                    <Section title="Sicurezza"              items={techProfile.security} />
-                    <Section title="Test"                   items={techProfile.testing} />
-                    <Section title="Infrastruttura e build" items={techProfile.infrastructure} />
-                    <Section title="Componenti o moduli"    items={techProfile.components} />
-                  </div>
-
-                  {/* Segnali catalogo */}
-                  {techProfile.catalogSignals?.length > 0 && (
-                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "10px 12px", marginBottom: 10 }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: "#92400e", marginBottom: 6 }}>
-                        Indizi utili per il Catalogo del Lotto {lot}
-                      </div>
-                      <div style={{ fontSize: 11, lineHeight: 1.7, color: "#78350f" }}>
-                        {techProfile.catalogSignals.map((x) => (
-                          <span key={x.id} style={{ display: "block" }}>
-                            <strong>ID {x.id} · {x.name}</strong>{x.reason ? ` (${x.reason})` : ""}
-                          </span>
-                        ))}
-                      </div>
+                      {/* sezioni tecniche */}
+                      {(() => {
+                        const TagList = ({ items }) => (items?.length
+                          ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 5px", marginTop: 3 }}>
+                              {items.map(t => <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px", fontSize: 11, fontWeight: 600 }}>{t}</span>)}
+                            </div>
+                          : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>);
+                        const Section = ({ title, items }) => items?.length
+                          ? <div><div style={{ fontWeight: 700, fontSize: 11, color: "#475569", marginBottom: 1 }}>{title}</div><TagList items={items} /></div>
+                          : null;
+                        return (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "8px 14px", marginBottom: 10 }}>
+                            <Section title="Linguaggi"               items={tp.technologies} />
+                            <Section title="Framework"               items={tp.frameworks} />
+                            <Section title="Dati e persistenza"      items={tp.databases} />
+                            <Section title="Integrazioni"            items={tp.integrations} />
+                            <Section title="Interfacce"              items={tp.interfaces} />
+                            <Section title="Sicurezza"               items={tp.security} />
+                            <Section title="Test"                    items={tp.testing} />
+                            <Section title="Infrastruttura"          items={tp.infrastructure} />
+                            <Section title="Componenti"              items={tp.components} />
+                          </div>
+                        );
+                      })()}
+                      {tp.catalogSignals?.length > 0 && (
+                        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, fontSize: 11, color: "#92400e", marginBottom: 4 }}>Indizi catalogo Lotto {lot}</div>
+                          {tp.catalogSignals.map(x => (
+                            <div key={x.id} style={{ fontSize: 11, color: "#78350f" }}><strong>ID {x.id} · {x.name}</strong>{x.reason ? ` — ${x.reason}` : ""}</div>
+                          ))}
+                        </div>
+                      )}
+                      {tp.risks?.length > 0 && (
+                        <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "8px 10px" }}>
+                          <div style={{ fontWeight: 700, fontSize: 11, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
+                          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#881337" }}>
+                            {tp.risks.map((r, i) => <li key={i}>{r}</li>)}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {/* Rischi */}
-                  {techProfile.risks?.length > 0 && (
-                    <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "10px 12px" }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
-                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#881337" }}>
-                        {techProfile.risks.map((r, i) => <li key={i}>{r}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
+                  </details>
+                );
+              };
+              return selectedAppIds.map(aid => <AppProfileRow key={aid} appId={aid} />);
             })()}
           </div>
 
@@ -1536,50 +2199,39 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
       {step === 2 && (
         <div>
           <InitiativeBanner />
-          <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, borderTop: "3px solid #6366f1" }}>
+          <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, background: "#f5f3ff", borderColor: "#ddd6fe", borderTop: "3px solid #6366f1" }}>
             <h3 style={{ margin: "0 0 8px" }}>Supporto AI alla valutazione</h3>
-            {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell’iniziativa. Potrai esaminare il riepilogo e scegliere le proposte da applicare.</p>}
+            {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell'iniziativa. Le proposte AI verranno mostrate direttamente in cima a ogni gruppo negli interventi.</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
               <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}
                 title="Invia l'iniziativa al modello AI: riceverai un sommario e proposte di voci di catalogo da aggiungere/escludere/modificare">
-                {aiBusy ? "Analisi AI in corso…" : "Secondo parere AI"}
+                {aiBusy ? "Analisi AI in corso…" : aiProposals ? "Aggiorna parere AI" : "Secondo parere AI"}
               </button>
+              {aiProposals && !aiBusy && (
+                <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
+                  ✓ {aiProposals.proposals.length} proposte AI attive · {aiProposals.model || "AI"}
+                </span>
+              )}
             </div>
             {aiBusy && (
               <div role="status" aria-live="polite" style={{ marginTop: 16, padding: "16px 18px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 12, color: "#92400e" }}>
                 <strong>Analisi AI in corso</strong> — il modello sta esaminando l'iniziativa, gli interventi e il catalogo.<br/>
-                <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span><br/>
-                <span style={{ color: "#555", marginTop: 4, display: "block" }}>Al termine vedrai un sommario testuale e una lista di proposte (voci di catalogo suggerite) che potrai applicare o ignorare.</span>
+                <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span>
               </div>
             )}
-            {aiProposals && (
-              <div style={{ ...styles.card, marginTop: 16, background: "#f5f7ff", borderColor: "#c7d2fe" }}>
-                <div role="status" style={{ fontWeight: 700, color: "#3730a3", marginBottom: 10 }}>{aiBusy ? "Risultato precedente · aggiornamento in corso" : "Analisi disponibile"} · {aiProposals.proposals.length} proposte</div>
-                {aiProposals.proposals.length === 0 && <p style={styles.hint}>Nessuna proposta da applicare. Consulta il riepilogo dell’analisi.</p>}
-                <div>
-                  <small>Secondo parere AI · {aiProposals.model || "AI"} — <em>rivedi le proposte e applica solo quelle corrette</em></small>
-                  <p style={{ margin: "6px 0", whiteSpace: "pre-wrap" }}>{aiProposals.analysis?.summary || "Analisi completata."}</p>
-                </div>
-                <div>
-                  {aiProposals.proposals.map((p, i) => {
-                    const cc = catalog.find((x) => String(x.id) === String(p.catalogId));
-                    return (
-                      <label key={i} style={{ display: "block", margin: "10px 0", padding: 14, borderRadius: 10, border: p.apply ? "1px solid #818cf8" : "1px solid #dce5ef", background: "#fff", cursor: "pointer", fontSize: 14 }}>
-                        <input type="checkbox" checked={p.apply} onChange={(e) => setAiProposals((prev) => ({ ...prev, proposals: prev.proposals.map((q, j) => (j === i ? { ...q, apply: e.target.checked } : q)) }))} />
-                        {" "}ID {p.catalogId} · {cc?.nome || "Voce catalogo"} — {p.rationale || ""}
-                        <div style={{ fontSize: 12, color: "#555" }}>
-                          {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1} · Confidenza {Math.round((Number(p.confidence) || 0) * 100)}%
-                        </div>
-                      </label>
-                    );
-                  })}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-                    <button style={btnStyles.primary} onClick={applyAiProposals} disabled={!aiProposals.proposals.length}>Applica proposte selezionate</button>
-                    <button style={btnStyles.secondary} onClick={() => setAiProposals(null)}>Chiudi</button>
-                  </div>
-                </div>
-              </div>
+            {aiProposals?.analysis?.summary && (
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontSize: 12, color: "#6366f1", fontWeight: 600 }}>Leggi il riepilogo AI</summary>
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "#374151", whiteSpace: "pre-wrap", background: "#f5f7ff", borderRadius: 6, padding: "10px 12px", border: "1px solid #c7d2fe" }}>
+                  {aiProposals.analysis.summary}
+                </p>
+                {aiProposals.analysis?.warnings?.length > 0 && (
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 11, color: "#92400e" }}>
+                    {aiProposals.analysis.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                )}
+              </details>
             )}
           </div>
 
@@ -1597,10 +2249,93 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push({ ...s, __gi: gi });
   });
-  return [...groups.entries()].map(([gid, items]) => {
+
+  // Proposte AI valide (voce esiste nel catalogo, non è "exclude")
+  const aiPending = (aiProposals?.proposals || []).filter(p =>
+    p.action !== "exclude" &&
+    catalog.some(c => String(c.id) === String(p.catalogId)) &&
+    // non già aggiunta come suggestion
+    !suggestions.some(s => String(s.id) === String(p.catalogId))
+  );
+
+  return (
+    <>
+      {/* ── BLOCCO PROPOSTE AI – sempre in cima, prima dei gruppi ── */}
+      {aiPending.length > 0 && (
+        <div style={{ display: "grid", gap: 8, padding: "12px 14px", background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: 8, marginTop: 12, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#5b21b6" }}>
+            Proposte AI · {aiProposals.model || "AI"} — aggiungi quelle pertinenti
+          </div>
+          {aiPending.map((p, pi) => {
+            const cc = catalog.find(c => String(c.id) === String(p.catalogId));
+            if (!cc) return null;
+            const conf = Math.round((Number(p.confidence) || 0) * 100);
+            return (
+              <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "16px", flexWrap: "wrap", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
+                    ID {cc.id} · {esc(cc.ambito)}
+                    {p.interventionId && p.interventionId.trim() && (
+                      <span style={{ marginLeft: 8, background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>
+                        ID_INTERVENTO {p.interventionId}
+                      </span>
+                    )}
+                    {conf > 0 && (
+                      <span style={{ marginLeft: 8, background: conf >= 70 ? "#dcfce7" : "#fef9c3", color: conf >= 70 ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 5px", fontSize: 10 }}>
+                        Confidenza {conf}%
+                      </span>
+                    )}
+                  </div>
+                  <strong style={{ fontSize: 13, display: "block", marginBottom: 3 }}>{esc(cc.nome)}</strong>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>
+                    {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1}
+                  </div>
+                  {p.rationale && (
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "#374151", background: "#ede9fe", borderRadius: 4, padding: "6px 8px", borderLeft: "3px solid #7c3aed" }}>
+                      {p.rationale}
+                    </p>
+                  )}
+                </div>
+                <button
+                  style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
+                  onClick={() => {
+                    const catalogEntry = catalog.find(c => String(c.id) === String(p.catalogId));
+                    if (!catalogEntry) return;
+                    // Assegna al gruppo dell'interventionId se presente, altrimenti nessun gruppo
+                    const intId = p.interventionId && p.interventionId.trim() !== "" ? p.interventionId.trim() : undefined;
+                    const newSugg = {
+                      id: catalogEntry.id,
+                      selected: true,
+                      type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
+                      complexity: p.complexity || "Medio",
+                      qty: Math.max(0.01, Number(p.quantity) || 1),
+                      score: Math.round((Number(p.confidence) || 0) * 10),
+                      reason: p.rationale || "",
+                      additionalInfo: "Proposta AI",
+                      interventionId: intId,
+                    };
+                    setSuggestions(prev => {
+                      const next = [...prev, newSugg];
+                      // Auto-salva in background per persistere la nuova suggestion
+                      setTimeout(() => persistInitiativeEvaluation(false), 0);
+                      return next;
+                    });
+                  }}
+                >
+                  + Aggiungi
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── GRUPPI ESISTENTI ── */}
+      {[...groups.entries()].map(([gid, items]) => {
     const inter = importedInterventions.find((x) => String(x.id) === String(gid));
     const isNoIntervention = gid === "__NOX__";
     const isManual = gid === "__MANUALE__";
+
     return (
       <details key={gid} open={isNoIntervention || isManual} style={{ ...styles.card, marginBottom: 10, padding: 0, border: "1px solid #dde1e6" }}>
         <summary style={{ cursor: "pointer", padding: "10px 14px", fontWeight: 700, fontSize: 13, background: "#f8f9fa", borderRadius: "8px 8px 0 0", listStyle: "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -1622,31 +2357,36 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         </summary>
         <div style={{ padding: "10px 14px", display: "grid", gap: 10 }}>
           {items.map((s, i) => {
-            const cc = catalog.find((x) => x.id === s.id);
+            const cc = catalog.find((x) => String(x.id) === String(s.id));
             if (!cc) return null;
             // CORRETTO: validComplexities(catalogEntry, typeString)
             const vals = validComplexities(cc, s.type);
-            const unitPrice = defaultPrice(s, { catalog, priceMode, builtin: !!activeContract?.builtin });
+            const unitPrice = defaultPrice(s, { catalog, priceMode, builtin: isBuiltin });
             const importoProposto = unitPrice * (s.qty || 1);
             return (
               <div key={i} style={{ ...styles.suggestion, border: s.selected ? "1px solid #1a73e8" : "1px solid #ddd", display: "grid", gap: 8, background: s.selected ? "#f0f7ff" : "#fff" }}>
                 {/* Riga intestazione con checkbox */}
                 <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
                   <input type="checkbox" style={{ marginTop: 3, flex: "0 0 auto" }} checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>ID {cc.id} · {esc(cc.ambito)}</div>
-                    <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
-                    {cc.descrizione && (
-                      <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "10px 12px" }}>
-                        <span style={{ fontWeight: 600, color: "#102a47" }}>Voce catalogo: </span>{esc(cc.descrizione)}
-                      </p>
-                    )}
-                    {s.reason && (
-                      <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "10px 12px", borderLeft: "3px solid #1a73e8" }}>
-                        <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{esc(s.reason)}
-                      </p>
-                    )}
-                  </div>
+                   <div style={{ flex: 1 }}>
+                     <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>
+                       ID {cc.id} · {esc(cc.ambito)}
+                       {s.additionalInfo === "Proposta AI" && (
+                         <span style={{ marginLeft: 8, background: "#ede9fe", color: "#6d28d9", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>✦ AI</span>
+                       )}
+                     </div>
+                     <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
+                     {cc.descrizione && (
+                       <p style={{ margin: "0 0 4px", fontSize: 12, color: "#444", lineHeight: 1.5, background: "#f4f6f8", borderRadius: 5, padding: "10px 12px" }}>
+                         <span style={{ fontWeight: 600, color: "#102a47" }}>Voce catalogo: </span>{esc(cc.descrizione)}
+                       </p>
+                     )}
+                     {s.reason && (
+                       <p style={{ margin: 0, fontSize: 12, color: "#1a5276", lineHeight: 1.5, background: "#eaf4fb", borderRadius: 5, padding: "10px 12px", borderLeft: "3px solid #1a73e8" }}>
+                         <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{s.reason}
+                       </p>
+                     )}
+                   </div>
                 </label>
 
                 {/* Tabella prezzi S/M/C */}
@@ -1713,7 +2453,9 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         </div>
       </details>
     );
-  });
+  })}
+    </>
+  );
 })()}
           </div>
 
@@ -1793,7 +2535,10 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               <label style={styles.label}>Contingenza (%) <input style={styles.input} type="number" step="0.01" value={contingency} onChange={(e) => setContingency(Number(e.target.value) || 0)} /></label>
             </div>
             <div style={{ marginTop: 10 }}>
-              <strong>Base allocazione TOW .5: </strong>{euro.format(calculation.allocationBase)} ({tow5Share}%)
+              <strong>Base TOW automatici: </strong>{euro.format(calculation.allocationBase)}
+              <span style={{ fontSize: 12, color: '#52657d', marginLeft: 8 }}>
+                (catalogo × {calculation.towMultiplier?.toFixed(5)})
+              </span>
             </div>
           </div>
 
@@ -1889,9 +2634,24 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 
           {/* Riga offerta */}
           <div style={styles.card}>
-            <h3 style={{ margin: "0 0 10px" }}>Voci di catalogo</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+              <h3 style={{ margin: 0 }}>Voci di catalogo</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={{ ...btnStyles.ghost, fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => {
+                    const groups = {};
+                    items.forEach(it => { const g = it.interventionId || "—"; if (!groups[g]) groups[g] = true; });
+                    setExpandedOfferGroups(new Set(Object.keys(groups)));
+                  }}>
+                  Espandi tutti
+                </button>
+                <button style={{ ...btnStyles.ghost, fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => setExpandedOfferGroups(new Set())}>
+                  Chiudi tutti
+                </button>
+              </div>
+            </div>
             {(() => {
-              // Raggruppa items per interventionId
               const groups = {};
               items.forEach(it => {
                 const gid = it.interventionId || "—";
@@ -1899,64 +2659,79 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                 groups[gid].push(it);
               });
               return Object.entries(groups).map(([gid, gitems]) => {
+                const isOpen = expandedOfferGroups.has(gid);
                 const groupTotal = gitems.reduce((s, it) => {
-                  const u = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  const u = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                   return s + u * it.qty;
                 }, 0);
                 return (
-                  <details key={gid} open style={{ marginBottom: 8, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
-                    <summary style={{ padding: "9px 14px", background: "#f8fafc", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between", listStyle: "none" }}>
-                      <span>ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span> <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span></span>
+                  <div key={gid} style={{ marginBottom: 6, border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+                    <div
+                      onClick={() => setExpandedOfferGroups(prev => {
+                        const next = new Set(prev);
+                        isOpen ? next.delete(gid) : next.add(gid);
+                        return next;
+                      })}
+                      style={{ padding: "9px 14px", background: "#f8fafc", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#102a47", display: "flex", justifyContent: "space-between", alignItems: "center", userSelect: "none" }}>
+                      <span>
+                        <span style={{ fontSize: 11, color: "#64748b", marginRight: 8 }}>{isOpen ? "▼" : "▶"}</span>
+                        ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span>
+                        <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span>
+                      </span>
                       <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
-                    </summary>
-                    <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
-                      <thead>
-                        <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>ID Catalogo / componente</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Prezzo unitario</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Totale</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Note</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gitems.map((it) => {
-                          const cc = catalog.find((x) => x.id === it.id);
-                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
-                          return (
-                            <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
-                              <td style={{ padding: "10px 12px" }}>
-                                <strong>ID {it.id}</strong>
-                                <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
-                              </td>
-                              <td style={{ padding: "10px 12px" }}>
-                                <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
-                                  <option>REALIZZAZIONE</option><option>MODIFICA</option>
-                                </select>
-                              </td>
-                              <td style={{ padding: "10px 12px" }}>
-                                <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
-                                  {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
-                                </select>
-                              </td>
-                              <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64 }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
-                              <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 90 }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
-                              <td style={{ padding: "10px 12px" }}><strong>{euro.format(unit * it.qty)}</strong></td>
-                              <td style={{ padding: "10px 12px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
-                              <td style={{ padding: "10px 12px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                    </div>
+                    {isOpen && (
+                      <div style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
+                        <table style={{ ...styles.table, margin: 0, borderRadius: 0, border: "none" }}>
+                          <thead>
+                            <tr style={{ ...styles.thead, background: "#f1f5f9" }}>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>ID Catalogo / componente</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Q.tà</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Prezzo unitario</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Totale</th>
+                              <th style={{ padding: "10px 12px", fontSize: 12 }}>Note</th>
+                              <th></th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table></div>
-                  </details>
+                          </thead>
+                          <tbody>
+                            {gitems.map((it, rowIndex) => {
+                              const cc = catalog.find((x) => String(x.id) === String(it.id));
+                              const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
+                              return (
+                                <tr key={it.key} style={{ borderTop: "1px solid #e8edf3", background: rowIndex % 2 ? "#f8fafc" : "#fff" }}>
+                                  <td style={{ padding: "10px 12px" }}>
+                                    <strong>ID {it.id}</strong>
+                                    <div style={{ color: "#666", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</div>
+                                  </td>
+                                  <td style={{ padding: "10px 12px" }}>
+                                    <select style={styles.input} value={it.type} onChange={(e) => updateItem(it.key, { type: e.target.value, unit: null })}>
+                                      <option>REALIZZAZIONE</option><option>MODIFICA</option>
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "10px 12px" }}>
+                                    <select style={styles.input} value={it.complexity} onChange={(e) => updateItem(it.key, { complexity: e.target.value, unit: null })}>
+                                      {validComplexities(cc, it.type).map((v) => <option key={v}>{v}</option>)}
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 64, textAlign: "right" }} type="number" min="0" value={it.qty} onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) || 0 })} /></td>
+                                  <td style={{ padding: "10px 12px" }}><input style={{ ...styles.input, width: 110, textAlign: "right" }} type="number" min="0" step=".01" value={unit} onChange={(e) => updateItem(it.key, { unit: Number(e.target.value) || 0 })} /></td>
+                                  <td style={{ padding: "10px 12px", textAlign: "right", whiteSpace: "nowrap" }}><strong>{euro.format(unit * it.qty)}</strong></td>
+                                  <td style={{ padding: "10px 12px" }}><textarea style={{ ...styles.textarea, minWidth: 180 }} rows={2} placeholder="Razionali, vincoli o note" value={it.additionalInfo || ""} onChange={(e) => updateItem(it.key, { additionalInfo: e.target.value })} /></td>
+                                  <td style={{ padding: "10px 12px" }}><button style={btnStyles.danger} onClick={() => removeItem(it.key)}>×</button></td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 );
               });
             })()}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20, padding: 20, borderRadius: 12, background: "#102a47", color: "#fff", gap: 16, flexWrap: "wrap" }}>
               <strong>Totale catalogo: {euro.format(calculation.cat)}</strong>
               <strong>Altri TOW: {euro.format(calculation.oth)}</strong>
               <strong style={{ fontSize: 16 }}>Totale offerta: {euro.format(calculation.total)}</strong>
@@ -2004,7 +2779,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
               });
               return Object.entries(groups).map(([gid, gitems]) => {
                 const groupTotal = gitems.reduce((s, it) => {
-                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                  const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                   return s + unit * it.qty;
                 }, 0);
                 return (
@@ -2020,17 +2795,17 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Voce</th>
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Tipo</th>
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Complessità</th>
-                          <th style={{ padding: "10px 12px", fontSize: 12 }}>Q.tà</th>
+                          <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Q.tà</th>
                           <th style={{ padding: "10px 12px", fontSize: 12 }}>Razionale</th>
                           <th style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>Importo</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {gitems.map((it) => {
-                          const cc = catalog.find((x) => x.id === it.id);
-                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: !!activeContract?.builtin });
+                        {gitems.map((it, rowIndex) => {
+                          const cc = catalog.find((x) => String(x.id) === String(it.id));
+                          const unit = it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin });
                           return (
-                            <tr key={it.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                            <tr key={it.key} style={{ borderTop: "1px solid #e8edf3", background: rowIndex % 2 ? "#f8fafc" : "#fff" }}>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.id}</td>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{esc(cc?.nome || "Voce manuale")}</td>
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.type}</td>
@@ -2059,101 +2834,11 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
         </div>
       )}
 
-      {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
-      <div style={{ ...styles.card, marginTop: 28 }}>
-        <div
-          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, cursor: "pointer", userSelect: "none" }}
-          onClick={() => setShowApplicativi(v => !v)}
-        >
-          <h3 style={{ margin: 0 }}>
-            {showApplicativi ? "▾" : "▸"} Applicativi e tecnologie · Lotto {lot}
-            {!showApplicativi && applications.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 400, color: "#64748b", marginLeft: 8 }}>({applications.length} configurati)</span>
-            )}
-          </h3>
-          {showApplicativi && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-              <input style={styles.input} placeholder="Cerca applicativo…" value={applicationSearch} onChange={(e) => setApplicationSearch(e.target.value)} />
-              <button style={btnStyles.secondary} onClick={addApplicationV39}>Aggiungi applicativo</button>
-            </div>
-          )}
-        </div>
-        {showApplicativi && (
-        <>
-        {applications.length === 0 ? (
-          <p style={{ color: "#666", fontSize: 13 }}>Nessun applicativo configurato per questo lotto.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-            {applications
-              .filter((a) => !appNorm(applicationSearch) || appNorm([a.name, a.code, (a.systemAliases || []).join(" "), (a.ambiti || []).join(" ")].join(" ")).includes(appNorm(applicationSearch)))
-              .map((a, i) => {
-                const tag = (props, arr) =>
-                  (arr || []).length
-                    ? `${props}: ${[...arr].join(" · ")}`
-                    : "";
-                const tags = [tag("OS", a.operatingSystems), tag("DBMS", a.databases), tag("Linguaggi", a.languages), tag("Extra", a.extraTechnologies)].filter(Boolean).join("<br>");
-                return (
-                  <div key={applicationIdentity(a) + "-" + i} style={styles.suggestion}>
-                    <div style={{ minWidth: 0 }}>
-                      <strong>{esc(a.name || "Applicativo senza nome")}{a.code ? <span style={{ color: "#666", fontWeight: 400 }}> · {esc(a.code)}</span> : null}</strong>
-                      {a.codeUrl ? <div style={styles.hint}><a href={safeAppUrl(a.codeUrl)} target="_blank" rel="noopener noreferrer">Repository</a></div> : null}
-                      {(a.systemAliases || []).length ? <div style={styles.hint}>Sistema: {esc([...a.systemAliases].join(", "))}</div> : null}
-                      <div style={styles.hint} dangerouslySetInnerHTML={{ __html: tags || "Nessuna tecnologia indicata" }} />
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button style={btnStyles.secondary} onClick={() => setApplicationDraft({ ...a })}>Modifica</button>
-                      <button style={btnStyles.danger} onClick={() => deleteApplication(a)}>Elimina</button>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        )}
-
-        {applicationDraft && (
-          <div style={{ border: "1px solid #d7dce1", borderRadius: 8, padding: 12, marginTop: 12, background: "#fbfbfc" }}>
-            <h4 style={{ margin: "0 0 8px" }}>Modifica applicativo</h4>
-            <div style={styles.grid2}>
-              <label style={styles.label}>Nome applicativo<input style={styles.input} value={applicationDraft.name || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, name: e.target.value })} /></label>
-              <label style={styles.label}>Codice AP<input style={styles.input} value={applicationDraft.code || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, code: e.target.value.toUpperCase() })} placeholder="AP-00226" /></label>
-            </div>
-            <label style={styles.label}>Nomi riconosciuti nel campo Sistema (uno per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.systemAliases || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, systemAliases: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
-            <label style={styles.label}>Link al codice o repository
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
-                <input style={{ ...styles.input, marginTop: 0, flex: 1 }} value={applicationDraft.codeUrl || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, codeUrl: e.target.value })} placeholder="https://github.com/..." />
-                <button type="button" style={{ ...btnStyles.secondary, whiteSpace: "nowrap", padding: "8px 12px" }}
-                  onClick={() => {
-                    const inp = document.createElement("input");
-                    inp.type = "file"; inp.multiple = true;
-                    inp.setAttribute("webkitdirectory", ""); inp.setAttribute("directory", "");
-                    inp.onchange = () => {
-                      if (!inp.files.length) return;
-                      const rel = inp.files[0].webkitRelativePath || "";
-                      const folder = rel.split("/")[0] || "cartella";
-                      setApplicationDraft((d) => ({ ...d, codeUrl: folder + " (" + inp.files.length + " file)" }));
-                      toast("Cartella collegata: " + folder + " — " + inp.files.length + " file");
-                    };
-                    inp.click();
-                  }}>
-                  Seleziona cartella
-                </button>
-              </div>
-            </label>
-            <label style={styles.label}>Tecnologie aggiuntive (una per riga)<textarea style={styles.textarea} rows={2} value={(applicationDraft.extraTechnologies || []).join("\n")} onChange={(e) => setApplicationDraft({ ...applicationDraft, extraTechnologies: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} /></label>
-             <label style={styles.label}>Note integrative<textarea style={styles.textarea} rows={2} value={applicationDraft.notes || ""} onChange={(e) => setApplicationDraft({ ...applicationDraft, notes: e.target.value })} /></label>
-             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-               <button style={btnStyles.primary} onClick={saveApplicationDraft}>Salva applicativo</button>
-               <button style={btnStyles.secondary} onClick={() => setApplicationDraft(null)}>Annulla</button>
-             </div>
-           </div>
-         )}
-         </>
-        )}
-       </div>
-
+      </main>
       {/* SVILUPPO INIZIATIVA */}
-      <div style={{ ...styles.card, marginTop: 28 }}>
-        <h3 style={{ margin: 0 }}>Sviluppo iniziativa · richiesta di modifica codice</h3>
+      <details style={{ ...styles.card, marginTop: 28, background: "#edf1f6" }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#102a47" }}>Sviluppo iniziativa</summary>
+        <h3 style={{ margin: 0 }}>Richiesta di modifica codice</h3>
         <p style={styles.hint}>Autorizza gli interventi nello step Offerta/Revisione, collega il repository e genera il pacchetto di richiesta codice (ZIP) per lo strumento di sviluppo scelto.</p>
         <div style={{ ...styles.grid2, marginTop: 10 }}>
           <label style={styles.label}>
@@ -2168,12 +2853,6 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
             Branch suggerito
             <input style={styles.input} value={implementationBranch} onChange={(e) => setImplementationBranch(e.target.value)} placeholder="feature/<codice>" />
           </label>
-          <label style={styles.label}>
-            Repository (cartella sorgente)
-            <button style={btnStyles.secondary} onClick={selectImplementationRepository}>
-              {implementationFiles.length ? `${implementationFiles.length} file selezionati` : "Scegli cartella…"}
-            </button>
-          </label>
         </div>
         <label style={styles.label}>
           Note di approvazione
@@ -2183,9 +2862,17 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           Compilazione e test
           <textarea style={styles.textarea} rows={2} value={implementationTests} onChange={(e) => setImplementationTests(e.target.value)} placeholder="Comandi di build/test da eseguire (es. npm run build, dotnet test)…" />
         </label>
-        {implementationFiles.length > 0 && (
+        {implementationFiles.length > 0 ? (
           <p style={styles.hint}>
             {implementationFiles.filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name)).length} file sorgente presi in considerazione · quelli ignorati (node_modules, dist, build, vendor, bin/obj, minificati, lock) non vengono elencati.
+          </p>
+        ) : techProfile ? (
+          <p style={styles.hint}>
+            Repository: <strong>{techProfile.name || initiative.system}</strong> — profilo tecnico caricato dall'applicativo selezionato ({techProfile.totalFiles || 0} file totali, {techProfile.readFiles || 0} analizzati).
+          </p>
+        ) : (
+          <p style={{ ...styles.hint, color: "#b00020" }}>
+            Nessun applicativo selezionato — torna al passo 1 e seleziona un applicativo da "Applicativi e tecnologie".
           </p>
         )}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
@@ -2194,7 +2881,7 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
           </button>
           <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
         </div>
-      </div>
+      </details>
 
       {toastMsg && (
         <div role="status" aria-live="polite" style={styles.toast}>
@@ -2206,18 +2893,20 @@ function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto }) {
 }
 
 const styles = {
-  card: { background: "#fff", border: "1px solid #dce5ef", borderRadius: 16, padding: "clamp(14px, 2vw, 24px)", marginBottom: 20, minWidth: 0, boxSizing: "border-box", boxShadow: "0 3px 14px rgba(24, 48, 78, 0.04)" },
-  input: { padding: "10px 12px", minHeight: 42, minWidth: 0, maxWidth: "100%", boxSizing: "border-box", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#172b4d", fontSize: 14, fontFamily: "inherit", marginTop: 5 },
+  eyebrow: { fontSize: 11, fontWeight: 700, letterSpacing: "1.3px", textTransform: "uppercase", color: "#64748b", marginBottom: 10 },
+  badge: { display: "inline-flex", alignItems: "center", padding: "3px 9px", borderRadius: 6, background: "#eef2f6", color: "#475569", fontSize: 11, fontWeight: 600 },
+  card: { background: "#fff", border: "1px solid #dce5ef", borderRadius: 12, padding: "clamp(16px, 2vw, 24px)", marginBottom: 20, minWidth: 0, boxSizing: "border-box", boxShadow: "0 1px 3px rgba(16,42,71,0.04)" },
+  input: { padding: "10px 12px", minHeight: 42, minWidth: 0, maxWidth: "100%", boxSizing: "border-box", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#172b4d", fontSize: 14, fontFamily: "inherit", marginTop: 5 },
   inputFile: { marginBottom: 8, maxWidth: "100%" },
-  textarea: { width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 9, border: "1px solid #bac8da", fontSize: 14, marginTop: 5, fontFamily: "inherit", lineHeight: 1.6, resize: "vertical", color: "#172b4d", background: "#fff" },
+  textarea: { width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 9, border: "1px solid #cbd5e1", fontSize: 14, marginTop: 5, fontFamily: "inherit", lineHeight: 1.6, resize: "vertical", color: "#172b4d", background: "#fff" },
   label: { display: "flex", flexDirection: "column", minWidth: 0, fontSize: 13, fontWeight: 500, color: "#40536d", gap: 4 },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 18 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: 20 },
   hint: { color: "#52657d", fontSize: 13, lineHeight: 1.6, marginTop: 6 },
   checkRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14 },
   suggestion: { border: "1px solid #dce5ef", borderRadius: 12, padding: 16, minWidth: 0, display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap", background: "#fafcff" },
-  step: { flex: "1 1 150px", textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#52657d", fontWeight: 600, fontSize: 14, cursor: "pointer" },
-  stepActive: { flex: "1 1 150px", textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #174ea6", background: "#174ea6", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 3px 8px rgba(23,78,166,.16)" },
-  lotBtn: { padding: "10px 14px", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#52657d", fontSize: 14, cursor: "pointer" },
+  step: { flex: "1 1 145px", textAlign: "left", padding: "12px", borderRadius: 8, border: "1px solid transparent", background: "#fff", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" },
+  stepActive: { flex: "1 1 145px", textAlign: "left", padding: "12px", borderRadius: 8, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#102a47", fontWeight: 700, fontSize: 13, cursor: "pointer" },
+  lotBtn: { padding: "10px 14px", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#52657d", fontSize: 14, cursor: "pointer" },
   lotBtnActive: { padding: "10px 14px", borderRadius: 9, border: "1px solid #174ea6", background: "#eaf2ff", color: "#174ea6", fontWeight: 600, fontSize: 14, cursor: "pointer" },
   table: { width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 14, lineHeight: 1.5, fontVariantNumeric: "tabular-nums" },
   thead: { background: "#edf2f8", color: "#40536d", textAlign: "left", fontSize: 12 },
@@ -2225,9 +2914,8 @@ const styles = {
 };
 
 const btnStyles = {
-  primary: { minHeight: 44, padding: "10px 16px", borderRadius: 9, border: "1px solid #174ea6", background: "#174ea6", color: "#fff", fontWeight: 600, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
-  secondary: { minHeight: 44, padding: "10px 16px", borderRadius: 9, border: "1px solid #bac8da", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
-  danger: { minHeight: 44, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  primary: { minHeight: 38, padding: "10px 16px", borderRadius: 9, border: "1px solid #174ea6", background: "#1a73e8", color: "#fff", fontWeight: 600, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  secondary: { minHeight: 38, padding: "10px 16px", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
+  danger: { minHeight: 38, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
 };
 
-export default ConfiguratorePage;

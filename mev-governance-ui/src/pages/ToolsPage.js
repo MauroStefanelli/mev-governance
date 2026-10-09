@@ -6,6 +6,17 @@ import { tryRefreshToken, updateOrdineConsegna } from "../services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
+// Deriva l'URL diretto del parser dall'URL del backend:
+//   https://mev-governance-backend-dev.onrender.com → https://mev-pdf-parser-dev.onrender.com
+//   https://mev-governance-backend.onrender.com     → https://mev-pdf-parser.onrender.com
+const PDF_PARSER_URL = (() => {
+  try {
+    return API_BASE_URL.replace("mev-governance-backend", "mev-pdf-parser");
+  } catch {
+    return "";
+  }
+})();
+
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("jwt") || ""}`,
 });
@@ -31,31 +42,48 @@ const fetchAuth = async (url, options = {}) => {
 // ============================================================
 
 /**
- * Aspetta che il parser PDF sia pronto facendo polling su /parser-warmup.
- * Chiama onProgress(secondi) ad ogni tentativo per aggiornare l'UI.
- * Lancia eccezione se il parser non risponde entro maxWaitMs.
+ * Sveglia il parser PDF chiamando direttamente /health sul servizio parser
+ * (senza passare per il backend, che potrebbe anch'esso essere in cold start).
+ * Polling ogni 5s, timeout 70s per tentativo (Render free cold start ~50s).
+ * Chiama onProgress(secondi) ad ogni tick per aggiornare l'UI.
  */
 const waitForParser = async (onProgress, maxWaitMs = 270000) => {
-  const interval = 18000;  // polling ogni 18s (backend impiega max 30s a rispondere)
+  const pollInterval = 5000;   // riprova ogni 5s
+  const fetchTimeout = 70000;  // 70s per tentativo: copre il cold start Render free
   const started = Date.now();
   let elapsed = 0;
+
+  // Se non riusciamo a derivare l'URL del parser, fallback al backend come proxy
+  const useDirectUrl = PDF_PARSER_URL && PDF_PARSER_URL !== API_BASE_URL;
+
   while (elapsed < maxWaitMs) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000); // timeout fetch 35s
-      const res = await fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
-        headers: authHeaders(),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === "ok") return; // parser pronto
+      const timeoutId = setTimeout(() => controller.abort(), fetchTimeout);
+      let ok = false;
+
+      if (useDirectUrl) {
+        // Chiamata diretta al parser — nessun JWT necessario
+        const res = await fetch(`${PDF_PARSER_URL}/health`, { signal: controller.signal });
+        ok = res.ok;
+      } else {
+        // Fallback: proxy via backend
+        const res = await fetch(`${API_BASE_URL}/api/tools/parser-warmup`, {
+          headers: authHeaders(), signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          ok = data.status === "ok";
+        }
       }
-    } catch { /* rete non disponibile o timeout, riprova */ }
+
+      clearTimeout(timeoutId);
+      if (ok) return; // parser pronto
+    } catch { /* timeout o rete — riprova */ }
+
     elapsed = Date.now() - started;
     onProgress(Math.round(elapsed / 1000));
-    await new Promise(r => setTimeout(r, interval));
+    if (elapsed < maxWaitMs) await new Promise(r => setTimeout(r, pollInterval));
   }
   throw new Error("Il servizio di parsing PDF non risponde dopo 4 minuti. Riprovare più tardi.");
 };

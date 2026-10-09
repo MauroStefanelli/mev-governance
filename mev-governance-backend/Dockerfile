@@ -23,8 +23,9 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_RUNNING_IN_CONTAINER=true
 ENV ASPNETCORE_hostBuilder__reloadConfigOnChange=false
 
-# PDF_PARSER_URL punta al servizio mev-pdf-parser su Render
-# Sovrascrivibile via variabile d'ambiente nel deploy
+# PDF_PARSER_URL: default PROD. Sovrascrivere via env var Render per ogni servizio:
+#   DEV  → https://mev-pdf-parser-dev.onrender.com
+#   PROD → https://mev-pdf-parser.onrender.com
 ENV PDF_PARSER_URL=https://mev-pdf-parser.onrender.com
 
 # Limita heap GC per contenere l'uso di memoria nel piano free
