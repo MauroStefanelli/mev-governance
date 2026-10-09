@@ -859,6 +859,62 @@ function ConsumoTowSection({ towRows, ambienteId }) {
             </table>
           </div>
 
+          {/* ── Consumo TOW — quantità per ogni TOW del contratto selezionato ── */}
+          {filtered.length > 0 && filtered.some(r => (r.towApprovati || 0) + (r.towImpegnati || 0) + (r.towResidui || 0) > 0) && (
+            <div style={{ borderRadius: "0px", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th style={TH()}>Consumo TOW — {selectedTipo}</th>
+                    <th style={TH("right")}>TOW Approvati</th>
+                    <th style={TH("right")}>TOW Impegnati</th>
+                    <th style={TH("right")}>TOW Residui</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Riga totali */}
+                  <tr style={{ background: "#DCEEFF", borderBottom: "1px solid #BFDFFF" }}>
+                    <td style={TD("left", { fontWeight: 700, color: "#0F4C81", fontSize: "13px" })}>Totale</td>
+                    <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                      {filtered.reduce((s, r) => s + (r.towApprovati || 0), 0).toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                      {filtered.reduce((s, r) => s + (r.towImpegnati || 0), 0).toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={TD("right", { fontWeight: 700, color: "#0F4C81" })}>
+                      {filtered.reduce((s, r) => s + (r.towResidui || 0), 0).toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  {/* Righe per TOW */}
+                  {filtered
+                    .filter(r => (r.towApprovati || 0) + (r.towImpegnati || 0) + (r.towResidui || 0) > 0)
+                    .map((row, ri) => (
+                      <tr key={`tow-consumo-${ri}`} style={{ background: ri % 2 === 0 ? "white" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                        <td style={TD("left", { fontSize: "12px", paddingLeft: "28px", color: "#334155", fontWeight: 600 })}>
+                          {row.tow}
+                        </td>
+                        <td style={TD("right", { fontSize: "12px", color: "#166534", fontWeight: 600 })}>
+                          {(row.towApprovati || 0) > 0
+                            ? (row.towApprovati).toLocaleString("it-IT", { maximumFractionDigits: 2 })
+                            : <span style={{ color: "#cbd5e1" }}>—</span>}
+                        </td>
+                        <td style={TD("right", { fontSize: "12px", color: "#92400e", fontWeight: 600 })}>
+                          {(row.towImpegnati || 0) > 0
+                            ? (row.towImpegnati).toLocaleString("it-IT", { maximumFractionDigits: 2 })
+                            : <span style={{ color: "#cbd5e1" }}>—</span>}
+                        </td>
+                        <td style={TD("right", { fontSize: "12px", color: "#1e40af", fontWeight: 600 })}>
+                          {(row.towResidui || 0) > 0
+                            ? (row.towResidui).toLocaleString("it-IT", { maximumFractionDigits: 2 })
+                            : <span style={{ color: "#cbd5e1" }}>—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* ── 3 Grafici a torta: Totale → Task → Canone ── */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>
             {allRows.length > 0 && (
