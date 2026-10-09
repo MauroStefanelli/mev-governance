@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { getConsumoTow } from "../services/mevService";
 
 const TABS = [
   { id: "release", label: "Release" },
@@ -99,22 +100,32 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-function KpiCard({ title, value, description, accent, symbol }) {
+function KpiCard({ title, value, description, accent, symbol, loading = false }) {
   return (
     <section aria-label={title} style={{ ...panel, padding: 24, flex: "1 1 230px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <span style={{ ...muted, fontWeight: 600 }}>{title}</span>
         <span aria-hidden="true" style={{ color: accent, background: `${accent}12`, borderRadius: 10, width: 36, height: 36, display: "grid", placeItems: "center", fontWeight: 700 }}>{symbol}</span>
       </div>
-      <div style={{ fontSize: "clamp(23px, 2.5vw, 32px)", fontWeight: 700, letterSpacing: "-0.8px", margin: "15px 0 8px", overflowWrap: "anywhere", fontVariantNumeric: "tabular-nums" }}>{euro.format(value)}</div>
+      <div style={{ fontSize: "clamp(23px, 2.5vw, 32px)", fontWeight: 700, letterSpacing: "-0.8px", margin: "15px 0 8px", overflowWrap: "anywhere", fontVariantNumeric: "tabular-nums", color: loading ? "#C8D0DC" : "inherit" }}>
+        {loading ? "—" : euro.format(value ?? 0)}
+      </div>
       <div style={{ ...muted, fontSize: 12 }}>{description}</div>
     </section>
   );
 }
 
-export default function ChartPage({ rows = [] }) {
+export default function ChartPage({ rows = [], ambienteId }) {
   const [activeTab, setActiveTab] = useState("release");
   const [sort, setSort] = useState("name");
+
+  // ── KPI da ConsumoTow (stessa fonte del Monitoraggio contratto) ───────────
+  const [towRows, setTowRows] = useState(null); // null = loading
+  useEffect(() => {
+    getConsumoTow()
+      .then(data => setTowRows(Array.isArray(data) ? data : []))
+      .catch(() => setTowRows([]));
+  }, [ambienteId]);
 
   // Tutti gli stati presenti nei dati — escluso Eliminato e Sospeso
   const safeRows = useMemo(() =>
@@ -170,24 +181,20 @@ export default function ChartPage({ rows = [] }) {
     safeRows.filter(row => resolvedActiveStates.has(normalize(row.stato))),
     [safeRows, resolvedActiveStates]);
 
-  // I KPI usano importoBdo (valore contrattuale effettivo) con fallback su importoExcel.
-  // ordinatoBdo e fatturato vengono sommati solo sulle righe con stato Approvato,
-  // per coerenza con il Monitoraggio contratto.
+  // ── KPI aggregati dalla tabella ConsumoTow — allineati al Monitoraggio contratto ──
+  // towRows contiene tutte le righe dell'ambiente; sommiamo senza filtro per contratto.
   const kpis = useMemo(() => {
-    // Base: tutte le safeRows (non filtrate dai checkbox) per i KPI di stato
-    return safeRows.reduce((result, row) => {
-      const s = normalize(row.stato);
-      const imp = amount(row.importoBdo || row.importoExcel);
-      if (s === "approvato") {
-        result.approved += imp;
-        result.ordered  += amount(row.ordinatoBdo);
-        result.invoiced += amount(row.fatturato);
-      }
-      if (s === "in approvazione")                          result.inApproval += imp;
-      if (s === "in analisi / stima" || s === "in analisi") result.inAnalisi  += imp;
-      return result;
-    }, { approved: 0, inApproval: 0, inAnalisi: 0, ordered: 0, invoiced: 0 });
-  }, [safeRows]);
+    if (!towRows) return null; // loading
+    const sumField = (field) => towRows.reduce((s, r) => s + (r[field] || 0), 0);
+    return {
+      approved:   sumField("approvato"),
+      ordered:    sumField("ordinatiRda"),
+      impegnato:  sumField("impegnato"),
+      // In Approvazione e In Analisi: non disponibili in ConsumoTow → calcolati da safeRows
+      inApproval: safeRows.reduce((s, r) => normalize(r.stato) === "in approvazione" ? s + amount(r.importoBdo || r.importoExcel) : s, 0),
+      inAnalisi:  safeRows.reduce((s, r) => ["in analisi / stima","in analisi"].includes(normalize(r.stato)) ? s + amount(r.importoBdo || r.importoExcel) : s, 0),
+    };
+  }, [towRows, safeRows]);
 
   const summary = useMemo(() => aggregate(filteredRows, activeTab), [filteredRows, activeTab]);
   const data = useMemo(() => sort === "amount"
@@ -208,13 +215,13 @@ export default function ChartPage({ rows = [] }) {
           <span style={{ padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E3E8EF", borderRadius: 8, fontSize: 12, color: "#68758A" }}>{count.format(filteredRows.length)} MEV nel perimetro</span>
         </header>
 
-        {/* ── KPI box — ordine: Approvato, In Approvazione, In Analisi/Stima, Ordinato, Fatturato ── */}
+        {/* ── KPI box — allineati al Monitoraggio contratto (fonte: ConsumoTow) ── */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
-          <KpiCard title="Approvato" value={kpis.approved} description="Importo BDO · stato Approvato" accent="#526DAB" symbol="✓" />
-          <KpiCard title="In Approvazione" value={kpis.inApproval} description="Importo BDO · stato In Approvazione" accent="#C48A39" symbol="⏳" />
-          <KpiCard title="In Analisi / Stima" value={kpis.inAnalisi} description="Importo BDO · In Analisi / Stima" accent="#438579" symbol="◎" />
-          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · solo righe Approvate" accent="#687A99" symbol="≡" />
-          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · solo righe Approvate" accent="#688B9C" symbol="€" />
+          <KpiCard title="Approvato"        value={kpis?.approved}   description="Da ConsumoTow · identico al Monitoraggio" accent="#526DAB" symbol="✓" loading={!kpis} />
+          <KpiCard title="In Approvazione"  value={kpis?.inApproval} description="Importo MEV · stato In Approvazione"      accent="#C48A39" symbol="⏳" loading={!kpis} />
+          <KpiCard title="In Analisi / Stima" value={kpis?.inAnalisi} description="Importo MEV · In Analisi / Stima"         accent="#438579" symbol="◎" loading={!kpis} />
+          <KpiCard title="Ordinato"         value={kpis?.ordered}    description="Da ConsumoTow · OrdinatiRda"               accent="#687A99" symbol="≡" loading={!kpis} />
+          <KpiCard title="Impegnato"        value={kpis?.impegnato}  description="Da ConsumoTow · Approvato − Ordinato"      accent="#8D78AB" symbol="◐" loading={!kpis} />
         </div>
 
         {/* ── Tab raggruppamento + Filtro Visualizza + Ordina ── */}

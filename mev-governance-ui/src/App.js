@@ -585,7 +585,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_152</span>
+            }}>DEV_Rel_153</span>
             {page !== "gara" && ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -916,7 +916,7 @@ function App() {
         {page === "mev"               && canViewApp("mev")               && <MevPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
         {page === "mevcap"            && canViewApp("mevcap")            && <MevCapPage onUnauthorized={handleUnauthorized} onRowsChange={setRows} onFilteredRowsChange={setFilteredRows} onAligned={() => getLastAlign().then(d => setLastAlign(d.lastAlignAt)).catch(() => {})} ambienteId={ambienteId} />}
         {page === "contratti"         && canViewApp("contratti")         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "chart"             && canViewApp("chart")             && <ChartPage rows={filteredRows.length > 0 ? filteredRows : rows} />}
+        {page === "chart"             && canViewApp("chart")             && <ChartPage rows={filteredRows.length > 0 ? filteredRows : rows} ambienteId={ambienteId} />}
         {page === "contratti_interni" && canViewApp("contratti_interni") && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "reportavanzamenti" && canViewApp("reportavanzamenti") && <ReportAvanzamentiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); }} />}
