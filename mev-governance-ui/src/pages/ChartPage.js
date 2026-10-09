@@ -71,7 +71,7 @@ function aggregate(rows, tab) {
       groups.set(group, { group, total: 0, records: 0, ...Object.fromEntries(series.map((s) => [s.key, 0])) });
     }
     const entry = groups.get(group);
-    const value = amount(row.importoExcel);
+    const value = amount(row.importoBdo || row.importoExcel); // preferisce importoBdo, fallback su importoExcel
     entry[statusKeys.get(normalize(row.stato))] += value;
     entry.total += value;
     entry.records += 1;
@@ -170,15 +170,24 @@ export default function ChartPage({ rows = [] }) {
     safeRows.filter(row => resolvedActiveStates.has(normalize(row.stato))),
     [safeRows, resolvedActiveStates]);
 
-  const kpis = useMemo(() => filteredRows.reduce((result, row) => {
-    const s = normalize(row.stato);
-    if (s === "approvato")                                            result.approved   += amount(row.importoExcel);
-    if (s === "in approvazione")                                      result.inApproval += amount(row.importoExcel);
-    if (s === "in analisi / stima" || s === "in analisi")             result.inAnalisi  += amount(row.importoExcel);
-    result.ordered  += amount(row.ordinatoBdo);
-    result.invoiced += amount(row.fatturato);
-    return result;
-  }, { approved: 0, inApproval: 0, inAnalisi: 0, ordered: 0, invoiced: 0 }), [filteredRows]);
+  // I KPI usano importoBdo (valore contrattuale effettivo) con fallback su importoExcel.
+  // ordinatoBdo e fatturato vengono sommati solo sulle righe con stato Approvato,
+  // per coerenza con il Monitoraggio contratto.
+  const kpis = useMemo(() => {
+    // Base: tutte le safeRows (non filtrate dai checkbox) per i KPI di stato
+    return safeRows.reduce((result, row) => {
+      const s = normalize(row.stato);
+      const imp = amount(row.importoBdo || row.importoExcel);
+      if (s === "approvato") {
+        result.approved += imp;
+        result.ordered  += amount(row.ordinatoBdo);
+        result.invoiced += amount(row.fatturato);
+      }
+      if (s === "in approvazione")                          result.inApproval += imp;
+      if (s === "in analisi / stima" || s === "in analisi") result.inAnalisi  += imp;
+      return result;
+    }, { approved: 0, inApproval: 0, inAnalisi: 0, ordered: 0, invoiced: 0 });
+  }, [safeRows]);
 
   const summary = useMemo(() => aggregate(filteredRows, activeTab), [filteredRows, activeTab]);
   const data = useMemo(() => sort === "amount"
@@ -201,11 +210,11 @@ export default function ChartPage({ rows = [] }) {
 
         {/* ── KPI box — ordine: Approvato, In Approvazione, In Analisi/Stima, Ordinato, Fatturato ── */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
-          <KpiCard title="Approvato" value={kpis.approved} description="Importo fornitura · stato Approvato" accent="#526DAB" symbol="✓" />
-          <KpiCard title="In Approvazione" value={kpis.inApproval} description="Importo fornitura · stato In Approvazione" accent="#C48A39" symbol="⏳" />
-          <KpiCard title="In Analisi / Stima" value={kpis.inAnalisi} description="Importo fornitura · In Analisi / Stima" accent="#438579" symbol="◎" />
-          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · stati selezionati" accent="#687A99" symbol="≡" />
-          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · stati selezionati" accent="#688B9C" symbol="€" />
+          <KpiCard title="Approvato" value={kpis.approved} description="Importo BDO · stato Approvato" accent="#526DAB" symbol="✓" />
+          <KpiCard title="In Approvazione" value={kpis.inApproval} description="Importo BDO · stato In Approvazione" accent="#C48A39" symbol="⏳" />
+          <KpiCard title="In Analisi / Stima" value={kpis.inAnalisi} description="Importo BDO · In Analisi / Stima" accent="#438579" symbol="◎" />
+          <KpiCard title="Totale ordinato" value={kpis.ordered} description="Ordinato BDO · solo righe Approvate" accent="#687A99" symbol="≡" />
+          <KpiCard title="Totale fatturato" value={kpis.invoiced} description="Fatturato · solo righe Approvate" accent="#688B9C" symbol="€" />
         </div>
 
         {/* ── Tab raggruppamento + Filtro Visualizza + Ordina ── */}
