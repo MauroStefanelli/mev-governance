@@ -68,8 +68,9 @@ const serializeSocietà = (arr) =>
 // ── MultiSelect dropdown con checkbox ────────────────────────────────────────
 // ── MultiSelect dropdown con checkbox ────────────────────────────────────────
 function MultiSelect({ options, selected, onChange, placeholder, formatOption }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [open, setOpen]     = useState(false);
+  const [search, setSearch] = useState("");
+  const ref                 = useRef(null);
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -77,25 +78,33 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const handleToggle = () => setOpen(v => { if (v) setSearch(""); return !v; });
+
   const toggle = (val) => {
     if (selected.includes(val)) onChange(selected.filter((v) => v !== val));
     else onChange([...selected, val]);
   };
 
+  const filtered = search.trim()
+    ? options.filter(o => String(formatOption ? formatOption(o) : o).toLowerCase().includes(search.trim().toLowerCase()))
+    : options;
+
   const label = selected.length === 0
     ? placeholder
     : selected.length === 1
-      ? String(selected[0])
+      ? String(formatOption ? formatOption(selected[0]) : selected[0])
       : `${selected.length} selezionati`;
 
   return (
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
       <div
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleToggle}
         style={{
           padding: "4px 6px", border: "1px solid #dadce0", borderRadius: "4px",
-          fontSize: "12px", background: "white", cursor: "pointer", color: selected.length ? "#1a73e8" : "#333",
-          fontWeight: selected.length ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          fontSize: "12px", background: "white", cursor: "pointer",
+          color: selected.length ? "#1a73e8" : "#333",
+          fontWeight: selected.length ? 600 : 400,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           userSelect: "none",
         }}
       >
@@ -104,34 +113,67 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
 
       {open && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, zIndex: 20,
+          position: "absolute", top: "100%", left: 0, zIndex: 200,
           background: "white", border: "1px solid #dadce0", borderRadius: "4px",
-          marginTop: "2px", minWidth: "220px", maxHeight: "300px", overflowY: "auto",
-          boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
+          marginTop: "2px", minWidth: "220px", maxWidth: "320px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          display: "flex", flexDirection: "column",
         }}>
+          {/* Ricerca — fuori dallo scroll */}
+          <div style={{ padding: "6px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onMouseDown={e => e.stopPropagation()}
+              placeholder="Cerca..."
+              style={{
+                width: "100%", boxSizing: "border-box",
+                padding: "4px 8px", fontSize: "12px",
+                border: "1px solid #dadce0", borderRadius: "3px", outline: "none",
+              }}
+            />
+          </div>
+          {/* Seleziona / Deseleziona tutti — fuori dallo scroll */}
           <div style={{
-            position: "sticky", top: 0, zIndex: 2, display: "flex", justifyContent: "space-between",
-            background: "white", borderBottom: "1px solid #dadce0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+            display: "flex", justifyContent: "space-between",
+            borderBottom: "1px solid #e8e8e8", background: "#fafafa",
           }}>
-            <div onClick={() => onChange(options.map((o) => String(o)))}
-              style={{ padding: "8px 10px", color: "#34a853", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}>
+            <div
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => onChange(filtered.map(o => String(o)))}
+              style={{ padding: "6px 10px", color: "#34a853", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}
+            >
               Seleziona tutti
             </div>
-            <div onClick={() => onChange([])}
-              style={{ padding: "8px 10px", color: "#ea4335", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}>
+            <div
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => onChange([])}
+              style={{ padding: "6px 10px", color: "#ea4335", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}
+            >
               Deseleziona tutti
             </div>
           </div>
-          {options.map((opt) => (
-            <label key={opt} style={{
-              display: "flex", alignItems: "center", gap: "6px", padding: "6px 10px",
-              fontSize: "12px", cursor: "pointer", textAlign: "left"
-            }}>
-              <input type="checkbox" checked={selected.includes(String(opt))} onChange={() => toggle(String(opt))}
-                style={{ cursor: "pointer", margin: 0 }} />
-              <span>{formatOption ? formatOption(opt) : opt}</span>
-            </label>
-          ))}
+          {/* Lista opzioni — scorrevole */}
+          <div style={{ maxHeight: "240px", overflowY: "auto" }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: "10px", fontSize: "12px", color: "#999", textAlign: "center" }}>Nessun risultato</div>
+            )}
+            {filtered.map((opt) => (
+              <label key={opt} style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "6px 10px", fontSize: "12px", cursor: "pointer",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"}
+                onMouseLeave={e => e.currentTarget.style.background = "white"}
+              >
+                <input type="checkbox" checked={selected.includes(String(opt))} onChange={() => toggle(String(opt))}
+                  style={{ cursor: "pointer", margin: 0 }} />
+                <span>{formatOption ? formatOption(opt) : opt}</span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
     </div>
