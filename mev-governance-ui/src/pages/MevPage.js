@@ -557,11 +557,11 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
           </div>
           <div style={{
-            background: isScostamento(totCap, totPoste) ? "#fce8e6" : "#e6f4ea",
+            background: "#e6f4ea",
             borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px"
           }}>
-            <div style={{ fontSize: "11px", color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Poste</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853" }}>{formatEuro(totPoste)}</div>
+            <div style={{ fontSize: "11px", color: "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Poste</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#34a853" }}>{formatEuro(totPoste)}</div>
           </div>
         </div>
       </div>
@@ -636,7 +636,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
           <tbody>
             {filteredRows.map((r, index) => {
-              const scost = isScostamento(r.importoExcel, r.pImporto);
+              const scost = false;
               return (
                 <tr
                   key={r.id}
