@@ -413,7 +413,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
         pAnno: Number(row.pAnno), pRelease: row.pRelease,
         pImporto: Number(row.pImporto), pNote: row.pNote,
         noteCap: row.noteCap,
-        importoBdo: Number(row.importoBdo && row.importoBdo !== 0 ? row.importoBdo : (row.ordinatoBdo ?? 0)),
+        importoBdo: Number(row.ordinatoBdo ?? 0),
       });
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? { ...r, ...updatedItem } : r))
@@ -720,8 +720,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, textAlign: "right" }}>
                     <input
                       type="text"
-                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro(r.importoBdo ?? 0)}
-                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: r.importoBdo ?? "" }))}
+                      value={editingBdo[r.id] !== undefined ? editingBdo[r.id] : formatEuro(r.pImporto ?? 0)}
+                      onFocus={() => setEditingBdo((prev) => ({ ...prev, [r.id]: r.pImporto ?? "" }))}
                       onChange={(e) => setEditingBdo((prev) => ({ ...prev, [r.id]: e.target.value }))}
                       onBlur={(e) => {
                         let raw = e.target.value.trim();
@@ -729,7 +729,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                         else raw = raw.replace(",", ".");
                         raw = raw.replace(/[^\d.]/g, "");
                         const value = isNaN(parseFloat(raw)) ? 0 : parseFloat(raw);
-                        handleChange(r.id, "importoBdo", value);
+                        handleChange(r.id, "pImporto", value);
                         setEditingBdo((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
                       }}
                       style={inputStyle({
@@ -922,7 +922,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
               <ViewField label="Contratto"      value={viewRow.contratto} />
               <ViewField label="RDA"            value={viewRow.rda} />
               <ViewField label="Importo ODA"    value={viewRow.ordinatoBdo != null ? formatEuro(viewRow.ordinatoBdo) : "—"} green />
-              <ViewField label="P Importo"      value={viewRow.importoBdo != null ? formatEuro(viewRow.importoBdo) : "—"} />
+              <ViewField label="P Importo"      value={viewRow.pImporto != null ? formatEuro(viewRow.pImporto) : "—"} />
               <ViewField label="Importo CAP"    value={viewRow.importoExcel != null ? formatEuro(viewRow.importoExcel) : "—"} />
             </ViewSection>
 
