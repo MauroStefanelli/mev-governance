@@ -197,20 +197,20 @@ const isScostamento = (excel, pianificato) =>
 // ── Stili condivisi ──────────────────────────────────────────────────────────
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" };
 
-// Sticky columns: left offset cumulativi per le prime 11 colonne (ID → Importo ODA)
-const SC_LEFT  = [0, 50, 130, 240, 440, 500, 600, 730, 790, 870, 950];
-const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60, 80, 80, 120];
+// Sticky columns: left offset cumulativi per le prime 8 colonne (ID → Note)
+const SC_LEFT  = [0, 50, 130, 240, 440, 500, 600, 730];
+const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60];
 const stickyTh = (i, extra = {}) => ({
   position: "sticky", left: SC_LEFT[i], zIndex: 11,
   background: "inherit",
-  borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
+  borderRight: i === 7 ? "2px solid #c7d2e8" : undefined,
   borderBottom: "inherit",
   ...extra,
 });
 const stickyTd = (i, bg, extra = {}) => ({
   ...TD, position: "sticky", left: SC_LEFT[i], zIndex: 1,
   background: bg || "white",
-  borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
+  borderRight: i === 7 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
 
@@ -596,9 +596,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                <th style={{ padding: "4px 6px", ...stickyTh(5, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", ...stickyTh(6, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
                <th style={{ padding: "4px 6px", ...stickyTh(7, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* Note */}</th>
-               <th style={{ padding: "4px 6px", ...stickyTh(8, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(9, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...stickyTh(10, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* Importo ODA */}</th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={odaOptions} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={rdaOptions} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}>{/* Importo ODA */}</th>
                <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={subcoOptions} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={pAnnoOptions} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", borderBottom: "1px solid #dadce0" }}><MultiSelect options={pReleaseOptions} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
@@ -627,7 +627,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                  <th key={h} style={{
                    padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
                    borderBottom: "2px solid #dadce0",
-                   ...(i < 11 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
+                   ...(i < 8 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
                    minWidth: h === "Importo CAP" ? "130px" : undefined,
                  }}>{h}</th>
                ))}
@@ -688,9 +688,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                        </button>
                      ) : null}
                    </td>
-                   <td style={stickyTd(8, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { color: "#12c937", fontWeight: "bold", fontSize: "13px" })}>{r.bc ?? ""}</td>
-                   <td style={stickyTd(9, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { color: "#12c937", fontWeight: "bold", fontSize: "13px" })}>{r.atId ?? ""}</td>
-                   <td style={stickyTd(10, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa", { textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" })}>{formatEuro(r.ordinatoBdo)}</td>
+                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.bc ?? ""}</td>
+                   <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
+                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{formatEuro(r.ordinatoBdo)}</td>
 
                   <td style={{ ...TD }}>
                     {resolveSubco(r.subco, rtiRows).length > 0
