@@ -1743,11 +1743,11 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
           </div>
           <div style={{
-            background: isScostamento(totCap, totPoste) ? "#fce8e6" : "#e6f4ea",
+            background: "#e6f4ea",
             borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px"
           }}>
-            <div style={{ fontSize: "11px", color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Poste <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: isScostamento(totCap, totPoste) ? "#ea4335" : "#34a853" }}>{formatEuro(totPoste)}</div>
+            <div style={{ fontSize: "11px", color: "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Poste <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#34a853" }}>{formatEuro(totPoste)}</div>
           </div>
         </div>
       </div>
@@ -1823,9 +1823,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
           <tbody>
             {filteredRows.map((r, index) => {
-              const scost = isScostamento(r.importoExcel, r.pImporto);
-              const bg = scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa";
-              const bgHover = scost ? "#ffe8e8" : "#f0f4ff";
+              const scost = false;
+              const bg = index % 2 === 0 ? "white" : "#fafafa";
+              const bgHover = "#f0f4ff";
               return (
                 <tr key={r.id}
                   onClick={() => setEditRow(r)}
