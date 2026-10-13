@@ -1,5 +1,6 @@
 import re
 import io
+import os
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -132,7 +133,11 @@ async def debug_pdf(file: UploadFile = File(...)):
     return JSONResponse({"testo": text, "lunghezza": len(text)})
 
 
-# ============================================================
-# HEALTH CHECK (duplicato rimosso — definizione unica sopra)
-# ============================================================
 
+# ============================================================
+# ENTRYPOINT — legge $PORT da Render (obbligatorio per port binding)
+# ============================================================
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, log_level="info")
