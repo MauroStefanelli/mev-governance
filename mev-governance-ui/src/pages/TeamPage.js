@@ -238,6 +238,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
           return;
         }
 
+        console.log("[TeamImport] righe mappate:", mapped.length, mapped.slice(0, 3));
         const result = await importTeam(mapped);
         setImportResult(`Importati ${result.imported} membri.`);
         await load();

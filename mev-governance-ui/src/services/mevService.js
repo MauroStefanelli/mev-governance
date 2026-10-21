@@ -1514,6 +1514,9 @@ export const importTeam = async (rows) => {
     method: "POST", headers: authHeaders(), body: JSON.stringify(rows),
   });
   if (r.status === 401) throw new Error("401");
-  if (!r.ok) throw new Error("Errore importazione team");
+  if (!r.ok) {
+    const text = await r.text().catch(() => `HTTP ${r.status}`);
+    throw new Error(`HTTP ${r.status}: ${text}`);
+  }
   return r.json();
 };
