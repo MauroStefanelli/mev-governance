@@ -1474,3 +1474,46 @@ export const getMyAppPermissions = async () => {
   if (!r.ok) return [];
   return r.json();
 };
+
+// ── Team ─────────────────────────────────────────────────────────────────────
+export const getTeam = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore caricamento team");
+  return r.json();
+};
+
+export const createTeamMember = async (payload) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(payload),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore creazione membro");
+  return r.json();
+};
+
+export const updateTeamMember = async (id, payload) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team/${id}`, {
+    method: "PUT", headers: authHeaders(), body: JSON.stringify(payload),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore aggiornamento membro");
+  return r.json();
+};
+
+export const deleteTeamMember = async (id) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team/${id}`, {
+    method: "DELETE", headers: authHeaders(),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore eliminazione membro");
+};
+
+export const importTeam = async (rows) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team/import`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(rows),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore importazione team");
+  return r.json();
+};

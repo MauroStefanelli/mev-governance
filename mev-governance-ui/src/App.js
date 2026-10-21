@@ -13,6 +13,7 @@ import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
 import GarePage from "./pages/GarePage";
 import ReportAvanzamentiPage from "./pages/ReportAvanzamentiPage";
+import TeamPage from "./pages/TeamPage";
 import HomePage from "./pages/HomePage";
 import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages, getMyAppPermissions } from "./services/mevService";
 
@@ -585,7 +586,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_167</span>
+            }}>DEV_Rel_168</span>
             {page !== "gara" && ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -919,6 +920,7 @@ function App() {
         {page === "chart"             && canViewApp("chart")             && <ChartPage rows={rows} ambienteId={ambienteId} />}
         {page === "contratti_interni" && canViewApp("contratti_interni") && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "reportavanzamenti" && canViewApp("reportavanzamenti") && <ReportAvanzamentiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "team"              && canViewApp("team")              && <TeamPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); }} />}
         {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
         {page === "tools"             && canViewApp("tools")             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
