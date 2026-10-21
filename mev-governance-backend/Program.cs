@@ -380,6 +380,23 @@ using (var scope = app.Services.CreateScope())
                     ON ""{sch}"".""PC_DataRecords"" (""entity_type"", ""contract_id"");
                 CREATE INDEX IF NOT EXISTS ""idx_pc_updated""
                     ON ""{sch}"".""PC_DataRecords"" (""updated_at"" DESC);
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""TeamMembers"" (
+                    ""Id""               SERIAL PRIMARY KEY,
+                    ""AmbienteId""       INTEGER NOT NULL DEFAULT 0,
+                    ""Risorsa""          TEXT NOT NULL DEFAULT '',
+                    ""Ambito""           TEXT NULL,
+                    ""Specialita""       TEXT NULL,
+                    ""PosteApplication"" TEXT NULL,
+                    ""Note""             TEXT NULL,
+                    ""RisorsaGrade""     TEXT NULL,
+                    ""Grade""            TEXT NULL,
+                    ""Cdc""              TEXT NULL,
+                    ""Practice""         TEXT NULL,
+                    ""Adrc""             TEXT NULL,
+                    ""Cor""              TEXT NULL,
+                    ""CorpId""           TEXT NULL,
+                    ""Email""            TEXT NULL
+                );
             ");
             // Aggiunge tutte le colonne MevItems/Users/altri che le migration AddColumn
             // potrebbero aver mancato se search_path era errato al primo deploy

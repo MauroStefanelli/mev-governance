@@ -1015,6 +1015,7 @@ const KNOWN_APPS = [
   { id: "tools",             label: "Tools" },
   { id: "gara",              label: "Gare" },
   { id: "configuratore",     label: "Configuratore" },
+  { id: "team",              label: "Gestione Team" },
 ];
 const KNOWN_ROLES = ["Admin", "Editor", "Client", "Developer", "Bid Manager"];
 
