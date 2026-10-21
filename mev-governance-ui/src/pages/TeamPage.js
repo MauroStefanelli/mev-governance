@@ -160,13 +160,15 @@ function MemberModal({ initial, onClose, onSave, onDelete }) {
         <input type="date" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)} style={inputSt()} />
       ) : col.euro ? (
         <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#fafafa" }}>
-          <input type="number" step="0.01" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
+          <input type="text" inputMode="decimal" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
+            placeholder="0.00"
             style={{ flex: 1, padding: "8px 10px", border: "none", fontSize: "13px", textAlign: "right", background: "transparent", outline: "none" }} />
           <span style={{ padding: "0 10px", color: "#9ca3af", fontSize: "13px", fontWeight: 600 }}>€</span>
         </div>
       ) : col.perc ? (
         <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#fafafa" }}>
-          <input type="number" step="1" min="0" max="100" value={form[col.key] ?? 100} onChange={e => set(col.key, e.target.value)}
+          <input type="text" inputMode="decimal" value={form[col.key] ?? 100} onChange={e => set(col.key, e.target.value)}
+            placeholder="100"
             style={{ flex: 1, padding: "8px 10px", border: "none", fontSize: "13px", textAlign: "right", background: "transparent", outline: "none" }} />
           <span style={{ padding: "0 10px", color: "#9ca3af", fontSize: "13px", fontWeight: 600 }}>%</span>
         </div>
@@ -271,6 +273,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
   const [importing, setImporting]     = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [showDestaffati, setShowDestaffati] = useState(false);
+  const [giorniAnno, setGiorniAnno]         = useState(232);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -289,6 +292,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
   // ── KPI (solo attivi nella ricerca corrente) ───────────────────────────────
   const costoGiorno = attivi.reduce((s, r) => s + costoEffettivo(r), 0);
   const costoMese   = costoGiorno * 20;
+  const costoAnno   = costoGiorno * (Number(giorniAnno) || 232);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSave = async (form) => {
@@ -369,6 +373,25 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
       <div style={{ display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }}>
         <KpiCard label="Costo al giorno" value={fmtEuro(costoGiorno)} sub={`${attivi.length} risorse attive${q ? " (filtrate)" : ""}`} color="#2563eb" bg="linear-gradient(135deg,#eff6ff,#dbeafe)" icon="💼" />
         <KpiCard label="Costo al mese" value={fmtEuro(costoMese)} sub="× 20 giorni lavorativi" color="#059669" bg="linear-gradient(135deg,#ecfdf5,#d1fae5)" icon="📅" />
+        <div style={{ flex: "1 1 200px", borderRadius: "14px", padding: "20px 22px", background: "linear-gradient(135deg,#fff7ed,#fed7aa)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: "11px", fontWeight: 700, color: "#c2410c", textTransform: "uppercase", letterSpacing: "0.5px" }}>Costo anno</p>
+              <p style={{ margin: "6px 0 0", fontSize: "22px", fontWeight: 800, color: "#ea580c" }}>{fmtEuro(costoAnno)}</p>
+            </div>
+            <span style={{ fontSize: "22px" }}>📆</span>
+          </div>
+          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "12px", color: "#92400e" }}>×</span>
+            <input
+              type="text" inputMode="numeric"
+              value={giorniAnno}
+              onChange={e => setGiorniAnno(e.target.value.replace(/[^0-9]/g, ""))}
+              style={{ width: "52px", padding: "3px 7px", border: "1px solid #fdba74", borderRadius: "6px", fontSize: "13px", fontWeight: 700, color: "#c2410c", background: "#fff7ed", textAlign: "center", outline: "none" }}
+            />
+            <span style={{ fontSize: "12px", color: "#92400e" }}>gg lavorativi/anno</span>
+          </div>
+        </div>
         <KpiCard label="Risorse attive" value={attivi.length} sub={`${destaffati.length} destaffate`} color="#7c3aed" bg="linear-gradient(135deg,#f5f3ff,#ede9fe)" icon="👥" />
       </div>
 
