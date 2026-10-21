@@ -20,4 +20,5 @@ public class TeamMember
     public string? Email { get; set; }
     public DateOnly? DataIngresso { get; set; }
     public DateOnly? DataUscita { get; set; }
+    public decimal PercImpegno { get; set; } = 100;
 }

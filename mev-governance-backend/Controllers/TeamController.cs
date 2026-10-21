@@ -65,6 +65,7 @@ public class TeamController : BaseController
         item.Email            = req.Email;
         item.DataIngresso     = req.DataIngresso;
         item.DataUscita       = req.DataUscita;
+        item.PercImpegno      = req.PercImpegno ?? 100;
 
         _db.SaveChanges();
         return Ok(item);
@@ -118,6 +119,7 @@ public class TeamController : BaseController
         Email            = req.Email,
         DataIngresso     = req.DataIngresso,
         DataUscita       = req.DataUscita,
+        PercImpegno      = req.PercImpegno ?? 100,
     };
 }
 
@@ -138,4 +140,5 @@ public class TeamMemberRequest
     public string?   Email            { get; set; }
     public DateOnly? DataIngresso     { get; set; }
     public DateOnly? DataUscita       { get; set; }
+    public decimal?  PercImpegno      { get; set; }
 }

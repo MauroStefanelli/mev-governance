@@ -2,123 +2,108 @@ import { useEffect, useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { getTeam, createTeamMember, updateTeamMember, deleteTeamMember, importTeam } from "../services/mevService";
 
-// ── Stili condivisi ────────────────────────────────────────────────────────────
-const TH = {
-  padding: "9px 8px", textAlign: "left", fontWeight: 600, fontSize: "12px",
-  color: "#444", whiteSpace: "nowrap", borderBottom: "2px solid #dadce0",
-  background: "#f8f9fa", position: "sticky", top: 0, zIndex: 2,
-};
-const TD = {
-  padding: "7px 8px", fontSize: "13px", color: "#333",
-  borderBottom: "1px solid #f0f0f0", verticalAlign: "middle",
-};
-const btn = (variant = "primary") => ({
-  padding: "5px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600,
-  cursor: "pointer", border: "none",
-  background: variant === "primary" ? "#1a73e8" : variant === "danger" ? "#ea4335" : variant === "success" ? "#34a853" : "#f1f3f4",
-  color: variant === "ghost" ? "#555" : "white",
-});
-
+// ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtEuro = (v) => {
   const n = Number(v);
-  if (!v && v !== 0) return "—";
+  if (v === null || v === undefined || v === "") return "—";
   return `€ ${n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-
 const fmtDate = (v) => {
   if (!v) return "";
-  // v può essere "2024-12-31" (ISO) o "31/12/2024" (IT)
-  try {
-    const d = new Date(v);
-    if (isNaN(d)) return v;
-    return d.toLocaleDateString("it-IT");
-  } catch { return v; }
+  try { return new Date(v).toLocaleDateString("it-IT"); } catch { return v; }
 };
-
-// Converte stringa data Excel (varie format) → "YYYY-MM-DD" per il backend
 const parseDate = (v) => {
   if (!v) return null;
   const s = String(v).trim();
   if (!s) return null;
-  // Numero seriale Excel
-  if (/^\d+$/.test(s)) {
+  if (/^\d{5,}$/.test(s)) {
     const d = XLSX.SSF.parse_date_code(Number(s));
     if (d) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
   }
-  // GG/MM/YYYY o GG-MM-YYYY
-  const itMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (itMatch) return `${itMatch[3]}-${itMatch[2].padStart(2,"0")}-${itMatch[1].padStart(2,"0")}`;
-  // ISO YYYY-MM-DD
-  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const it = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (it) return `${it[3]}-${it[2].padStart(2,"0")}-${it[1].padStart(2,"0")}`;
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
   return null;
 };
+const normalize = (s) => String(s ?? "").trim().toLowerCase();
+const isAttiva = (r) => {
+  if (!r.dataUscita) return true;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return new Date(r.dataUscita) >= today;
+};
+const costoEffettivo = (r) => (Number(r.cor) || 0) * (Number(r.percImpegno) || 100) / 100;
 
+// ── Dati colonne ───────────────────────────────────────────────────────────────
 const EMPTY_FORM = {
   risorsa: "", ambito: "", specialita: "", posteApplication: "",
   note: "", risorsaGrade: "", grade: "", cdc: "", practice: "",
-  adrc: "", cor: "", corpId: "", email: "",
+  adrc: "", cor: "", percImpegno: 100, corpId: "", email: "",
   dataIngresso: "", dataUscita: "",
 };
 
 const COLS = [
-  { key: "risorsa",          label: "Risorsa",             required: true },
-  { key: "ambito",           label: "Ambito" },
-  { key: "specialita",       label: "Specialità" },
-  { key: "posteApplication", label: "Poste Application" },
-  { key: "note",             label: "Note" },
-  { key: "risorsaGrade",     label: "Risorse GRADE" },
-  { key: "grade",            label: "GRADE" },
-  { key: "cdc",              label: "CDC" },
-  { key: "practice",         label: "Practice" },
-  { key: "adrc",             label: "ADRC (€)",      euro: true },
-  { key: "cor",              label: "COR (€)",       euro: true },
-  { key: "corpId",           label: "Corp ID" },
-  { key: "email",            label: "E-mail" },
-  { key: "dataIngresso",     label: "Data Ingresso", date: true },
-  { key: "dataUscita",       label: "Data Uscita",   date: true },
+  { key: "risorsa",          label: "Risorsa",           required: true, minW: 140 },
+  { key: "ambito",           label: "Ambito",                            minW: 100 },
+  { key: "specialita",       label: "Specialità",                        minW: 120 },
+  { key: "posteApplication", label: "Poste App.",                        minW: 100 },
+  { key: "risorsaGrade",     label: "Ris. GRADE",                        minW: 90  },
+  { key: "grade",            label: "GRADE",                             minW: 70  },
+  { key: "cdc",              label: "CDC",                               minW: 80  },
+  { key: "practice",         label: "Practice",                          minW: 90  },
+  { key: "adrc",             label: "ADRC (€)",          euro: true,     minW: 100 },
+  { key: "cor",              label: "COR (€)",           euro: true,     minW: 100 },
+  { key: "percImpegno",      label: "% Impegno",         perc: true,     minW: 90  },
+  { key: "corpId",           label: "Corp ID",                           minW: 80  },
+  { key: "email",            label: "E-mail",            mail: true,     minW: 150 },
+  { key: "dataIngresso",     label: "Data Ingresso",     date: true,     minW: 110 },
+  { key: "dataUscita",       label: "Data Uscita",       date: true,     minW: 110 },
+  { key: "note",             label: "Note",                              minW: 150 },
 ];
 
-// Mappa nomi colonne Excel → chiavi form
 const EXCEL_COL_MAP = {
-  "risorse":             "risorsa",
-  "risorsa":             "risorsa",
-  "ambito":              "ambito",
-  "specialità":          "specialita",
-  "specialita":          "specialita",
-  "poste application":   "posteApplication",
-  "note":                "note",
-  "risorse grade":       "risorsaGrade",
-  "risorse_grade":       "risorsaGrade",
-  "grade":               "grade",
-  "cdc":                 "cdc",
-  "practice":            "practice",
-  "adrc":                "adrc",
-  "cor":                 "cor",
-  "corp id":             "corpId",
-  "corp_id":             "corpId",
-  "corpid":              "corpId",
-  "e-mail address":      "email",
-  "email address":       "email",
-  "email":               "email",
-  "e-mail":              "email",
-  "data ingresso":       "dataIngresso",
-  "data_ingresso":       "dataIngresso",
-  "ingresso":            "dataIngresso",
-  "data uscita":         "dataUscita",
-  "data_uscita":         "dataUscita",
-  "uscita":              "dataUscita",
+  "risorse": "risorsa", "risorsa": "risorsa",
+  "ambito": "ambito",
+  "specialità": "specialita", "specialita": "specialita",
+  "poste application": "posteApplication", "poste app": "posteApplication",
+  "note": "note",
+  "risorse grade": "risorsaGrade", "risorse_grade": "risorsaGrade",
+  "grade": "grade",
+  "cdc": "cdc",
+  "practice": "practice",
+  "adrc": "adrc",
+  "cor": "cor",
+  "% impegno": "percImpegno", "%impegno": "percImpegno", "impegno": "percImpegno",
+  "corp id": "corpId", "corp_id": "corpId", "corpid": "corpId",
+  "e-mail address": "email", "email address": "email", "email": "email", "e-mail": "email",
+  "data ingresso": "dataIngresso", "data_ingresso": "dataIngresso", "ingresso": "dataIngresso",
+  "data uscita": "dataUscita", "data_uscita": "dataUscita", "uscita": "dataUscita",
 };
 
-function normalize(s) { return String(s ?? "").trim().toLowerCase(); }
+// ── Sotto-componenti UI ────────────────────────────────────────────────────────
+const KpiCard = ({ label, value, sub, color, bg, icon }) => (
+  <div style={{
+    background: bg, borderRadius: "14px", padding: "18px 24px",
+    minWidth: "210px", flex: "1", maxWidth: "280px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+    display: "flex", alignItems: "center", gap: "16px",
+  }}>
+    <div style={{ fontSize: "28px", opacity: 0.85 }}>{icon}</div>
+    <div>
+      <div style={{ fontSize: "11px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "4px" }}>{label}</div>
+      <div style={{ fontSize: "24px", fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: "11px", color, opacity: 0.7, marginTop: "3px" }}>{sub}</div>}
+    </div>
+  </div>
+);
 
-// Risorsa attiva oggi: nessuna data uscita, o data uscita >= oggi
-const isAttiva = (r) => {
-  if (!r.dataUscita) return true;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const uscita = new Date(r.dataUscita);
-  return uscita >= today;
-};
+function Badge({ children, color = "#6b7280", bg = "#f3f4f6" }) {
+  return (
+    <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600, color, background: bg, whiteSpace: "nowrap" }}>
+      {children}
+    </span>
+  );
+}
 
 // ── Modale add/edit ────────────────────────────────────────────────────────────
 function MemberModal({ initial, onClose, onSave }) {
@@ -126,20 +111,21 @@ function MemberModal({ initial, onClose, onSave }) {
     ...EMPTY_FORM, ...initial,
     adrc: initial.adrc ?? "",
     cor:  initial.cor  ?? "",
-    dataIngresso: initial.dataIngresso ?? "",
-    dataUscita:   initial.dataUscita   ?? "",
-  } : EMPTY_FORM);
+    percImpegno: initial.percImpegno ?? 100,
+    dataIngresso: initial.dataIngresso ? String(initial.dataIngresso).slice(0,10) : "",
+    dataUscita:   initial.dataUscita   ? String(initial.dataUscita).slice(0,10)   : "",
+  } : { ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
-
-  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
-    if (!form.risorsa.trim()) { alert("Il campo Risorsa è obbligatorio"); return; }
+    if (!form.risorsa.trim()) { alert("Risorsa obbligatoria"); return; }
     setSaving(true);
     const payload = {
       ...form,
       adrc: form.adrc !== "" && form.adrc !== null ? Number(String(form.adrc).replace(",",".")) : null,
       cor:  form.cor  !== "" && form.cor  !== null ? Number(String(form.cor).replace(",","."))  : null,
+      percImpegno: Number(form.percImpegno) || 100,
       dataIngresso: form.dataIngresso || null,
       dataUscita:   form.dataUscita   || null,
     };
@@ -148,87 +134,143 @@ function MemberModal({ initial, onClose, onSave }) {
     finally { setSaving(false); }
   };
 
+  const Field = ({ col }) => (
+    <div style={{ width: col.key === "note" ? "100%" : "calc(33% - 9px)", minWidth: "140px", marginBottom: "2px" }}>
+      <label style={{ display: "block", fontSize: "10px", fontWeight: 700, color: "#6b7280", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        {col.label}{col.required && <span style={{ color: "#ef4444" }}> *</span>}
+      </label>
+      {col.key === "note" ? (
+        <textarea value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)} rows={2}
+          style={inputSt()} />
+      ) : col.date ? (
+        <input type="date" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)} style={inputSt()} />
+      ) : col.euro ? (
+        <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#fafafa" }}>
+          <input type="number" step="0.01" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
+            style={{ flex: 1, padding: "8px 10px", border: "none", fontSize: "13px", textAlign: "right", background: "transparent", outline: "none" }} />
+          <span style={{ padding: "0 10px", color: "#9ca3af", fontSize: "13px", fontWeight: 600 }}>€</span>
+        </div>
+      ) : col.perc ? (
+        <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden", background: "#fafafa" }}>
+          <input type="number" step="1" min="0" max="100" value={form[col.key] ?? 100} onChange={e => set(col.key, e.target.value)}
+            style={{ flex: 1, padding: "8px 10px", border: "none", fontSize: "13px", textAlign: "right", background: "transparent", outline: "none" }} />
+          <span style={{ padding: "0 10px", color: "#9ca3af", fontSize: "13px", fontWeight: 600 }}>%</span>
+        </div>
+      ) : (
+        <input value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)} style={inputSt()} />
+      )}
+    </div>
+  );
+
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: "#fff", borderRadius: "12px", padding: "24px 28px", width: "min(720px, 96vw)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1a1a2e" }}>
-            {initial ? "Modifica membro" : "Nuovo membro"}
-          </h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#666" }}>×</button>
+      <div style={{ background: "#fff", borderRadius: "16px", padding: "28px 32px", width: "min(760px, 96vw)", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>{initial ? "Modifica membro" : "Nuovo membro"}</h3>
+            <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#94a3b8" }}>{initial ? "Aggiorna i dati della risorsa" : "Aggiungi una nuova risorsa al team"}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: "8px", width: "32px", height: "32px", fontSize: "18px", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-          {COLS.map(col => (
-            <div key={col.key} style={{ width: col.key === "note" ? "100%" : "calc(33% - 8px)", minWidth: "150px" }}>
-              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#555", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                {col.label}{col.required && <span style={{ color: "#ea4335" }}> *</span>}
-              </label>
-              {col.key === "note" ? (
-                <textarea value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)} rows={2}
-                  style={{ width: "100%", padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" }} />
-              ) : col.date ? (
-                <input type="date" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
-                  style={{ width: "100%", padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", boxSizing: "border-box" }} />
-              ) : col.euro ? (
-                <div style={{ display: "flex", alignItems: "center", border: "1px solid #dadce0", borderRadius: "4px", overflow: "hidden" }}>
-                  <input type="number" step="0.01" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
-                    style={{ flex: 1, padding: "6px 8px", border: "none", fontSize: "13px", textAlign: "right", outline: "none" }} />
-                  <span style={{ padding: "0 8px", color: "#888", fontSize: "12px" }}>€</span>
-                </div>
-              ) : (
-                <input value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
-                  style={{ width: "100%", padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", boxSizing: "border-box" }} />
-              )}
-            </div>
-          ))}
+          {COLS.map(col => <Field key={col.key} col={col} />)}
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "20px" }}>
-          <button onClick={onClose} style={btn("ghost")}>Annulla</button>
-          <button onClick={handleSave} disabled={saving} style={btn("primary")}>{saving ? "Salvataggio…" : "Salva"}</button>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #f1f5f9" }}>
+          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#64748b" }}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "9px 24px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : "#2563eb", fontSize: "13px", fontWeight: 700, cursor: "pointer", color: "white" }}>
+            {saving ? "Salvataggio…" : "Salva"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Componente principale ──────────────────────────────────────────────────────
+const inputSt = () => ({ width: "100%", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "13px", boxSizing: "border-box", background: "#fafafa", outline: "none" });
+
+// ── Tabella risorse ────────────────────────────────────────────────────────────
+function TeamTable({ rows, onEdit, onDelete, dimmed }) {
+  if (rows.length === 0) return (
+    <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8", fontSize: "14px" }}>
+      Nessuna risorsa
+    </div>
+  );
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
+        <thead>
+          <tr>
+            <th style={thSt()}>#</th>
+            {COLS.map(c => <th key={c.key} style={{ ...thSt(), minWidth: c.minW }}>{c.label}</th>)}
+            <th style={{ ...thSt(), textAlign: "center" }}>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, idx) => (
+            <tr key={r.id} style={{ opacity: dimmed ? 0.65 : 1, background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+              onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}>
+              <td style={{ ...tdSt(), color: "#cbd5e1", fontSize: "11px", textAlign: "center" }}>{idx + 1}</td>
+              {COLS.map(c => (
+                <td key={c.key} style={{ ...tdSt(), maxWidth: c.key === "note" ? "200px" : undefined, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c.key === "note" ? "normal" : "nowrap" }}>
+                  {c.euro
+                    ? <span style={{ fontWeight: 600, color: "#0ea5e9" }}>{fmtEuro(r[c.key])}</span>
+                    : c.perc
+                      ? <Badge color={Number(r[c.key]) < 100 ? "#d97706" : "#16a34a"} bg={Number(r[c.key]) < 100 ? "#fef3c7" : "#dcfce7"}>{Number(r[c.key]) || 100}%</Badge>
+                      : c.date
+                        ? <span style={{ color: "#64748b", fontSize: "12px" }}>{fmtDate(r[c.key])}</span>
+                        : c.mail && r[c.key]
+                          ? <a href={`mailto:${r[c.key]}`} style={{ color: "#2563eb", textDecoration: "none" }}>{r[c.key]}</a>
+                          : <span>{r[c.key] ?? ""}</span>
+                  }
+                </td>
+              ))}
+              <td style={{ ...tdSt(), textAlign: "center", whiteSpace: "nowrap" }}>
+                <button onClick={() => onEdit(r)} style={{ marginRight: "6px", padding: "5px 12px", borderRadius: "6px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "12px", fontWeight: 600, cursor: "pointer", color: "#374151" }}>Modifica</button>
+                <button onClick={() => onDelete(r)} style={{ padding: "5px 12px", borderRadius: "6px", border: "none", background: "#fee2e2", fontSize: "12px", fontWeight: 600, cursor: "pointer", color: "#dc2626" }}>Elimina</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const thSt = () => ({ padding: "10px 10px", textAlign: "left", fontWeight: 700, fontSize: "11px", color: "#64748b", whiteSpace: "nowrap", borderBottom: "2px solid #e2e8f0", background: "#f8fafc", position: "sticky", top: 0, zIndex: 2, textTransform: "uppercase", letterSpacing: "0.4px" });
+const tdSt = () => ({ padding: "9px 10px", fontSize: "13px", color: "#1e293b", borderBottom: "1px solid #f1f5f9", verticalAlign: "middle" });
+
+// ── Pagina principale ──────────────────────────────────────────────────────────
 export default function TeamPage({ onUnauthorized, ambienteId }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [modal, setModal] = useState(null);
+  const [rows, setRows]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [search, setSearch]           = useState("");
+  const [modal, setModal]             = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting]     = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showDestaffati, setShowDestaffati] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const data = await getTeam();
-      setRows(data);
-    } catch (e) {
-      if (e.message === "401") onUnauthorized?.();
-    } finally {
-      setLoading(false);
-    }
+    try { setRows(await getTeam()); }
+    catch (e) { if (e.message === "401") onUnauthorized?.(); }
+    finally { setLoading(false); }
   }, [ambienteId]); // eslint-disable-line
-
   useEffect(() => { load(); }, [load]);
 
-  // ── KPI ────────────────────────────────────────────────────────────────────
-  const attive = rows.filter(isAttiva);
-  const costoGiorno = attive.reduce((s, r) => s + (Number(r.adrc) || 0) + (Number(r.cor) || 0), 0);
+  // ── Filtro e split ─────────────────────────────────────────────────────────
+  const q = search.trim().toLowerCase();
+  const filtered = rows.filter(r => !q || COLS.some(c => String(r[c.key] ?? "").toLowerCase().includes(q)));
+  const attivi      = filtered.filter(isAttiva);
+  const destaffati  = filtered.filter(r => !isAttiva(r));
+
+  // ── KPI (solo attivi nella ricerca corrente) ───────────────────────────────
+  const costoGiorno = attivi.reduce((s, r) => s + costoEffettivo(r), 0);
   const costoMese   = costoGiorno * 20;
 
-  // ── Filtro ricerca ─────────────────────────────────────────────────────────
-  const filtered = rows.filter(r => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return COLS.some(c => String(r[c.key] ?? "").toLowerCase().includes(q));
-  });
-
-  // ── Save ───────────────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSave = async (form) => {
     if (modal.mode === "create") {
       const created = await createTeamMember(form);
@@ -239,204 +281,142 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
     }
   };
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
   const handleDelete = async (row) => {
-    try {
-      await deleteTeamMember(row.id);
-      setRows(prev => prev.filter(r => r.id !== row.id));
-    } catch (e) { alert(`Errore eliminazione: ${e.message}`); }
+    try { await deleteTeamMember(row.id); setRows(prev => prev.filter(r => r.id !== row.id)); }
+    catch (e) { alert(`Errore: ${e.message}`); }
     setConfirmDelete(null);
   };
 
-  // ── Import da Excel ────────────────────────────────────────────────────────
   const handleImport = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    setImporting(true);
-    setImportResult(null);
-
+    const file = e.target.files?.[0]; if (!file) return;
+    e.target.value = ""; setImporting(true); setImportResult(null);
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
         const wb = XLSX.read(ev.target.result, { type: "array", cellDates: false });
         const sheetName = wb.SheetNames.find(n => n.trim().toUpperCase().startsWith("TEAM"));
-        if (!sheetName) {
-          alert(`Foglio che inizia con "TEAM" non trovato.\nFogli: ${wb.SheetNames.join(", ")}`);
-          setImporting(false);
-          return;
-        }
+        if (!sheetName) { alert(`Foglio "TEAM*" non trovato.\n${wb.SheetNames.join(", ")}`); setImporting(false); return; }
         const ws = wb.Sheets[sheetName];
-
         let jsonRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
-        const hasMappable = (rows) => rows.some(row =>
-          Object.keys(row).some(k => EXCEL_COL_MAP[normalize(k)])
-        );
-
+        const hasMappable = (rs) => rs.some(row => Object.keys(row).some(k => EXCEL_COL_MAP[normalize(k)]));
         if (jsonRows.length === 0 || !hasMappable(jsonRows)) {
-          const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-          let headerIdx = -1;
-          for (let i = 0; i < Math.min(10, rawRows.length); i++) {
-            if (rawRows[i].some(cell => EXCEL_COL_MAP[normalize(cell)])) { headerIdx = i; break; }
-          }
-          if (headerIdx >= 0) {
-            const headers = rawRows[headerIdx];
-            jsonRows = rawRows.slice(headerIdx + 1).map(row => {
-              const obj = {};
-              headers.forEach((h, i) => { obj[h] = row[i] ?? ""; });
-              return obj;
-            });
-          }
+          const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          let hi = -1;
+          for (let i = 0; i < Math.min(10, raw.length); i++) { if (raw[i].some(c => EXCEL_COL_MAP[normalize(c)])) { hi = i; break; } }
+          if (hi >= 0) { const hdr = raw[hi]; jsonRows = raw.slice(hi+1).map(row => { const o = {}; hdr.forEach((h,i)=>{o[h]=row[i]??""}); return o; }); }
         }
-
         const mapped = jsonRows.map(row => {
           const out = { ...EMPTY_FORM };
-          for (const [excelKey, val] of Object.entries(row)) {
-            const field = EXCEL_COL_MAP[normalize(excelKey)];
-            if (!field) continue;
-            if (field === "adrc" || field === "cor") {
-              const n = parseFloat(String(val).replace(",", "."));
-              out[field] = isNaN(n) ? null : n;
-            } else if (field === "dataIngresso" || field === "dataUscita") {
-              out[field] = parseDate(val);
-            } else {
-              out[field] = String(val ?? "").trim();
-            }
+          for (const [ek, val] of Object.entries(row)) {
+            const f = EXCEL_COL_MAP[normalize(ek)]; if (!f) continue;
+            if (f === "adrc" || f === "cor") { const n = parseFloat(String(val).replace(",",".")); out[f] = isNaN(n) ? null : n; }
+            else if (f === "percImpegno") { const n = parseFloat(String(val)); out[f] = isNaN(n) ? 100 : n; }
+            else if (f === "dataIngresso" || f === "dataUscita") { out[f] = parseDate(val); }
+            else { out[f] = String(val ?? "").trim(); }
           }
           return out;
-        }).filter(r => r.risorsa && r.risorsa.trim() !== "");
-
-        if (mapped.length === 0) {
-          alert("Nessuna riga valida (campo Risorsa obbligatorio).");
-          setImporting(false);
-          return;
-        }
-
-        console.log("[TeamImport] righe:", mapped.length, mapped.slice(0, 2));
+        }).filter(r => r.risorsa?.trim());
+        if (!mapped.length) { alert("Nessuna riga valida."); setImporting(false); return; }
         const result = await importTeam(mapped);
-        setImportResult(`Importati ${result.imported} membri.`);
+        setImportResult(`Importati ${result.imported} membri`);
         await load();
-      } catch (err) {
-        alert(`Errore importazione: ${err.message}`);
-      } finally {
-        setImporting(false);
-      }
+      } catch (err) { alert(`Errore importazione: ${err.message}`); }
+      finally { setImporting(false); }
     };
     reader.readAsArrayBuffer(file);
   };
 
   if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "#666", fontSize: "15px" }}>
-      Caricamento Team…
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px", flexDirection: "column", gap: "12px" }}>
+      <div style={{ width: "36px", height: "36px", border: "3px solid #e2e8f0", borderTop: "3px solid #2563eb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <span style={{ color: "#94a3b8", fontSize: "14px" }}>Caricamento team…</span>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 
   return (
-    <div style={{ padding: "20px 24px", maxWidth: "1600px", margin: "0 auto" }}>
+    <div style={{ padding: "24px 28px", maxWidth: "1700px", margin: "0 auto", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+
+      {/* ── Page header ── */}
+      <div style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px" }}>Gestione Team</h1>
+        <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#94a3b8" }}>
+          {rows.length} risorse totali · {attivi.length} attive · {destaffati.length} destaffate
+        </p>
+      </div>
 
       {/* ── KPI ── */}
-      <div style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <div style={{ background: "#e8f0fe", borderRadius: "10px", padding: "14px 22px", minWidth: "200px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-            Costo al giorno
-          </div>
-          <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a73e8" }}>{fmtEuro(costoGiorno)}</div>
-          <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{attive.length} risorse attive</div>
-        </div>
-        <div style={{ background: "#e6f4ea", borderRadius: "10px", padding: "14px 22px", minWidth: "200px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#34a853", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-            Costo al mese
-          </div>
-          <div style={{ fontSize: "22px", fontWeight: 700, color: "#34a853" }}>{fmtEuro(costoMese)}</div>
-          <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>× 20 giorni lavorativi</div>
-        </div>
+      <div style={{ display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }}>
+        <KpiCard label="Costo al giorno" value={fmtEuro(costoGiorno)} sub={`${attivi.length} risorse attive${q ? " (filtrate)" : ""}`} color="#2563eb" bg="linear-gradient(135deg,#eff6ff,#dbeafe)" icon="💼" />
+        <KpiCard label="Costo al mese" value={fmtEuro(costoMese)} sub="× 20 giorni lavorativi" color="#059669" bg="linear-gradient(135deg,#ecfdf5,#d1fae5)" icon="📅" />
+        <KpiCard label="Risorse attive" value={attivi.length} sub={`${destaffati.length} destaffate`} color="#7c3aed" bg="linear-gradient(135deg,#f5f3ff,#ede9fe)" icon="👥" />
       </div>
 
-      {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#1a1a2e" }}>Gestione Team</h2>
-          <div style={{ fontSize: "13px", color: "#888", marginTop: "3px" }}>{rows.length} membri totali</div>
+      {/* ── Toolbar ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: "14px" }}>🔍</span>
+          <input type="text" placeholder="Cerca risorsa, ambito, specialità…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ paddingLeft: "36px", paddingRight: "12px", paddingTop: "9px", paddingBottom: "9px", border: "1px solid #e2e8f0", borderRadius: "10px", fontSize: "13px", width: "280px", background: "#f8fafc", outline: "none" }} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          {importResult && <span style={{ fontSize: "12px", color: "#34a853", fontWeight: 600 }}>{importResult}</span>}
-          <input type="text" placeholder="Cerca…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ padding: "7px 12px", border: "1px solid #dadce0", borderRadius: "6px", fontSize: "13px", width: "200px" }} />
-          <label style={{ padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", border: "1px solid #dadce0", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#555", background: "#f1f3f4" }}>
-            {importing ? "Importazione…" : "Importa da Excel"}
+          {importResult && <span style={{ fontSize: "12px", color: "#16a34a", fontWeight: 700, background: "#dcfce7", padding: "4px 10px", borderRadius: "6px" }}>{importResult}</span>}
+          <label style={{ padding: "9px 16px", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", border: "1px solid #e2e8f0", borderRadius: "10px", fontSize: "13px", fontWeight: 600, color: "#374151", background: "#f8fafc" }}>
+            {importing ? "⏳ Importazione…" : "📥 Importa Excel"}
             <input type="file" accept=".xlsx,.xls" onChange={handleImport} style={{ display: "none" }} disabled={importing} />
           </label>
-          <button onClick={() => setModal({ mode: "create" })} style={btn("primary")}>+ Nuovo membro</button>
+          <button onClick={() => setModal({ mode: "create" })}
+            style={{ padding: "9px 20px", borderRadius: "10px", border: "none", background: "#2563eb", fontSize: "13px", fontWeight: 700, cursor: "pointer", color: "white", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}>
+            + Nuovo membro
+          </button>
         </div>
       </div>
 
-      {/* ── Tabella ── */}
-      <div style={{ overflowX: "auto", border: "1px solid #e8eaed", borderRadius: "8px" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={{ ...TH, width: "36px", textAlign: "center" }}>#</th>
-              {COLS.map(c => <th key={c.key} style={TH}>{c.label}</th>)}
-              <th style={{ ...TH, textAlign: "center", width: "110px" }}>Azioni</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={COLS.length + 2} style={{ ...TD, textAlign: "center", color: "#aaa", padding: "32px" }}>
-                {search ? "Nessun risultato." : "Nessun membro. Clicca '+ Nuovo membro' o importa da Excel."}
-              </td></tr>
-            ) : filtered.map((r, idx) => {
-              const attiva = isAttiva(r);
-              return (
-                <tr key={r.id}
-                  style={{ background: !attiva ? "#fafafa" : idx % 2 === 0 ? "white" : "#f8faff", opacity: attiva ? 1 : 0.6 }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#f0f4ff"}
-                  onMouseLeave={e => e.currentTarget.style.background = !attiva ? "#fafafa" : idx % 2 === 0 ? "white" : "#f8faff"}>
-                  <td style={{ ...TD, textAlign: "center", fontSize: "11px", color: "#aaa" }}>{idx + 1}</td>
-                  {COLS.map(c => (
-                    <td key={c.key} style={{ ...TD, maxWidth: c.key === "note" ? "200px" : "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c.key === "note" ? "normal" : "nowrap" }}>
-                      {c.euro
-                        ? <span style={{ color: "#1a73e8", fontWeight: 600 }}>{fmtEuro(r[c.key])}</span>
-                        : c.date
-                          ? fmtDate(r[c.key])
-                          : c.key === "email" && r[c.key]
-                            ? <a href={`mailto:${r[c.key]}`} style={{ color: "#1a73e8" }}>{r[c.key]}</a>
-                            : (r[c.key] ?? "")
-                      }
-                    </td>
-                  ))}
-                  <td style={{ ...TD, textAlign: "center", whiteSpace: "nowrap" }}>
-                    <button onClick={() => setModal({ mode: "edit", row: r })} style={{ ...btn("ghost"), marginRight: "6px", padding: "4px 10px", border: "1px solid #dadce0" }}>Modifica</button>
-                    <button onClick={() => setConfirmDelete(r)} style={{ ...btn("danger"), padding: "4px 10px" }}>Elimina</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* ── Tabella attivi ── */}
+      <div style={{ background: "#fff", borderRadius: "16px", border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.05)", marginBottom: "24px" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+            <span style={{ fontWeight: 700, fontSize: "15px", color: "#0f172a" }}>Team Attivo</span>
+            <Badge color="#16a34a" bg="#dcfce7">{attivi.length}</Badge>
+          </div>
+        </div>
+        <TeamTable rows={attivi} onEdit={r => setModal({ mode: "edit", row: r })} onDelete={r => setConfirmDelete(r)} dimmed={false} />
       </div>
 
-      {/* ── Modale ── */}
-      {modal && (
-        <MemberModal
-          initial={modal.mode === "edit" ? modal.row : null}
-          onClose={() => setModal(null)}
-          onSave={handleSave}
-        />
+      {/* ── Tabella destaffati (collassabile) ── */}
+      {destaffati.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: "16px", border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+          <div style={{ padding: "16px 20px", borderBottom: showDestaffati ? "1px solid #f1f5f9" : "none", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+            onClick={() => setShowDestaffati(p => !p)}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#94a3b8", display: "inline-block" }} />
+              <span style={{ fontWeight: 700, fontSize: "15px", color: "#64748b" }}>Team Destaffato</span>
+              <Badge color="#64748b" bg="#f1f5f9">{destaffati.length}</Badge>
+            </div>
+            <span style={{ color: "#94a3b8", fontSize: "18px", transition: "transform 0.2s", display: "inline-block", transform: showDestaffati ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+          </div>
+          {showDestaffati && (
+            <TeamTable rows={destaffati} onEdit={r => setModal({ mode: "edit", row: r })} onDelete={r => setConfirmDelete(r)} dimmed={true} />
+          )}
+        </div>
       )}
+
+      {/* ── Modale ── */}
+      {modal && <MemberModal initial={modal.mode === "edit" ? modal.row : null} onClose={() => setModal(null)} onSave={handleSave} />}
 
       {/* ── Conferma eliminazione ── */}
       {confirmDelete && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: "10px", padding: "24px 28px", width: "min(400px, 92vw)", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: "15px", fontWeight: 700 }}>Conferma eliminazione</h3>
-            <p style={{ margin: "0 0 20px", color: "#555", fontSize: "13px" }}>
-              Eliminare <strong>{confirmDelete.risorsa}</strong>? L'operazione non è reversibile.
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)" }}>
+          <div style={{ background: "#fff", borderRadius: "16px", padding: "28px 32px", width: "min(420px, 92vw)", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: "32px", marginBottom: "12px" }}>🗑️</div>
+            <h3 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>Elimina risorsa</h3>
+            <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: "14px" }}>
+              Stai eliminando <strong>{confirmDelete.risorsa}</strong>. L'operazione non è reversibile.
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-              <button onClick={() => setConfirmDelete(null)} style={btn("ghost")}>Annulla</button>
-              <button onClick={() => handleDelete(confirmDelete)} style={btn("danger")}>Elimina</button>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#64748b" }}>Annulla</button>
+              <button onClick={() => handleDelete(confirmDelete)} style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: "#dc2626", fontSize: "13px", fontWeight: 700, cursor: "pointer", color: "white" }}>Elimina</button>
             </div>
           </div>
         </div>

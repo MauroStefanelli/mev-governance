@@ -397,7 +397,8 @@ using (var scope = app.Services.CreateScope())
                     ""CorpId""           TEXT NULL,
                     ""Email""            TEXT NULL,
                     ""DataIngresso""     DATE NULL,
-                    ""DataUscita""       DATE NULL
+                    ""DataUscita""       DATE NULL,
+                    ""PercImpegno""      NUMERIC NOT NULL DEFAULT 100
                 );
             ");
             // Aggiunge le nuove colonne TeamMembers per tabelle già esistenti
@@ -406,6 +407,7 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""Cor""          NUMERIC NULL;
                 ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""DataIngresso"" DATE NULL;
                 ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""DataUscita""   DATE NULL;
+                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""PercImpegno""  NUMERIC NOT NULL DEFAULT 100;
             ");
             // Converti Adrc/Cor da TEXT a NUMERIC se necessario (tabella creata manualmente)
             db.Database.ExecuteSqlRaw($@"
