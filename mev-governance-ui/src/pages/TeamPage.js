@@ -41,24 +41,38 @@ const EMPTY_FORM = {
   adrc: "", cor: "", percImpegno: 100, corpId: "", email: "",
   dataIngresso: "", dataUscita: "",
 };
-
+// Colonne mostrate in tabella (ridotte)
 const COLS = [
   { key: "risorsa",          label: "Risorsa",           required: true, minW: 140 },
   { key: "ambito",           label: "Ambito",                            minW: 100 },
-  { key: "specialita",       label: "Specialità",                        minW: 120 },
   { key: "posteApplication", label: "Poste App.",                        minW: 100 },
-  { key: "risorsaGrade",     label: "Ris. GRADE",                        minW: 90  },
   { key: "grade",            label: "GRADE",                             minW: 70  },
-  { key: "cdc",              label: "CDC",                               minW: 80  },
-  { key: "practice",         label: "Practice",                          minW: 90  },
   { key: "adrc",             label: "ADRC (€)",          euro: true,     minW: 100 },
   { key: "cor",              label: "COR (€)",           euro: true,     minW: 100 },
   { key: "percImpegno",      label: "% Impegno",         perc: true,     minW: 90  },
   { key: "corpId",           label: "Corp ID",                           minW: 80  },
-  { key: "email",            label: "E-mail",            mail: true,     minW: 150 },
   { key: "dataIngresso",     label: "Data Ingresso",     date: true,     minW: 110 },
   { key: "dataUscita",       label: "Data Uscita",       date: true,     minW: 110 },
-  { key: "note",             label: "Note",                              minW: 150 },
+];
+
+// Tutti i campi per il modale di edit/creazione
+const ALL_FORM_COLS = [
+  { key: "risorsa",          label: "Risorsa",           required: true },
+  { key: "ambito",           label: "Ambito" },
+  { key: "specialita",       label: "Specialità" },
+  { key: "posteApplication", label: "Poste Application" },
+  { key: "risorsaGrade",     label: "Risorse GRADE" },
+  { key: "grade",            label: "GRADE" },
+  { key: "cdc",              label: "CDC" },
+  { key: "practice",         label: "Practice" },
+  { key: "adrc",             label: "ADRC (€)",          euro: true },
+  { key: "cor",              label: "COR (€)",           euro: true },
+  { key: "percImpegno",      label: "% Impegno",         perc: true },
+  { key: "corpId",           label: "Corp ID" },
+  { key: "email",            label: "E-mail",            mail: true },
+  { key: "dataIngresso",     label: "Data Ingresso",     date: true },
+  { key: "dataUscita",       label: "Data Uscita",       date: true },
+  { key: "note",             label: "Note" },
 ];
 
 const EXCEL_COL_MAP = {
@@ -106,7 +120,7 @@ function Badge({ children, color = "#6b7280", bg = "#f3f4f6" }) {
 }
 
 // ── Modale add/edit ────────────────────────────────────────────────────────────
-function MemberModal({ initial, onClose, onSave }) {
+function MemberModal({ initial, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(() => initial ? {
     ...EMPTY_FORM, ...initial,
     adrc: initial.adrc ?? "",
@@ -174,13 +188,22 @@ function MemberModal({ initial, onClose, onSave }) {
           <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: "8px", width: "32px", height: "32px", fontSize: "18px", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-          {COLS.map(col => <Field key={col.key} col={col} />)}
+          {ALL_FORM_COLS.map(col => <Field key={col.key} col={col} />)}
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #f1f5f9" }}>
-          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#64748b" }}>Annulla</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "9px 24px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : "#2563eb", fontSize: "13px", fontWeight: 700, cursor: "pointer", color: "white" }}>
-            {saving ? "Salvataggio…" : "Salva"}
-          </button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #f1f5f9" }}>
+          <div>
+            {initial && onDelete && (
+              <button onClick={() => onDelete(initial)} style={{ padding: "9px 18px", borderRadius: "8px", border: "none", background: "#fee2e2", fontSize: "13px", fontWeight: 700, cursor: "pointer", color: "#dc2626" }}>
+                🗑 Elimina
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#64748b" }}>Annulla</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "9px 24px", borderRadius: "8px", border: "none", background: saving ? "#93c5fd" : "#2563eb", fontSize: "13px", fontWeight: 700, cursor: "pointer", color: "white" }}>
+              {saving ? "Salvataggio…" : "Salva"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -190,7 +213,7 @@ function MemberModal({ initial, onClose, onSave }) {
 const inputSt = () => ({ width: "100%", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "13px", boxSizing: "border-box", background: "#fafafa", outline: "none" });
 
 // ── Tabella risorse ────────────────────────────────────────────────────────────
-function TeamTable({ rows, onEdit, onDelete, dimmed }) {
+function TeamTable({ rows, onEdit, dimmed }) {
   if (rows.length === 0) return (
     <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8", fontSize: "14px" }}>
       Nessuna risorsa
@@ -203,17 +226,18 @@ function TeamTable({ rows, onEdit, onDelete, dimmed }) {
           <tr>
             <th style={thSt()}>#</th>
             {COLS.map(c => <th key={c.key} style={{ ...thSt(), minWidth: c.minW }}>{c.label}</th>)}
-            <th style={{ ...thSt(), textAlign: "center" }}>Azioni</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r, idx) => (
-            <tr key={r.id} style={{ opacity: dimmed ? 0.65 : 1, background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}
+            <tr key={r.id}
+              onClick={() => onEdit(r)}
+              style={{ opacity: dimmed ? 0.65 : 1, background: idx % 2 === 0 ? "#fff" : "#f8fafc", cursor: "pointer" }}
               onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
               onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#f8fafc"}>
               <td style={{ ...tdSt(), color: "#cbd5e1", fontSize: "11px", textAlign: "center" }}>{idx + 1}</td>
               {COLS.map(c => (
-                <td key={c.key} style={{ ...tdSt(), maxWidth: c.key === "note" ? "200px" : undefined, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c.key === "note" ? "normal" : "nowrap" }}>
+                <td key={c.key} style={{ ...tdSt(), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {c.euro
                     ? <span style={{ fontWeight: 600, color: "#0ea5e9" }}>{fmtEuro(r[c.key])}</span>
                     : c.perc
@@ -221,15 +245,11 @@ function TeamTable({ rows, onEdit, onDelete, dimmed }) {
                       : c.date
                         ? <span style={{ color: "#64748b", fontSize: "12px" }}>{fmtDate(r[c.key])}</span>
                         : c.mail && r[c.key]
-                          ? <a href={`mailto:${r[c.key]}`} style={{ color: "#2563eb", textDecoration: "none" }}>{r[c.key]}</a>
+                          ? <a href={`mailto:${r[c.key]}`} style={{ color: "#2563eb", textDecoration: "none" }} onClick={e => e.stopPropagation()}>{r[c.key]}</a>
                           : <span>{r[c.key] ?? ""}</span>
                   }
                 </td>
               ))}
-              <td style={{ ...tdSt(), textAlign: "center", whiteSpace: "nowrap" }}>
-                <button onClick={() => onEdit(r)} style={{ marginRight: "6px", padding: "5px 12px", borderRadius: "6px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "12px", fontWeight: 600, cursor: "pointer", color: "#374151" }}>Modifica</button>
-                <button onClick={() => onDelete(r)} style={{ padding: "5px 12px", borderRadius: "6px", border: "none", background: "#fee2e2", fontSize: "12px", fontWeight: 600, cursor: "pointer", color: "#dc2626" }}>Elimina</button>
-              </td>
             </tr>
           ))}
         </tbody>
@@ -381,7 +401,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
             <Badge color="#16a34a" bg="#dcfce7">{attivi.length}</Badge>
           </div>
         </div>
-        <TeamTable rows={attivi} onEdit={r => setModal({ mode: "edit", row: r })} onDelete={r => setConfirmDelete(r)} dimmed={false} />
+        <TeamTable rows={attivi} onEdit={r => setModal({ mode: "edit", row: r })} dimmed={false} />
       </div>
 
       {/* ── Tabella destaffati (collassabile) ── */}
@@ -397,13 +417,13 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
             <span style={{ color: "#94a3b8", fontSize: "18px", transition: "transform 0.2s", display: "inline-block", transform: showDestaffati ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
           </div>
           {showDestaffati && (
-            <TeamTable rows={destaffati} onEdit={r => setModal({ mode: "edit", row: r })} onDelete={r => setConfirmDelete(r)} dimmed={true} />
+            <TeamTable rows={destaffati} onEdit={r => setModal({ mode: "edit", row: r })} dimmed={true} />
           )}
         </div>
       )}
 
       {/* ── Modale ── */}
-      {modal && <MemberModal initial={modal.mode === "edit" ? modal.row : null} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal && <MemberModal initial={modal.mode === "edit" ? modal.row : null} onClose={() => setModal(null)} onSave={handleSave} onDelete={modal.mode === "edit" ? (r) => { setModal(null); setConfirmDelete(r); } : null} />}
 
       {/* ── Conferma eliminazione ── */}
       {confirmDelete && (
