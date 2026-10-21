@@ -185,15 +185,43 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
     reader.onload = async (ev) => {
       try {
         const wb = XLSX.read(ev.target.result, { type: "array" });
-        // Cerca il foglio "TEAM" (case-insensitive)
-        const sheetName = wb.SheetNames.find(n => n.trim().toUpperCase() === "TEAM");
+        // Cerca il foglio che inizia con "TEAM" (es. "TEAM LAVORO", "TEAM", ecc.)
+        const sheetName = wb.SheetNames.find(n => n.trim().toUpperCase().startsWith("TEAM"));
         if (!sheetName) {
-          alert(`Foglio "TEAM" non trovato.\nFogli presenti: ${wb.SheetNames.join(", ")}`);
+          alert(`Foglio con nome che inizia per "TEAM" non trovato.\nFogli presenti: ${wb.SheetNames.join(", ")}`);
           setImporting(false);
           return;
         }
         const ws = wb.Sheets[sheetName];
-        const jsonRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+        // Prova prima sheet_to_json standard (prima riga = header)
+        let jsonRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+        // Se nessuna riga ha una chiave mappabile, prova a cercare la riga header
+        // scorrendo le prime 10 righe del foglio (gestisce tabelle con titolo sopra)
+        const hasMappable = (rows) => rows.some(row =>
+          Object.keys(row).some(k => EXCEL_COL_MAP[normalize(k)])
+        );
+
+        if (jsonRows.length === 0 || !hasMappable(jsonRows)) {
+          const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          let headerIdx = -1;
+          for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+            const row = rawRows[i];
+            if (row.some(cell => EXCEL_COL_MAP[normalize(cell)])) {
+              headerIdx = i;
+              break;
+            }
+          }
+          if (headerIdx >= 0) {
+            const headers = rawRows[headerIdx];
+            jsonRows = rawRows.slice(headerIdx + 1).map(row => {
+              const obj = {};
+              headers.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+              return obj;
+            });
+          }
+        }
 
         const mapped = jsonRows.map(row => {
           const out = { ...EMPTY_FORM };
