@@ -19,10 +19,46 @@ const btn = (variant = "primary") => ({
   color: variant === "ghost" ? "#555" : "white",
 });
 
+const fmtEuro = (v) => {
+  const n = Number(v);
+  if (!v && v !== 0) return "—";
+  return `€ ${n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const fmtDate = (v) => {
+  if (!v) return "";
+  // v può essere "2024-12-31" (ISO) o "31/12/2024" (IT)
+  try {
+    const d = new Date(v);
+    if (isNaN(d)) return v;
+    return d.toLocaleDateString("it-IT");
+  } catch { return v; }
+};
+
+// Converte stringa data Excel (varie format) → "YYYY-MM-DD" per il backend
+const parseDate = (v) => {
+  if (!v) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  // Numero seriale Excel
+  if (/^\d+$/.test(s)) {
+    const d = XLSX.SSF.parse_date_code(Number(s));
+    if (d) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
+  }
+  // GG/MM/YYYY o GG-MM-YYYY
+  const itMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (itMatch) return `${itMatch[3]}-${itMatch[2].padStart(2,"0")}-${itMatch[1].padStart(2,"0")}`;
+  // ISO YYYY-MM-DD
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  return null;
+};
+
 const EMPTY_FORM = {
   risorsa: "", ambito: "", specialita: "", posteApplication: "",
   note: "", risorsaGrade: "", grade: "", cdc: "", practice: "",
   adrc: "", cor: "", corpId: "", email: "",
+  dataIngresso: "", dataUscita: "",
 };
 
 const COLS = [
@@ -35,13 +71,15 @@ const COLS = [
   { key: "grade",            label: "GRADE" },
   { key: "cdc",              label: "CDC" },
   { key: "practice",         label: "Practice" },
-  { key: "adrc",             label: "ADRC" },
-  { key: "cor",              label: "COR" },
+  { key: "adrc",             label: "ADRC (€)",      euro: true },
+  { key: "cor",              label: "COR (€)",       euro: true },
   { key: "corpId",           label: "Corp ID" },
   { key: "email",            label: "E-mail" },
+  { key: "dataIngresso",     label: "Data Ingresso", date: true },
+  { key: "dataUscita",       label: "Data Uscita",   date: true },
 ];
 
-// Mappa nomi colonne Excel (foglio TEAM) → chiavi del form
+// Mappa nomi colonne Excel → chiavi form
 const EXCEL_COL_MAP = {
   "risorse":             "risorsa",
   "risorsa":             "risorsa",
@@ -64,15 +102,33 @@ const EXCEL_COL_MAP = {
   "email address":       "email",
   "email":               "email",
   "e-mail":              "email",
+  "data ingresso":       "dataIngresso",
+  "data_ingresso":       "dataIngresso",
+  "ingresso":            "dataIngresso",
+  "data uscita":         "dataUscita",
+  "data_uscita":         "dataUscita",
+  "uscita":              "dataUscita",
 };
 
-function normalize(s) {
-  return String(s ?? "").trim().toLowerCase();
-}
+function normalize(s) { return String(s ?? "").trim().toLowerCase(); }
+
+// Risorsa attiva oggi: nessuna data uscita, o data uscita >= oggi
+const isAttiva = (r) => {
+  if (!r.dataUscita) return true;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const uscita = new Date(r.dataUscita);
+  return uscita >= today;
+};
 
 // ── Modale add/edit ────────────────────────────────────────────────────────────
 function MemberModal({ initial, onClose, onSave }) {
-  const [form, setForm] = useState(initial || EMPTY_FORM);
+  const [form, setForm] = useState(() => initial ? {
+    ...EMPTY_FORM, ...initial,
+    adrc: initial.adrc ?? "",
+    cor:  initial.cor  ?? "",
+    dataIngresso: initial.dataIngresso ?? "",
+    dataUscita:   initial.dataUscita   ?? "",
+  } : EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
@@ -80,7 +136,14 @@ function MemberModal({ initial, onClose, onSave }) {
   const handleSave = async () => {
     if (!form.risorsa.trim()) { alert("Il campo Risorsa è obbligatorio"); return; }
     setSaving(true);
-    try { await onSave(form); onClose(); }
+    const payload = {
+      ...form,
+      adrc: form.adrc !== "" && form.adrc !== null ? Number(String(form.adrc).replace(",",".")) : null,
+      cor:  form.cor  !== "" && form.cor  !== null ? Number(String(form.cor).replace(",","."))  : null,
+      dataIngresso: form.dataIngresso || null,
+      dataUscita:   form.dataUscita   || null,
+    };
+    try { await onSave(payload); onClose(); }
     catch (e) { alert(`Errore: ${e.message}`); }
     finally { setSaving(false); }
   };
@@ -88,7 +151,7 @@ function MemberModal({ initial, onClose, onSave }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: "#fff", borderRadius: "12px", padding: "24px 28px", width: "min(700px, 96vw)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+      <div style={{ background: "#fff", borderRadius: "12px", padding: "24px 28px", width: "min(720px, 96vw)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1a1a2e" }}>
             {initial ? "Modifica membro" : "Nuovo membro"}
@@ -104,6 +167,15 @@ function MemberModal({ initial, onClose, onSave }) {
               {col.key === "note" ? (
                 <textarea value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)} rows={2}
                   style={{ width: "100%", padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" }} />
+              ) : col.date ? (
+                <input type="date" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
+                  style={{ width: "100%", padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", boxSizing: "border-box" }} />
+              ) : col.euro ? (
+                <div style={{ display: "flex", alignItems: "center", border: "1px solid #dadce0", borderRadius: "4px", overflow: "hidden" }}>
+                  <input type="number" step="0.01" value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
+                    style={{ flex: 1, padding: "6px 8px", border: "none", fontSize: "13px", textAlign: "right", outline: "none" }} />
+                  <span style={{ padding: "0 8px", color: "#888", fontSize: "12px" }}>€</span>
+                </div>
               ) : (
                 <input value={form[col.key] ?? ""} onChange={e => set(col.key, e.target.value)}
                   style={{ width: "100%", padding: "6px 8px", border: "1px solid #dadce0", borderRadius: "4px", fontSize: "13px", boxSizing: "border-box" }} />
@@ -125,8 +197,8 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState(null); // null | { mode: "create" } | { mode: "edit", row }
-  const [confirmDelete, setConfirmDelete] = useState(null); // row da eliminare
+  const [modal, setModal] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
@@ -144,6 +216,11 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── KPI ────────────────────────────────────────────────────────────────────
+  const attive = rows.filter(isAttiva);
+  const costoGiorno = attive.reduce((s, r) => s + (Number(r.adrc) || 0) + (Number(r.cor) || 0), 0);
+  const costoMese   = costoGiorno * 20;
+
   // ── Filtro ricerca ─────────────────────────────────────────────────────────
   const filtered = rows.filter(r => {
     if (!search.trim()) return true;
@@ -151,7 +228,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
     return COLS.some(c => String(r[c.key] ?? "").toLowerCase().includes(q));
   });
 
-  // ── Save (create / update) ─────────────────────────────────────────────────
+  // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = async (form) => {
     if (modal.mode === "create") {
       const created = await createTeamMember(form);
@@ -167,9 +244,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
     try {
       await deleteTeamMember(row.id);
       setRows(prev => prev.filter(r => r.id !== row.id));
-    } catch (e) {
-      alert(`Errore eliminazione: ${e.message}`);
-    }
+    } catch (e) { alert(`Errore eliminazione: ${e.message}`); }
     setConfirmDelete(null);
   };
 
@@ -184,21 +259,17 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const wb = XLSX.read(ev.target.result, { type: "array" });
-        // Cerca il foglio che inizia con "TEAM" (es. "TEAM LAVORO", "TEAM", ecc.)
+        const wb = XLSX.read(ev.target.result, { type: "array", cellDates: false });
         const sheetName = wb.SheetNames.find(n => n.trim().toUpperCase().startsWith("TEAM"));
         if (!sheetName) {
-          alert(`Foglio con nome che inizia per "TEAM" non trovato.\nFogli presenti: ${wb.SheetNames.join(", ")}`);
+          alert(`Foglio che inizia con "TEAM" non trovato.\nFogli: ${wb.SheetNames.join(", ")}`);
           setImporting(false);
           return;
         }
         const ws = wb.Sheets[sheetName];
 
-        // Prova prima sheet_to_json standard (prima riga = header)
         let jsonRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
-        // Se nessuna riga ha una chiave mappabile, prova a cercare la riga header
-        // scorrendo le prime 10 righe del foglio (gestisce tabelle con titolo sopra)
         const hasMappable = (rows) => rows.some(row =>
           Object.keys(row).some(k => EXCEL_COL_MAP[normalize(k)])
         );
@@ -207,11 +278,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
           const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
           let headerIdx = -1;
           for (let i = 0; i < Math.min(10, rawRows.length); i++) {
-            const row = rawRows[i];
-            if (row.some(cell => EXCEL_COL_MAP[normalize(cell)])) {
-              headerIdx = i;
-              break;
-            }
+            if (rawRows[i].some(cell => EXCEL_COL_MAP[normalize(cell)])) { headerIdx = i; break; }
           }
           if (headerIdx >= 0) {
             const headers = rawRows[headerIdx];
@@ -226,19 +293,27 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
         const mapped = jsonRows.map(row => {
           const out = { ...EMPTY_FORM };
           for (const [excelKey, val] of Object.entries(row)) {
-            const mapped = EXCEL_COL_MAP[normalize(excelKey)];
-            if (mapped) out[mapped] = String(val ?? "").trim();
+            const field = EXCEL_COL_MAP[normalize(excelKey)];
+            if (!field) continue;
+            if (field === "adrc" || field === "cor") {
+              const n = parseFloat(String(val).replace(",", "."));
+              out[field] = isNaN(n) ? null : n;
+            } else if (field === "dataIngresso" || field === "dataUscita") {
+              out[field] = parseDate(val);
+            } else {
+              out[field] = String(val ?? "").trim();
+            }
           }
           return out;
-        }).filter(r => r.risorsa.trim() !== ""); // salta righe senza Risorsa
+        }).filter(r => r.risorsa && r.risorsa.trim() !== "");
 
         if (mapped.length === 0) {
-          alert("Nessuna riga valida trovata nel foglio TEAM (campo Risorsa obbligatorio).");
+          alert("Nessuna riga valida (campo Risorsa obbligatorio).");
           setImporting(false);
           return;
         }
 
-        console.log("[TeamImport] righe mappate:", mapped.length, mapped.slice(0, 3));
+        console.log("[TeamImport] righe:", mapped.length, mapped.slice(0, 2));
         const result = await importTeam(mapped);
         setImportResult(`Importati ${result.imported} membri.`);
         await load();
@@ -260,19 +335,35 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
   return (
     <div style={{ padding: "20px 24px", maxWidth: "1600px", margin: "0 auto" }}>
 
+      {/* ── KPI ── */}
+      <div style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+        <div style={{ background: "#e8f0fe", borderRadius: "10px", padding: "14px 22px", minWidth: "200px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+            Costo al giorno
+          </div>
+          <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a73e8" }}>{fmtEuro(costoGiorno)}</div>
+          <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{attive.length} risorse attive</div>
+        </div>
+        <div style={{ background: "#e6f4ea", borderRadius: "10px", padding: "14px 22px", minWidth: "200px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#34a853", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+            Costo al mese
+          </div>
+          <div style={{ fontSize: "22px", fontWeight: 700, color: "#34a853" }}>{fmtEuro(costoMese)}</div>
+          <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>× 20 giorni lavorativi</div>
+        </div>
+      </div>
+
       {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#1a1a2e" }}>Gestione Team</h2>
           <div style={{ fontSize: "13px", color: "#888", marginTop: "3px" }}>{rows.length} membri totali</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          {importResult && (
-            <span style={{ fontSize: "12px", color: "#34a853", fontWeight: 600 }}>{importResult}</span>
-          )}
+          {importResult && <span style={{ fontSize: "12px", color: "#34a853", fontWeight: 600 }}>{importResult}</span>}
           <input type="text" placeholder="Cerca…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ padding: "7px 12px", border: "1px solid #dadce0", borderRadius: "6px", fontSize: "13px", width: "200px" }} />
-          <label style={{ ...btn("ghost"), padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", border: "1px solid #dadce0", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#555" }}>
+          <label style={{ padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", border: "1px solid #dadce0", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#555", background: "#f1f3f4" }}>
             {importing ? "Importazione…" : "Importa da Excel"}
             <input type="file" accept=".xlsx,.xls" onChange={handleImport} style={{ display: "none" }} disabled={importing} />
           </label>
@@ -282,12 +373,12 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
 
       {/* ── Tabella ── */}
       <div style={{ overflowX: "auto", border: "1px solid #e8eaed", borderRadius: "8px" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
               <th style={{ ...TH, width: "36px", textAlign: "center" }}>#</th>
               {COLS.map(c => <th key={c.key} style={TH}>{c.label}</th>)}
-              <th style={{ ...TH, textAlign: "center", width: "100px" }}>Azioni</th>
+              <th style={{ ...TH, textAlign: "center", width: "110px" }}>Azioni</th>
             </tr>
           </thead>
           <tbody>
@@ -295,34 +386,41 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
               <tr><td colSpan={COLS.length + 2} style={{ ...TD, textAlign: "center", color: "#aaa", padding: "32px" }}>
                 {search ? "Nessun risultato." : "Nessun membro. Clicca '+ Nuovo membro' o importa da Excel."}
               </td></tr>
-            ) : filtered.map((r, idx) => (
-              <tr key={r.id}
-                style={{ background: idx % 2 === 0 ? "white" : "#fafafa", transition: "background 0.1s" }}
-                onMouseEnter={e => e.currentTarget.style.background = "#f0f4ff"}
-                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "white" : "#fafafa"}>
-                <td style={{ ...TD, textAlign: "center", fontSize: "11px", color: "#aaa" }}>{idx + 1}</td>
-                {COLS.map(c => (
-                  <td key={c.key} style={{ ...TD, maxWidth: c.key === "note" ? "220px" : "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c.key === "note" ? "normal" : "nowrap" }}>
-                    {c.key === "email" && r[c.key]
-                      ? <a href={`mailto:${r[c.key]}`} style={{ color: "#1a73e8" }}>{r[c.key]}</a>
-                      : (r[c.key] ?? "")
-                    }
+            ) : filtered.map((r, idx) => {
+              const attiva = isAttiva(r);
+              return (
+                <tr key={r.id}
+                  style={{ background: !attiva ? "#fafafa" : idx % 2 === 0 ? "white" : "#f8faff", opacity: attiva ? 1 : 0.6 }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f0f4ff"}
+                  onMouseLeave={e => e.currentTarget.style.background = !attiva ? "#fafafa" : idx % 2 === 0 ? "white" : "#f8faff"}>
+                  <td style={{ ...TD, textAlign: "center", fontSize: "11px", color: "#aaa" }}>{idx + 1}</td>
+                  {COLS.map(c => (
+                    <td key={c.key} style={{ ...TD, maxWidth: c.key === "note" ? "200px" : "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c.key === "note" ? "normal" : "nowrap" }}>
+                      {c.euro
+                        ? <span style={{ color: "#1a73e8", fontWeight: 600 }}>{fmtEuro(r[c.key])}</span>
+                        : c.date
+                          ? fmtDate(r[c.key])
+                          : c.key === "email" && r[c.key]
+                            ? <a href={`mailto:${r[c.key]}`} style={{ color: "#1a73e8" }}>{r[c.key]}</a>
+                            : (r[c.key] ?? "")
+                      }
+                    </td>
+                  ))}
+                  <td style={{ ...TD, textAlign: "center", whiteSpace: "nowrap" }}>
+                    <button onClick={() => setModal({ mode: "edit", row: r })} style={{ ...btn("ghost"), marginRight: "6px", padding: "4px 10px", border: "1px solid #dadce0" }}>Modifica</button>
+                    <button onClick={() => setConfirmDelete(r)} style={{ ...btn("danger"), padding: "4px 10px" }}>Elimina</button>
                   </td>
-                ))}
-                <td style={{ ...TD, textAlign: "center", whiteSpace: "nowrap" }}>
-                  <button onClick={() => setModal({ mode: "edit", row: r })} style={{ ...btn("ghost"), marginRight: "6px", padding: "4px 10px", border: "1px solid #dadce0" }}>Modifica</button>
-                  <button onClick={() => setConfirmDelete(r)} style={{ ...btn("danger"), padding: "4px 10px" }}>Elimina</button>
-                </td>
-              </tr>
-            ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* ── Modale add/edit ── */}
+      {/* ── Modale ── */}
       {modal && (
         <MemberModal
-          initial={modal.mode === "edit" ? { ...modal.row } : null}
+          initial={modal.mode === "edit" ? modal.row : null}
           onClose={() => setModal(null)}
           onSave={handleSave}
         />

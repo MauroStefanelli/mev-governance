@@ -392,11 +392,42 @@ using (var scope = app.Services.CreateScope())
                     ""Grade""            TEXT NULL,
                     ""Cdc""              TEXT NULL,
                     ""Practice""         TEXT NULL,
-                    ""Adrc""             TEXT NULL,
-                    ""Cor""              TEXT NULL,
+                    ""Adrc""             NUMERIC NULL,
+                    ""Cor""              NUMERIC NULL,
                     ""CorpId""           TEXT NULL,
-                    ""Email""            TEXT NULL
+                    ""Email""            TEXT NULL,
+                    ""DataIngresso""     DATE NULL,
+                    ""DataUscita""       DATE NULL
                 );
+            ");
+            // Aggiunge le nuove colonne TeamMembers per tabelle già esistenti
+            db.Database.ExecuteSqlRaw($@"
+                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""Adrc""         NUMERIC NULL;
+                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""Cor""          NUMERIC NULL;
+                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""DataIngresso"" DATE NULL;
+                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""DataUscita""   DATE NULL;
+            ");
+            // Converti Adrc/Cor da TEXT a NUMERIC se necessario (tabella creata manualmente)
+            db.Database.ExecuteSqlRaw($@"
+                DO $$
+                BEGIN
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = '{sch}' AND table_name = 'TeamMembers'
+                      AND column_name = 'Adrc' AND data_type = 'text'
+                  ) THEN
+                    ALTER TABLE ""{sch}"".""TeamMembers""
+                      ALTER COLUMN ""Adrc"" TYPE NUMERIC USING NULLIF(TRIM(""Adrc""), '')::NUMERIC;
+                  END IF;
+                  IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = '{sch}' AND table_name = 'TeamMembers'
+                      AND column_name = 'Cor' AND data_type = 'text'
+                  ) THEN
+                    ALTER TABLE ""{sch}"".""TeamMembers""
+                      ALTER COLUMN ""Cor"" TYPE NUMERIC USING NULLIF(TRIM(""Cor""), '')::NUMERIC;
+                  END IF;
+                END $$;
             ");
             // Aggiunge tutte le colonne MevItems/Users/altri che le migration AddColumn
             // potrebbero aver mancato se search_path era errato al primo deploy

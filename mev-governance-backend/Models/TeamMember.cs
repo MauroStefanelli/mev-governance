@@ -14,8 +14,10 @@ public class TeamMember
     public string? Grade { get; set; }
     public string? Cdc { get; set; }
     public string? Practice { get; set; }
-    public string? Adrc { get; set; }
-    public string? Cor { get; set; }
+    public decimal? Adrc { get; set; }
+    public decimal? Cor { get; set; }
     public string? CorpId { get; set; }
     public string? Email { get; set; }
+    public DateOnly? DataIngresso { get; set; }
+    public DateOnly? DataUscita { get; set; }
 }

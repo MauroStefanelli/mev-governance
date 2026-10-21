@@ -35,23 +35,7 @@ public class TeamController : BaseController
     public IActionResult Create([FromBody] TeamMemberRequest req)
     {
         var ambienteId = GetAmbienteId();
-        var item = new TeamMember
-        {
-            AmbienteId      = ambienteId,
-            Risorsa         = req.Risorsa ?? "",
-            Ambito          = req.Ambito,
-            Specialita      = req.Specialita,
-            PosteApplication = req.PosteApplication,
-            Note            = req.Note,
-            RisorsaGrade    = req.RisorsaGrade,
-            Grade           = req.Grade,
-            Cdc             = req.Cdc,
-            Practice        = req.Practice,
-            Adrc            = req.Adrc,
-            Cor             = req.Cor,
-            CorpId          = req.CorpId,
-            Email           = req.Email,
-        };
+        var item = MapFromRequest(req, ambienteId);
         _db.TeamMembers.Add(item);
         _db.SaveChanges();
         return CreatedAtAction(nameof(GetAll), new { }, item);
@@ -79,6 +63,8 @@ public class TeamController : BaseController
         item.Cor              = req.Cor;
         item.CorpId           = req.CorpId;
         item.Email            = req.Email;
+        item.DataIngresso     = req.DataIngresso;
+        item.DataUscita       = req.DataUscita;
 
         _db.SaveChanges();
         return Ok(item);
@@ -98,7 +84,6 @@ public class TeamController : BaseController
     }
 
     // ── POST /api/team/import ─────────────────────────────────────────────────
-    // Importa un array di righe (da Excel sheet TEAM), sostituisce tutto per l'ambiente
     [HttpPost("import")]
     [Authorize(Policy = "AdminOrSuper")]
     public IActionResult Import([FromBody] List<TeamMemberRequest> rows)
@@ -108,43 +93,49 @@ public class TeamController : BaseController
         _db.TeamMembers.RemoveRange(existing);
 
         foreach (var req in rows)
-        {
-            _db.TeamMembers.Add(new TeamMember
-            {
-                AmbienteId       = ambienteId,
-                Risorsa          = req.Risorsa ?? "",
-                Ambito           = req.Ambito,
-                Specialita       = req.Specialita,
-                PosteApplication = req.PosteApplication,
-                Note             = req.Note,
-                RisorsaGrade     = req.RisorsaGrade,
-                Grade            = req.Grade,
-                Cdc              = req.Cdc,
-                Practice         = req.Practice,
-                Adrc             = req.Adrc,
-                Cor              = req.Cor,
-                CorpId           = req.CorpId,
-                Email            = req.Email,
-            });
-        }
+            _db.TeamMembers.Add(MapFromRequest(req, ambienteId));
+
         _db.SaveChanges();
         return Ok(new { imported = rows.Count });
     }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+    private static TeamMember MapFromRequest(TeamMemberRequest req, int ambienteId) => new()
+    {
+        AmbienteId       = ambienteId,
+        Risorsa          = req.Risorsa ?? "",
+        Ambito           = req.Ambito,
+        Specialita       = req.Specialita,
+        PosteApplication = req.PosteApplication,
+        Note             = req.Note,
+        RisorsaGrade     = req.RisorsaGrade,
+        Grade            = req.Grade,
+        Cdc              = req.Cdc,
+        Practice         = req.Practice,
+        Adrc             = req.Adrc,
+        Cor              = req.Cor,
+        CorpId           = req.CorpId,
+        Email            = req.Email,
+        DataIngresso     = req.DataIngresso,
+        DataUscita       = req.DataUscita,
+    };
 }
 
 public class TeamMemberRequest
 {
-    public string? Risorsa { get; set; }
-    public string? Ambito { get; set; }
-    public string? Specialita { get; set; }
-    public string? PosteApplication { get; set; }
-    public string? Note { get; set; }
-    public string? RisorsaGrade { get; set; }
-    public string? Grade { get; set; }
-    public string? Cdc { get; set; }
-    public string? Practice { get; set; }
-    public string? Adrc { get; set; }
-    public string? Cor { get; set; }
-    public string? CorpId { get; set; }
-    public string? Email { get; set; }
+    public string?   Risorsa          { get; set; }
+    public string?   Ambito           { get; set; }
+    public string?   Specialita       { get; set; }
+    public string?   PosteApplication { get; set; }
+    public string?   Note             { get; set; }
+    public string?   RisorsaGrade     { get; set; }
+    public string?   Grade            { get; set; }
+    public string?   Cdc              { get; set; }
+    public string?   Practice         { get; set; }
+    public decimal?  Adrc             { get; set; }
+    public decimal?  Cor              { get; set; }
+    public string?   CorpId           { get; set; }
+    public string?   Email            { get; set; }
+    public DateOnly? DataIngresso     { get; set; }
+    public DateOnly? DataUscita       { get; set; }
 }
