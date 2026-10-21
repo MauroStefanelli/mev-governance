@@ -123,8 +123,8 @@ function Badge({ children, color = "#6b7280", bg = "#f3f4f6" }) {
 function MemberModal({ initial, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(() => initial ? {
     ...EMPTY_FORM, ...initial,
-    adrc: initial.adrc ?? "",
-    cor:  initial.cor  ?? "",
+    adrc: initial.adrc != null ? String(Number(initial.adrc).toFixed(2)).replace(".", ",") : "",
+    cor:  initial.cor  != null ? String(Number(initial.cor).toFixed(2)).replace(".", ",")  : "",
     percImpegno: initial.percImpegno ?? 100,
     dataIngresso: initial.dataIngresso ? String(initial.dataIngresso).slice(0,10) : "",
     dataUscita:   initial.dataUscita   ? String(initial.dataUscita).slice(0,10)   : "",
@@ -273,7 +273,11 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
   const [importing, setImporting]     = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [showDestaffati, setShowDestaffati] = useState(false);
-  const [giorniAnno, setGiorniAnno]         = useState(232);
+  const [giorniAnno, setGiorniAnnoState] = useState(() => {
+    const saved = localStorage.getItem("team_giorniAnno");
+    return saved ? Number(saved) : 232;
+  });
+  const setGiorniAnno = (v) => { setGiorniAnnoState(v); localStorage.setItem("team_giorniAnno", v); };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -373,23 +377,21 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
       <div style={{ display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }}>
         <KpiCard label="Costo al giorno" value={fmtEuro(costoGiorno)} sub={`${attivi.length} risorse attive${q ? " (filtrate)" : ""}`} color="#2563eb" bg="linear-gradient(135deg,#eff6ff,#dbeafe)" icon="💼" />
         <KpiCard label="Costo al mese" value={fmtEuro(costoMese)} sub="× 20 giorni lavorativi" color="#059669" bg="linear-gradient(135deg,#ecfdf5,#d1fae5)" icon="📅" />
-        <div style={{ flex: "1 1 200px", borderRadius: "14px", padding: "20px 22px", background: "linear-gradient(135deg,#fff7ed,#fed7aa)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <p style={{ margin: 0, fontSize: "11px", fontWeight: 700, color: "#c2410c", textTransform: "uppercase", letterSpacing: "0.5px" }}>Costo anno</p>
-              <p style={{ margin: "6px 0 0", fontSize: "22px", fontWeight: 800, color: "#ea580c" }}>{fmtEuro(costoAnno)}</p>
+        <div style={{ background: "linear-gradient(135deg,#fff7ed,#fed7aa)", borderRadius: "14px", padding: "18px 24px", minWidth: "210px", flex: "1", maxWidth: "280px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ fontSize: "28px", opacity: 0.85 }}>📆</div>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#c2410c", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "4px" }}>Costo anno</div>
+            <div style={{ fontSize: "24px", fontWeight: 800, color: "#ea580c", lineHeight: 1 }}>{fmtEuro(costoAnno)}</div>
+            <div style={{ fontSize: "11px", color: "#c2410c", opacity: 0.85, marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+              ×
+              <input
+                type="text" inputMode="numeric"
+                value={giorniAnno}
+                onChange={e => setGiorniAnno(e.target.value.replace(/[^0-9]/g, ""))}
+                style={{ width: "36px", padding: "1px 4px", border: "1px solid #fdba74", borderRadius: "4px", fontSize: "11px", fontWeight: 700, color: "#c2410c", background: "rgba(255,255,255,0.6)", textAlign: "center", outline: "none" }}
+              />
+              gg lavorativi/anno
             </div>
-            <span style={{ fontSize: "22px" }}>📆</span>
-          </div>
-          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "12px", color: "#92400e" }}>×</span>
-            <input
-              type="text" inputMode="numeric"
-              value={giorniAnno}
-              onChange={e => setGiorniAnno(e.target.value.replace(/[^0-9]/g, ""))}
-              style={{ width: "52px", padding: "3px 7px", border: "1px solid #fdba74", borderRadius: "6px", fontSize: "13px", fontWeight: 700, color: "#c2410c", background: "#fff7ed", textAlign: "center", outline: "none" }}
-            />
-            <span style={{ fontSize: "12px", color: "#92400e" }}>gg lavorativi/anno</span>
           </div>
         </div>
         <KpiCard label="Risorse attive" value={attivi.length} sub={`${destaffati.length} destaffate`} color="#7c3aed" bg="linear-gradient(135deg,#f5f3ff,#ede9fe)" icon="👥" />
