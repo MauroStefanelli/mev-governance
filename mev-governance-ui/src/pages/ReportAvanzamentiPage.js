@@ -229,8 +229,17 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
         const resolveMevId = (idMevRaw, goToRaw, titoloRaw, sistemiRaw) => {
           // 0) ID_MEV diretto — priorità assoluta
           if (idMevRaw) {
-            const key = String(idMevRaw).trim();
+            // Normalizza: "18.0" → "18", "18" → "18", "  18  " → "18"
+            const rawStr = String(idMevRaw).trim();
+            // Se è un numero con .0 lo converte in intero
+            const asNum = parseFloat(rawStr);
+            const key = !isNaN(asNum) && String(asNum) !== rawStr
+              ? String(Math.round(asNum))   // 18.0 → "18"
+              : rawStr;
+            // Prova anche come stringa originale e come intero
             if (idMap[key]) return { id: idMap[key], method: "id_mev" };
+            if (idMap[rawStr]) return { id: idMap[rawStr], method: "id_mev" };
+            if (!isNaN(asNum) && idMap[String(Math.round(asNum))]) return { id: idMap[String(Math.round(asNum))], method: "id_mev" };
           }
 
           // 1) GoTo esatto
@@ -287,8 +296,9 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
           const resolved = resolveMevId(idMevRaw, goToRaw, titoloRaw, sistemiRaw);
 
           if (!resolved || usedMevIds.has(resolved.id)) {
-            if (goToRaw) unmatchedSet.add(goToRaw);
-            else if (titoloRaw) unmatchedSet.add(titoloRaw);
+            // Etichetta per "non trovato": preferisce ID_MEV, poi GoTo, poi titolo
+            const label = idMevRaw || goToRaw || titoloRaw;
+            if (label) unmatchedSet.add(label);
             continue;
           }
           usedMevIds.add(resolved.id);
@@ -312,7 +322,7 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
             }
           });
 
-          matched.push({ mevId: resolved.id, goTo: goToRaw || titoloRaw, method: resolved.method, fields });
+          matched.push({ mevId: resolved.id, idMev: idMevRaw, goTo: goToRaw || titoloRaw, method: resolved.method, fields });
         }
 
         resolve({ matched, unmatched: [...unmatchedSet], sheetUsed: sheetName });
@@ -603,7 +613,9 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     setImporting(true);
     try {
       const releaseLabel = selectedRelease === "__ALL__" ? "Tutte le release" : selectedRelease;
-      const result = await parseExcelToProgress(file, filteredRows, releaseLabel);
+      // Passa mevRows completo (non filteredRows): il match deve cercare su tutto il dataset,
+      // indipendentemente da stato/applicativo/release della MEV
+      const result = await parseExcelToProgress(file, mevRows, releaseLabel);
       // Auto-crea release rilevate dall'Excel che non esistono ancora in lista
       if (result?.detectedRelease && result.detectedRelease !== releaseLabel) {
         const detected = result.detectedRelease.trim();
@@ -620,7 +632,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     } finally {
       setImporting(false);
     }
-  }, [filteredRows, selectedRelease, releases, releaseContractId]);
+  }, [mevRows, selectedRelease, releases, releaseContractId]);
 
   // Applica i dati importati al progressData
   const applyImport = useCallback(() => {
@@ -1061,13 +1073,13 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               <div style={{ flex: 1, minWidth: 120, background: C.successLt, border: `1px solid #86EFAC`,
                 borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: C.success }}>{importPreview.matched.length}</div>
-                <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginTop: 2 }}>GoTo trovati</div>
+                <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginTop: 2 }}>Righe abbinate</div>
               </div>
               {importPreview.unmatched.length > 0 && (
                 <div style={{ flex: 1, minWidth: 120, background: C.warnLt, border: `1px solid #FCD34D`,
                   borderRadius: 10, padding: "12px 16px" }}>
                   <div style={{ fontSize: 22, fontWeight: 800, color: C.warn }}>{importPreview.unmatched.length}</div>
-                  <div style={{ fontSize: 11, color: C.warn, fontWeight: 600, marginTop: 2 }}>GoTo non trovati</div>
+                  <div style={{ fontSize: 11, color: C.warn, fontWeight: 600, marginTop: 2 }}>ID / GoTo non trovati</div>
                 </div>
               )}
             </div>
@@ -1080,18 +1092,29 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                   Righe da importare {importPreview.matched.length > 10 ? `(prime 10 di ${importPreview.matched.length})` : ""}
                 </div>
                 <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
-                  {importPreview.matched.slice(0, 10).map(({ goTo, method, fields }) => (
-                    <div key={goTo} style={{ display: "flex", alignItems: "flex-start", gap: 10,
+                  {importPreview.matched.slice(0, 10).map(({ mevId, idMev, goTo, method, fields }) => (
+                    <div key={mevId} style={{ display: "flex", alignItems: "flex-start", gap: 8,
                       padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
                       background: C.surface, fontSize: 12 }}>
-                       <span style={{ fontWeight: 700, color: C.accent, minWidth: 80 }}>{goTo}</span>
-                       <span style={{ fontSize: 10, color: "#fff", background:
-                         method === "id_mev" ? "#16a34a" :
-                         method === "goto" ? C.accent :
-                         method?.startsWith("titolo") ? "#7C3AED" : "#0891b2",
-                         borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center" }}>
-                         {method === "id_mev" ? "ID MEV" : method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
+                      {/* ID MEV */}
+                      <span style={{ fontWeight: 700, color: "#16a34a", minWidth: 42, fontSize: 11, flexShrink: 0 }}>
+                        #{idMev || mevId}
                       </span>
+                      {/* GoTo */}
+                      {goTo && (
+                        <span style={{ fontWeight: 600, color: C.accent, minWidth: 70, fontSize: 11, flexShrink: 0 }}>
+                          {goTo}
+                        </span>
+                      )}
+                      {/* Badge metodo */}
+                      <span style={{ fontSize: 10, color: "#fff", background:
+                        method === "id_mev" ? "#16a34a" :
+                        method === "goto" ? C.accent :
+                        method?.startsWith("titolo") ? "#7C3AED" : "#0891b2",
+                        borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center", flexShrink: 0 }}>
+                        {method === "id_mev" ? "ID MEV" : method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
+                      </span>
+                      {/* Campi importati */}
                       <span style={{ color: C.muted, fontSize: 11, lineHeight: 1.5 }}>
                         {Object.entries(fields).map(([k, v]) => {
                           const f = EDITABLE_FIELDS.find(ef => ef.key === k);
@@ -1109,7 +1132,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.warn, marginBottom: 6,
                   textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  GoTo non presenti in questa release (verranno ignorati)
+                 GoTo / ID non trovati nel dataset MEV (verranno ignorati)
                 </div>
                 <div style={{ background: C.warnLt, border: `1px solid #FCD34D`, borderRadius: 8,
                   padding: "10px 14px", fontSize: 12, color: C.warn, lineHeight: 1.8 }}>
