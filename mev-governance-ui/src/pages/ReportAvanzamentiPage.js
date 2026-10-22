@@ -20,7 +20,7 @@ const C = {
   head:     "#1E3A5F",
 };
 
-const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtPct = (v) => v != null && v !== "" ? `${v}%` : "—";
 const fmtDate = (v) => v || "—";
 
@@ -292,6 +292,10 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
 
           // Salta righe completamente vuote
           if (!idMevRaw && !goToRaw && !titoloRaw && !sistemiRaw) continue;
+
+          // Salta (e interrompe) righe "TOTALE" — stesso comportamento del backend MEV
+          const isTotale = (s) => s.toLowerCase().includes("totale");
+          if (isTotale(idMevRaw) || isTotale(goToRaw) || isTotale(titoloRaw)) break;
 
           const resolved = resolveMevId(idMevRaw, goToRaw, titoloRaw, sistemiRaw);
 
