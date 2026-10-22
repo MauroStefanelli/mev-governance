@@ -718,10 +718,13 @@ public class ConfiguratoreController : ControllerBase
         catch (Exception ex) { return StatusCode(500, new { message = "Errore salvataggio avanzamento", error = ex.Message }); }
     }
 
-    // DELETE /api/configuratore/release-progress?contractId=
-    // Elimina tutti i record release_progress per il contractId — solo Admin/SuperAdmin
+    // DELETE /api/configuratore/release-progress?contractId=&release=
+    // Se release è specificata: elimina solo quella release. Altrimenti elimina tutto.
+    // Solo Admin/SuperAdmin
     [HttpDelete("release-progress")]
-    public async Task<IActionResult> DeleteAllReleaseProgress([FromQuery] string? contractId)
+    public async Task<IActionResult> DeleteAllReleaseProgress(
+        [FromQuery] string? contractId,
+        [FromQuery] string? release)
     {
         if (!CanAccessRecords()) return Forbid();
         if (!User.IsInRole("SuperAdmin") && !User.IsInRole("Admin"))
@@ -730,13 +733,28 @@ public class ConfiguratoreController : ControllerBase
             return BadRequest("contractId obbligatorio");
 
         var (sch, cs) = GetDbTarget();
-        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords""
+        string sql;
+        var ps = new List<NpgsqlParameter> { new("cid", contractId) };
+
+        if (!string.IsNullOrWhiteSpace(release))
+        {
+            sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords""
+                     WHERE ""entity_type"" = 'release_progress'
+                       AND ""contract_id"" = @cid
+                       AND ""title"" = @rel";
+            ps.Add(new("rel", release));
+        }
+        else
+        {
+            sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords""
                      WHERE ""entity_type"" = 'release_progress'
                        AND ""contract_id"" = @cid";
+        }
+
         try
         {
-            await ExecuteAsync(cs, sql, new List<NpgsqlParameter> { new("cid", contractId) });
-            return Ok(new { message = "Dati avanzamenti eliminati", contractId });
+            await ExecuteAsync(cs, sql, ps);
+            return Ok(new { message = "Dati avanzamenti eliminati", contractId, release });
         }
         catch (Exception ex) { return StatusCode(500, new { message = "Errore eliminazione avanzamenti", error = ex.Message }); }
     }

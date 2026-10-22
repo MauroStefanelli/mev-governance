@@ -20,7 +20,7 @@ const C = {
   head:     "#1E3A5F",
 };
 
-const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtPct = (v) => v != null && v !== "" ? `${v}%` : "—";
 const fmtDate = (v) => v || "—";
 
@@ -542,6 +542,27 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     }
   }, [progressData, selectedRelease, mevReleaseMap, contractId]);
 
+  // Elimina i dati di avanzamento di una singola riga (azzeramento campi + salvataggio)
+  const deleteRow = useCallback(async (mevId) => {
+    const targetRelease = selectedRelease === "__ALL__" ? (mevReleaseMap[mevId] || "") : selectedRelease;
+    if (!targetRelease) return;
+    setSaving(prev => ({ ...prev, [mevId]: true }));
+    try {
+      // Rimuovi i dati locali
+      const next = { ...progressData };
+      delete next[mevId];
+      setProgressData(next);
+      setDirty(prev => { const n = { ...prev }; delete n[mevId]; return n; });
+      // Salva il record con payload vuoto (sovrascrive)
+      await putReleaseProgress(contractId, targetRelease, { rows: next });
+      setDetailRow(null);
+    } catch (e) {
+      setMsg({ type: "err", text: "Errore eliminazione riga: " + e.message });
+    } finally {
+      setSaving(prev => { const n = { ...prev }; delete n[mevId]; return n; });
+    }
+  }, [progressData, selectedRelease, mevReleaseMap, contractId]); // eslint-disable-line
+
   // Salva tutto
   const saveAll = useCallback(async () => {
     if (selectedRelease === "") return;
@@ -623,16 +644,33 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
 
   const hasDirty = Object.keys(dirty).length > 0;
 
-  // Elimina tutti i dati avanzamenti
+  // Elimina dati avanzamenti della release corrente (o tutti se __ALL__)
   const handleDeleteAll = useCallback(async () => {
     setDeleting(true);
+    const targetRelease = selectedRelease === "__ALL__" ? null : selectedRelease;
     try {
-      await deleteAllReleaseProgress(contractId);
-      setProgressData({});
-      setDirty({});
-      setReleases([]);
-      setSelectedRelease("");
-      setMsg({ type: "ok", text: "Tutti i dati avanzamenti sono stati eliminati." });
+      await deleteAllReleaseProgress(contractId, targetRelease);
+      if (targetRelease) {
+        // Rimuovi solo le righe della release cancellata da progressData
+        setProgressData(prev => {
+          const next = { ...prev };
+          filteredRows.forEach(r => { delete next[String(r.id)]; });
+          return next;
+        });
+        setDirty(prev => {
+          const next = { ...prev };
+          filteredRows.forEach(r => { delete next[String(r.id)]; });
+          return next;
+        });
+      } else {
+        setProgressData({});
+        setDirty({});
+        setReleases([]);
+        setSelectedRelease("");
+      }
+      setMsg({ type: "ok", text: targetRelease
+        ? `Dati avanzamenti della release "${targetRelease}" eliminati.`
+        : "Tutti i dati avanzamenti sono stati eliminati." });
       setTimeout(() => setMsg(null), 4000);
     } catch (e) {
       setMsg({ type: "err", text: e.message || "Errore eliminazione." });
@@ -640,7 +678,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       setDeleting(false);
       setShowConfirmDelete(false);
     }
-  }, [contractId]); // eslint-disable-line
+  }, [contractId, selectedRelease, filteredRows]); // eslint-disable-line
 
   // Crea una nuova release nella lista
   const handleCreateRelease = useCallback(async (name) => {
@@ -838,28 +876,23 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                    ["Importo",             "110px"],
                    ["Mandataria/Mandante","160px"],
                  ].map(([lbl, w]) => (
-                   <th key={lbl} style={{ padding: "12px 14px", textAlign: "left", whiteSpace: "nowrap",
+                   <th key={lbl} style={{ padding: "12px 14px", textAlign: lbl === "Importo" ? "right" : "left", whiteSpace: "nowrap",
                      fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: w, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
                      {lbl}
                    </th>
                  ))}
-                 {/* Colonna dettaglio popup */}
-                 <th style={{ padding: "12px 10px", textAlign: "center", fontSize: 11,
-                   fontWeight: 700, minWidth: 44, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
-                   Det.
-                 </th>
                 {/* Separatore */}
                 <th style={{ padding: "12px 6px", background: "#152C4A", minWidth: 4, borderRight: "2px solid #4A90C4" }}></th>
-                {/* Colonne editabili */}
-                {EDITABLE_FIELDS.map(f => (
+                {/* Colonne avanzamento (read-only summary) */}
+                {EDITABLE_FIELDS.filter(f => f.type === "percent").map(f => (
                   <th key={f.key} style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap",
-                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: f.type === "text" ? "200px" : f.type === "date" ? "140px" : "90px",
+                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: "90px",
                     background: "#1E4976", borderRight: `1px solid rgba(255,255,255,0.1)` }}>
-                    {f.label}
-                    {f.type === "percent" && <span style={{ fontWeight: 400, opacity: 0.7 }}> %</span>}
+                    {f.label} <span style={{ fontWeight: 400, opacity: 0.7 }}>%</span>
                   </th>
                 ))}
-                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 80 }}>Salva</th>
+                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 110, whiteSpace: "nowrap" }}>Data Aggiorn.</th>
+                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 60 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -867,102 +900,52 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                 const mevId    = String(r.id);
                 const prog     = progressData[mevId] || {};
                 const isDirty  = !!dirty[mevId];
-                const isSaving = !!saving[mevId];
-                const isOk     = !!savedOk[mevId];
                 const mandataria = resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ") || "—";
                 const bg = isDirty ? "#FFFBEB" : idx % 2 === 0 ? C.surface : "#F8FAFC";
                 const PERCENT_COLORS = {
-                  requisito:     "#7C3AED",
-                  analisi:       "#1A6EBD",
-                  progettazione: "#0891B2",
-                  sviluppo:      "#166534",
+                  requisito: "#7C3AED", analisi: "#1A6EBD", progettazione: "#0891B2", sviluppo: "#166534",
                 };
-
                 return (
-                  <tr key={mevId} style={{ background: bg, transition: "background .15s",
-                    borderBottom: `1px solid ${C.border}` }}>
-                    {/* GoTo */}
-                    <td style={{ padding: "12px 14px", fontWeight: 700, color: C.accent, whiteSpace: "nowrap" }}>
-                      {r.goTo || "—"}
-                    </td>
-                    {/* Titolo */}
+                  <tr key={mevId}
+                    onClick={() => setDetailRow({ mevId, r })}
+                    style={{ background: bg, transition: "background .15s", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#EFF6FF"}
+                    onMouseLeave={e => e.currentTarget.style.background = bg}>
+                    <td style={{ padding: "12px 14px", fontWeight: 700, color: C.accent, whiteSpace: "nowrap" }}>{r.goTo || "—"}</td>
                     <td style={{ padding: "12px 14px", maxWidth: 220 }}>
                       <div style={{ fontWeight: 600, color: C.text, lineHeight: 1.4,
                         overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                         {r.descrizione || r.goTo || "—"}
                       </div>
                     </td>
-                    {/* Sistemi */}
-                    <td style={{ padding: "12px 14px", color: C.muted, whiteSpace: "nowrap" }}>
-                      {r.applicativo || "—"}
-                    </td>
-                    {/* PM Poste */}
+                    <td style={{ padding: "12px 14px", color: C.muted, whiteSpace: "nowrap" }}>{r.applicativo || "—"}</td>
                     <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>{r.pmPoste || "—"}</td>
-                    {/* PM CAP */}
                     <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>{r.pmCap || "—"}</td>
-                    {/* Stato */}
                     <td style={{ padding: "12px 14px" }}>
                       {r.stato ? (
-                        <span style={{ ...statoStyle(r.stato), borderRadius: 20,
-                          padding: "3px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                        <span style={{ ...statoStyle(r.stato), borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
                           {r.stato}
                         </span>
                       ) : <span style={{ color: C.muted }}>—</span>}
                     </td>
-                    {/* Importo */}
-                    <td style={{ padding: "12px 14px", fontWeight: 600, whiteSpace: "nowrap",
+                    <td style={{ padding: "12px 14px", fontWeight: 600, whiteSpace: "nowrap", textAlign: "right",
                       color: r.importoExcel ? C.text : C.muted }}>
                       {r.importoExcel ? euro.format(r.importoExcel) : "—"}
                     </td>
-                    {/* Mandataria */}
-                    <td style={{ padding: "12px 14px", maxWidth: 160, color: C.muted, fontSize: 11 }}>
-                      {mandataria}
-                    </td>
-                    {/* Dettaglio — icona click popup */}
-                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                      <button
-                        onClick={() => setDetailRow({ mevId, r })}
-                        title="Apri dettaglio date e deploy"
-                        style={{ background: "#EBF4FF", border: `1px solid #93C5FD`, borderRadius: 7,
-                          padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.accent,
-                          lineHeight: 1 }}>
-                        ⋯
-                      </button>
-                    </td>
+                    <td style={{ padding: "12px 14px", maxWidth: 160, color: C.muted, fontSize: 11 }}>{mandataria}</td>
                     {/* Separatore */}
                     <td style={{ padding: 0, borderRight: "2px solid #4A90C4", background: "#EBF4FF" }}></td>
-
-                    {/* Campi editabili in tabella */}
-                    {EDITABLE_FIELDS.map(f => (
-                      <td key={f.key} style={{ padding: "8px 10px", verticalAlign: "middle" }}>
-                        {f.type === "percent" ? (
-                          <div>
-                            <EditCell value={prog[f.key]} type={f.type}
-                              onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
-                            <ProgressBar value={prog[f.key]}
-                              color={PERCENT_COLORS[f.key] || C.accent} />
-                          </div>
-                        ) : (
-                          <EditCell value={prog[f.key]} type={f.type}
-                            onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
-                        )}
+                    {/* Avanzamento % — sola lettura con progress bar */}
+                    {EDITABLE_FIELDS.filter(f => f.type === "percent").map(f => (
+                      <td key={f.key} style={{ padding: "8px 10px", verticalAlign: "middle", minWidth: 90 }}>
+                        <ProgressBar value={prog[f.key]} color={PERCENT_COLORS[f.key] || C.accent} />
                       </td>
                     ))}
-
-                    {/* Bottone salva riga */}
+                    <td style={{ padding: "8px 14px", color: C.muted, fontSize: 11, whiteSpace: "nowrap" }}>
+                      {prog.dataAggiornamento || "—"}
+                    </td>
                     <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                      {isOk ? (
-                        <span style={{ fontSize: 18, color: C.success }}>✓</span>
-                      ) : (
-                        <button onClick={() => saveRow(mevId)}
-                          disabled={!isDirty || isSaving}
-                          style={{ padding: "6px 14px", background: isDirty ? C.accent : "#E2E8F0",
-                            color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
-                            fontWeight: 700, fontSize: 12, cursor: isDirty ? "pointer" : "default",
-                            opacity: isSaving ? 0.6 : 1, transition: "all .15s", whiteSpace: "nowrap" }}>
-                          {isSaving ? "…" : "Salva"}
-                        </button>
-                      )}
+                      {isDirty && <span style={{ fontSize: 10, background: "#FEF3C7", color: "#92400E", borderRadius: 4, padding: "2px 6px", fontWeight: 700 }}>●</span>}
                     </td>
                   </tr>
                 );
@@ -985,38 +968,43 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         </div>
       )}
 
-      {/* ── Modal dettaglio riga ── */}
+      {/* ── Modal dettaglio riga (modifica + elimina) ── */}
       {detailRow && (() => {
         const { mevId, r } = detailRow;
         const prog     = progressData[mevId] || {};
         const isSaving = !!saving[mevId];
         const isDirty  = !!dirty[mevId];
+        const ALL_FIELDS = [...EDITABLE_FIELDS, ...DETAIL_FIELDS];
         return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
             display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
             onClick={() => setDetailRow(null)}>
             <div style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
-              width: "100%", maxWidth: 520, padding: "28px 28px 24px" }}
+              width: "100%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: "28px 28px 24px" }}
               onClick={e => e.stopPropagation()}>
 
               {/* Intestazione */}
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 20, borderBottom: `1px solid ${C.border}`, paddingBottom: 16 }}>
                 <div style={{ fontSize: 11, color: C.muted, fontWeight: 700,
                   textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
-                  Dettaglio date e deploy
+                  Avanzamento attività
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: C.head }}>
                   {r.goTo} — {r.descrizione || ""}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.applicativo}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4, display: "flex", gap: 16 }}>
+                  <span>{r.applicativo || ""}</span>
+                  {r.stato && <span style={{ ...statoStyle(r.stato), borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{r.stato}</span>}
+                  {r.importoExcel && <span style={{ fontWeight: 600, color: C.text }}>{euro.format(r.importoExcel)}</span>}
+                </div>
               </div>
 
-              {/* Campi dettaglio */}
-              <div style={{ display: "grid", gap: 14 }}>
-                {DETAIL_FIELDS.map(f => (
-                  <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text,
-                      minWidth: 200, flexShrink: 0 }}>{f.label}</label>
+              {/* Tutti i campi in griglia 2 colonne */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
+                {ALL_FIELDS.map(f => (
+                  <div key={f.key} style={{ gridColumn: f.type === "text" ? "1 / -1" : undefined }}>
+                    <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#6b7280",
+                      marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</label>
                     <EditCell value={prog[f.key]} type={f.type}
                       onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
                   </div>
@@ -1024,21 +1012,28 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               </div>
 
               {/* Azioni */}
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
-                <button onClick={() => setDetailRow(null)}
-                  style={{ padding: "9px 20px", background: "#F1F5F9", color: C.muted,
-                    border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  Chiudi
-                </button>
-                <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
-                  disabled={!isDirty || isSaving}
-                  style={{ padding: "9px 22px",
-                    background: isDirty ? C.accent : "#E2E8F0",
-                    color: isDirty ? "#fff" : C.muted,
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+                <button onClick={() => deleteRow(mevId)} disabled={isSaving}
+                  style={{ padding: "9px 18px", background: "#FEE2E2", color: C.danger,
                     border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
-                    cursor: isDirty ? "pointer" : "default", opacity: isSaving ? 0.6 : 1 }}>
-                  {isSaving ? "Salvataggio…" : "Salva"}
+                    cursor: isSaving ? "wait" : "pointer", opacity: isSaving ? 0.6 : 1 }}>
+                  🗑 Elimina dati riga
                 </button>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setDetailRow(null)}
+                    style={{ padding: "9px 20px", background: "#F1F5F9", color: C.muted,
+                      border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                    Chiudi
+                  </button>
+                  <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
+                    disabled={!isDirty || isSaving}
+                    style={{ padding: "9px 22px", background: isDirty ? C.accent : "#E2E8F0",
+                      color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
+                      fontWeight: 700, fontSize: 13, cursor: isDirty ? "pointer" : "default",
+                      opacity: isSaving ? 0.6 : 1 }}>
+                    {isSaving ? "Salvataggio…" : "Salva"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1153,11 +1148,15 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
             onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 32, marginBottom: 12, textAlign: "center" }}>⚠️</div>
             <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: C.danger, textAlign: "center" }}>
-              Elimina tutti i dati avanzamenti
+              {selectedRelease === "__ALL__"
+                ? "Elimina tutti i dati avanzamenti"
+                : `Elimina dati release "${selectedRelease}"`}
             </h3>
             <p style={{ margin: "0 0 24px", fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 1.6 }}>
-              Questa operazione elimina <strong>tutti</strong> i dati di avanzamento per tutte le release.<br />
-              L'azione è <strong>irreversibile</strong>.
+              {selectedRelease === "__ALL__"
+                ? <>Questa operazione elimina <strong>tutti</strong> i dati di avanzamento per <strong>tutte le release</strong>.</>
+                : <>Questa operazione elimina i dati di avanzamento importati per la release <strong>{selectedRelease}</strong>.</>}
+              <br />L'azione è <strong>irreversibile</strong>.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button onClick={() => setShowConfirmDelete(false)} disabled={deleting}

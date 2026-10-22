@@ -1434,9 +1434,10 @@ export const putReleaseProgress = async (contractId, release, payload) => {
   return r.json();
 };
 
-export const deleteAllReleaseProgress = async (contractId) => {
+export const deleteAllReleaseProgress = async (contractId, release) => {
+  const qs = new URLSearchParams({ contractId, ...(release ? { release } : {}) }).toString();
   const r = await fetchWithRefresh(
-    `${API_BASE_URL}/api/configuratore/release-progress?contractId=${encodeURIComponent(contractId)}`,
+    `${API_BASE_URL}/api/configuratore/release-progress?${qs}`,
     { method: "DELETE", headers: authHeaders() }
   );
   if (r.status === 401 || r.status === 403) throw { status: r.status };
