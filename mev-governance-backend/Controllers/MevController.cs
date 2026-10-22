@@ -466,6 +466,8 @@ public class MevController : BaseController
                 .OrderBy(kv => kv.Value)
                 .Select(kv => $"{kv.Key}=col{kv.Value}")));
 
+        Console.WriteLine($"[MEV ALIGN] Colonne chiave: ID={columnMap.ContainsKey("ID")}, ID_MEV={columnMap.ContainsKey("ID_MEV")}, Release={columnMap.ContainsKey("Release")}, GoTo={columnMap.ContainsKey("GoTo")}. Totale colonne: {columnMap.Count}");
+
         // Costruisco un dizionario delle righe esistenti per ExcelId (filtrato per ambiente)
         var existingItems = _db.MevItems
             .Where(x => x.AmbienteId == ambienteId)
@@ -516,7 +518,10 @@ public class MevController : BaseController
             decimal importo    = GetDecimal("Importo Fornitura");
             string tipoContratto = GetString("Tipo Contratto");
             decimal importoScontato = GetDecimal("Importo Fornitura scontato ");
-            string excelId     = GetString("ID");
+            // Legge ExcelId: supporta sia la colonna "ID_MEV" (nuovo formato) che "ID" (vecchio formato)
+            string excelId = !string.IsNullOrWhiteSpace(GetString("ID_MEV"))
+                ? GetString("ID_MEV")
+                : GetString("ID");
             string noteExcel   = GetString("Note");
             string recupero    = GetString("Recupero");
             string subco       = GetString("SUBCO");
