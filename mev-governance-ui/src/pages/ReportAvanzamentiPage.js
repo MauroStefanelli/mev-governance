@@ -197,9 +197,13 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
         }
 
         // ── Indici di ricerca sul dataset MEV ────────────────────────────────
-        // idMap: mevId (come stringa) → mevId  (match diretto via ID_MEV)
+        // idMap: excelId (valore colonna ID/ID_MEV del file Excel) → r.id (DB id usato come mevId)
         const idMap = {};
-        mevRows.forEach(r => { idMap[String(r.id)] = String(r.id); });
+        mevRows.forEach(r => {
+          // Mappa sia excelId (es. "105") che id DB come chiavi per massima copertura
+          if (r.excelId) idMap[String(r.excelId).trim()] = String(r.id);
+          idMap[String(r.id)] = String(r.id);
+        });
 
         // goToMap: match esatto GoTo → mevId
         const goToMap = {};

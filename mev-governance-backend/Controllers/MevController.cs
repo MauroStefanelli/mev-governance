@@ -596,6 +596,9 @@ public class MevController : BaseController
                 existing.Stato                  = stato;
                 existing.AnnoCompetenza         = GetInt("Anno Competenza");
                 existing.ReleaseExcel           = releaseExcel;
+                // PRelease segue ReleaseExcel dall'Excel se non è vuota
+                if (!string.IsNullOrWhiteSpace(releaseExcel))
+                    existing.PRelease = releaseExcel;
                 existing.Capgemini              = cap;
                 existing.Iet                    = iet;
                 existing.ImportoExcel           = importo;
