@@ -718,6 +718,28 @@ public class ConfiguratoreController : ControllerBase
         catch (Exception ex) { return StatusCode(500, new { message = "Errore salvataggio avanzamento", error = ex.Message }); }
     }
 
+    // DELETE /api/configuratore/release-progress?contractId=
+    // Elimina tutti i record release_progress per il contractId — solo Admin/SuperAdmin
+    [HttpDelete("release-progress")]
+    public async Task<IActionResult> DeleteAllReleaseProgress([FromQuery] string? contractId)
+    {
+        if (!CanAccessRecords()) return Forbid();
+        if (!User.IsInRole("SuperAdmin") && !User.IsInRole("Admin"))
+            return Forbid();
+        if (string.IsNullOrWhiteSpace(contractId))
+            return BadRequest("contractId obbligatorio");
+
+        var (sch, cs) = GetDbTarget();
+        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords""
+                     WHERE ""entity_type"" = 'release_progress'
+                       AND ""contract_id"" = @cid";
+        try
+        {
+            await ExecuteAsync(cs, sql, new List<NpgsqlParameter> { new("cid", contractId) });
+            return Ok(new { message = "Dati avanzamenti eliminati", contractId });
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Errore eliminazione avanzamenti", error = ex.Message }); }
+    }
 
     private async Task<List<Dictionary<string, object?>>> QueryAsync(string cs, string sql, List<NpgsqlParameter> ps, string schema)
     {

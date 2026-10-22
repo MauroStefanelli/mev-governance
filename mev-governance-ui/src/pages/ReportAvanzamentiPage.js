@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
-import { getMevList, getReleaseSchedules, upsertReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
+import { getMevList, getReleaseSchedules, upsertReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -111,6 +111,9 @@ const EXCEL_COL_MAP = {
   "note":                       { key: "note",                 type: "text"    },
 };
 
+// Colonna ID_MEV — identifica le colonne che contengono l'ID diretto della MEV
+const ID_MEV_HEADERS = new Set(["id_mev", "id mev", "idmev", "mev id", "mev_id"]);
+
 // Converte serial Excel o stringa data in "YYYY-MM-DD" (o stringa vuota)
 const excelDateToISO = (v) => {
   if (v == null || v === "") return "";
@@ -170,12 +173,13 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         if (raw.length < 2) { resolve({ matched: [], unmatched: [], sheetUsed: sheetName }); return; }
 
-        // Trova riga header (prima delle prime 5 righe che contiene "goto")
+        // Trova riga header (prima delle prime 5 righe che contiene "goto" oppure "id_mev")
         let headerRowIdx = 0;
         for (let i = 0; i < Math.min(5, raw.length); i++) {
-          if (raw[i].some(c => normHeader(c) === "goto")) { headerRowIdx = i; break; }
+          if (raw[i].some(c => normHeader(c) === "goto" || ID_MEV_HEADERS.has(normHeader(c)))) { headerRowIdx = i; break; }
         }
         const headers = raw[headerRowIdx].map(normHeader);
+        const idMevIdx   = headers.findIndex(h => ID_MEV_HEADERS.has(h));
         const gotoIdx    = headers.indexOf("goto");
         const titoloIdx  = headers.findIndex(h =>
           h === "titolo" || h === "titolo / descr." || h === "titolo/descr." ||
@@ -187,12 +191,16 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
           h === "applicativo"
         );
 
-        if (gotoIdx === -1) {
-          reject(new Error(`Colonna "GOTO" non trovata nel foglio "${sheetName}".`));
+        if (gotoIdx === -1 && idMevIdx === -1) {
+          reject(new Error(`Colonna "GOTO" o "ID_MEV" non trovata nel foglio "${sheetName}".`));
           return;
         }
 
         // ── Indici di ricerca sul dataset MEV ────────────────────────────────
+        // idMap: mevId (come stringa) → mevId  (match diretto via ID_MEV)
+        const idMap = {};
+        mevRows.forEach(r => { idMap[String(r.id)] = String(r.id); });
+
         // goToMap: match esatto GoTo → mevId
         const goToMap = {};
         mevRows.forEach(r => {
@@ -217,8 +225,14 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
         });
 
         // ── Risolve mevId per una riga Excel ─────────────────────────────────
-        // Strategia: GoTo esatto → Titolo fuzzy → Sistemi+GoTo incrociato
-        const resolveMevId = (goToRaw, titoloRaw, sistemiRaw) => {
+        // Strategia: ID_MEV diretto → GoTo esatto → Titolo fuzzy → Sistemi+GoTo incrociato
+        const resolveMevId = (idMevRaw, goToRaw, titoloRaw, sistemiRaw) => {
+          // 0) ID_MEV diretto — priorità assoluta
+          if (idMevRaw) {
+            const key = String(idMevRaw).trim();
+            if (idMap[key]) return { id: idMap[key], method: "id_mev" };
+          }
+
           // 1) GoTo esatto
           const goToKey = goToRaw.toUpperCase();
           if (goToMap[goToKey]) return { id: goToMap[goToKey], method: "goto" };
@@ -262,14 +276,15 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
 
         for (let i = headerRowIdx + 1; i < raw.length; i++) {
           const row = raw[i];
-          const goToRaw   = String(row[gotoIdx]    || "").trim();
+          const idMevRaw  = idMevIdx >= 0  ? String(row[idMevIdx]   || "").trim() : "";
+          const goToRaw   = gotoIdx >= 0   ? String(row[gotoIdx]    || "").trim() : "";
           const titoloRaw = titoloIdx >= 0  ? String(row[titoloIdx]  || "").trim() : "";
           const sistemiRaw = sistemiIdx >= 0 ? String(row[sistemiIdx] || "").trim() : "";
 
           // Salta righe completamente vuote
-          if (!goToRaw && !titoloRaw && !sistemiRaw) continue;
+          if (!idMevRaw && !goToRaw && !titoloRaw && !sistemiRaw) continue;
 
-          const resolved = resolveMevId(goToRaw, titoloRaw, sistemiRaw);
+          const resolved = resolveMevId(idMevRaw, goToRaw, titoloRaw, sistemiRaw);
 
           if (!resolved || usedMevIds.has(resolved.id)) {
             if (goToRaw) unmatchedSet.add(goToRaw);
@@ -363,7 +378,13 @@ function ProgressBar({ value, color = C.accent }) {
 }
 
 // ── Pagina principale ─────────────────────────────────────────────────────────
-export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
+export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role, roles }) {
+  // Helper ruolo
+  const isAdminOrSuper = (() => {
+    const myRoles = (roles && roles.length > 0) ? roles : (role ? [role] : []);
+    return myRoles.some(r => r === "Admin" || r === "SuperAdmin");
+  })();
+
   const [mevRows, setMevRows]           = useState([]);
   const [releases, setReleases]         = useState([]);
   const LS_KEY = `reportAvanzamenti_release_${ambienteId || "default"}`;
@@ -393,6 +414,9 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [newReleaseName, setNewReleaseName] = useState("");
   const [savingRelease, setSavingRelease]   = useState(false);
   const newReleaseInputRef = useRef(null);
+  // Elimina dati
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [deleting, setDeleting]                   = useState(false);
 
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
@@ -599,6 +623,25 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
 
   const hasDirty = Object.keys(dirty).length > 0;
 
+  // Elimina tutti i dati avanzamenti
+  const handleDeleteAll = useCallback(async () => {
+    setDeleting(true);
+    try {
+      await deleteAllReleaseProgress(contractId);
+      setProgressData({});
+      setDirty({});
+      setReleases([]);
+      setSelectedRelease("");
+      setMsg({ type: "ok", text: "Tutti i dati avanzamenti sono stati eliminati." });
+      setTimeout(() => setMsg(null), 4000);
+    } catch (e) {
+      setMsg({ type: "err", text: e.message || "Errore eliminazione." });
+    } finally {
+      setDeleting(false);
+      setShowConfirmDelete(false);
+    }
+  }, [contractId]); // eslint-disable-line
+
   // Crea una nuova release nella lista
   const handleCreateRelease = useCallback(async (name) => {
     const trimmed = name.trim();
@@ -738,6 +781,16 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
             border: `1px solid ${msg.type === "ok" ? "#86EFAC" : "#FCA5A5"}` }}>
             {msg.text}
           </div>
+        )}
+
+        {/* ── Elimina dati — solo Admin/SuperAdmin ── */}
+        {isAdminOrSuper && (
+          <button onClick={() => setShowConfirmDelete(true)}
+            style={{ padding: "10px 18px", background: C.dangerLt, color: C.danger,
+              border: `1px solid #FCA5A5`, borderRadius: 10, fontWeight: 700, fontSize: 13,
+              cursor: "pointer", marginLeft: "auto", whiteSpace: "nowrap" }}>
+            🗑 Elimina dati
+          </button>
         )}
       </div>
 
@@ -1036,12 +1089,13 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
                     <div key={goTo} style={{ display: "flex", alignItems: "flex-start", gap: 10,
                       padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
                       background: C.surface, fontSize: 12 }}>
-                      <span style={{ fontWeight: 700, color: C.accent, minWidth: 80 }}>{goTo}</span>
-                      <span style={{ fontSize: 10, color: "#fff", background:
-                        method === "goto" ? C.accent :
-                        method?.startsWith("titolo") ? "#7C3AED" : "#0891b2",
-                        borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center" }}>
-                        {method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
+                       <span style={{ fontWeight: 700, color: C.accent, minWidth: 80 }}>{goTo}</span>
+                       <span style={{ fontSize: 10, color: "#fff", background:
+                         method === "id_mev" ? "#16a34a" :
+                         method === "goto" ? C.accent :
+                         method?.startsWith("titolo") ? "#7C3AED" : "#0891b2",
+                         borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center" }}>
+                         {method === "id_mev" ? "ID MEV" : method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
                       </span>
                       <span style={{ color: C.muted, fontSize: 11, lineHeight: 1.5 }}>
                         {Object.entries(fields).map(([k, v]) => {
@@ -1083,6 +1137,39 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
                   border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
                   cursor: importPreview.matched.length > 0 ? "pointer" : "default" }}>
                 Applica {importPreview.matched.length} righe
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal conferma Elimina dati ── */}
+      {showConfirmDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={() => !deleting && setShowConfirmDelete(false)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 440, width: "100%",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 32, marginBottom: 12, textAlign: "center" }}>⚠️</div>
+            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: C.danger, textAlign: "center" }}>
+              Elimina tutti i dati avanzamenti
+            </h3>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 1.6 }}>
+              Questa operazione elimina <strong>tutti</strong> i dati di avanzamento per tutte le release.<br />
+              L'azione è <strong>irreversibile</strong>.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => setShowConfirmDelete(false)} disabled={deleting}
+                style={{ padding: "10px 24px", background: "#F1F5F9", color: C.muted,
+                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                Annulla
+              </button>
+              <button onClick={handleDeleteAll} disabled={deleting}
+                style={{ padding: "10px 24px", background: C.danger, color: "#fff",
+                  border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                  cursor: deleting ? "wait" : "pointer", opacity: deleting ? 0.7 : 1 }}>
+                {deleting ? "Eliminazione…" : "Sì, elimina tutto"}
               </button>
             </div>
           </div>

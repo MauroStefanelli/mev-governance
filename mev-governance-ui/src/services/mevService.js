@@ -1434,6 +1434,16 @@ export const putReleaseProgress = async (contractId, release, payload) => {
   return r.json();
 };
 
+export const deleteAllReleaseProgress = async (contractId) => {
+  const r = await fetchWithRefresh(
+    `${API_BASE_URL}/api/configuratore/release-progress?contractId=${encodeURIComponent(contractId)}`,
+    { method: "DELETE", headers: authHeaders() }
+  );
+  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  return r.json();
+};
+
 // ── App Role Permissions ─────────────────────────────────────────────────────
 
 /**
