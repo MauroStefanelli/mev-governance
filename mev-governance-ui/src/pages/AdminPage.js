@@ -894,6 +894,10 @@ const ALL_PAGES = [
   { id: "tools",             label: "Gestione Ordini" },
   { id: "consumotow",        label: "TOW Contratti" },
   { id: "superadmin",        label: "Gestione Contratti" },
+  { id: "reportavanzamenti", label: "Report Avanzamenti" },
+  { id: "ordini",            label: "Ordini Consegna" },
+  { id: "gara",              label: "Gare" },
+  { id: "team",              label: "Gestione Team" },
 ];
 
 function PermessiClientModal({ user, onClose }) {
