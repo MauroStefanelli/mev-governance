@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
+import "./reportAvanzamenti.css";
 import { getMevList, getReleaseSchedules, upsertReleaseSchedule, deleteReleaseSchedule, renameReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -7,8 +8,8 @@ const C = {
   bg:       "#F4F6FA",
   surface:  "#FFFFFF",
   border:   "#E3E8EF",
-  accent:   "#1A6EBD",
-  accentLt: "#EAF2FB",
+  accent:   "#4F46E5",
+  accentLt: "#EEF2FF",
   success:  "#166534",
   successLt:"#DCFCE7",
   warn:     "#92400E",
@@ -17,7 +18,7 @@ const C = {
   dangerLt: "#FEE2E2",
   muted:    "#64748B",
   text:     "#0F172A",
-  head:     "#1E3A5F",
+  head:     "#172554",
 };
 
 const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -343,17 +344,17 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
   });
 
 // ── Componente cella editabile ────────────────────────────────────────────────
-function EditCell({ value, type, onChange, saving }) {
+function EditCell({ value, type, onChange, saving, label }) {
   if (type === "percent") return (
-    <input type="number" min={0} max={100} step={1}
+    <input aria-label={label} type="number" min={0} max={100} step={1}
       value={value ?? ""}
-      onChange={e => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+      onChange={e => onChange(e.target.value === "" ? "" : Math.min(100, Math.max(0, Number(e.target.value))))}
       disabled={saving}
       style={{ width: 64, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
         fontSize: 12, textAlign: "center", background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
   );
   if (type === "date") return (
-    <input type="date"
+    <input aria-label={label} type="date"
       value={value ?? ""}
       onChange={e => onChange(e.target.value)}
       disabled={saving}
@@ -361,7 +362,7 @@ function EditCell({ value, type, onChange, saving }) {
         fontSize: 12, background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
   );
   return (
-    <textarea value={value ?? ""} onChange={e => onChange(e.target.value)} disabled={saving} rows={2}
+    <textarea aria-label={label} value={value ?? ""} onChange={e => onChange(e.target.value)} disabled={saving} rows={2}
       style={{ width: 180, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
         fontSize: 12, resize: "vertical", background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
   );
@@ -370,7 +371,7 @@ function EditCell({ value, type, onChange, saving }) {
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, sub, accent }) {
   return (
-    <div style={{ background: C.surface, borderRadius: 14, padding: "18px 24px",
+    <div className="ra-kpi" style={{ "--card-accent": accent || C.accent, background: C.surface, borderRadius: 14, padding: "18px 24px",
       border: `1px solid ${C.border}`, flex: "1 1 180px", minWidth: 0,
       boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: accent || C.accent,
@@ -386,9 +387,9 @@ function KpiCard({ label, value, sub, accent }) {
 function ProgressBar({ value, color = C.accent }) {
   const pct = Math.min(100, Math.max(0, Number(value) || 0));
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div className="ra-progress" role="progressbar" aria-label="Avanzamento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
       <div style={{ flex: 1, height: 6, background: "#E2E8F0", borderRadius: 99, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .3s" }} />
+        <div className="ra-progress-fill" style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99 }} />
       </div>
       <span style={{ fontSize: 11, color: C.muted, minWidth: 30, textAlign: "right" }}>{pct}%</span>
     </div>
@@ -427,6 +428,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [importPreview, setImportPreview] = useState(null);
   const [importing, setImporting]         = useState(false);
   // Popup dettaglio riga
+  const detailModalRef = useRef(null);
   const [detailRow, setDetailRow]         = useState(null); // { mevId, r } | null
   // Nuova release
   const [showNewRelease, setShowNewRelease] = useState(false);
@@ -445,6 +447,26 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [deleting, setDeleting]                   = useState(false);
 
+  useEffect(() => {
+    if (!detailRow) return;
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    detailModalRef.current?.focus();
+    const handleKey = (event) => {
+      if (event.key === "Escape") setDetailRow(null);
+      if (event.key === "Tab") {
+        const items = detailModalRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)');
+        if (!items?.length) { event.preventDefault(); return; }
+        const first = items[0], last = items[items.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === detailModalRef.current)) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || document.activeElement === detailModalRef.current)) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", handleKey); previous?.focus(); };
+  }, [detailRow]);
+
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
   // Il contractId per release_progress rimane "poste-tet-2025" (chiave archivio)
@@ -458,7 +480,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       getRtiSocieta().catch(() => []),
     ]).then(([mev, relData, rti]) => {
       setMevRows(mev || []);
-      const recs = (relData.records || []).filter(r => r.title).sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      const recs = (relData.records || []).filter(r => r.title).sort((a, b) => (a.title || "").localeCompare(b.title || ""))
+        .map(r => ({ id: r.Id || r.id, title: r.title })); // normalizza sempre a id minuscolo
       const rel = recs.map(r => r.title);
       setReleaseRecords(recs);
       setReleases(rel);
@@ -556,7 +579,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const saveRow = useCallback(async (mevId) => {
     // Su __ALL__ determina la release di appartenenza dalla mappa
     const targetRelease = selectedRelease === "__ALL__" ? (mevReleaseMap[mevId] || "") : selectedRelease;
-    if (!targetRelease) { setMsg({ type: "err", text: "Release non determinabile per la riga " + mevId }); return; }
+    if (!targetRelease) { setMsg({ type: "err", text: "Release non determinabile per la riga " + mevId }); return false; }
     setSaving(prev => ({ ...prev, [mevId]: true }));
     try {
       const allRows = { ...progressData, [mevId]: progressData[mevId] || {} };
@@ -564,8 +587,10 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       setDirty(prev => { const n = { ...prev }; delete n[mevId]; return n; });
       setSavedOk(prev => ({ ...prev, [mevId]: true }));
       setTimeout(() => setSavedOk(prev => { const n = { ...prev }; delete n[mevId]; return n; }), 2000);
+      return true;
     } catch {
       setMsg({ type: "err", text: "Errore salvataggio riga " + mevId });
+      return false;
     } finally {
       setSaving(prev => { const n = { ...prev }; delete n[mevId]; return n; });
     }
@@ -781,20 +806,21 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   );
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", padding: "28px 24px 60px" }}>
+    <div className="ra-dashboard">
 
       {/* ── Intestazione ── */}
-      <div style={{ marginBottom: 24 }}>
+      <div className="ra-hero">
+        <span className="ra-eyebrow">GOVERNANCE / RELEASE MANAGEMENT</span>
         <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: C.head, letterSpacing: "-0.4px" }}>
           Report Avanzamenti Attività
         </h1>
         <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>
-          Monitora lo stato di avanzamento delle attività per release. I dati MEV sono in sola lettura; i campi di avanzamento sono modificabili.
+          Ogni release, una visione chiara. Monitora le attività e accompagna il lavoro fino al rilascio.
         </p>
       </div>
 
       {/* ── Selezione release + Salva tutto ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+      <div className="ra-toolbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface,
           border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 16px",
           boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
@@ -823,15 +849,15 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
             return (
               <>
                 <button type="button" title="Rinomina release"
-                  onClick={() => { setRenameRelease({ id: rec.Id || rec.id, oldName: rec.title }); setRenameValue(rec.title); setTimeout(() => renameInputRef.current?.focus(), 50); }}
+                  onClick={() => { setRenameRelease({ id: rec.id, oldName: rec.title }); setRenameValue(rec.title); setTimeout(() => renameInputRef.current?.focus(), 50); }}
                   style={{ background: "#FEF9C3", border: "1px solid #FDE047", color: "#854D0E",
                     borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
-                  title="Rinomina">✏️</button>
+                  >✏️</button>
                 <button type="button" title="Elimina release dal calendario"
-                  onClick={() => setConfirmDeleteRelease({ id: rec.Id || rec.id, name: rec.title })}
+                  onClick={() => setConfirmDeleteRelease({ id: rec.id, name: rec.title })}
                   style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", color: C.danger,
                     borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
-                  title="Elimina release">🗑</button>
+                  >🗑</button>
               </>
             );
           })()}
@@ -975,8 +1001,9 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
           <div style={{ fontSize: 13, marginTop: 6 }}>Le righe con stato "Eliminato" o vuoto sono escluse. Verifica i dati MEV.</div>
         </div>
       ) : (
-        <div style={{ overflowX: "auto", borderRadius: 14,
+        <div className="ra-table" style={{ overflowX: "auto", borderRadius: 14,
           boxShadow: "0 2px 12px rgba(0,0,0,0.07)", border: `1px solid ${C.border}` }}>
+          <div className="ra-table-heading"><div><span className="ra-eyebrow">PANORAMICA OPERATIVA</span><h2>Attività della release <span>{filteredRows.length}</span></h2></div><p>Seleziona un’attività per aprire il dettaglio →</p></div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: C.surface }}>
             <thead>
               <tr style={{ background: C.head, color: "#fff", position: "sticky", top: 0, zIndex: 5 }}>
@@ -1018,10 +1045,11 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                 const mandataria = resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ") || "—";
                 const bg = isDirty ? "#FFFBEB" : idx % 2 === 0 ? C.surface : "#F8FAFC";
                 const PERCENT_COLORS = {
-                  requisito: "#7C3AED", analisi: "#1A6EBD", progettazione: "#0891B2", sviluppo: "#166534",
+                  requisito: "#7C3AED", analisi: "#4F46E5", progettazione: "#0891B2", sviluppo: "#166534",
                 };
                 return (
-                  <tr key={mevId}
+                  <tr key={mevId} tabIndex={0} aria-label={`Apri dettaglio ${r.goTo || r.descrizione || mevId}`}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailRow({ mevId, r }); } }}
                     onClick={() => setDetailRow({ mevId, r })}
                     style={{ background: bg, transition: "background .15s", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#EFF6FF"}
@@ -1091,10 +1119,10 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         const isDirty  = !!dirty[mevId];
         const ALL_FIELDS = [...EDITABLE_FIELDS, ...DETAIL_FIELDS];
         return (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+          <div className="ra-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
             display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
             onClick={() => setDetailRow(null)}>
-            <div style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+            <div className="ra-detail-modal" role="dialog" aria-modal="true" aria-labelledby="ra-detail-title" tabIndex={-1} ref={detailModalRef} style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
               width: "100%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: "28px 28px 24px" }}
               onClick={e => e.stopPropagation()}>
 
@@ -1104,7 +1132,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                   textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
                   Avanzamento attività
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: C.head }}>
+                <div id="ra-detail-title" style={{ fontSize: 20, fontWeight: 800, color: C.head }}>
                   {r.goTo} — {r.descrizione || ""}
                 </div>
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 4, display: "flex", gap: 16 }}>
@@ -1114,26 +1142,37 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                 </div>
               </div>
 
-              {/* Tutti i campi in griglia 2 colonne */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
-                {ALL_FIELDS.map(f => (
-                  <div key={f.key} style={{ gridColumn: f.type === "text" ? "1 / -1" : undefined }}>
-                    <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#6b7280",
-                      marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</label>
-                    {isAdminOrSuper
-                      ? <EditCell value={prog[f.key]} type={f.type}
-                          onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
-                      : <div style={{ padding: "8px 10px", background: "#F8FAFC", border: `1px solid ${C.border}`,
-                          borderRadius: 7, fontSize: 13, color: C.text, minHeight: 36, wordBreak: "break-word" }}>
-                          {f.type === "percent"
-                            ? (prog[f.key] != null && prog[f.key] !== "" ? `${prog[f.key]}%` : "—")
-                            : (prog[f.key] ?? "—")}
-                        </div>
-                    }
+              <section className="ra-section ra-mev-section">
+                <div className="ra-section-title"><div><span className="ra-eyebrow">01 / ANAGRAFICA</span><h3>Dati MEV</h3></div><span className="ra-section-badge">Sola lettura</span></div>
+                <dl className="ra-mev-grid">
+                  {[["GoTo", r.goTo], ["Sistema", r.applicativo], ["PM Poste", r.pmPoste], ["PM CAP", r.pmCap], ["Importo fornitura", r.importoExcel != null ? euro.format(r.importoExcel) : null], ["Mandataria / Mandante", resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ")]].map(([label, value]) => (
+                    <div key={label}><dt>{label}</dt><dd>{value || "—"}</dd></div>
+                  ))}
+                </dl>
+              </section>
+              {[
+                { title: "Avanzamento attività", subtitle: "02 / COMPLETAMENTO", fields: ALL_FIELDS.filter(f => f.type === "percent") },
+                { title: "Documenti e aggiornamenti", subtitle: "03 / DOCUMENTAZIONE", fields: EDITABLE_FIELDS.filter(f => f.type !== "percent") },
+                { title: "Pianificazione e rilasci", subtitle: "04 / MILESTONE", fields: DETAIL_FIELDS },
+              ].map(section => (
+                <section className="ra-section ra-edit-section" key={section.title}>
+                  <div className="ra-section-title"><div><span className="ra-eyebrow">{section.subtitle}</span><h3>{section.title}</h3></div><span className="ra-section-badge">{isAdminOrSuper ? "Modificabile" : "Sola lettura"}</span></div>
+                  <div className="ra-field-grid">
+                    {section.fields.map(f => (
+                      <div className={`ra-field ${f.type === "text" ? "ra-field-wide" : ""}`} key={f.key}>
+                        <label>{f.label}
+                          {isAdminOrSuper
+                            ? <EditCell label={f.label} value={prog[f.key]} type={f.type} onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                            : <div className="ra-read-value">{prog[f.key] != null && prog[f.key] !== "" ? `${prog[f.key]}${f.type === "percent" ? "%" : ""}` : "—"}</div>}
+                        </label>
+                        {f.type === "percent" && <ProgressBar value={prog[f.key]} color={f.key === "sviluppo" ? "#059669" : f.key === "progettazione" ? "#0891B2" : C.accent} />}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </section>
+              ))}
 
+              {msg?.type === "err" && <p role="alert" className="ra-error">{msg.text}</p>}
               {/* Azioni */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
                 {isAdminOrSuper
@@ -1152,7 +1191,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                     Chiudi
                   </button>
                   {isAdminOrSuper && (
-                    <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
+                    <button onClick={async () => { if (await saveRow(mevId)) setDetailRow(null); }}
                       disabled={!isDirty || isSaving}
                       style={{ padding: "9px 22px", background: isDirty ? C.accent : "#E2E8F0",
                         color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
