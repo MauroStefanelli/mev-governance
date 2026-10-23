@@ -2442,36 +2442,27 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
 
   // Helper: restituisce i 5 valori per una riga RTI/SUBCO.
   // - Valore Totale : importo manuale della riga RTI
-  // - Approvato     : da mevImportiPerSocieta (somma MEV in stato Approvato per quella società)
-  // - Ordinato      : dagli Ordini di Consegna (fonte primaria); fallback MEV ordinatoBdo
-  // - Impegnato     : proporzionale al fatturato MEV
+  // - Approvato     : percentuale × approvato del contratto (dai totali TOW salvati nel DB → allineato con tabella CONTRATTO)
+  // - Ordinato      : dagli Ordini di Consegna (fonte primaria per società); fallback percentuale × ordinatiRda
+  // - Impegnato     : percentuale × impegnato del contratto
   // - Residuo       : per RTI  → VT − Approvato
   //                   per SUBCO → VT − Ordinato
-  const calcCampiRiga = (r) => {
+   const calcCampiRiga = (r) => {
     const vt       = r.importo != null ? Number(r.importo) : null;
     const isSubco  = r.ruolo === "SUBCO";
-    const mev      = mevImportiPerSocieta[r.societa];
 
-    // Ordinato dagli ordini di consegna (fonte primaria, flat per società)
+    // Fonte primaria per Ordinato: Ordini di Consegna per società
     const ordiniOrdinato = ordiniOrdinatoMap[r.societa] || 0;
 
-    if (mev) {
-      const approvato = mev.approvato || 0;
-      const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : (mev.ordinato || 0);
-      const impegnato = mev.impegnato > 0 ? mev.impegnato : null;
-      const residuo   = vt != null
-        ? (isSubco ? vt - ordinato : vt - approvato)
-        : null;
-      return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
-    }
-
-    // Fallback: % × totali ConsumoTow (società senza MEV assegnate)
+    // Approvato e Impegnato: sempre da percentuale × totali TOW salvati nel DB
+    // (stessa fonte della tabella CONTRATTO → i totali coincidono)
     const vc   = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
-    const approvato = apply(vc.approvato   || 0);
+
+    const approvato = apply(vc.approvato  || 0);
     const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : apply(vc.ordinatiRda || 0);
-    const impegnato = apply(vc.impegnato   || 0);
+    const impegnato = apply(vc.impegnato  || 0);
     const residuo   = vt != null
       ? (isSubco
           ? vt - (ordinato ?? 0)
