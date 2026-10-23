@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
-import { getMevList, getReleaseSchedules, upsertReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
+import { getMevList, getReleaseSchedules, upsertReleaseSchedule, deleteReleaseSchedule, renameReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -404,7 +404,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   })();
 
   const [mevRows, setMevRows]           = useState([]);
-  const [releases, setReleases]         = useState([]);
+  const [releases, setReleases]         = useState([]); // array di stringhe (nomi)
+  const [releaseRecords, setReleaseRecords] = useState([]); // array di { id, title } per rename/delete
   const LS_KEY = `reportAvanzamenti_release_${ambienteId || "default"}`;
   const [selectedRelease, setSelectedReleaseState] = useState(() => {
     try { return localStorage.getItem(LS_KEY) || ""; } catch { return ""; }
@@ -432,6 +433,14 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [newReleaseName, setNewReleaseName] = useState("");
   const [savingRelease, setSavingRelease]   = useState(false);
   const newReleaseInputRef = useRef(null);
+  // Rinomina release
+  const [renameRelease, setRenameRelease]   = useState(null); // { id, oldName } | null
+  const [renameValue, setRenameValue]       = useState("");
+  const [savingRename, setSavingRename]     = useState(false);
+  const renameInputRef = useRef(null);
+  // Elimina release (il record dal calendario, non i dati progress)
+  const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(null); // { id, name } | null
+  const [deletingRelease, setDeletingRelease]           = useState(false);
   // Elimina dati
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [deleting, setDeleting]                   = useState(false);
@@ -449,7 +458,9 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       getRtiSocieta().catch(() => []),
     ]).then(([mev, relData, rti]) => {
       setMevRows(mev || []);
-      const rel = (relData.records || []).map(r => r.title || "").filter(Boolean).sort();
+      const recs = (relData.records || []).filter(r => r.title).sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      const rel = recs.map(r => r.title);
+      setReleaseRecords(recs);
       setReleases(rel);
       setRtiRows(rti || []);
       // Ripristina l'ultima release visitata; se non è più disponibile usa __ALL__
@@ -724,6 +735,45 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     }
   }, [releases, releaseContractId]);
 
+  // Rinomina release esistente
+  const handleRenameRelease = useCallback(async () => {
+    if (!renameRelease || !renameValue.trim()) return;
+    const newName = renameValue.trim();
+    if (newName === renameRelease.oldName) { setRenameRelease(null); setRenameValue(""); return; }
+    setSavingRename(true);
+    try {
+      await renameReleaseSchedule(releaseContractId, renameRelease.id, renameRelease.oldName, newName);
+      setReleaseRecords(prev => prev.map(r => r.id === renameRelease.id ? { ...r, title: newName } : r));
+      setReleases(prev => prev.map(r => r === renameRelease.oldName ? newName : r).sort());
+      if (selectedRelease === renameRelease.oldName) setSelectedRelease(newName);
+      setRenameRelease(null);
+      setRenameValue("");
+    } catch {
+      setMsg({ type: "err", text: "Errore rinomina release." });
+    } finally {
+      setSavingRename(false);
+    }
+  }, [renameRelease, renameValue, releaseContractId, selectedRelease]); // eslint-disable-line
+
+  // Elimina release dal calendario (non elimina i dati progress)
+  const handleDeleteRelease = useCallback(async () => {
+    if (!confirmDeleteRelease) return;
+    setDeletingRelease(true);
+    try {
+      await deleteReleaseSchedule(confirmDeleteRelease.id);
+      const newRecs = releaseRecords.filter(r => r.id !== confirmDeleteRelease.id);
+      const newRel  = newRecs.map(r => r.title);
+      setReleaseRecords(newRecs);
+      setReleases(newRel);
+      if (selectedRelease === confirmDeleteRelease.name) setSelectedRelease("__ALL__");
+      setConfirmDeleteRelease(null);
+    } catch {
+      setMsg({ type: "err", text: "Errore eliminazione release." });
+    } finally {
+      setDeletingRelease(false);
+    }
+  }, [confirmDeleteRelease, releaseRecords, selectedRelease]); // eslint-disable-line
+
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: C.muted, fontSize: 15 }}>
       Caricamento dati…
@@ -766,8 +816,27 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                 fontSize: 14, outline: "none", minWidth: 160 }} />
           )}
           {loadingProg && <span style={{ fontSize: 11, color: C.muted }}>…</span>}
+          {/* Pulsanti rinomina/elimina release (solo Admin/SuperAdmin, solo su release specifica) */}
+          {isAdminOrSuper && selectedRelease && selectedRelease !== "__ALL__" && (() => {
+            const rec = releaseRecords.find(r => r.title === selectedRelease);
+            if (!rec) return null;
+            return (
+              <>
+                <button type="button" title="Rinomina release"
+                  onClick={() => { setRenameRelease({ id: rec.Id || rec.id, oldName: rec.title }); setRenameValue(rec.title); setTimeout(() => renameInputRef.current?.focus(), 50); }}
+                  style={{ background: "#FEF9C3", border: "1px solid #FDE047", color: "#854D0E",
+                    borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
+                  title="Rinomina">✏️</button>
+                <button type="button" title="Elimina release dal calendario"
+                  onClick={() => setConfirmDeleteRelease({ id: rec.Id || rec.id, name: rec.title })}
+                  style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", color: C.danger,
+                    borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
+                  title="Elimina release">🗑</button>
+              </>
+            );
+          })()}
           {/* Bottone nuova release */}
-          {!showNewRelease && (
+          {!showNewRelease && !renameRelease && (
             <button type="button" onClick={() => { setShowNewRelease(true); setTimeout(() => newReleaseInputRef.current?.focus(), 50); }}
               title="Crea nuova release"
               style={{ background: C.accentLt, border: `1px solid ${C.accent}`, color: C.accent,
@@ -777,6 +846,32 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
             </button>
           )}
         </div>
+
+        {/* Form rinomina release inline */}
+        {renameRelease && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface,
+            border: "1px solid #FDE047", borderRadius: 12, padding: "8px 14px",
+            boxShadow: "0 1px 4px rgba(234,179,8,0.2)" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#854D0E" }}>Rinomina:</span>
+            <input
+              ref={renameInputRef}
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleRenameRelease(); if (e.key === "Escape") { setRenameRelease(null); setRenameValue(""); } }}
+              style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 10px",
+                fontSize: 13, outline: "none", minWidth: 140 }} />
+            <button type="button" onClick={handleRenameRelease}
+              disabled={savingRename || !renameValue.trim()}
+              style={{ background: "#EAB308", color: "#fff", border: "none", borderRadius: 8,
+                padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                opacity: (savingRename || !renameValue.trim()) ? 0.6 : 1 }}>
+              {savingRename ? "…" : "Salva"}
+            </button>
+            <button type="button" onClick={() => { setRenameRelease(null); setRenameValue(""); }}
+              style={{ background: "none", border: "none", color: C.muted, fontSize: 18,
+                cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>✕</button>
+          </div>
+        )}
 
         {/* Form nuova release inline */}
         {showNewRelease && (
@@ -1030,7 +1125,9 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                           onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
                       : <div style={{ padding: "8px 10px", background: "#F8FAFC", border: `1px solid ${C.border}`,
                           borderRadius: 7, fontSize: 13, color: C.text, minHeight: 36, wordBreak: "break-word" }}>
-                          {prog[f.key] ?? "—"}
+                          {f.type === "percent"
+                            ? (prog[f.key] != null && prog[f.key] !== "" ? `${prog[f.key]}%` : "—")
+                            : (prog[f.key] ?? "—")}
                         </div>
                     }
                   </div>
@@ -1211,6 +1308,39 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                   border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
                   cursor: deleting ? "wait" : "pointer", opacity: deleting ? 0.7 : 1 }}>
                 {deleting ? "Eliminazione…" : "Sì, elimina tutto"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal conferma Elimina release dal calendario ── */}
+      {confirmDeleteRelease && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1001,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={() => !deletingRelease && setConfirmDeleteRelease(null)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 420, width: "100%",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 32, marginBottom: 12, textAlign: "center" }}>🗑</div>
+            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: C.danger, textAlign: "center" }}>
+              Elimina release dal calendario
+            </h3>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 1.6 }}>
+              La release <strong>{confirmDeleteRelease.name}</strong> verrà rimossa dal calendario.<br />
+              I dati di avanzamento associati <strong>non</strong> vengono eliminati.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => setConfirmDeleteRelease(null)} disabled={deletingRelease}
+                style={{ padding: "10px 24px", background: "#F1F5F9", color: C.muted,
+                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                Annulla
+              </button>
+              <button onClick={handleDeleteRelease} disabled={deletingRelease}
+                style={{ padding: "10px 24px", background: C.danger, color: "#fff",
+                  border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                  cursor: deletingRelease ? "wait" : "pointer", opacity: deletingRelease ? 0.7 : 1 }}>
+                {deletingRelease ? "Eliminazione…" : "Sì, elimina"}
               </button>
             </div>
           </div>

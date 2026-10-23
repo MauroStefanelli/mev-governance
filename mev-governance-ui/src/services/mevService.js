@@ -879,6 +879,22 @@ export const upsertReleaseSchedule = async (contractId, release) => {
   });
 };
 
+export const deleteReleaseSchedule = async (id) => {
+  return deleteConfiguratoreRecord(id);
+};
+
+export const renameReleaseSchedule = async (contractId, id, oldName, newName) => {
+  return upsertConfiguratoreRecord({
+    id,
+    record_key:  `${contractId}|release|${(newName || "").replace(/\s+/g, "-").toLowerCase()}`,
+    entity_type: "release_calendar",
+    contract_id: contractId,
+    lot_id:      null,
+    title:       newName,
+    payload:     { name: newName, createdAt: new Date().toISOString() },
+  });
+};
+
 // ── Configuratore Offerta — AI (secondo parere e sviluppo) ───────────────────
 export const testAiConnection = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/test`, {
