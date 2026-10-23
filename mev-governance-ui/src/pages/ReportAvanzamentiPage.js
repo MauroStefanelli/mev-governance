@@ -1025,34 +1025,45 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                   <div key={f.key} style={{ gridColumn: f.type === "text" ? "1 / -1" : undefined }}>
                     <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#6b7280",
                       marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</label>
-                    <EditCell value={prog[f.key]} type={f.type}
-                      onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                    {isAdminOrSuper
+                      ? <EditCell value={prog[f.key]} type={f.type}
+                          onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                      : <div style={{ padding: "8px 10px", background: "#F8FAFC", border: `1px solid ${C.border}`,
+                          borderRadius: 7, fontSize: 13, color: C.text, minHeight: 36, wordBreak: "break-word" }}>
+                          {prog[f.key] ?? "—"}
+                        </div>
+                    }
                   </div>
                 ))}
               </div>
 
               {/* Azioni */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
-                <button onClick={() => deleteRow(mevId)} disabled={isSaving}
-                  style={{ padding: "9px 18px", background: "#FEE2E2", color: C.danger,
-                    border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
-                    cursor: isSaving ? "wait" : "pointer", opacity: isSaving ? 0.6 : 1 }}>
-                  🗑 Elimina dati riga
-                </button>
+                {isAdminOrSuper
+                  ? <button onClick={() => deleteRow(mevId)} disabled={isSaving}
+                      style={{ padding: "9px 18px", background: "#FEE2E2", color: C.danger,
+                        border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                        cursor: isSaving ? "wait" : "pointer", opacity: isSaving ? 0.6 : 1 }}>
+                      🗑 Elimina dati riga
+                    </button>
+                  : <div />
+                }
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => setDetailRow(null)}
                     style={{ padding: "9px 20px", background: "#F1F5F9", color: C.muted,
                       border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                     Chiudi
                   </button>
-                  <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
-                    disabled={!isDirty || isSaving}
-                    style={{ padding: "9px 22px", background: isDirty ? C.accent : "#E2E8F0",
-                      color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
-                      fontWeight: 700, fontSize: 13, cursor: isDirty ? "pointer" : "default",
-                      opacity: isSaving ? 0.6 : 1 }}>
-                    {isSaving ? "Salvataggio…" : "Salva"}
-                  </button>
+                  {isAdminOrSuper && (
+                    <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
+                      disabled={!isDirty || isSaving}
+                      style={{ padding: "9px 22px", background: isDirty ? C.accent : "#E2E8F0",
+                        color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
+                        fontWeight: 700, fontSize: 13, cursor: isDirty ? "pointer" : "default",
+                        opacity: isSaving ? 0.6 : 1 }}>
+                      {isSaving ? "Salvataggio…" : "Salva"}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
