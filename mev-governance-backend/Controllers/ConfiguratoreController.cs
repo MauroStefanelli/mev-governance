@@ -41,6 +41,12 @@ public class ConfiguratoreController : ControllerBase
             || User.IsInRole("Bid Manager");
     }
 
+    // Lettura avanzamenti: accessibile anche ai Client (sola lettura)
+    private bool CanReadProgress()
+    {
+        return CanAccessRecords() || User.IsInRole("Client");
+    }
+
     private bool CanAccessGare() => User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager");
 
     private static readonly string[] ValidEntities =
@@ -678,7 +684,7 @@ public class ConfiguratoreController : ControllerBase
     [HttpGet("release-progress")]
     public async Task<IActionResult> GetReleaseProgress([FromQuery] string? contractId, [FromQuery] string? release)
     {
-        if (!CanAccessRecords()) return Forbid();
+        if (!CanReadProgress()) return Forbid();
         var (sch, cs) = GetDbTarget();
         try
         {
