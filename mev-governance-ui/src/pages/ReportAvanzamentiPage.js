@@ -850,12 +850,12 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               <>
                 <button type="button" title="Rinomina release"
                   onClick={() => { setRenameRelease({ id: rec.id, oldName: rec.title }); setRenameValue(rec.title); setTimeout(() => renameInputRef.current?.focus(), 50); }}
-                  style={{ background: "#FEF9C3", border: "1px solid #FDE047", color: "#854D0E",
+                  style={{ background: "transparent", border: "none", color: C.danger,
                     borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
                   >✏️</button>
                 <button type="button" title="Elimina release dal calendario"
                   onClick={() => setConfirmDeleteRelease({ id: rec.id, name: rec.title })}
-                  style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", color: C.danger,
+                  style={{ background: "transparent", border: "none", color: C.danger,
                     borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
                   >🗑</button>
               </>
@@ -966,7 +966,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         {isAdminOrSuper && (
           <button onClick={() => setShowConfirmDelete(true)}
             style={{ padding: "10px 18px", background: C.dangerLt, color: C.danger,
-              border: `1px solid #FCA5A5`, borderRadius: 10, fontWeight: 700, fontSize: 13,
+              border: "none",  fontWeight: 700, fontSize: 13,
               cursor: "pointer", marginLeft: "auto", whiteSpace: "nowrap" }}>
             🗑 Elimina dati
           </button>
