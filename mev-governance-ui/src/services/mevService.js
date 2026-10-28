@@ -530,7 +530,7 @@ export const getConfiguratoreContracts = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore recupero contratti configuratore");
   return response.json();
 };
@@ -539,7 +539,7 @@ export const getConfiguratoreContract = async (contractId) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}`, {
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore recupero contratto configuratore");
   return response.json();
 };
@@ -550,7 +550,7 @@ export const upsertConfiguratoreContract = async (payload) => {
     headers: authHeaders(),
     body: JSON.stringify(payload)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);

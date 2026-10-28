@@ -965,7 +965,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         {/* ── Elimina dati — solo Admin/SuperAdmin ── */}
         {isAdminOrSuper && (
           <button onClick={() => setShowConfirmDelete(true)}
-            style={{ padding: "10px 18px", background: C.dangerLt, color: C.danger,
+            style={{ padding: "10px 18px", background: "transparent", color: C.danger,
               border: "none",  fontWeight: 700, fontSize: 13,
               cursor: "pointer", marginLeft: "auto", whiteSpace: "nowrap" }}>
             🗑 Elimina dati
@@ -1177,7 +1177,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
                 {isAdminOrSuper
                   ? <button onClick={() => deleteRow(mevId)} disabled={isSaving}
-                      style={{ padding: "9px 18px", background: "#FEE2E2", color: C.danger,
+                      style={{ padding: "9px 18px", background: "transparent", color: C.danger,
                         border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
                         cursor: isSaving ? "wait" : "pointer", opacity: isSaving ? 0.6 : 1 }}>
                       🗑 Elimina dati riga

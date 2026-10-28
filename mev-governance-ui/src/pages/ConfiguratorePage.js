@@ -745,9 +745,57 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     try {
       const ctx = await buildAiContext();
       const data = await analyzeInitiativeWithAi(ctx);
-      const proposals = (data.analysis?.proposals || [])
-        .filter((p) => catalog.some((c) => String(c.id) === String(p.catalogId)))
-        .map((p, i) => ({ ...p, apply: p.action !== "exclude", _index: i }));
+      // Filtra le proposte AI: mantiene solo voci del catalogo valido
+      // e scarta le proposte che citano integrazioni/tecnologie non presenti
+      // nel contesto applicativo (riduce le allucinazioni tipo "SAP" quando
+      // l'iniziativa è su IPERSUITE/IPER).
+      const rawProposals = (data.analysis?.proposals || []).filter((p) =>
+        catalog.some((c) => String(c.id) === String(p.catalogId))
+      );
+
+      // Costruisci un set di termini "permessi" presi dal contesto applicativo
+      // (nomi, codici, alias, tecnologie, integrazioni, note)
+      const allowedTerms = new Set();
+      (ctx.applicationContext || []).forEach((a) => {
+        if (a.name) allowedTerms.add(String(a.name).toLowerCase());
+        if (a.code) allowedTerms.add(String(a.code).toLowerCase());
+        (a.systemAliases || []).forEach((s) => allowedTerms.add(String(s).toLowerCase()));
+        (a.technologies || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
+        if (a.notes) allowedTerms.add(String(a.notes).toLowerCase());
+        if (a.techProfile) {
+          (a.techProfile.integrations || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
+          (a.techProfile.frameworks || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
+          (a.techProfile.technologies || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
+        }
+        if (a.aiProfile) {
+          (a.aiProfile.catalogMappings || []).forEach((m) => {
+            if (m.name) allowedTerms.add(String(m.name).toLowerCase());
+            if (m.rationale) allowedTerms.add(String(m.rationale).toLowerCase());
+          });
+          (a.aiProfile.techSummary || "").split(/\W+/).forEach((w) => { if (w) allowedTerms.add(w.toLowerCase()); });
+        }
+      });
+
+      const normalize = (s) => String(s || "").toLowerCase();
+
+      const proposals = rawProposals
+        .map((p) => ({ raw: p, text: normalize(p.rationale) + " " + normalize(p.additionalInfo) + " " + normalize(p.notes) }))
+        .filter(({ raw, text }) => {
+          // Se non abbiamo termini permessi (nessun applicativo nel contesto), manteniamo la proposta
+          // ma in generale il contesto d'applicativi è sempre passato: questo è un guardrail.
+          if (!allowedTerms.size) return true;
+          // Se la proposta contiene almeno uno dei termini permessi la consideriamo valida
+          for (const term of allowedTerms) {
+            if (!term) continue;
+            if (text.includes(term)) return true;
+          }
+          // In alternativa, se l'intervento è già collegato a un ID_INTERVENTO importato,
+          // lo manteniamo (è strettamente correlato all'iniziativa)
+          if (raw.interventionId) return true;
+          // Altrimenti consideriamo la proposta "hallucination" e la scartiamo
+          return false;
+        })
+        .map(({ raw }, i) => ({ ...raw, apply: raw.action !== "exclude", _index: i }));
       setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
     } catch (err) {
       const msg = err?.message || (err?.status ? `Errore ${err.status}` : String(err));
@@ -2918,4 +2966,3 @@ const btnStyles = {
   secondary: { minHeight: 38, padding: "10px 16px", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
   danger: { minHeight: 38, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
 };
-
