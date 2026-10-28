@@ -56,3 +56,4 @@ services:
         value: https://mev-governance-backend-dev.onrender.com
       - key: REACT_APP_RELEASE
         value: "DEV_REL_{{SHORT_SHA}}"
+      # Redeploy trigger: updated to force new build on Render when we push this change
