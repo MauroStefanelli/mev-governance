@@ -67,6 +67,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
+  // Auto-approve AI proposals with high confidence
+  const [autoApproveAi, setAutoApproveAi] = useState(true);
+  const aiAutoApproveThreshold = 0.85; // confidence threshold for auto-adding proposals
   const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
@@ -755,6 +758,38 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       const rawProposals = (data.analysis?.proposals || []).filter((p) =>
         catalog.some((c) => String(c.id) === String(p.catalogId))
       );
+
+      // Auto-apply high-confidence AI proposals if enabled
+      if (autoApproveAi && rawProposals.length) {
+        const high = rawProposals.filter(p => (Number(p.confidence) || 0) >= aiAutoApproveThreshold);
+        if (high.length) {
+          // add them immediately to suggestions (as selected)
+          setSuggestions(prev => {
+            const next = [...prev];
+            high.forEach(p => {
+              const catalogEntry = catalog.find(c => String(c.id) === String(p.catalogId));
+              if (!catalogEntry) return;
+              const exists = next.find(s => String(s.id) === String(catalogEntry.id) && (s.interventionId || "") === (p.interventionId || ""));
+              if (!exists) {
+                next.push({
+                  id: catalogEntry.id,
+                  selected: true,
+                  type: p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA",
+                  complexity: p.complexity || "Medio",
+                  qty: Math.max(0.01, Number(p.quantity) || 1),
+                  score: Math.round((Number(p.confidence) || 0) * 10),
+                  reason: p.rationale || "Proposta AI (auto-approve)",
+                  additionalInfo: "Proposta AI",
+                  interventionId: p.interventionId || undefined,
+                });
+              }
+            });
+            // persist in background
+            setTimeout(() => persistInitiativeEvaluation(false), 0);
+            return next;
+          });
+        }
+      }
 
       // Costruisci un set di termini "permessi" presi dal contesto applicativo
       // (nomi, codici, alias, tecnologie, integrazioni, note)
