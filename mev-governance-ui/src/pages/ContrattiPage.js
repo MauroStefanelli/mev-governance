@@ -293,9 +293,9 @@ function TowChart({ title, rows, sum }) {
 
   return (
     <div style={{
-      flex: "1 1 240px", padding: "12px 14px", minWidth: 0,
-      background: "white", border: "1px solid #dadce0",
-      borderRadius: "12px", padding: "12px 16px",
+    flex: "1 1 240px", padding: "12px 14px", minWidth: 0,
+    background: "white", border: "1px solid #dadce0",
+    borderRadius: "12px", padding: "12px 16px",
       boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
     }}>
       <div style={{
@@ -307,7 +307,7 @@ function TowChart({ title, rows, sum }) {
 
       {/* Valori numerici in cima */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
-        {FIELDS.map(f => (
+  {FIELDS.map(f => (
           <div key={f} style={{
             display: "flex", flexDirection: "column", alignItems: "center",
             background: "#f8f9fa", borderRadius: "8px", padding: "6px 12px",
@@ -1120,22 +1120,22 @@ function ConsumoTowSection({ towRows, ambienteId }) {
                     }}
                   />
 
-                  <Bar
-                    dataKey="ordinatoPerc"
-                    stackId="a"
-                    fill={COLORS.ordinatiRda}
-                    name="Ordinato"
-                    minPointSize={8}
-                    radius={[4, 0, 0, 4]}
-                    background={{ fill: "#f1f5f9", radius: 4 }}
-                    label={{
-                      position: "insideLeft",
-                      formatter: (v) => v > 2 ? `${Number(v).toFixed(0)}%` : "",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      fill: "#fff",
-                    }}
-                  />
+              <Bar
+                dataKey="ordinatoPerc"
+                stackId="a"
+                fill={COLORS.ordinatiRda}
+                name="Ordinato"
+                minPointSize={8}
+                radius={[4, 0, 0, 4]}
+                background={{ fill: "#f1f5f9", radius: 4 }}
+                label={{
+                  position: "insideLeft",
+                  formatter: (v) => v > 2 ? `${Number(v).toFixed(0)}%` : "",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fill: "#fff",
+                }}
+              />
                   <Bar
                     dataKey="impegnatoPerc"
                     stackId="a"
