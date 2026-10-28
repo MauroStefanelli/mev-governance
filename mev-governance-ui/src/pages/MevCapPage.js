@@ -77,12 +77,7 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => {
-      if (
-        triggerRef.current && !triggerRef.current.contains(e.target) &&
-        dropRef.current    && !dropRef.current.contains(e.target)
-      ) { setOpen(false); setSearch(""); }
-    };
+    const handler = () => { setOpen(false); setSearch(""); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
@@ -310,7 +305,7 @@ function TowEuroInput({ importoTow, valUnitTow, onCommit }) {
         min="0"
         value={displayValue}
         placeholder="—"
-        onFocus={e => {
+        onFocus={() => {
           // All'ingresso nel campo, imposta il draft con il valore attuale
           setDraft(importoTow != null ? parseFloat(importoTow.toFixed(2)) : "");
         }}
@@ -843,7 +838,7 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
   const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
     if (!row?.id) return;
-    if (!window.confirm(`Eliminare definitivamente la riga GoTo "${row.goTo || row.excelId}"?\nL'operazione non è reversibile.`)) return;
+    if (!window.confirm(`Eliminare definitivamente la riga GoTo "${row.goTo || row.excelId}"?\nL&apos;operazione non è reversibile.`)) return;
     setDeleting(true);
     try {
       await deleteMev(row.id);

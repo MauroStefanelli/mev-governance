@@ -1096,7 +1096,7 @@ function AppPermissionsPanel() {
         <h4 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#243247" }}>Configurazione accessi per sotto-applicazione</h4>
         <p style={{ margin: "6px 0 0", color: "#68758A", fontSize: 13 }}>
           Definisci quale ruolo può <strong>visualizzare</strong> (accedere ai dati) e <strong>modificare</strong> (salvare dati) in ogni app.
-          SuperAdmin ha sempre accesso completo e non è configurabile. Disattivare "Visualizza" disattiva anche "Modifica".
+          SuperAdmin ha sempre accesso completo e non è configurabile. Disattivare &quot;Visualizza&quot; disattiva anche &quot;Modifica&quot;.
         </p>
       </div>
 

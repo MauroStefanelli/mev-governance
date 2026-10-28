@@ -210,7 +210,7 @@ export default function ChartPage({ rows = [], ambienteId }) {
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.8px", color: "#718097", marginBottom: 10 }}>MEV / ANALISI ECONOMICA</div>
             <h1 style={{ fontSize: 30, letterSpacing: "-0.8px", margin: "0 0 8px", fontWeight: 700 }}>Grafici</h1>
-            <p style={{ ...muted, margin: 0 }}>Una vista d'insieme su forniture, ordini e fatturazione.</p>
+            <p style={{ ...muted, margin: 0 }}>Una vista d&apos;insieme su forniture, ordini e fatturazione.</p>
           </div>
           <span style={{ padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E3E8EF", borderRadius: 8, fontSize: 12, color: "#68758A" }}>{count.format(filteredRows.length)} MEV nel perimetro</span>
         </header>

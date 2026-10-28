@@ -1469,7 +1469,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     setRows(prev => [...prev, ...newRows]);
     const contratto = newRows[0]?.towContratto;
     if (contratto) {
-      setContratti(prev => {
+    setContratti(prev => {
         const next = prev.includes(contratto) ? prev : [...prev, contratto];
         localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
         return next;
@@ -1490,7 +1490,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
         return next;
       });
-      setSelectedContratto(prev => {
+      setSelectedContratto(_prev => {
         const remaining = contratti.filter(c => c !== nome);
         return remaining[0] || "";
       });
@@ -1505,7 +1505,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [resetting, setResetting] = useState(false);
   const handleResetAll = async () => {
     if (!window.confirm(
-      "ATTENZIONE: questa operazione eliminerà TUTTE le righe MEV e TUTTI i dati ConsumoTow (contratti + TOW) per questo ambiente.\n\nI dati RTI & SUBCO, Ordini di Consegna e Verbali NON verranno toccati.\n\nL'operazione è IRREVERSIBILE. Continuare?"
+      "ATTENZIONE: questa operazione eliminerà TUTTE le righe MEV e TUTTI i dati ConsumoTow (contratti + TOW) per questo ambiente.\n\nI dati RTI & SUBCO, Ordini di Consegna e Verbali NON verranno toccati.\n\nL&apos;operazione è IRREVERSIBILE. Continuare?"
     )) return;
     setResetting(true);
     setError("");
@@ -2093,7 +2093,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, contractCols = [], contractVisFields = [], onRigheChange, scrollRef, onScroll }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = [], righeInit = [], righeLoading = false, hasImpatto = false, _contractTotalW = 0, _contractCols = [], contractVisFields = [], onRigheChange, scrollRef, onScroll }) {
   // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};

@@ -13,7 +13,7 @@ export default function LottoWorkspace({ lotto, deadline, mode = "documenti", on
   const change = (group, key, patch) => onChange({ ...workflow, [group]: { ...workflow[group], [key]: { ...workflow[group]?.[key], ...patch } } });
   const stats = lottoProgress(lotto, deadline);
   if (mode === "requisiti") return <div className="gara-workspace">
-    <div className="gara-section-title"><div><h3>Verifica dei requisiti · {lotto.nome}</h3><p>Registra l'esito della verifica e il riferimento che lo dimostra.</p></div><span className="gara-tag">{stats.requirementsPending} da verificare</span></div>
+    <div className="gara-section-title"><div><h3>Verifica dei requisiti · {lotto.nome}</h3><p>Registra l&apos;esito della verifica e il riferimento che lo dimostra.</p></div><span className="gara-tag">{stats.requirementsPending} da verificare</span></div>
     {!requirements.length && <p className="gara-empty">Nessun requisito tecnico estratto per questo lotto. Verifica il capitolato importato.</p>}
     {requirements.map((r, i) => {
       const key = itemKey(r, i, requirements, "req");

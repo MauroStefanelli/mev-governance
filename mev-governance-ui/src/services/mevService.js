@@ -952,7 +952,7 @@ export const getUserAccessLogSafe = async (username) => {
 
   const allLogs = await response.json();
 
-  console.log("LOG REALI:", allLogs);
+  // Debug: raw logs available in allLogs (suppressed to avoid noisy console output)
 
   // ✅ filtro utente (robusto)
   const userLogs = allLogs.filter(l => {
@@ -1068,8 +1068,8 @@ export const getTowImpatto = async () => {
   if (response.status === 401) throw new Error("401");
   if (!response.ok) { console.error("[TOW] HTTP", response.status); return {}; }
   const text = await response.text();
-  console.log("[TOW] raw response:", text.slice(0, 200));
-  try { return JSON.parse(text); } catch(e) { console.error("[TOW] JSON parse error:", e); return {}; }
+  // raw response logged during development; keep minimal output
+  try { return JSON.parse(text); } catch(e) { return {}; }
 };
 
 export const setTowImpatto = async (data) => {

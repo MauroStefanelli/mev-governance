@@ -990,7 +990,7 @@ function App() {
                   Accesso Editor
                 </div>
                 <div style={{ fontSize: "13px", color: "#555" }}>
-                  <strong>{alert.fullName || alert.username}</strong> ha effettuato l'accesso
+                  <strong>{alert.fullName || alert.username}</strong> ha effettuato l&apos;accesso
                 </div>
                 <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>
                   {new Date(

@@ -1000,12 +1000,12 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
           padding: "60px 24px", textAlign: "center", color: C.muted }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Nessuna attività per questa release</div>
-          <div style={{ fontSize: 13, marginTop: 6 }}>Le righe con stato "Eliminato" o vuoto sono escluse. Verifica i dati MEV.</div>
+            <div style={{ fontSize: 13, marginTop: 6 }}>Le righe con stato &quot;Eliminato&quot; o vuoto sono escluse. Verifica i dati MEV.</div>
         </div>
       ) : (
         <div className="ra-table" style={{ overflowX: "auto", borderRadius: 14,
           boxShadow: "0 2px 12px rgba(0,0,0,0.07)", border: `1px solid ${C.border}` }}>
-          <div className="ra-table-heading"><div><span className="ra-eyebrow">PANORAMICA OPERATIVA</span><h2>Attività della release <span>{filteredRows.length}</span></h2></div><p>Seleziona un’attività per aprire il dettaglio →</p></div>
+            <div className="ra-table-heading"><div><span className="ra-eyebrow">PANORAMICA OPERATIVA</span><h2>Attività della release <span>{filteredRows.length}</span></h2></div><p>Seleziona un&apos;attività per aprire il dettaglio →</p></div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: C.surface }}>
             <thead>
               <tr style={{ background: C.head, color: "#fff", position: "sticky", top: 0, zIndex: 5 }}>
@@ -1336,7 +1336,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               {selectedRelease === "__ALL__"
                 ? <>Questa operazione elimina <strong>tutti</strong> i dati di avanzamento per <strong>tutte le release</strong>.</>
                 : <>Questa operazione elimina i dati di avanzamento importati per la release <strong>{selectedRelease}</strong>.</>}
-              <br />L'azione è <strong>irreversibile</strong>.
+              <br />L&apos;azione è <strong>irreversibile</strong>.
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button onClick={() => setShowConfirmDelete(false)} disabled={deleting}

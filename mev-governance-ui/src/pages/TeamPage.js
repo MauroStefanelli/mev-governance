@@ -457,7 +457,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>🗑️</div>
             <h3 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>Elimina risorsa</h3>
             <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: "14px" }}>
-              Stai eliminando <strong>{confirmDelete.risorsa}</strong>. L'operazione non è reversibile.
+              Stai eliminando <strong>{confirmDelete.risorsa}</strong>. L&apos;operazione non è reversibile.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button onClick={() => setConfirmDelete(null)} style={{ padding: "9px 20px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#64748b" }}>Annulla</button>
