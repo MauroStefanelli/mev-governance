@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import { 
   getUsers, 
@@ -856,7 +856,7 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
               { label: "Email", key: "email" },
             ].map(({ label, key }) => (
               <div key={key} style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#526079", fontWeight: 600, color: "#555" }}>{label}</label>
+                <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#555" }}>{label}</label>
                 <input
                   type="text"
                   value={editModal[key]}
@@ -894,6 +894,10 @@ const ALL_PAGES = [
   { id: "tools",             label: "Gestione Ordini" },
   { id: "consumotow",        label: "TOW Contratti" },
   { id: "superadmin",        label: "Gestione Contratti" },
+  { id: "reportavanzamenti", label: "Report Avanzamenti" },
+  { id: "ordini",            label: "Ordini Consegna" },
+  { id: "gara",              label: "Gare" },
+  { id: "team",              label: "Gestione Team" },
 ];
 
 function PermessiClientModal({ user, onClose }) {
@@ -1015,6 +1019,7 @@ const KNOWN_APPS = [
   { id: "tools",             label: "Tools" },
   { id: "gara",              label: "Gare" },
   { id: "configuratore",     label: "Configuratore" },
+  { id: "team",              label: "Gestione Team" },
 ];
 const KNOWN_ROLES = ["Admin", "Editor", "Client", "Developer", "Bid Manager"];
 
@@ -1091,7 +1096,7 @@ function AppPermissionsPanel() {
         <h4 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#243247" }}>Configurazione accessi per sotto-applicazione</h4>
         <p style={{ margin: "6px 0 0", color: "#68758A", fontSize: 13 }}>
           Definisci quale ruolo può <strong>visualizzare</strong> (accedere ai dati) e <strong>modificare</strong> (salvare dati) in ogni app.
-          SuperAdmin ha sempre accesso completo e non è configurabile. Disattivare "Visualizza" disattiva anche "Modifica".
+          SuperAdmin ha sempre accesso completo e non è configurabile. Disattivare &quot;Visualizza&quot; disattiva anche &quot;Modifica&quot;.
         </p>
       </div>
 

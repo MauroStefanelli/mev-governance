@@ -172,7 +172,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                 <thead>
                   <tr>
                     {['ID', 'Ambito', 'Nome componente'].map(h => <th rowSpan={2} scope="col" key={h} style={{ ...S.thead, padding: '12px 14px', textAlign: 'left' }}>{h}</th>)}
-                    {["Base d’asta REALIZZAZIONE", "Base d’asta MODIFICA"].map(h => <th colSpan={3} scope="colgroup" key={h} style={{ ...S.thead, padding: '12px 14px' }}>{h}</th>)}
+                    {["Base d&apos;asta REALIZZAZIONE", "Base d&apos;asta MODIFICA"].map(h => <th colSpan={3} scope="colgroup" key={h} style={{ ...S.thead, padding: '12px 14px' }}>{h}</th>)}
                   </tr>
                   <tr>{['Realizzazione', 'Modifica'].flatMap(type => ['Semplice', 'Medio', 'Complesso'].map(f => <th scope="col" key={`${type}-${f}`} style={{ ...S.thead, padding: '12px 14px' }}>{f} (€)</th>))}</tr>
                 </thead>
@@ -643,7 +643,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
     const contract = archContracts.find(c => c.contractId === contractId);
     const visible = (contract?.lots || []).filter(l => !l.deleted);
     if (visible.length <= 1 || (contract.lots.filter(l => !l.deleted && l.active !== false).length <= 1 && contract.lots.find(l => l.lotId === lotId)?.active !== false)) {
-      setMsg({ type: 'error', text: 'Non puoi eliminare l’ultimo lotto o l’ultimo lotto attivo.' });
+      setMsg({ type: 'error', text: 'Non puoi eliminare l&apos;ultimo lotto o l&apos;ultimo lotto attivo.' });
       return;
     }
     if (!window.confirm('Eliminare il Lotto ' + lotId + ' dal contratto?')) return;
@@ -1012,9 +1012,9 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
 
       {/* ── Lista contratti ── */}
       {archLoading && archContracts.length === 0
-        ? <div role="status" style={{ ...S.card, textAlign: 'center', padding: 40 }}><strong>Caricamento dell’archivio…</strong><p style={S.muted}>Recupero dei contratti e dei lotti configurati.</p></div>
+            ? <div role="status" style={{ ...S.card, textAlign: 'center', padding: 40 }}><strong>Caricamento dell&apos;archivio…</strong><p style={S.muted}>Recupero dei contratti e dei lotti configurati.</p></div>
         : archContracts.length === 0
-          ? <div style={{ ...S.card, textAlign: 'center', padding: 40, border: '1px dashed #dce5ef' }}><h3 style={S.h2}>L’archivio è vuoto</h3><p style={S.muted}>Usa «Nuovo contratto» per aggiungere i dati, i lotti e i documenti economici.</p></div>
+          ? <div style={{ ...S.card, textAlign: 'center', padding: 40, border: '1px dashed #dce5ef' }}><h3 style={S.h2}>L&apos;archivio è vuoto</h3><p style={S.muted}>Usa «Nuovo contratto» per aggiungere i dati, i lotti e i documenti economici.</p></div>
           : (
             <div className="ca-workspace">
               <aside className="ca-directory" aria-label="Elenco contratti">

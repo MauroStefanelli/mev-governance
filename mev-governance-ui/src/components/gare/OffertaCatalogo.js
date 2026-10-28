@@ -64,7 +64,7 @@ export default function OffertaCatalogo({ offertaLotti, lotti, onUpdate, gara, l
     {rows.length > 0 && <div style={{ padding: "10px 20px", fontSize: 12, color: "#475569", background: "#f8fafc" }}>
       I prezzi Modifica sono calcolati dal prezzo offerto Medio di Realizzazione: Semplice 10%, Medio 30%, Complesso 50%.
     </div>}
-    {rows.length === 0 ? <div style={{ padding: 24 }}>Nessun dato catalogo per questo lotto. Carica l'Excel dal modale Modifica.</div> :
+    {rows.length === 0 ? <div style={{ padding: 24 }}>Nessun dato catalogo per questo lotto. Carica l&apos;Excel dal modale Modifica.</div> :
       <div style={{ overflowX: "auto" }}>
         <table aria-label="Offerta Catalogo per driver" style={{ width: "100%", minWidth: 1750, borderCollapse: "collapse", fontSize: 12 }}>
           <thead>

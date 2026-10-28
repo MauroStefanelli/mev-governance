@@ -26,6 +26,7 @@ public class AppRolePermissionsController : BaseController
         new("tools",             "Tools"),
         new("gara",              "Gare"),
         new("configuratore",     "Configuratore"),
+        new("team",              "Gestione Team"),
     ];
 
     // Ruoli che partecipano al configuratore (SuperAdmin bypassa sempre)

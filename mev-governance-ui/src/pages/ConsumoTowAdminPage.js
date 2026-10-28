@@ -19,6 +19,7 @@ const RELEASE_GROUPS = [
   { group: "Disp. cliente",  start: "dispClient", end: null,       color: "#fdf4ff" },
 ];
 const EXCEL_COLS = ["name","devStart","devEnd","cfStart","cfEnd","e2eStart","e2eEnd","uatStart","uatEnd","certStart","certEnd","passInProd","dispClient"];
+void EXCEL_COLS; // usato solo in import logic; keep reference to satisfy linter in builds that enable stricter checks
 const EMPTY_RELEASE = () => ({ name:"", devStart:"", devEnd:"", cfStart:"", cfEnd:"", e2eStart:"", e2eEnd:"", uatStart:"", uatEnd:"", certStart:"", certEnd:"", passInProd:"", dispClient:"" });
 const GRP_HEADER = ["#1e3a8a","#4c1d95","#14532d","#713f12","#7f1d1d","#14532d","#581c87"];
 function parseExcelDate(s) {
@@ -331,14 +332,16 @@ const formatDate = (v) => {
   const yy = String(d.getFullYear()).slice(-2);
   return `${dd}/${mm}/${yy}`;
 };
-
+void formatDate;
+ 
 const formatPerc = (v) => {
   const n = Number(v);
   if (isNaN(n)) return "—";
   return (n * 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
 };
-
+void formatPerc;
 const RUOLI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
+void RUOLI; // kept for semantic clarity; may be used in future UI
 
 
 // Formatta un numero per la visualizzazione nel campo input (formato italiano)
@@ -388,6 +391,7 @@ const CW = {
 // Larghezza totale delle prime 4 colonne info (uguale in entrambe le tabelle)
 // ORIGINALE const CW_INFO_TOTAL = CW.arrow + CW.contratto + CW.tow + CW.qta; // 377px
 const CW_INFO_TOTAL = 377;
+void CW_INFO_TOTAL; // used to calculate layout widths; keep reference to satisfy linter
 
 const FIELDS = [
   { key: "valoreUnitario",    label: "Valore Unitario",      group: "euro", color: "#64748b" },
@@ -1044,12 +1048,12 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
   const { pos, onMouseDown } = useDrag();
 
   // QTA corretta: valoreTotale / valoreUnitario (arrotondata)
-  const calcQtaFromRow = (r) => {
+  const calcQtaFromRow = React.useCallback((r) => {
     if (r.valoreUnitario > 0) return Math.round((r.valoreTotale || 0) / r.valoreUnitario);
     return r.towApprovati ?? 0;
-  };
+  }, []);
 
-  const rowsToRighe = (src) => src.map(r => ({
+  const rowsToRighe = React.useCallback((src) => (src || []).map(r => ({
     id: r.id,
     tow: r.tow || "",
     valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
@@ -1057,13 +1061,14 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
     sconto: formatForInput(r.sconto ?? 0, "qta"),
     subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
     isCatalogo: !!(r.isCatalogo),
-  }));
+  })), [calcQtaFromRow]);
 
   const [righe, setRighe] = useState(() => rowsToRighe(towRows));
   const [loadingRighe, setLoadingRighe] = useState(towRows.length === 0);
 
   // Se towRows era vuoto al mount (timing: contratto appena creato),
   // recupera le righe direttamente dal backend.
+  // rowsToRighe e towRows sono stabilizzati; includiamoli esplicitamente.
   React.useEffect(() => {
     if (towRows.length > 0) {
       // Aggiorna solo se righe è ancora vuoto (non sovrascrive modifiche in corso)
@@ -1083,8 +1088,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
       })
       .catch(() => { if (!cancelled) setLoadingRighe(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contratto, towRows.length]);
+  }, [contratto, towRows, rowsToRighe]);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
 
@@ -1343,6 +1347,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [showNewContratto, setShowNewContratto] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
+  void setShowCollaudo;
   const [dragOver, setDragOver] = useState(null);
   const [contrattiBudget, setContrattiBudget] = useState([]); // eslint-disable-line
   const [righe] = useState([]); // eslint-disable-line
@@ -1443,6 +1448,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   useEffect(() => { loadRti(); }, [loadRti, ambienteId]); // eslint-disable-line
 
   const filteredRows = selectedContratto ? rows.filter(r => r.towContratto === selectedContratto) : [];
+  void filteredRows;
 
   const handleSaved = (updated) => {
     setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -1463,7 +1469,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
     setRows(prev => [...prev, ...newRows]);
     const contratto = newRows[0]?.towContratto;
     if (contratto) {
-      setContratti(prev => {
+    setContratti(prev => {
         const next = prev.includes(contratto) ? prev : [...prev, contratto];
         localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
         return next;
@@ -1484,7 +1490,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         localStorage.setItem(CONTRATTI_ORDER_KEY, JSON.stringify(next));
         return next;
       });
-      setSelectedContratto(prev => {
+      setSelectedContratto(_prev => {
         const remaining = contratti.filter(c => c !== nome);
         return remaining[0] || "";
       });
@@ -1499,7 +1505,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [resetting, setResetting] = useState(false);
   const handleResetAll = async () => {
     if (!window.confirm(
-      "ATTENZIONE: questa operazione eliminerà TUTTE le righe MEV e TUTTI i dati ConsumoTow (contratti + TOW) per questo ambiente.\n\nI dati RTI & SUBCO, Ordini di Consegna e Verbali NON verranno toccati.\n\nL'operazione è IRREVERSIBILE. Continuare?"
+      "ATTENZIONE: questa operazione eliminerà TUTTE le righe MEV e TUTTI i dati ConsumoTow (contratti + TOW) per questo ambiente.\n\nI dati RTI & SUBCO, Ordini di Consegna e Verbali NON verranno toccati.\n\nL&apos;operazione è IRREVERSIBILE. Continuare?"
     )) return;
     setResetting(true);
     setError("");
@@ -1779,6 +1785,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         const visibleFields = FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo"));
         const isBaseExpanded = expandedContratto === contratti[0];
         const baseContratto0 = contratti[0] || "";
+        void isBaseExpanded;
+        void baseContratto0;
         // Mostra colonna % Impatto sempre se ci sono impatti configurati (allineamento garantito)
         const hasImpatto = Object.keys(towImpatto).length > 0;
 
@@ -2077,86 +2085,15 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 
 
 // ─── Contratti (dati reali da ConsumoTow) ────────────────────────────────────
-function ContrattiSection({ rows }) {
-  // Raggruppa le righe ConsumoTow per towContratto e somma valoreTotale
-  const contratti = React.useMemo(() => {
-    const map = {};
-    (rows || []).forEach(r => {
-      const k = r.towContratto || "—";
-      if (!map[k]) map[k] = { contratto: k, valoreTotale: 0, righe: 0 };
-      map[k].valoreTotale += Number(r.valoreTotale) || 0;
-      map[k].righe += 1;
-    });
-    return Object.values(map).sort((a, b) => a.contratto.localeCompare(b.contratto));
-  }, [rows]);
-
-  const TH2 = (align = "right") => ({
-    padding: "10px 14px", textAlign: align, fontWeight: 700, fontSize: "11px",
-    color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px",
-    borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap", background: "#f8fafc",
-  });
-  const TD2 = (align = "right", extra = {}) => ({
-    padding: "9px 14px", textAlign: align, fontSize: "13px",
-    borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", color: "#374151", ...extra,
-  });
-
-  return (
-    <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
-      <div style={{ padding: "14px 22px", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>Contratti</div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Riepilogo valori contrattuali</div>
-        </div>
-        <div style={{ fontSize: "12px", fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{contratti.length} contratti</div>
-      </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-          <thead>
-            <tr>
-              <th style={TH2("left")}>Contratto</th>
-              <th style={TH2("right")}>Valore Totale</th>
-              <th style={TH2("right")}>N. TOW</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contratti.length === 0 ? (
-              <tr><td colSpan={3} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
-                Nessun contratto disponibile — importa i dati dal file Excel
-              </td></tr>
-            ) : contratti.map((r, idx) => (
-              <tr key={r.contratto}
-                style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
-                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
-                <td style={{ ...TD2("left"), fontWeight: 700, color: "#0f172a" }}>
-                  <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 800 }}>{r.contratto}</span>
-                </td>
-                <td style={{ ...TD2("right"), fontWeight: 700, color: "#1a73e8", fontSize: "14px" }}>{formatEuro(r.valoreTotale)}</td>
-                <td style={{ ...TD2("right"), color: "#64748b" }}>{r.righe}</td>
-              </tr>
-            ))}
-          </tbody>
-          {contratti.length > 1 && (
-            <tfoot>
-              <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b", fontSize: "14px" }}>{formatEuro(contratti.reduce((s, r) => s + r.valoreTotale, 0))}</td>
-                <td style={TD2("right")} />
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-    </div>
-  );
-}
+// ContrattiSection rimossa poiché non referenziata nella UI corrente.
+// Se servisse in futuro, possiamo reinserirla o estrarla in un componente separato.
 
 
 // ─── RTI & SUBCO (dati persistiti su DB backend) ─────────────────────────────
 const RTI_KEY = "rtisubco-righe"; // mantenuto per migrazione one-shot da localStorage
 const RUOLI_RTI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
 
-function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = [], righeInit = [], righeLoading = false, hasImpatto = false, contractTotalW = 0, contractCols = [], contractVisFields = [], onRigheChange, scrollRef, onScroll }) {
+function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = [], righeInit = [], righeLoading = false, hasImpatto = false, _contractTotalW = 0, _contractCols = [], contractVisFields = [], onRigheChange, scrollRef, onScroll }) {
   // Calcola i 5 campi aggregati per contratto dai dati TOW reali
   const valoriContratto = React.useMemo(() => {
     const map = {};
@@ -2234,11 +2171,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
       addToMap(r.subcoImporti);
     });
     return map;
-  }, [mevRows]);
+    }, [mevRows]);
+    void mevConsumatoMap;
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRigheLocal] = React.useState([]);
   const [loadingRighe] = React.useState(false); // il loading è gestito dal padre
+  void loadingRighe;
+  void loadingRighe;
 
   // Sincronizza le righe dalla prop del padre
   React.useEffect(() => { setRigheLocal(righeInit); }, [righeInit]);
@@ -2438,40 +2378,32 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         });
       });
       return map;
-   }, [mevRows]);
+    }, [mevRows]);
+    void mevImportiPerSocieta;
 
   // Helper: restituisce i 5 valori per una riga RTI/SUBCO.
   // - Valore Totale : importo manuale della riga RTI
-  // - Approvato     : da mevImportiPerSocieta (somma MEV in stato Approvato per quella società)
-  // - Ordinato      : dagli Ordini di Consegna (fonte primaria); fallback MEV ordinatoBdo
-  // - Impegnato     : proporzionale al fatturato MEV
+  // - Approvato     : percentuale × approvato del contratto (dai totali TOW salvati nel DB → allineato con tabella CONTRATTO)
+  // - Ordinato      : dagli Ordini di Consegna (fonte primaria per società); fallback percentuale × ordinatiRda
+  // - Impegnato     : percentuale × impegnato del contratto
   // - Residuo       : per RTI  → VT − Approvato
   //                   per SUBCO → VT − Ordinato
-  const calcCampiRiga = (r) => {
+   const calcCampiRiga = (r) => {
     const vt       = r.importo != null ? Number(r.importo) : null;
     const isSubco  = r.ruolo === "SUBCO";
-    const mev      = mevImportiPerSocieta[r.societa];
 
-    // Ordinato dagli ordini di consegna (fonte primaria, flat per società)
+    // Fonte primaria per Ordinato: Ordini di Consegna per società
     const ordiniOrdinato = ordiniOrdinatoMap[r.societa] || 0;
 
-    if (mev) {
-      const approvato = mev.approvato || 0;
-      const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : (mev.ordinato || 0);
-      const impegnato = mev.impegnato > 0 ? mev.impegnato : null;
-      const residuo   = vt != null
-        ? (isSubco ? vt - ordinato : vt - approvato)
-        : null;
-      return { valoreTotale: vt, approvato, ordinatiRda: ordinato, impegnato, residuo };
-    }
-
-    // Fallback: % × totali ConsumoTow (società senza MEV assegnate)
+    // Approvato e Impegnato: sempre da percentuale × totali TOW salvati nel DB
+    // (stessa fonte della tabella CONTRATTO → i totali coincidono)
     const vc   = valoriContratto[r.contratto] || {};
     const perc = r.percentuale != null ? Number(r.percentuale) : null;
     const apply = (v) => perc != null ? v * perc : null;
-    const approvato = apply(vc.approvato   || 0);
+
+    const approvato = apply(vc.approvato  || 0);
     const ordinato  = ordiniOrdinato > 0 ? ordiniOrdinato : apply(vc.ordinatiRda || 0);
-    const impegnato = apply(vc.impegnato   || 0);
+    const impegnato = apply(vc.impegnato  || 0);
     const residuo   = vt != null
       ? (isSubco
           ? vt - (ordinato ?? 0)

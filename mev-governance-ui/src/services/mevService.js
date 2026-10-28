@@ -530,7 +530,7 @@ export const getConfiguratoreContracts = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore recupero contratti configuratore");
   return response.json();
 };
@@ -539,7 +539,7 @@ export const getConfiguratoreContract = async (contractId) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/${encodeURIComponent(contractId)}`, {
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore recupero contratto configuratore");
   return response.json();
 };
@@ -550,7 +550,7 @@ export const upsertConfiguratoreContract = async (payload) => {
     headers: authHeaders(),
     body: JSON.stringify(payload)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -564,7 +564,7 @@ export const updateConfiguratoreLot = async (contractId, lotId, payload) => {
     headers: authHeaders(),
     body: JSON.stringify(payload)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -577,7 +577,7 @@ export const deleteConfiguratoreContract = async (contractId) => {
     method: "DELETE",
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore eliminazione contratto configuratore");
   return response.json();
 };
@@ -611,7 +611,7 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -637,7 +637,7 @@ export const uploadConfiguratoreContractLot = async ({ contractId, contractName,
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -650,7 +650,7 @@ export const getConfiguratoreRecords = async (params = {}) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records${qs ? `?${qs}` : ""}`, {
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore recupero records configuratore");
   const data = await response.json();
   // Il backend può restituire un array diretto o {records:[...]} — normalizziamo sempre
@@ -673,7 +673,7 @@ export const upsertConfiguratoreRecord = async (payload) => {
     headers: authHeaders(),
     body: JSON.stringify(body)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -686,7 +686,7 @@ export const deleteConfiguratoreRecord = async (id) => {
     method: "DELETE",
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore eliminazione record configuratore");
   return response.json();
 };
@@ -711,7 +711,7 @@ export const getSharedApplications = async (contractId, lot) => {
     `${API_BASE_URL}/api/configuratore/records?${params}`,
     { headers: authHeaders() }
   );
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) return null;
   const data = await response.json();
   const records = Array.isArray(data) ? data : (data.records || data.data || []);
@@ -750,7 +750,7 @@ export const analizzaCapitolatoGara = async (file, towFiles = {}, catalogFiles =
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -767,7 +767,7 @@ export const analizzaProposteGara = async (context) => {
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(context),
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -787,7 +787,7 @@ export const analizzaOffertaExcel = async (file, lot, password) => {
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -803,7 +803,7 @@ export const getGare = async () => {
     `${API_BASE_URL}/api/configuratore/records?${params}`,
     { headers: authHeaders() }
   );
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) return [];
   const data = await response.json();
   const records = Array.isArray(data) ? data : (data.records || data.data || []);
@@ -837,7 +837,7 @@ export const importaGaraComContratto = async ({ garaId, contractId, contractName
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ garaId, contractId, contractName }),
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -876,6 +876,22 @@ export const upsertReleaseSchedule = async (contractId, release) => {
     lot_id:      null,
     title:       release.name || "Release senza nome",
     payload:     release,
+  });
+};
+
+export const deleteReleaseSchedule = async (id) => {
+  return deleteConfiguratoreRecord(id);
+};
+
+export const renameReleaseSchedule = async (contractId, id, oldName, newName) => {
+  return upsertConfiguratoreRecord({
+    id,
+    record_key:  `${contractId}|release|${(newName || "").replace(/\s+/g, "-").toLowerCase()}`,
+    entity_type: "release_calendar",
+    contract_id: contractId,
+    lot_id:      null,
+    title:       newName,
+    payload:     { name: newName, createdAt: new Date().toISOString() },
   });
 };
 
@@ -936,7 +952,7 @@ export const getUserAccessLogSafe = async (username) => {
 
   const allLogs = await response.json();
 
-  console.log("LOG REALI:", allLogs);
+  // Debug: raw logs available in allLogs (suppressed to avoid noisy console output)
 
   // ✅ filtro utente (robusto)
   const userLogs = allLogs.filter(l => {
@@ -1052,8 +1068,8 @@ export const getTowImpatto = async () => {
   if (response.status === 401) throw new Error("401");
   if (!response.ok) { console.error("[TOW] HTTP", response.status); return {}; }
   const text = await response.text();
-  console.log("[TOW] raw response:", text.slice(0, 200));
-  try { return JSON.parse(text); } catch(e) { console.error("[TOW] JSON parse error:", e); return {}; }
+  // raw response logged during development; keep minimal output
+  try { return JSON.parse(text); } catch(e) { return {}; }
 };
 
 export const setTowImpatto = async (data) => {
@@ -1418,7 +1434,7 @@ export const getMyContratti = async () => {
 export const getReleaseProgress = async (contractId, release) => {
   const qs = new URLSearchParams({ contractId, ...(release ? { release } : {}) }).toString();
   const r = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/release-progress?${qs}`, { headers: authHeaders() });
-  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (r.status === 401 || r.status === 403) throw new Error(JSON.stringify({ status: r.status }));
   if (!r.ok) throw new Error("Errore lettura avanzamenti");
   return r.json();
 };
@@ -1429,7 +1445,18 @@ export const putReleaseProgress = async (contractId, release, payload) => {
     headers: authHeaders(),
     body: JSON.stringify({ contractId, release, payload }),
   });
-  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (r.status === 401 || r.status === 403) throw new Error(JSON.stringify({ status: r.status }));
+  if (!r.ok) { const t = await r.text(); throw new Error(t); }
+  return r.json();
+};
+
+export const deleteAllReleaseProgress = async (contractId, release) => {
+  const qs = new URLSearchParams({ contractId, ...(release ? { release } : {}) }).toString();
+  const r = await fetchWithRefresh(
+    `${API_BASE_URL}/api/configuratore/release-progress?${qs}`,
+    { method: "DELETE", headers: authHeaders() }
+  );
+  if (r.status === 401 || r.status === 403) throw new Error(JSON.stringify({ status: r.status }));
   if (!r.ok) { const t = await r.text(); throw new Error(t); }
   return r.json();
 };
@@ -1472,5 +1499,51 @@ export const getMyAppPermissions = async () => {
     headers: authHeaders(),
   });
   if (!r.ok) return [];
+  return r.json();
+};
+
+// ── Team ─────────────────────────────────────────────────────────────────────
+export const getTeam = async () => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team`, { headers: authHeaders() });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore caricamento team");
+  return r.json();
+};
+
+export const createTeamMember = async (payload) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(payload),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore creazione membro");
+  return r.json();
+};
+
+export const updateTeamMember = async (id, payload) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team/${id}`, {
+    method: "PUT", headers: authHeaders(), body: JSON.stringify(payload),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore aggiornamento membro");
+  return r.json();
+};
+
+export const deleteTeamMember = async (id) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team/${id}`, {
+    method: "DELETE", headers: authHeaders(),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("Errore eliminazione membro");
+};
+
+export const importTeam = async (rows) => {
+  const r = await fetchWithRefresh(`${API_BASE_URL}/api/team/import`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(rows),
+  });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) {
+    const text = await r.text().catch(() => `HTTP ${r.status}`);
+    throw new Error(`HTTP ${r.status}: ${text}`);
+  }
   return r.json();
 };
