@@ -280,76 +280,10 @@ function TowPieChart({ title, rows, sum }) {
 }
 
 // ── Grafico a barre ───────────────────────────────────────────────────────────
-function TowChart({ title, rows, sum }) {
-  // Un unico "gruppo" con tutte le 5 voci come barre separate
-  const data = [{
-    name: title,
-    valoreTotale: sum(rows, "valoreTotale"),
-    approvato: sum(rows, "approvato"),
-    ordinatiRda: sum(rows, "ordinatiRda"),
-    impegnato: sum(rows, "impegnato"),
-    residuo: sum(rows, "residuo"),
-  }];
-
-  return (
-    <div style={{
-    flex: "1 1 240px", padding: "12px 14px", minWidth: 0,
-    background: "white", border: "1px solid #dadce0",
-    borderRadius: "12px", padding: "12px 16px",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    }}>
-      <div style={{
-        fontSize: "13px", fontWeight: 700, color: "#1a73e8",
-        textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "14px",
-      }}>
-        {title}
-      </div>
-
-      {/* Valori numerici in cima */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
-  {FIELDS.map(f => (
-          <div key={f} style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            background: "#f8f9fa", borderRadius: "8px", padding: "6px 12px",
-            borderLeft: `3px solid ${COLORS[f]}`, flex: "1 1 80px", minWidth: 0,
-          }}>
-            <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }}>
-              {LABELS[f]}
-            </div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: COLORS.valoreTotale, marginTop: "2px", whiteSpace: "nowrap" }}>
-              {formatEuro(data[0][f])}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Grafico a barre raggruppate */}
-      <ResponsiveContainer width="100%" height={500}>
-        <BarChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
-          barCategoryGap="30%" barGap={3}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-          <XAxis dataKey="name" hide />
-          <YAxis tickFormatter={formatEuroK} tick={{ fontSize: 10, fill: "#888" }} width={60} />
-          <Tooltip content={<CustomTooltip />} />
-
-          <Legend
-            wrapperStyle={{ fontSize: "12px" }}
-            iconType="square"
-            payload={[
-              { value: "Ordinato", type: "square", color: "#00B853" },
-              { value: "Impegnato", type: "square", color: "#FFFF00" },
-              { value: "Residuo", type: "square", color: "#FFC000" }
-            ]}
-          />
-
-          {FIELDS.map(f => (
-            <Bar key={f} dataKey={f} name={f} fill={COLORS[f]} radius={[4, 4, 0, 0]} maxBarSize={40} />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+// TowChart non usato nell'UI corrente ma tenuto per possibili varianti future.
+// Per evitare warning durante la cleanup, lo dichiariamo come variabile e lo marchiamo con void.
+const TowChart = null;
+void TowChart;
 
 const renderCalloutLabel = (props) => {
   const { cx, cy, midAngle, outerRadius, percent, value, name, fill } = props;
