@@ -415,14 +415,10 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     setSelectedReleaseState(val);
     try { if (val) localStorage.setItem(LS_KEY, val); else localStorage.removeItem(LS_KEY); } catch {}
   }, [LS_KEY]);
-  // savedOk used to show transient save feedback; keep reference to avoid lint noise
-  void savedOk;
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
   const [savedOk, setSavedOk]           = useState({});
-  // savedOk is used after saveRow; ensure linter does not flag use-before-define
-  void setSavedOk;
   const [rtiRows, setRtiRows]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [loadingProg, setLoadingProg]   = useState(false);
