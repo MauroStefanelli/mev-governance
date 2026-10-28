@@ -2817,7 +2817,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                         ID_INTERVENTO: <span style={{ color: "#1a73e8" }}>{gid}</span>
                         <span style={{ fontWeight: 400, color: "#64748b", fontSize: 11, marginLeft: 8 }}>{gitems.length} voc{gitems.length === 1 ? "e" : "i"}</span>
                       </span>
-                      <span style={{ color: "#0f172a" }}>{euro.format(groupTotal)}</span>
+                      <span style={{ color: "#0f172a", whiteSpace: 'nowrap' }}>{euro.format(groupTotal)}</span>
                     </div>
                     {isOpen && (
                       <div style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
@@ -2951,7 +2951,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                               <td style={{ padding: "10px 12px", fontSize: 12 }}>{it.complexity}</td>
                               <td style={{ padding: "10px 12px", fontSize: 12, textAlign: "center" }}>{it.qty}</td>
                               <td style={{ padding: "10px 12px", fontSize: 12, color: "#64748b", maxWidth: 200 }}>{esc(it.reason || it.additionalInfo || "—")}</td>
-                              <td style={{ padding: "10px 12px", fontSize: 12, textAlign: "right", fontWeight: 600 }}>{euro.format(unit * it.qty)}</td>
+                               <td style={{ padding: "10px 12px", fontSize: 12, textAlign: "right", fontWeight: 600, whiteSpace: 'nowrap' }}>{euro.format(unit * it.qty)}</td>
                             </tr>
                           );
                         })}
