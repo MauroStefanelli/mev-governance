@@ -22,7 +22,7 @@ const C = {
 };
 
 const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtDate = (v) => v || "—";
+// fmtDate was declared but unused; remove to avoid lint warning
 
 // ── Stato colori ─────────────────────────────────────────────────────────────
 const statoStyle = (s) => {
@@ -413,7 +413,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const setSelectedRelease = useCallback((val) => {
     setSelectedReleaseState(val);
     try { if (val) localStorage.setItem(LS_KEY, val); else localStorage.removeItem(LS_KEY); } catch {}
-  }, []);
+  }, [LS_KEY]);
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
@@ -528,7 +528,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
         .finally(() => setLoadingProg(false));
     }
-  }, [selectedRelease]); // eslint-disable-line
+  }, [selectedRelease, contractId, onUnauthorized]);
 
   // Filtra righe MEV per la release selezionata
   // Esclude: stato "Eliminato"/vuoto; sistemi RECUPERO, Collaudo, Presidio
