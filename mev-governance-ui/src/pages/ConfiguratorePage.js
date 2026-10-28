@@ -6,6 +6,7 @@ import {
   upsertConfiguratoreRecord,
   deleteConfiguratoreRecord,
   analyzeInitiativeWithAi,
+  analyzeDevelopmentWithAi,
   getReleaseSchedules,
   getTowImpatto,
   getSharedApplications,
@@ -835,6 +836,17 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         })
         .map(({ raw }, i) => ({ ...raw, apply: raw.action !== "exclude", _index: i }));
       setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
+      // Persist the AI analysis as a draft record for traceability
+      try {
+        await upsertConfiguratoreRecord({
+          record_key: `${initiativeContractId}|${lot}|ai_analysis|${appNorm(initiative.code || initiative.title).replace(/\s+/g,'-')}-${Date.now()}`,
+          entity_type: 'ai_analysis',
+          contract_id: initiativeContractId,
+          lot_id: String(lot),
+          title: `AI analysis ${initiative.code || initiative.title}`,
+          payload: { analysis: data.analysis, proposals, model: data.model, provider: data.provider, createdAt: new Date().toISOString() }
+        });
+      } catch (e) { /* non critico */ }
     } catch (err) {
       const msg = err?.message || (err?.status ? `Errore ${err.status}` : String(err));
       const isAuthErr = msg.includes("401") || msg.includes("403")
@@ -874,6 +886,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setSuggestions(next);
     setAiProposals(null);
     toast("Proposte AI applicate; resta possibile modificarle manualmente");
+    // salva bozza dell'applicazione delle proposte
+    try { persistInitiativeEvaluation(false); } catch {}
   };
   // kept for UI action wiring; mark as used to silence linter
   void applyAiProposals;
