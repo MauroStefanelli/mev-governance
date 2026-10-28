@@ -18,6 +18,9 @@ import HomePage from "./pages/HomePage";
 import { getMevList, getLastAlign, changeMyPassword, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages, getMyAppPermissions } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
+// Release tag displayed in header. Prefer env-config (window._env_.REACT_APP_RELEASE) set by deploy pipeline.
+// Fallback to process.env or a build/runtime timestamp to help identify the build.
+const RELEASE_TAG = (window._env_ && window._env_.REACT_APP_RELEASE) || process.env.REACT_APP_RELEASE || `DEV_REL_${new Date().toISOString().replace(/[^0-9]/g, '').slice(0,12)}`;
 
 function App() {
   // ── Stato autenticazione ─────────────────────────────────────────────────────
@@ -604,7 +607,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_REL_187</span>
+            }}>{RELEASE_TAG}</span>
             {page !== "gara" && ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
