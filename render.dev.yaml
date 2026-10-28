@@ -54,3 +54,5 @@ services:
     envVars:
       - key: REACT_APP_API_URL
         value: https://mev-governance-backend-dev.onrender.com
+      - key: REACT_APP_RELEASE
+        value: "DEV_REL_{{SHORT_SHA}}"
