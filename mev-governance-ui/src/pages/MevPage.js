@@ -262,8 +262,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savedRows, setSavedRows] = useState({});
-  // eslint-disable-next-line no-unused-vars
   const [editingImporto, setEditingImporto] = useState({});
+  // ensure linter sees usage when editingImporto is intentionally kept for UI behavior
+  void editingImporto;
   const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
   const [alignStatus, setAlignStatus] = useState(null); // { step: "running"|"done"|"error", msg: string }
