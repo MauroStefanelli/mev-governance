@@ -258,9 +258,10 @@ const PAGE_DEFS = [
 ];
 
 // Gradi per card basati sull'accento
-  // eslint-disable-next-line no-unused-vars
   const cardGradient = (accent, accentDark) =>
-  `linear-gradient(135deg, ${accent}22 0%, ${accentDark}11 100%)`;
+    `linear-gradient(135deg, ${accent}22 0%, ${accentDark}11 100%)`;
+  // mark as used to avoid lint warning if referenced indirectly
+  void cardGradient;
 
 export default function HomePage({
   username, fullName, role, roles = [],

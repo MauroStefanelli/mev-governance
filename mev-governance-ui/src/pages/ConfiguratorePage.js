@@ -1417,8 +1417,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
   if (loading) return <div role="status" aria-live="polite" style={{ padding: 40, margin: 24, borderRadius: 16, background: "#f4f7fb", color: "#174ea6" }}>Caricamento configuratore…</div>;
 
   const c = activeContract || builtinContract;
-  // eslint-disable-next-line no-unused-vars
   const lots = c ? (c.lots || []).filter((l) => l.active !== false) : [];
+  // reference to avoid unused-vars lint if lots is only sometimes used
+  void lots;
 
   // Pill riassuntiva dell'iniziativa — mostrata in step 2, 3, 4
   const InitiativeBanner = () => {
