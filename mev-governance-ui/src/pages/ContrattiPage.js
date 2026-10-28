@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord, recalcConsumoTow } from "../services/mevService";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
 } from "recharts";
 
@@ -110,24 +110,7 @@ const LABELS = {
 const FIELDS = ["valoreTotale", "approvato", "ordinatiRda", "impegnato", "residuo"];
 
 // ── Tooltip personalizzato ────────────────────────────────────────────────────
-function CustomTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{
-      background: "white", border: "1px solid #dadce0", borderRadius: "8px",
-      padding: "10px 14px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", fontSize: "12px",
-    }}>
-      <div style={{ fontWeight: 700, marginBottom: "6px", color: "#333" }}>{label}</div>
-      {payload.map(p => (
-        <div key={p.dataKey} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: p.fill, display: "inline-block" }} />
-          <span style={{ color: "#555" }}>{LABELS[p.dataKey] || p.dataKey}:</span>
-          <span style={{ fontWeight: 600, color: "#333" }}>{formatEuro(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+// CustomTooltip removed — not used in current charts. Kept charts simplified to inlined tooltips.
 
 
 function PieTooltip({ active, payload }) {
