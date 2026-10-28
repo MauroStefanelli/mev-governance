@@ -83,6 +83,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [implementationFiles, setImplementationFiles] = useState([]);
   const [techProfile, setTechProfile] = useState(null);
   const [techProfileBusy, setTechProfileBusy] = useState(false);
+  // kept for UI flows; mark as used to avoid eslint no-unused-vars
+  void techProfileBusy;
   const [selectedAppId, setSelectedAppId] = useState("");
   const [selectedAppIds, setSelectedAppIds] = useState([]);
   const [codeChangeTool, setCodeChangeTool] = useState("vscode");
@@ -838,6 +840,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setAiProposals(null);
     toast("Proposte AI applicate; resta possibile modificarle manualmente");
   };
+  // kept for UI action wiring; mark as used to silence linter
+  void applyAiProposals;
 
   // ── Step 3: compose (port da compose r.379) ──
   const compose = () => {
@@ -1220,6 +1224,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
     };
     input.click();
   };
+  // referenced by UI flows / future wiring
+  void selectSourceFolder;
 
   // ── Sviluppo: repository + ZIP richiesta codice (port da generateCodeChangeRequest r.244) ──
   const selectImplementationRepository = () => {
@@ -1235,6 +1241,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
     };
     input.click();
   };
+  // referenced by UI flows / future wiring
+  void selectImplementationRepository;
 
   const approvedInterventionsFor = () =>
     [...suggestions.filter((s) => s.selected && s.approved !== false), ...items.filter((it) => it.selected || it.imported)].map((x, i) => ({

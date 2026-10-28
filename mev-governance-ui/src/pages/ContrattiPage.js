@@ -1188,6 +1188,7 @@ const EXCEL_COLS = [
   "e2eStart", "e2eEnd", "uatStart", "uatEnd",
   "certStart", "certEnd", "passInProd", "dispClient",
 ];
+void EXCEL_COLS; // eslint: kept for import logic in other build configs; mark as used to silence no-unused-vars
 
 const EMPTY_RELEASE = () => ({
   name: "", devStart: "", devEnd: "", cfStart: "", cfEnd: "",

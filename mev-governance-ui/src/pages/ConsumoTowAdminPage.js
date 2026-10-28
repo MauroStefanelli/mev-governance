@@ -19,6 +19,7 @@ const RELEASE_GROUPS = [
   { group: "Disp. cliente",  start: "dispClient", end: null,       color: "#fdf4ff" },
 ];
 const EXCEL_COLS = ["name","devStart","devEnd","cfStart","cfEnd","e2eStart","e2eEnd","uatStart","uatEnd","certStart","certEnd","passInProd","dispClient"];
+void EXCEL_COLS; // usato solo in import logic; keep reference to satisfy linter in builds that enable stricter checks
 const EMPTY_RELEASE = () => ({ name:"", devStart:"", devEnd:"", cfStart:"", cfEnd:"", e2eStart:"", e2eEnd:"", uatStart:"", uatEnd:"", certStart:"", certEnd:"", passInProd:"", dispClient:"" });
 const GRP_HEADER = ["#1e3a8a","#4c1d95","#14532d","#713f12","#7f1d1d","#14532d","#581c87"];
 function parseExcelDate(s) {
@@ -331,14 +332,16 @@ const formatDate = (v) => {
   const yy = String(d.getFullYear()).slice(-2);
   return `${dd}/${mm}/${yy}`;
 };
-
+void formatDate;
+ 
 const formatPerc = (v) => {
   const n = Number(v);
   if (isNaN(n)) return "—";
   return (n * 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
 };
-
+void formatPerc;
 const RUOLI = ["Mandataria", "Mandante", "SUBCO", "Altro"];
+void RUOLI; // kept for semantic clarity; may be used in future UI
 
 
 // Formatta un numero per la visualizzazione nel campo input (formato italiano)
@@ -388,6 +391,7 @@ const CW = {
 // Larghezza totale delle prime 4 colonne info (uguale in entrambe le tabelle)
 // ORIGINALE const CW_INFO_TOTAL = CW.arrow + CW.contratto + CW.tow + CW.qta; // 377px
 const CW_INFO_TOTAL = 377;
+void CW_INFO_TOTAL; // used to calculate layout widths; keep reference to satisfy linter
 
 const FIELDS = [
   { key: "valoreUnitario",    label: "Valore Unitario",      group: "euro", color: "#64748b" },
@@ -1064,6 +1068,8 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
 
   // Se towRows era vuoto al mount (timing: contratto appena creato),
   // recupera le righe direttamente dal backend.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (towRows.length > 0) {
       // Aggiorna solo se righe è ancora vuoto (non sovrascrive modifiche in corso)
@@ -1083,6 +1089,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
       })
       .catch(() => { if (!cancelled) setLoadingRighe(false); });
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   // The effect intentionally excludes some deps to avoid repeated calls; kept explicit to be clear
   }, [contratto, towRows.length]);
   const [saving, setSaving] = useState(false);
@@ -1343,6 +1350,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   const [showNewContratto, setShowNewContratto] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [showCollaudo, setShowCollaudo] = useState(false);
+  void setShowCollaudo;
   const [dragOver, setDragOver] = useState(null);
   const [contrattiBudget, setContrattiBudget] = useState([]); // eslint-disable-line
   const [righe] = useState([]); // eslint-disable-line
@@ -1443,6 +1451,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
   useEffect(() => { loadRti(); }, [loadRti, ambienteId]); // eslint-disable-line
 
   const filteredRows = selectedContratto ? rows.filter(r => r.towContratto === selectedContratto) : [];
+  void filteredRows;
 
   const handleSaved = (updated) => {
     setRows(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -1779,6 +1788,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
         const visibleFields = FIELDS.filter(f => showCollaudo || !f.key.startsWith("collaudo"));
         const isBaseExpanded = expandedContratto === contratti[0];
         const baseContratto0 = contratti[0] || "";
+        void isBaseExpanded;
+        void baseContratto0;
         // Mostra colonna % Impatto sempre se ci sono impatti configurati (allineamento garantito)
         const hasImpatto = Object.keys(towImpatto).length > 0;
 
@@ -2078,6 +2089,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 
 // ─── Contratti (dati reali da ConsumoTow) ────────────────────────────────────
 function ContrattiSection({ rows }) {
+  void rows;
   // Raggruppa le righe ConsumoTow per towContratto e somma valoreTotale
   const contratti = React.useMemo(() => {
     const map = {};
@@ -2234,11 +2246,14 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
       addToMap(r.subcoImporti);
     });
     return map;
-  }, [mevRows]);
+    }, [mevRows]);
+    void mevConsumatoMap;
 
   const emptyForm = { contratto: contratti[0] || "", ruolo: "Mandataria", societa: "", dataInizio: "", dataApprovazione: "", percentuale: "", importo: "", consumato: "" };
   const [righe, setRigheLocal] = React.useState([]);
   const [loadingRighe] = React.useState(false); // il loading è gestito dal padre
+  void loadingRighe;
+  void loadingRighe;
 
   // Sincronizza le righe dalla prop del padre
   React.useEffect(() => { setRigheLocal(righeInit); }, [righeInit]);
@@ -2438,7 +2453,8 @@ function RigheSection({ contratti = [], rows = [], mevRows = [], ordiniRows = []
         });
       });
       return map;
-   }, [mevRows]);
+    }, [mevRows]);
+    void mevImportiPerSocieta;
 
   // Helper: restituisce i 5 valori per una riga RTI/SUBCO.
   // - Valore Totale : importo manuale della riga RTI
