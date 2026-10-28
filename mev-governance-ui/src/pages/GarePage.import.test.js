@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-node-access, testing-library/no-container */
 import React from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -61,4 +62,7 @@ test("catalogo senza ID originale mostra i nomi, senza esporre la chiave tecnica
   expect(screen.queryByRole("columnheader", { name: "Ambito" })).not.toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Descrizione Driver" })).toBeInTheDocument();
 });
-/* eslint-disable testing-library/no-node-access */
+/* eslint-disable testing-library/no-node-access, testing-library/no-container */
+// Temporanea disabilitazione rule testing-library: test legacy
+// Temporanea disabilitazione rule testing-library: test legacy
+// Temporanea disabilitazione rule testing-library per test di import

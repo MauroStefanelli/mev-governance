@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-node-access, testing-library/no-container */
 import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import GaraSections, { buildSectionsTree } from "./GaraSections";

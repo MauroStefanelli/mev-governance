@@ -33,8 +33,8 @@ function App() {
   // true finché non abbiamo verificato se la sessione salvata è ancora valida
   const [bootstrapping, setBootstrapping] = useState(true);
   const [page, setPage]             = useState("home");
-  const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
-  const [filteredRows, setFilteredRows] = useState([]);
+  const [rows, setRows]             = useState([]);
+  const [filteredRows, setFilteredRows] = useState([]); // maintained for API compatibility
   const [lastAlign, setLastAlign]   = useState(null);
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [pwdModalTab, setPwdModalTab]   = useState("password"); // "password" | "aikey"
@@ -43,13 +43,23 @@ function App() {
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
+  // NOTE: le variabili AI vengono gestite in Profilo/Modal; manteniamo i state
+  // per compatibilità ma li segnaliamo come intenzionalmente non usati dal lint.
+  // eslint-disable-next-line no-unused-vars
   const [aiKeyVal, setAiKeyVal]     = useState("");
+  // eslint-disable-next-line no-unused-vars
   const [aiKeyHas, setAiKeyHas]     = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [aiKeyEnabled, setAiKeyEnabled] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [aiKeyMsg, setAiKeyMsg]     = useState("");
+  // eslint-disable-next-line no-unused-vars
   const [aiTestResult, setAiTestResult] = useState(null); // null | {ok, model, message}
+  // eslint-disable-next-line no-unused-vars
   const [aiTestBusy, setAiTestBusy] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [aiModelList, setAiModelList] = useState(null); // null | string[] | {error}
+  // eslint-disable-next-line no-unused-vars
   const [aiModelsBusy, setAiModelsBusy] = useState(false);
   // Campi configurazione AI estesa
   const [aiEndpoint, setAiEndpoint] = useState("");

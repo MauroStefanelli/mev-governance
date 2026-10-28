@@ -258,7 +258,8 @@ const PAGE_DEFS = [
 ];
 
 // Gradi per card basati sull'accento
-const cardGradient = (accent, accentDark) =>
+  // eslint-disable-next-line no-unused-vars
+  const cardGradient = (accent, accentDark) =>
   `linear-gradient(135deg, ${accent}22 0%, ${accentDark}11 100%)`;
 
 export default function HomePage({

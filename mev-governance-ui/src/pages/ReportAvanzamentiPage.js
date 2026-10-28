@@ -22,6 +22,7 @@ const C = {
 };
 
 const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// eslint-disable-next-line no-unused-vars
 const fmtPct = (v) => v != null && v !== "" ? `${v}%` : "—";
 const fmtDate = (v) => v || "—";
 

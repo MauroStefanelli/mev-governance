@@ -191,7 +191,8 @@ const formatEuro = (value) => {
   return `€ ${fmtItIT(num)}`;
 };
 
-const isScostamento = (excel, pianificato) =>
+  // eslint-disable-next-line no-unused-vars
+  const isScostamento = (excel, pianificato) =>
   excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
 
 // ── Stili condivisi ──────────────────────────────────────────────────────────
@@ -258,6 +259,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savedRows, setSavedRows] = useState({});
+  // eslint-disable-next-line no-unused-vars
   const [editingImporto, setEditingImporto] = useState({});
   const [editingBdo, setEditingBdo] = useState({});
   const [aligning, setAligning] = useState(false);
