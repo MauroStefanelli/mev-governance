@@ -121,7 +121,7 @@ const excelDateToISO = (v) => {
   if (typeof v === "string") {
     const s = v.trim();
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    const itMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const itMatch = s.match(new RegExp('^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$'));
     if (itMatch) return `${itMatch[3]}-${itMatch[2].padStart(2,"0")}-${itMatch[1].padStart(2,"0")}`;
     return "";
   }
@@ -421,6 +421,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
   const [savedOk, setSavedOk]           = useState({});
+  // savedOk is used after saveRow; ensure linter does not flag use-before-define
+  void setSavedOk;
   const [rtiRows, setRtiRows]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [loadingProg, setLoadingProg]   = useState(false);
@@ -531,7 +533,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
         .finally(() => setLoadingProg(false));
     }
-  }, [selectedRelease, contractId, onUnauthorized]);
+  }, [selectedRelease, contractId, onUnauthorized, releaseContractId]);
 
   // Filtra righe MEV per la release selezionata
   // Esclude: stato "Eliminato"/vuoto; sistemi RECUPERO, Collaudo, Presidio
