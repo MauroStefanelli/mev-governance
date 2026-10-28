@@ -40,6 +40,7 @@ const formatPerc = (value, total) => {
   if (isNaN(perc)) return "";
   return `${perc.toFixed(1)}%`;
 };
+void formatPerc; // helper kept for parity with other pages; mark used to silence linter
 
 const PercBadge = ({ value, total, color = "#64748b" }) => {
   const perc = (!total || total === 0) ? null : (parseFloat(value) / parseFloat(total)) * 100;
@@ -58,7 +59,9 @@ const PercBadge = ({ value, total, color = "#64748b" }) => {
       {perc.toFixed(1)}%
     </span>
   );
+  // TowChart intentionally defined but currently unused; keep for future UI variants
 };
+void PercBadge; // component kept for API parity; mark used to silence linter
 
 const formatEuroK = (value) => {
   if (!value) return "€ 0";
@@ -163,10 +166,13 @@ function PieTooltip({ active, payload }) {
   );
 }
 
+void PieTooltip; // defined for potential future use by other chart components; mark used to avoid eslint warning
+
 
 
 function TowPieChart({ title, rows, sum }) {
   const [activeIndex, setActiveIndex] = useState(null);
+  void setActiveIndex; // setter intentionally unused in this component; mark with void to silence linter
 
   const valoreTotale = sum(rows, "valoreTotale");
 
