@@ -667,8 +667,10 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [towFiles,     setTowFiles]           = React.useState({});     // { 1: File, 2: File, ... }
   const [catalogFiles, setCatalogFiles]       = React.useState({});     // { 1: File, 2: File, ... }
   const [capFile,      setCapFile]            = React.useState(null);   // File capitolato tenuto in memoria
+  void capFile; // currently stored for on-demand analysis; may be unused in some flows
   const [analyzingProposte, setAnalyzingProposte] = React.useState({}); // { lottoIdx: bool }
   const towFileRefs    = React.useRef({});
+  void towFileRefs; // ref kept for optional upload flows; mark used to avoid linter warning
   const docFileRefs = React.useRef({});
   const capFileInputRef = useRef(null);
 
