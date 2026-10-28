@@ -82,7 +82,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   // ── Sviluppo ──
   const [implementationFiles, setImplementationFiles] = useState([]);
   const [techProfile, setTechProfile] = useState(null);
-  // eslint-disable-next-line no-unused-vars
   const [techProfileBusy, setTechProfileBusy] = useState(false);
   const [selectedAppId, setSelectedAppId] = useState("");
   const [selectedAppIds, setSelectedAppIds] = useState([]);
@@ -98,9 +97,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [applications, setApplications] = useState([]);
   const [showApplicativi, setShowApplicativi] = useState(false);
   const [appSyncBusy, setAppSyncBusy] = useState(false);     // salvataggio DB applicativi
-  // eslint-disable-next-line no-unused-vars
   const [aiAppBusy, setAiAppBusy]     = useState(false);     // scheda AI per applicativo
-  // eslint-disable-next-line no-unused-vars
   const [aiAppTarget, setAiAppTarget] = useState(null);      // applicativo selezionato per scheda AI
   const [openAppSheet, setOpenAppSheet] = useState(null);    // { id, type: 'ai'|'tech' } — pannello scheda aperto
 
@@ -344,13 +341,14 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     });
   };
 
-  // eslint-disable-next-line no-unused-vars
   const handleSelectContract = async (id) => {
     setSelectedContractId(id);
     setLot((allContracts.find((c) => c.contractId === id)?.lots || [])[0]?.lotId || "1");
     setStep(1);
     resetInitiative();
   };
+  // mark as used to satisfy linter while handler is kept for future wiring
+  void handleSelectContract;
 
   // ── Form contratto ──
   const updateContractLotField = (idx, patch) => {
