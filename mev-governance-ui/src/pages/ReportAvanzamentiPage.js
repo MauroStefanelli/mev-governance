@@ -419,6 +419,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
   const [savedOk, setSavedOk]           = useState({});
+  void savedOk;
   const [rtiRows, setRtiRows]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [loadingProg, setLoadingProg]   = useState(false);
