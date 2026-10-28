@@ -2086,7 +2086,9 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 
 // ─── Contratti (dati reali da ConsumoTow) ────────────────────────────────────
 function ContrattiSection({ rows }) {
-  // rows può non essere usato in alcune build; marcato volontariamente
+  // NOTE: ContrattiSection è definita ma non referenziata nella UI corrente.
+  // Manteniamo la definizione per futuri usi; assicurati che l'import/binding venga usato
+  // altrove prima di rimuoverlo definitivamente.
   void rows;
   // Raggruppa le righe ConsumoTow per towContratto e somma valoreTotale
   const contratti = React.useMemo(() => {
