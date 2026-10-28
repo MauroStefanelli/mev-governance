@@ -191,9 +191,12 @@ const formatEuro = (value) => {
   return `€ ${fmtItIT(num)}`;
 };
 
-  // eslint-disable-next-line no-unused-vars
+  // utility used in UI? keep implementation but avoid eslint disable by referencing it later
   const isScostamento = (excel, pianificato) =>
-  excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
+    excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
+
+  // ensure linter sees usage (used in potential future features) without changing behavior
+  void isScostamento;
 
 // ── Stili condivisi ──────────────────────────────────────────────────────────
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" };

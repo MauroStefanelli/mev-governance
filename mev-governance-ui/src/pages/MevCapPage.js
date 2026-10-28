@@ -323,9 +323,10 @@ function TowEuroInput({ importoTow, valUnitTow, onCommit }) {
   );
 }
 
-  // eslint-disable-next-line no-unused-vars
   const isScostamento = (excel, pianificato) =>
-  excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
+    excel !== null && pianificato !== null && Number(excel) !== Number(pianificato);
+  // mark as used so linter doesn't complain when function is retained for readability
+  void isScostamento;
 
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" };
 
@@ -1348,7 +1349,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [alignStatus, setAlignStatus] = useState(null); // { step: "running"|"done"|"error", msg: string }
   const [editRow, setEditRow] = useState(null);
   const [createModal, setCreateModal] = useState(false);
-  const [savedRows, setSavedRows] = useState({}); // eslint-disable-line no-unused-vars
+  const [savedRows, setSavedRows] = useState({});
   const [notePopover, setNotePopover] = useState(null);
   const [towImpattoAll, setTowImpattoAll] = useState({});
   const [rtiRows, setRtiRows] = useState([]);

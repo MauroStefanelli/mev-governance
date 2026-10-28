@@ -1083,7 +1083,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
       })
       .catch(() => { if (!cancelled) setLoadingRighe(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // The effect intentionally excludes some deps to avoid repeated calls; kept explicit to be clear
   }, [contratto, towRows.length]);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
