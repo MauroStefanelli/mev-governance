@@ -906,8 +906,50 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         implementationFiles: implementationFiles.length ? implementationFiles.map(f => f.webkitRelativePath || f.name) : (techProfile?.filePaths || []),
       };
       const result = await analyzeDevelopmentWithAi(payload);
-      // show result in modal download or copy
-      const doc = result.document || result.markdown || JSON.stringify(result, null, 2);
+      // Prefer structured analysis -> render to Markdown; otherwise fallback to any provided document/markdown field or raw JSON
+      let doc = "";
+      if (result && result.analysis) {
+        const a = result.analysis;
+        // If Recommendations present, format them
+        if (Array.isArray(a.recommendations) && a.recommendations.length > 0) {
+          doc += `# Documento di sviluppo - Iniziativa ${appNorm(initiative.code || initiative.title)}\n\n`;
+          if (a.summary) doc += `## Riepilogo\n${a.summary}\n\n`;
+          doc += `## Raccomandazioni\n`;
+          a.recommendations.forEach((r, idx) => {
+            doc += `\n### ${idx + 1}. Intervention ${r.interventionId || ""} · Catalog ${r.catalogId || ""}\n`;
+            if (r.reason) doc += `**Perché**: ${r.reason}\n\n`;
+            if (Array.isArray(r.activities) && r.activities.length) {
+              doc += `**Attività**:\n`;
+              r.activities.forEach(act => { doc += `- ${act}\n`; });
+              doc += `\n`;
+            }
+            if (Array.isArray(r.files) && r.files.length) {
+              doc += `**File candidati**:\n`;
+              r.files.forEach(f => { doc += `- ${f}\n`; });
+              doc += `\n`;
+            }
+            if (Array.isArray(r.risks) && r.risks.length) {
+              doc += `**Rischi**:\n`;
+              r.risks.forEach(rk => { doc += `- ${rk}\n`; });
+              doc += `\n`;
+            }
+            if (Array.isArray(r.tests) && r.tests.length) {
+              doc += `**Test consigliati**:\n`;
+              r.tests.forEach(t => { doc += `- ${t}\n`; });
+              doc += `\n`;
+            }
+          });
+          if (Array.isArray(a.warnings) && a.warnings.length) {
+            doc += `\n## Avvertenze\n`;
+            a.warnings.forEach(w => { doc += `- ${w}\n`; });
+          }
+        } else {
+          // No recommendations: include summary and raw analysis
+          doc = (a.summary ? `# Riepilogo\n${a.summary}\n\n` : "") + `\n\n` + `\n\nJSON analysis:\n` + JSON.stringify(a, null, 2);
+        }
+      } else {
+        doc = result.document || result.markdown || JSON.stringify(result, null, 2);
+      }
       downloadBlob(`sviluppo_iniziativa_${appNorm(initiative.code || initiative.title)}.md`, new Blob([doc], { type: 'text/markdown;charset=utf-8' }));
       toast('Documento di sviluppo generato (scaricato).');
     } catch (e) {
