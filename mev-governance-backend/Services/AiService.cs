@@ -289,6 +289,79 @@ public class AiService
         };
     }
 
+    // Filtra proposals nell'analysis JSON in base al catalogo e al context.applicationContext.
+    // Rimuove proposte il cui catalogId non è presente nel catalogo fornito oppure
+    // che non contengono termini riconducibili ad applicativi presenti nel context.
+    private static void FilterAnalysisProposals(JsonObject analysis, JsonObject context)
+    {
+        if (analysis == null) return;
+        if (!analysis.TryGetPropertyValue("proposals", out var proposals) || proposals is not JsonArray arr) return;
+
+        // Costruisci set di catalog IDs validi
+        var validCatalogIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (context.TryGetPropertyValue("catalog", out var catalog) && catalog is JsonArray catArr)
+        {
+            foreach (var item in catArr)
+                if (item is JsonObject c && c.TryGetPropertyValue("id", out var idVal))
+                    validCatalogIds.Add(idVal?.ToString() ?? "");
+        }
+
+        // Costruisci termini permessi dall'applicationContext
+        var allowedTerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (context.TryGetPropertyValue("applicationContext", out var appCtx) && appCtx is JsonArray apps)
+        {
+            foreach (var a in apps)
+            {
+                if (a is JsonObject ao)
+                {
+                    void AddIfString(string? s)
+                    {
+                        if (string.IsNullOrWhiteSpace(s)) return;
+                        foreach (var tok in s.Split(new[] { ' ', '\t', '\n', '\r', ',', ';', '.', '/', '-' }, StringSplitOptions.RemoveEmptyEntries))
+                            if (tok.Length > 2) allowedTerms.Add(tok.Trim());
+                    }
+
+                    if (ao.TryGetPropertyValue("name", out var name)) AddIfString(name?.ToString());
+                    if (ao.TryGetPropertyValue("code", out var code)) AddIfString(code?.ToString());
+                    if (ao.TryGetPropertyValue("notes", out var notes)) AddIfString(notes?.ToString());
+                    if (ao.TryGetPropertyValue("technologies", out var tech) && tech is JsonArray techArr)
+                        foreach (var t in techArr) AddIfString(t?.ToString());
+                    if (ao.TryGetPropertyValue("techProfile", out var tp) && tp is JsonObject tpo)
+                    {
+                        if (tpo.TryGetPropertyValue("integrations", out var ints) && ints is JsonArray intsArr)
+                            foreach (var it in intsArr) AddIfString(it?.ToString());
+                    }
+                }
+            }
+        }
+
+        var newProposals = new JsonArray();
+        foreach (var p in arr)
+        {
+            if (p is not JsonObject po) continue;
+            var catalogId = po.GetStringProp("catalogId") ?? "";
+            // Se catalogId non è nel catalogo valido, scarta
+            if (!string.IsNullOrEmpty(catalogId) && !validCatalogIds.Contains(catalogId))
+                continue;
+
+            // Se non abbiamo termini permessi, manteniamo le proposte (fallback permissivo)
+            if (allowedTerms.Count == 0) { newProposals.Add(po); continue; }
+
+            // Controlla testo di rationale/additionalInfo/notes
+            var text = (po.GetStringProp("rationale") ?? "") + " " + (po.GetStringProp("additionalInfo") ?? "") + " " + (po.GetStringProp("notes") ?? "");
+            var matched = false;
+            foreach (var term in allowedTerms)
+            {
+                if (string.IsNullOrWhiteSpace(term)) continue;
+                if (text.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0) { matched = true; break; }
+            }
+            if (matched || !string.IsNullOrEmpty(po.GetStringProp("interventionId")))
+                newProposals.Add(po);
+        }
+
+        analysis["proposals"] = newProposals;
+    }
+
     private JsonObject BuildPayload(AiSettings s, string endpointCheck, JsonNode input, bool structured)
     {
         JsonObject payload;
@@ -434,6 +507,17 @@ public class AiService
         JsonObject analysis;
         try { analysis = ParseAnalysisJson(responseText); }
         catch (InvalidOperationException) { analysis = FallbackAnalysisFromText(responseText, context.ToJsonObject()); }
+
+        // Server-side guard: filtra le proposals AI che non sono coerenti
+        // con il contesto applicativo e il catalogo effettivamente fornito.
+        try
+        {
+            FilterAnalysisProposals(analysis, context.ToJsonObject());
+        }
+        catch
+        {
+            // Non bloccare l'analisi per errori del filtro: manteniamo il risultato originale
+        }
 
         return (
             analysis,
