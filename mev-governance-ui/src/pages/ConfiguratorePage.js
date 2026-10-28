@@ -97,6 +97,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [implementationTests, setImplementationTests] = useState("");
   const [devBusy, setDevBusy] = useState(false);
 
+  // Snippet viewer modal for AI proposals
+  const [snippetModal, setSnippetModal] = useState({ open: false, title: "", content: "" });
+
   // ── Applicativi ──
   const [applicationSearch, setApplicationSearch] = useState("");
   const [applicationDraft, setApplicationDraft] = useState(null);
@@ -888,6 +891,30 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     toast("Proposte AI applicate; resta possibile modificarle manualmente");
     // salva bozza dell'applicazione delle proposte
     try { persistInitiativeEvaluation(false); } catch {}
+  };
+
+  // Generate aggregated development document via AI
+  const generateDevelopmentDocument = async () => {
+    setDevBusy(true);
+    try {
+      const payload = {
+        contractId: initiativeContractId,
+        lot,
+        initiative,
+        approved: approvedInterventionsFor(),
+        techProfile,
+        implementationFiles: implementationFiles.length ? implementationFiles.map(f => f.webkitRelativePath || f.name) : (techProfile?.filePaths || []),
+      };
+      const result = await analyzeDevelopmentWithAi(payload);
+      // show result in modal download or copy
+      const doc = result.document || result.markdown || JSON.stringify(result, null, 2);
+      downloadBlob(`sviluppo_iniziativa_${appNorm(initiative.code || initiative.title)}.md`, new Blob([doc], { type: 'text/markdown;charset=utf-8' }));
+      toast('Documento di sviluppo generato (scaricato).');
+    } catch (e) {
+      toast('Generazione documento non riuscita: ' + (e.message || e));
+    } finally {
+      setDevBusy(false);
+    }
   };
   // kept for UI action wiring; mark as used to silence linter
   void applyAiProposals;
@@ -2372,7 +2399,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           <div style={{ fontSize: 13, fontWeight: 700, color: "#5b21b6" }}>
             Proposte AI · {aiProposals.model || "AI"} — aggiungi quelle pertinenti
           </div>
-          {aiPending.map((p, pi) => {
+            {aiPending.map((p, pi) => {
             const cc = catalog.find(c => String(c.id) === String(p.catalogId));
             if (!cc) return null;
             const conf = Math.round((Number(p.confidence) || 0) * 100);
@@ -2402,9 +2429,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                     </p>
                   )}
                 </div>
-                <button
-                  style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
-                  onClick={() => {
+                  <button
+                    style={{ ...btnStyles.primary, background: "#7c3aed", border: "1px solid #6d28d9", whiteSpace: "nowrap", flexShrink: 0, fontSize: 12, padding: "6px 12px" }}
+                    onClick={() => {
                     const catalogEntry = catalog.find(c => String(c.id) === String(p.catalogId));
                     if (!catalogEntry) return;
                     // Assegna al gruppo dell'interventionId se presente, altrimenti nessun gruppo
@@ -2427,12 +2454,18 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                       return next;
                     });
                   }}
-                >
-                  + Aggiungi
-                </button>
-              </div>
-            );
-          })}
+                  >
+                    + Aggiungi
+                  </button>
+                  {/* Show suggested files/snippets if available */}
+                  {p.files && p.files.length > 0 && (
+                    <button style={{ ...btnStyles.secondary, marginLeft: 8, fontSize: 12 }} onClick={(e) => { e.preventDefault(); const f = p.files[0]; setSnippetModal({ open: true, title: f.path || f.file || "Snippet", content: f.snippet || f.content || "" }); }}>
+                      Mostra snippet
+                    </button>
+                  )}
+                </div>
+              );
+            })}
         </div>
       )}
 
@@ -2960,6 +2993,18 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             <input style={styles.input} value={implementationBranch} onChange={(e) => setImplementationBranch(e.target.value)} placeholder="feature/<codice>" />
           </label>
         </div>
+        {/* Snippet modal */}
+        {snippetModal.open && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSnippetModal({ open: false, title: '', content: '' })}>
+            <div style={{ width: 'min(900px, 94vw)', maxHeight: '85vh', overflow: 'auto', background: '#fff', borderRadius: 12 }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #e6eef8' }}>
+                <strong>{snippetModal.title}</strong>
+                <button style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer' }} onClick={() => setSnippetModal({ open: false, title: '', content: '' })}>✕</button>
+              </div>
+              <pre style={{ padding: 16, margin: 0, fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#0f172a', color: '#e6eef8' }}>{snippetModal.content}</pre>
+            </div>
+          </div>
+        )}
         <label style={styles.label}>
           Note di approvazione
           <textarea style={styles.textarea} rows={2} value={implementationApprovalNotes} onChange={(e) => setImplementationApprovalNotes(e.target.value)} placeholder="Criteri di autorizzazione, vincoli, razionale…" />
@@ -2981,12 +3026,15 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             Nessun applicativo selezionato — torna al passo 1 e seleziona un applicativo da &quot;Applicativi e tecnologie&quot;.
           </p>
         )}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-          <button style={btnStyles.primary} onClick={generateCodeChangeRequest} disabled={devBusy}>
-            {devBusy ? "Genero il pacchetto…" : "Genera ZIP richiesta modifica codice"}
-          </button>
-          <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
-        </div>
+           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+           <button style={btnStyles.primary} onClick={generateCodeChangeRequest} disabled={devBusy}>
+             {devBusy ? "Genero il pacchetto…" : "Genera ZIP richiesta modifica codice"}
+           </button>
+           <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
+           <button style={{ ...btnStyles.secondary, background: '#fff7ed', borderColor: '#f59e0b', color: '#92400e' }} onClick={generateDevelopmentDocument} disabled={devBusy}>
+             {devBusy ? 'Generazione documento…' : 'Genera documento sviluppo (AI)'}
+           </button>
+         </div>
       </details>
 
       {toastMsg && (
