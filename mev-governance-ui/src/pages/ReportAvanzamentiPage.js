@@ -141,7 +141,8 @@ const normHeader = (h) =>
 // ── Normalizzazione per match testuale (rimuove punteggiatura, spazi multipli) ─
 const normText = (s) =>
   String(s || "").trim().toLowerCase()
-    .replace(/[()[\]{}<>\/\\'",.;:!?#@€$%&*+=|~`^]/g, " ")
+    // Replace any character that is not letter (including basic Latin-1), number or whitespace
+    .replace(/[^A-Za-z0-9\u00C0-\u017F\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -414,6 +415,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     setSelectedReleaseState(val);
     try { if (val) localStorage.setItem(LS_KEY, val); else localStorage.removeItem(LS_KEY); } catch {}
   }, [LS_KEY]);
+  // savedOk used to show transient save feedback; keep reference to avoid lint noise
+  void savedOk;
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
