@@ -2085,83 +2085,8 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
 
 
 // ─── Contratti (dati reali da ConsumoTow) ────────────────────────────────────
-function ContrattiSection({ rows }) {
-  // NOTE: ContrattiSection è definita ma non referenziata nella UI corrente.
-  // Manteniamo la definizione per futuri usi; assicurati che l'import/binding venga usato
-  // altrove prima di rimuoverlo definitivamente.
-  void rows;
-  // Raggruppa le righe ConsumoTow per towContratto e somma valoreTotale
-  const contratti = React.useMemo(() => {
-    const map = {};
-    (rows || []).forEach(r => {
-      const k = r.towContratto || "—";
-      if (!map[k]) map[k] = { contratto: k, valoreTotale: 0, righe: 0 };
-      map[k].valoreTotale += Number(r.valoreTotale) || 0;
-      map[k].righe += 1;
-    });
-    return Object.values(map).sort((a, b) => a.contratto.localeCompare(b.contratto));
-  }, [rows]);
-
-  const TH2 = (align = "right") => ({
-    padding: "10px 14px", textAlign: align, fontWeight: 700, fontSize: "11px",
-    color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px",
-    borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap", background: "#f8fafc",
-  });
-  const TD2 = (align = "right", extra = {}) => ({
-    padding: "9px 14px", textAlign: align, fontSize: "13px",
-    borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", color: "#374151", ...extra,
-  });
-
-  return (
-    <div style={{ background: "#fff", borderRadius: "14px", border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflow: "hidden", marginBottom: "24px" }}>
-      <div style={{ padding: "14px 22px", background: "linear-gradient(135deg,#1a73e8 0%,#1557b0 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>Contratti</div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>Riepilogo valori contrattuali</div>
-        </div>
-        <div style={{ fontSize: "12px", fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{contratti.length} contratti</div>
-      </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-          <thead>
-            <tr>
-              <th style={TH2("left")}>Contratto</th>
-              <th style={TH2("right")}>Valore Totale</th>
-              <th style={TH2("right")}>N. TOW</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contratti.length === 0 ? (
-              <tr><td colSpan={3} style={{ padding: "36px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
-                Nessun contratto disponibile — importa i dati dal file Excel
-              </td></tr>
-            ) : contratti.map((r, idx) => (
-              <tr key={r.contratto}
-                style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}
-                onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#fafafa"}>
-                <td style={{ ...TD2("left"), fontWeight: 700, color: "#0f172a" }}>
-                  <span style={{ display: "inline-block", background: "#f1f5f9", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 800 }}>{r.contratto}</span>
-                </td>
-                <td style={{ ...TD2("right"), fontWeight: 700, color: "#1a73e8", fontSize: "14px" }}>{formatEuro(r.valoreTotale)}</td>
-                <td style={{ ...TD2("right"), color: "#64748b" }}>{r.righe}</td>
-              </tr>
-            ))}
-          </tbody>
-          {contratti.length > 1 && (
-            <tfoot>
-              <tr style={{ background: "#f1f5f9", borderTop: "2px solid #e2e8f0" }}>
-                <td style={{ ...TD2("left"), fontWeight: 700, color: "#1e293b", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>Totale</td>
-                <td style={{ ...TD2("right"), fontWeight: 800, color: "#1e293b", fontSize: "14px" }}>{formatEuro(contratti.reduce((s, r) => s + r.valoreTotale, 0))}</td>
-                <td style={TD2("right")} />
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-    </div>
-  );
-}
+// ContrattiSection rimossa poiché non referenziata nella UI corrente.
+// Se servisse in futuro, possiamo reinserirla o estrarla in un componente separato.
 
 
 // ─── RTI & SUBCO (dati persistiti su DB backend) ─────────────────────────────
