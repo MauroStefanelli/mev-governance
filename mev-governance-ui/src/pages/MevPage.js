@@ -204,6 +204,7 @@ const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign:
 // Sticky columns: left offset cumulativi per le prime 8 colonne (ID → Note)
 const SC_LEFT  = [0, 50, 130, 240, 440, 500, 600, 730];
 const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60];
+void SC_WIDTH;
 const stickyTh = (i, extra = {}) => ({
   position: "sticky", left: SC_LEFT[i], zIndex: 11,
   background: "inherit",
@@ -263,6 +264,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const [loading, setLoading] = useState(true);
   const [savedRows, setSavedRows] = useState({});
   const [editingImporto, setEditingImporto] = useState({});
+  void setEditingImporto;
   // ensure linter sees usage when editingImporto is intentionally kept for UI behavior
   void editingImporto;
   const [editingBdo, setEditingBdo] = useState({});
@@ -330,6 +332,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const mandatariaOptions = [...new Set(
     rows.flatMap(r => resolveCapMandanti(r.capgemini, r.iet, rtiRows))
   )].filter(Boolean).sort();
+  void mandatariaOptions; // kept for future UI; mark as used to silence linter
 
   // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
   const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
