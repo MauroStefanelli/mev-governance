@@ -1048,12 +1048,12 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
   const { pos, onMouseDown } = useDrag();
 
   // QTA corretta: valoreTotale / valoreUnitario (arrotondata)
-  const calcQtaFromRow = (r) => {
+  const calcQtaFromRow = React.useCallback((r) => {
     if (r.valoreUnitario > 0) return Math.round((r.valoreTotale || 0) / r.valoreUnitario);
     return r.towApprovati ?? 0;
-  };
+  }, []);
 
-  const rowsToRighe = (src) => src.map(r => ({
+  const rowsToRighe = React.useCallback((src) => (src || []).map(r => ({
     id: r.id,
     tow: r.tow || "",
     valoreUnitario: formatForInput(r.valoreUnitario ?? 0, "euro"),
@@ -1061,15 +1061,14 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
     sconto: formatForInput(r.sconto ?? 0, "qta"),
     subtotale: formatForInput(r.valoreTotale ?? 0, "euro"),
     isCatalogo: !!(r.isCatalogo),
-  }));
+  })), [calcQtaFromRow]);
 
   const [righe, setRighe] = useState(() => rowsToRighe(towRows));
   const [loadingRighe, setLoadingRighe] = useState(towRows.length === 0);
 
   // Se towRows era vuoto al mount (timing: contratto appena creato),
   // recupera le righe direttamente dal backend.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // rowsToRighe e towRows sono stabilizzati; includiamoli esplicitamente.
   React.useEffect(() => {
     if (towRows.length > 0) {
       // Aggiorna solo se righe è ancora vuoto (non sovrascrive modifiche in corso)
@@ -1089,9 +1088,7 @@ function EditContrattoModal({ contratto, towRows, isBase, baseRows, onClose, onS
       })
       .catch(() => { if (!cancelled) setLoadingRighe(false); });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // The effect intentionally excludes some deps to avoid repeated calls; kept explicit to be clear
-  }, [contratto, towRows.length]);
+  }, [contratto, towRows, rowsToRighe]);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
 
