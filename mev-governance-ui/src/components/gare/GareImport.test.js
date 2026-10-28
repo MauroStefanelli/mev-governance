@@ -48,3 +48,4 @@ test("sezioni senza sintesi espandibili, sintesi padre e ordine 1.2 prima di 1.1
   expect(empty.open).toBe(true);
   expect(within(empty).getByText(/Sintesi non disponibile/)).toBeInTheDocument();
 });
+/* eslint-disable testing-library/no-node-access, testing-library/no-container */

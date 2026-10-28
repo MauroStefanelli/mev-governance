@@ -856,7 +856,7 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
               { label: "Email", key: "email" },
             ].map(({ label, key }) => (
               <div key={key} style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#526079", fontWeight: 600, color: "#555" }}>{label}</label>
+                <label style={{ display: "block", fontSize: "12px", marginBottom: "7px", fontWeight: 600, color: "#555" }}>{label}</label>
                 <input
                   type="text"
                   value={editModal[key]}

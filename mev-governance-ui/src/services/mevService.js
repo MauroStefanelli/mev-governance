@@ -564,7 +564,7 @@ export const updateConfiguratoreLot = async (contractId, lotId, payload) => {
     headers: authHeaders(),
     body: JSON.stringify(payload)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -577,7 +577,7 @@ export const deleteConfiguratoreContract = async (contractId) => {
     method: "DELETE",
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore eliminazione contratto configuratore");
   return response.json();
 };
@@ -611,7 +611,7 @@ export const importConfiguratoreContract = async ({ contractId, name, rulesFile,
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -637,7 +637,7 @@ export const uploadConfiguratoreContractLot = async ({ contractId, contractName,
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -650,7 +650,7 @@ export const getConfiguratoreRecords = async (params = {}) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/records${qs ? `?${qs}` : ""}`, {
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore recupero records configuratore");
   const data = await response.json();
   // Il backend può restituire un array diretto o {records:[...]} — normalizziamo sempre
@@ -673,7 +673,7 @@ export const upsertConfiguratoreRecord = async (payload) => {
     headers: authHeaders(),
     body: JSON.stringify(body)
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text);
@@ -686,7 +686,7 @@ export const deleteConfiguratoreRecord = async (id) => {
     method: "DELETE",
     headers: authHeaders()
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) throw new Error("Errore eliminazione record configuratore");
   return response.json();
 };
@@ -711,7 +711,7 @@ export const getSharedApplications = async (contractId, lot) => {
     `${API_BASE_URL}/api/configuratore/records?${params}`,
     { headers: authHeaders() }
   );
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) return null;
   const data = await response.json();
   const records = Array.isArray(data) ? data : (data.records || data.data || []);
@@ -750,7 +750,7 @@ export const analizzaCapitolatoGara = async (file, towFiles = {}, catalogFiles =
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -767,7 +767,7 @@ export const analizzaProposteGara = async (context) => {
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(context),
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -787,7 +787,7 @@ export const analizzaOffertaExcel = async (file, lot, password) => {
     headers: { Authorization: `Bearer ${localStorage.getItem("jwt") || ""}` },
     body: form,
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -803,7 +803,7 @@ export const getGare = async () => {
     `${API_BASE_URL}/api/configuratore/records?${params}`,
     { headers: authHeaders() }
   );
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) return [];
   const data = await response.json();
   const records = Array.isArray(data) ? data : (data.records || data.data || []);
@@ -837,7 +837,7 @@ export const importaGaraComContratto = async ({ garaId, contractId, contractName
     headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ garaId, contractId, contractName }),
   });
-  if (response.status === 401 || response.status === 403) throw { status: response.status };
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
   if (!response.ok) {
     const text = await response.text();
     let errMsg = text;
@@ -1434,7 +1434,7 @@ export const getMyContratti = async () => {
 export const getReleaseProgress = async (contractId, release) => {
   const qs = new URLSearchParams({ contractId, ...(release ? { release } : {}) }).toString();
   const r = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/release-progress?${qs}`, { headers: authHeaders() });
-  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (r.status === 401 || r.status === 403) throw new Error(JSON.stringify({ status: r.status }));
   if (!r.ok) throw new Error("Errore lettura avanzamenti");
   return r.json();
 };
@@ -1445,7 +1445,7 @@ export const putReleaseProgress = async (contractId, release, payload) => {
     headers: authHeaders(),
     body: JSON.stringify({ contractId, release, payload }),
   });
-  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (r.status === 401 || r.status === 403) throw new Error(JSON.stringify({ status: r.status }));
   if (!r.ok) { const t = await r.text(); throw new Error(t); }
   return r.json();
 };
@@ -1456,7 +1456,7 @@ export const deleteAllReleaseProgress = async (contractId, release) => {
     `${API_BASE_URL}/api/configuratore/release-progress?${qs}`,
     { method: "DELETE", headers: authHeaders() }
   );
-  if (r.status === 401 || r.status === 403) throw { status: r.status };
+  if (r.status === 401 || r.status === 403) throw new Error(JSON.stringify({ status: r.status }));
   if (!r.ok) { const t = await r.text(); throw new Error(t); }
   return r.json();
 };

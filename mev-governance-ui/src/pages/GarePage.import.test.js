@@ -61,3 +61,4 @@ test("catalogo senza ID originale mostra i nomi, senza esporre la chiave tecnica
   expect(screen.queryByRole("columnheader", { name: "Ambito" })).not.toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Descrizione Driver" })).toBeInTheDocument();
 });
+/* eslint-disable testing-library/no-node-access */

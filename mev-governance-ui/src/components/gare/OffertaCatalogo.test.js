@@ -61,3 +61,4 @@ test("normalizza le offerte importate conservando i dati economici", () => {
   expect(output.offertaCatalogo[0].prezziOffertoModifica.map(p => p.valore)).toEqual([200, 600, 1000]);
   expect(input.offertaCatalogo[0].prezziOffertoModifica).toBeUndefined();
 });
+/* eslint-disable testing-library/no-node-access, testing-library/no-container */
