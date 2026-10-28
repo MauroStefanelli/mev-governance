@@ -418,8 +418,9 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
-  const [savedOk, setSavedOk]           = useState({});
-  void savedOk;
+  // savedOk removed: transient save indicator not used in UI. Keep setter noop.
+  const setSavedOk = () => {};
+  void setSavedOk;
   const [rtiRows, setRtiRows]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [loadingProg, setLoadingProg]   = useState(false);
