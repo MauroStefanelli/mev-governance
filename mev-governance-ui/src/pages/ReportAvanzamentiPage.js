@@ -736,7 +736,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       setDeleting(false);
       setShowConfirmDelete(false);
     }
-  }, [contractId, selectedRelease, filteredRows]); // eslint-disable-line
+  }, [contractId, selectedRelease, filteredRows, setSelectedRelease]); // eslint-disable-line
 
   // Crea una nuova release nella lista
   const handleCreateRelease = useCallback(async (name) => {
@@ -760,7 +760,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     } finally {
       setSavingRelease(false);
     }
-  }, [releases, releaseContractId]);
+  }, [releases, releaseContractId, setSelectedRelease]);
 
   // Rinomina release esistente
   const handleRenameRelease = useCallback(async () => {
@@ -780,7 +780,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     } finally {
       setSavingRename(false);
     }
-  }, [renameRelease, renameValue, releaseContractId, selectedRelease]); // eslint-disable-line
+  }, [renameRelease, renameValue, releaseContractId, selectedRelease, setSelectedRelease]); // eslint-disable-line
 
   // Elimina release dal calendario (non elimina i dati progress)
   const handleDeleteRelease = useCallback(async () => {
@@ -799,7 +799,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     } finally {
       setDeletingRelease(false);
     }
-  }, [confirmDeleteRelease, releaseRecords, selectedRelease]); // eslint-disable-line
+  }, [confirmDeleteRelease, releaseRecords, selectedRelease, setSelectedRelease]); // eslint-disable-line
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: C.muted, fontSize: 15 }}>
