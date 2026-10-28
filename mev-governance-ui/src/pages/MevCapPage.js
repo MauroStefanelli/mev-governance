@@ -1829,7 +1829,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
           <tbody>
             {filteredRows.map((r, index) => {
-              const scost = false;
+               const scost = false;
+               void scost; // intentionally kept for parity with MevPage highlighting logic
               const bg = index % 2 === 0 ? "white" : "#fafafa";
               const bgHover = "#f0f4ff";
               return (
