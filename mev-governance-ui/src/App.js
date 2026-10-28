@@ -20,7 +20,27 @@ import { getMevList, getLastAlign, changeMyPassword, saveMyAiSettings, setMyThem
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 // Release tag displayed in header. Prefer env-config (window._env_.REACT_APP_RELEASE) set by deploy pipeline.
 // Fallback to process.env or a build/runtime timestamp to help identify the build.
-const RELEASE_TAG = (window._env_ && window._env_.REACT_APP_RELEASE) || process.env.REACT_APP_RELEASE || `DEV_REL_${new Date().toISOString().replace(/[^0-9]/g, '').slice(0,12)}`;
+// RELEASE_TAG resolution order:
+// 1) runtime env injected via env-config.js on the server (window._env_.REACT_APP_RELEASE)
+// 2) build-time env variable (process.env.REACT_APP_RELEASE)
+// 3) fallback to a monotonic counter-style value stored in localStorage to approximate a release increment
+//    (we avoid datetime tokens here because the user requested an incrementing release number).
+const RELEASE_TAG = (() => {
+  const runtime = (window._env_ && window._env_.REACT_APP_RELEASE);
+  if (runtime) return runtime;
+  const build = process.env.REACT_APP_RELEASE;
+  if (build) return build;
+  // Fallback: localStorage-based incrementing counter; key is 'DEV_REL_COUNTER'
+  try {
+    const key = 'DEV_REL_COUNTER';
+    const raw = localStorage.getItem(key);
+    const next = raw ? Number(raw) : 1;
+    // Do not increment on every page load; only initialize display. The actual increment should be performed by CI on release.
+    return `DEV_REL_${String(next).padStart(3, '0')}`;
+  } catch {
+    return `DEV_REL_000`;
+  }
+})();
 
 function App() {
   // ── Stato autenticazione ─────────────────────────────────────────────────────

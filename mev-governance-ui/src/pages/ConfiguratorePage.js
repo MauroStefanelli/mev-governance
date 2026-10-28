@@ -2308,7 +2308,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                                       onChange={e => updMapping({ unit: Number(e.target.value) || 0, total: qty * (Number(e.target.value) || 0) })}
                                       style={{ ...styles.input, width: 90, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
                                   </td>
-                                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>
+                                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, whiteSpace: 'nowrap' }}>
                                     {euro.format(qty * unit)}
                                   </td>
                                 </tr>
