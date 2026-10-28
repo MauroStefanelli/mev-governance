@@ -410,10 +410,10 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [selectedRelease, setSelectedReleaseState] = useState(() => {
     try { return localStorage.getItem(LS_KEY) || ""; } catch { return ""; }
   });
-  const setSelectedRelease = (val) => {
+  const setSelectedRelease = useCallback((val) => {
     setSelectedReleaseState(val);
     try { if (val) localStorage.setItem(LS_KEY, val); else localStorage.removeItem(LS_KEY); } catch {}
-  };
+  }, []);
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
@@ -494,7 +494,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     }).catch(e => {
       if (e?.status === 401) onUnauthorized?.();
     }).finally(() => setLoading(false));
-  }, [ambienteId]); // eslint-disable-line
+  }, [ambienteId, onUnauthorized]);
 
   // Carica progressData quando cambia la release selezionata
   useEffect(() => {

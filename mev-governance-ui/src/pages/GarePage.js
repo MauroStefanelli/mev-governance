@@ -1274,6 +1274,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                             const hasPeso = d.tow.some(t => t.pesoEffort != null);
                             // Pre-calcola importo per ogni TOW
                             const sommaPeso = d.tow.reduce((s, t) => s + (t.pesoEffort != null ? Number(t.pesoEffort) : 0), 0);
+                            void sommaPeso; // usato solo per debug/analisi visiva in passato, mantenuto per chiarezza
                             const importiConPeso = d.tow.reduce((s, t) => s + (t.pesoEffort != null && baseAsta > 0 ? (Number(t.pesoEffort) / 100) * baseAsta : 0), 0);
                             const towCalc = d.tow.map(t => {
                               if (t.pesoEffort != null) {
@@ -1683,7 +1684,7 @@ export default function GarePage({ onUnauthorized }) {
         setError("Errore caricamento gare");
         setLoading(false);
       });
-  }, []);
+  }, [onUnauthorized]);
 
   const handleCreaGara = async (form) => {
     const nuova = {
