@@ -206,19 +206,19 @@ public class AiService
         try
         {
             // choices[0] deep search for first string leaf
-            if (response.TryGetPropertyValue("choices", out var choices) && choices is JsonArray carr && carr.Count > 0)
+            if (response.TryGetPropertyValue("choices", out var choicesNode) && choicesNode is JsonArray choicesArr && choicesArr.Count > 0)
             {
-                JsonNode? first = carr[0];
+                JsonNode? first = choicesArr[0];
                 var found = FindFirstStringInNode(first);
                 if (!string.IsNullOrWhiteSpace(found)) return found;
             }
 
-            if (response.TryGetPropertyValue("output_text", out var outputText) && outputText.GetValueKind() == JsonValueKind.String)
-                return outputText.GetValue<string>();
+            if (response.TryGetPropertyValue("output_text", out var outputTextNode) && outputTextNode.GetValueKind() == JsonValueKind.String)
+                return outputTextNode.GetValue<string>();
 
-            if (response.TryGetPropertyValue("output", out var output) && output is JsonArray outArr)
+            if (response.TryGetPropertyValue("output", out var outputNode) && outputNode is JsonArray outputArray)
             {
-                foreach (var item in outArr)
+                foreach (var item in outputArray)
                 {
                     if (item is JsonObject io && io.TryGetPropertyValue("text", out var tx) && tx.GetValueKind() == JsonValueKind.String)
                         return tx.GetValue<string>();
