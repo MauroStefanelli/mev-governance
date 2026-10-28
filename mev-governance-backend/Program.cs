@@ -380,56 +380,6 @@ using (var scope = app.Services.CreateScope())
                     ON ""{sch}"".""PC_DataRecords"" (""entity_type"", ""contract_id"");
                 CREATE INDEX IF NOT EXISTS ""idx_pc_updated""
                     ON ""{sch}"".""PC_DataRecords"" (""updated_at"" DESC);
-                CREATE TABLE IF NOT EXISTS ""{sch}"".""TeamMembers"" (
-                    ""Id""               SERIAL PRIMARY KEY,
-                    ""AmbienteId""       INTEGER NOT NULL DEFAULT 0,
-                    ""Risorsa""          TEXT NOT NULL DEFAULT '',
-                    ""Ambito""           TEXT NULL,
-                    ""Specialita""       TEXT NULL,
-                    ""PosteApplication"" TEXT NULL,
-                    ""Note""             TEXT NULL,
-                    ""RisorsaGrade""     TEXT NULL,
-                    ""Grade""            TEXT NULL,
-                    ""Cdc""              TEXT NULL,
-                    ""Practice""         TEXT NULL,
-                    ""Adrc""             NUMERIC NULL,
-                    ""Cor""              NUMERIC NULL,
-                    ""CorpId""           TEXT NULL,
-                    ""Email""            TEXT NULL,
-                    ""DataIngresso""     DATE NULL,
-                    ""DataUscita""       DATE NULL,
-                    ""PercImpegno""      NUMERIC NOT NULL DEFAULT 100
-                );
-            ");
-            // Aggiunge le nuove colonne TeamMembers per tabelle già esistenti
-            db.Database.ExecuteSqlRaw($@"
-                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""Adrc""         NUMERIC NULL;
-                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""Cor""          NUMERIC NULL;
-                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""DataIngresso"" DATE NULL;
-                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""DataUscita""   DATE NULL;
-                ALTER TABLE ""{sch}"".""TeamMembers"" ADD COLUMN IF NOT EXISTS ""PercImpegno""  NUMERIC NOT NULL DEFAULT 100;
-            ");
-            // Converti Adrc/Cor da TEXT a NUMERIC se necessario (tabella creata manualmente)
-            db.Database.ExecuteSqlRaw($@"
-                DO $$
-                BEGIN
-                  IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = '{sch}' AND table_name = 'TeamMembers'
-                      AND column_name = 'Adrc' AND data_type = 'text'
-                  ) THEN
-                    ALTER TABLE ""{sch}"".""TeamMembers""
-                      ALTER COLUMN ""Adrc"" TYPE NUMERIC USING NULLIF(TRIM(""Adrc""), '')::NUMERIC;
-                  END IF;
-                  IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = '{sch}' AND table_name = 'TeamMembers'
-                      AND column_name = 'Cor' AND data_type = 'text'
-                  ) THEN
-                    ALTER TABLE ""{sch}"".""TeamMembers""
-                      ALTER COLUMN ""Cor"" TYPE NUMERIC USING NULLIF(TRIM(""Cor""), '')::NUMERIC;
-                  END IF;
-                END $$;
             ");
             // Aggiunge tutte le colonne MevItems/Users/altri che le migration AddColumn
             // potrebbero aver mancato se search_path era errato al primo deploy

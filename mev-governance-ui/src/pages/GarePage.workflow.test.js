@@ -1,4 +1,3 @@
-/* eslint-disable testing-library/no-node-access, testing-library/no-container */
 import React from "react";
 import { render, screen, fireEvent, within, act, waitFor } from "@testing-library/react";
 import GarePage, { DettaglioGara } from "./GarePage";

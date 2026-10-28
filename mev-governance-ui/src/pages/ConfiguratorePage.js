@@ -83,8 +83,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [implementationFiles, setImplementationFiles] = useState([]);
   const [techProfile, setTechProfile] = useState(null);
   const [techProfileBusy, setTechProfileBusy] = useState(false);
-  // kept for UI flows; mark as used to avoid eslint no-unused-vars
-  void techProfileBusy;
   const [selectedAppId, setSelectedAppId] = useState("");
   const [selectedAppIds, setSelectedAppIds] = useState([]);
   const [codeChangeTool, setCodeChangeTool] = useState("vscode");
@@ -188,18 +186,18 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       .then(([c, imp]) => {
         if (!alive) return;
         setContracts(c);
-        // debug: risposta getTowImpatto disponibile in imp
+        console.log("[TOW] getTowImpatto risposta:", imp);
         if (imp && typeof imp === "object" && Object.keys(imp).length > 0) {
           setTowImpattoDb(imp);
         } else {
-          // warning: risposta vuota, retry 3s
+          console.warn("[TOW] risposta vuota, retry 3s");
           setTimeout(() => {
             if (!alive) return;
             getTowImpatto().then(imp2 => {
-              // debug: retry getTowImpatto risposta available in imp2
+              console.log("[TOW] retry risposta:", imp2);
               if (imp2 && typeof imp2 === "object" && Object.keys(imp2).length > 0)
                 setTowImpattoDb(imp2);
-            }).catch((e) => { /* retry error - logged intentionally during dev */ console.error("[TOW] retry errore:", e); });
+            }).catch((e) => console.error("[TOW] retry errore:", e));
           }, 3000);
         }
       })
@@ -296,13 +294,13 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     if (!src) return;
     const imp = towImpattoDb[src];
     if (!imp) {
-    // warning: towImpattoDb missing key — keys available in Object.keys(towImpattoDb)
+      console.warn(`[TOW] towImpattoDb non ha chiave "${src}". Chiavi disponibili:`, Object.keys(towImpattoDb));
       return;
     }
     const v1 = Number(imp[`TOW0${lot}.1`]) || 0;
     const v3 = Number(imp[`TOW0${lot}.3`]) || 0;
     const v4 = Number(imp[`TOW0${lot}.4`]) || 0;
-    // debug: applying TOW — details in {v1,v3,v4}
+    console.log(`[TOW] applico src=${src} lot=${lot} contract=${initiativeContractId}`, {v1,v3,v4});
     setTowPercentages(prev => {
       const next = {
         ...prev,
@@ -311,7 +309,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
           [lot]: { 1: v1, 3: v3, 4: v4 },
         },
       };
-      // debug: towPercentages after update available in next
+      console.log('[TOW] towPercentages dopo:', JSON.stringify(next));
       return next;
     });
   }, [initiative.contractType, towImpattoDb, initiativeContractId, lot]); // eslint-disable-line
@@ -343,14 +341,13 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     });
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleSelectContract = async (id) => {
     setSelectedContractId(id);
     setLot((allContracts.find((c) => c.contractId === id)?.lots || [])[0]?.lotId || "1");
     setStep(1);
     resetInitiative();
   };
-  // mark as used to satisfy linter while handler is kept for future wiring
-  void handleSelectContract;
 
   // ── Form contratto ──
   const updateContractLotField = (idx, patch) => {
@@ -527,7 +524,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
 
   // ── Step 2: gap analysis (port da analyzeImportedGaps) ──
-  const runGapAnalysis = async (interventions, _already = items) => {
+  const runGapAnalysis = async (interventions, already = items) => {
     const suggestions = [];
     for (const intervention of interventions) {
       const history = await loadInitiativeHistory();
@@ -748,57 +745,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     try {
       const ctx = await buildAiContext();
       const data = await analyzeInitiativeWithAi(ctx);
-      // Filtra le proposte AI: mantiene solo voci del catalogo valido
-      // e scarta le proposte che citano integrazioni/tecnologie non presenti
-      // nel contesto applicativo (riduce le allucinazioni tipo "SAP" quando
-      // l'iniziativa è su IPERSUITE/IPER).
-      const rawProposals = (data.analysis?.proposals || []).filter((p) =>
-        catalog.some((c) => String(c.id) === String(p.catalogId))
-      );
-
-      // Costruisci un set di termini "permessi" presi dal contesto applicativo
-      // (nomi, codici, alias, tecnologie, integrazioni, note)
-      const allowedTerms = new Set();
-      (ctx.applicationContext || []).forEach((a) => {
-        if (a.name) allowedTerms.add(String(a.name).toLowerCase());
-        if (a.code) allowedTerms.add(String(a.code).toLowerCase());
-        (a.systemAliases || []).forEach((s) => allowedTerms.add(String(s).toLowerCase()));
-        (a.technologies || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
-        if (a.notes) allowedTerms.add(String(a.notes).toLowerCase());
-        if (a.techProfile) {
-          (a.techProfile.integrations || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
-          (a.techProfile.frameworks || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
-          (a.techProfile.technologies || []).forEach((t) => allowedTerms.add(String(t).toLowerCase()));
-        }
-        if (a.aiProfile) {
-          (a.aiProfile.catalogMappings || []).forEach((m) => {
-            if (m.name) allowedTerms.add(String(m.name).toLowerCase());
-            if (m.rationale) allowedTerms.add(String(m.rationale).toLowerCase());
-          });
-          (a.aiProfile.techSummary || "").split(/\W+/).forEach((w) => { if (w) allowedTerms.add(w.toLowerCase()); });
-        }
-      });
-
-      const normalize = (s) => String(s || "").toLowerCase();
-
-      const proposals = rawProposals
-        .map((p) => ({ raw: p, text: normalize(p.rationale) + " " + normalize(p.additionalInfo) + " " + normalize(p.notes) }))
-        .filter(({ raw, text }) => {
-          // Se non abbiamo termini permessi (nessun applicativo nel contesto), manteniamo la proposta
-          // ma in generale il contesto d'applicativi è sempre passato: questo è un guardrail.
-          if (!allowedTerms.size) return true;
-          // Se la proposta contiene almeno uno dei termini permessi la consideriamo valida
-          for (const term of allowedTerms) {
-            if (!term) continue;
-            if (text.includes(term)) return true;
-          }
-          // In alternativa, se l'intervento è già collegato a un ID_INTERVENTO importato,
-          // lo manteniamo (è strettamente correlato all'iniziativa)
-          if (raw.interventionId) return true;
-          // Altrimenti consideriamo la proposta "hallucination" e la scartiamo
-          return false;
-        })
-        .map(({ raw }, i) => ({ ...raw, apply: raw.action !== "exclude", _index: i }));
+      const proposals = (data.analysis?.proposals || [])
+        .filter((p) => catalog.some((c) => String(c.id) === String(p.catalogId)))
+        .map((p, i) => ({ ...p, apply: p.action !== "exclude", _index: i }));
       setAiProposals({ analysis: data.analysis, provider: data.provider, model: data.model, proposals });
     } catch (err) {
       const msg = err?.message || (err?.status ? `Errore ${err.status}` : String(err));
@@ -840,8 +789,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setAiProposals(null);
     toast("Proposte AI applicate; resta possibile modificarle manualmente");
   };
-  // kept for UI action wiring; mark as used to silence linter
-  void applyAiProposals;
 
   // ── Step 3: compose (port da compose r.379) ──
   const compose = () => {
@@ -925,7 +872,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const loadArchive = useCallback(() => {
     getConfiguratoreRecords({ entity_type: "initiative_evaluation", contract_id: initiativeContractId, lot_id: lot })
       .then((d) => setArchiveRecords(d.records || []))
-      .catch((e) => { /* loadArchive failed (see server logs) */ console.warn("loadArchive failed:", e); });
+      .catch((e) => { console.warn("loadArchive failed:", e); });
   }, [initiativeContractId, lot]);
 
   useEffect(() => { loadArchive(); }, [loadArchive]);
@@ -1141,10 +1088,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       let aiEnrichment = null;
       try {
         const aiData = await analyzeInitiativeWithAi(aiCtx);
-        // AI response available in aiData (debug logs suppressed in lint cleanup)
-        // L&apos;AI può restituire il profilo in formati diversi — normalizziamo tutto
+        console.log("[AI App Profile] aiData completo:", JSON.stringify(aiData));
+        // L'AI può restituire il profilo in formati diversi — normalizziamo tutto
         const raw = aiData?.analysis || aiData;
-        // raw AI response and its type are available in raw
+        console.log("[AI App Profile] raw:", JSON.stringify(raw)?.slice(0, 500));
+        console.log("[AI App Profile] tipo raw:", typeof raw, "keys:", raw && typeof raw === "object" ? Object.keys(raw) : "N/A");
         if (raw && typeof raw === "object") {
           // Normalizza campi alternativi che l'AI usa talvolta
           aiEnrichment = {
@@ -1155,16 +1103,16 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           };
           // Se tutti i campi array sono vuoti e techSummary è vuoto → risposta inutile
           if (!aiEnrichment.interventionTypes.length && !aiEnrichment.catalogMappings.length && !aiEnrichment.risks.length && !aiEnrichment.techSummary) {
-            // AI response empty after normalization
+            console.warn("[AI App Profile] Risposta AI vuota dopo normalizzazione:", JSON.stringify(raw)?.slice(0, 300));
             aiEnrichment = null;
             toast(`Scheda tecnica di "${targetApp.name}" salvata — profilo AI vuoto`);
           }
         }
         if (!aiEnrichment) {
-          // AI not recognized — aiData available for debugging
+          console.warn("[AI App Profile] Risposta AI non riconosciuta:", JSON.stringify(aiData)?.slice(0, 300));
         }
       } catch (aiErr) {
-        // AI call error: toast kept to inform the user
+        console.warn("[AI App Profile] Errore chiamata AI:", aiErr.message);
         toast(`Scheda tecnica di "${targetApp.name}" salvata. AI non disponibile: ${aiErr.message}`);
       }
 
@@ -1223,8 +1171,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
     };
     input.click();
   };
-  // referenced by UI flows / future wiring
-  void selectSourceFolder;
 
   // ── Sviluppo: repository + ZIP richiesta codice (port da generateCodeChangeRequest r.244) ──
   const selectImplementationRepository = () => {
@@ -1240,8 +1186,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
     };
     input.click();
   };
-  // referenced by UI flows / future wiring
-  void selectImplementationRepository;
 
   const approvedInterventionsFor = () =>
     [...suggestions.filter((s) => s.selected && s.approved !== false), ...items.filter((it) => it.selected || it.imported)].map((x, i) => ({
@@ -1424,9 +1368,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
   if (loading) return <div role="status" aria-live="polite" style={{ padding: 40, margin: 24, borderRadius: 16, background: "#f4f7fb", color: "#174ea6" }}>Caricamento configuratore…</div>;
 
   const c = activeContract || builtinContract;
+  // eslint-disable-next-line no-unused-vars
   const lots = c ? (c.lots || []).filter((l) => l.active !== false) : [];
-  // reference to avoid unused-vars lint if lots is only sometimes used
-  void lots;
 
   // Pill riassuntiva dell'iniziativa — mostrata in step 2, 3, 4
   const InitiativeBanner = () => {
@@ -1816,7 +1759,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       <main style={{ minWidth: 0 }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
-        <p style={styles.hint}>{["Definisci il contesto dell&apos;iniziativa e collega i dati del cliente.", "Valuta gli interventi e integra le proposte del catalogo.", "Componi la valorizzazione e verifica il totale dell&apos;offerta.", "Verifica il riepilogo e prepara i documenti finali."][step - 1]}</p>
+        <p style={styles.hint}>{["Definisci il contesto dell’iniziativa e collega i dati del cliente.", "Valuta gli interventi e integra le proposte del catalogo.", "Componi la valorizzazione e verifica il totale dell’offerta.", "Verifica il riepilogo e prepara i documenti finali."][step - 1]}</p>
       </div>
       {/* Form contratto */}
       {showContractForm && (
@@ -1881,8 +1824,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
               <input type="file" accept=".xlsx" style={{ display: "none" }} disabled={mappedLoading}
                 onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0]); e.target.value = ""; }} />
             </label>
-                  <p style={{ ...styles.hint, marginTop: 8, marginBottom: 0 }}>
-                Carica il workbook dell&apos;iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).
+            <p style={{ ...styles.hint, marginTop: 8, marginBottom: 0 }}>
+              Carica il workbook dell'iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).
             </p>
           </div>
           <div style={{ ...styles.card, marginTop: 12 }}>
@@ -2060,7 +2003,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#102a47", marginBottom: selectedAppIds.length > 0 ? 10 : 0 }}>⌘ Codice sorgente</div>
             {selectedAppIds.length === 0 ? (
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>Nessun profilo tecnico — seleziona un applicativo nel campo &quot;Sistema / applicazione&quot; sopra</span>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>Nessun profilo tecnico — seleziona un applicativo nel campo "Sistema / applicazione" sopra</span>
             ) : (() => {
               const AppProfileRow = ({ appId }) => {
                 const app = applications.find(a => String(a.id) === appId);
@@ -2258,7 +2201,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           <InitiativeBanner />
           <div aria-busy={aiBusy} style={{ ...styles.card, marginBottom: 20, background: "#f5f3ff", borderColor: "#ddd6fe", borderTop: "3px solid #6366f1" }}>
             <h3 style={{ margin: "0 0 8px" }}>Supporto AI alla valutazione</h3>
-              {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell&apos;iniziativa. Le proposte AI verranno mostrate direttamente in cima a ogni gruppo negli interventi.</p>}
+            {!aiBusy && !aiProposals && <p style={styles.hint}>Richiedi un secondo parere sui dati dell'iniziativa. Le proposte AI verranno mostrate direttamente in cima a ogni gruppo negli interventi.</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong>{importedInterventions.length ? `${mappingCount} valorizzazioni già previste nell'Excel e ${suggestions.length} possibili integrazioni da valutare.` : `${suggestions.length} componenti candidate nel Catalogo Lotto ${lot}.`}</strong>
               <button style={btnStyles.primary} onClick={analyzeWithAi} disabled={aiBusy}
@@ -2273,8 +2216,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             </div>
             {aiBusy && (
               <div role="status" aria-live="polite" style={{ marginTop: 16, padding: "16px 18px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 12, color: "#92400e" }}>
-                <strong>Analisi AI in corso</strong> — il modello sta esaminando l&apos;iniziativa, gli interventi e il catalogo.<br/>
-                <span style={{ color: "#78350f" }}>L&apos;operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span>
+                <strong>Analisi AI in corso</strong> — il modello sta esaminando l'iniziativa, gli interventi e il catalogo.<br/>
+                <span style={{ color: "#78350f" }}>L'operazione può richiedere 1-2 minuti. Non chiudere la pagina.</span>
               </div>
             )}
             {aiProposals?.analysis?.summary && (
@@ -2295,9 +2238,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <h3 style={{ margin: 0 }}>Possibili integrazioni</h3>
-               <button style={btnStyles.primary} onClick={compose} disabled={!suggestions.some((s) => s.selected)}>
-                Vai all&apos;offerta ({suggestions.filter((s) => s.selected).length} selezionate)
-               </button>
+              <button style={btnStyles.primary} onClick={compose} disabled={!suggestions.some((s) => s.selected)}>
+                Vai all'offerta ({suggestions.filter((s) => s.selected).length} selezionate)
+              </button>
             </div>
 {(() => {
   const groups = new Map();
@@ -2521,9 +2464,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
              <summary style={{ cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center", userSelect: "none" }}>
                <div>
                  <h3 style={{ margin: 0, fontSize: 15 }}>Aggiungi manualmente dal catalogo</h3>
-                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#667482" }}>
-                    {catalog.length} voci disponibili · Le voci aggiunte compaiono nelle &quot;Possibili integrazioni&quot; come selezionate.
-                  </p>
+                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#667482" }}>
+                   {catalog.length} voci disponibili · Le voci aggiunte compaiono nelle "Possibili integrazioni" come selezionate.
+                 </p>
                </div>
                <span style={{ fontSize: 12, color: "#1a73e8", fontWeight: 600, whiteSpace: "nowrap", marginLeft: 12 }}>
                  {suggestions.filter(s => s.interventionId === "__MANUALE__").length > 0
@@ -2803,10 +2746,10 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           <InitiativeBanner />
           {/* Banner modifica record esistente */}
           {editingRecordKey && (
-              <div style={{ background: "#fff8e1", border: "1px solid #f6c90e", borderRadius: 8, padding: "10px 16px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                <span><strong>Modalità modifica:</strong> stai aggiornando una valutazione esistente. &quot;Salva valutazione&quot; sovrascriverà il record originale.</span>
-                <button onClick={() => setEditingRecordKey(null)} style={{ background: "none", border: "none", color: "#92600a", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Salva come nuovo</button>
-              </div>
+            <div style={{ background: "#fff8e1", border: "1px solid #f6c90e", borderRadius: 8, padding: "10px 16px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+              <span><strong>Modalità modifica:</strong> stai aggiornando una valutazione esistente. "Salva valutazione" sovrascriverà il record originale.</span>
+              <button onClick={() => setEditingRecordKey(null)} style={{ background: "none", border: "none", color: "#92600a", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>Salva come nuovo</button>
+            </div>
           )}
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 12px" }}>Revisione offerta</h3>
@@ -2925,11 +2868,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </p>
         ) : techProfile ? (
           <p style={styles.hint}>
-            Repository: <strong>{techProfile.name || initiative.system}</strong> — profilo tecnico caricato dall&apos;applicativo selezionato ({techProfile.totalFiles || 0} file totali, {techProfile.readFiles || 0} analizzati).
+            Repository: <strong>{techProfile.name || initiative.system}</strong> — profilo tecnico caricato dall'applicativo selezionato ({techProfile.totalFiles || 0} file totali, {techProfile.readFiles || 0} analizzati).
           </p>
         ) : (
           <p style={{ ...styles.hint, color: "#b00020" }}>
-            Nessun applicativo selezionato — torna al passo 1 e seleziona un applicativo da &quot;Applicativi e tecnologie&quot;.
+            Nessun applicativo selezionato — torna al passo 1 e seleziona un applicativo da "Applicativi e tecnologie".
           </p>
         )}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
@@ -2975,3 +2918,4 @@ const btnStyles = {
   secondary: { minHeight: 38, padding: "10px 16px", borderRadius: 9, border: "1px solid #cbd5e1", background: "#fff", color: "#29415e", fontWeight: 500, fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
   danger: { minHeight: 38, padding: "10px 12px", borderRadius: 9, border: "1px solid #f1b9c0", background: "#fff1f2", color: "#a81832", fontSize: 13, fontFamily: "inherit", cursor: "pointer" },
 };
+

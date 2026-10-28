@@ -121,7 +121,7 @@ function DbConfigTab() {
           border: "1px solid #ffcc80", lineHeight: "1.6"
         }}>
           <strong>Ambiente Render (cloud)</strong> — La configurazione salvata qui
-          sovrascrive la variabile d&apos;ambiente <code>DATABASE_DIRECT_URL</code>
+          sovrascrive la variabile d'ambiente <code>DATABASE_DIRECT_URL</code>
           ma <strong>non persiste tra i deploy</strong>. Per una config permanente
           su Render, aggiorna <code>DATABASE_DIRECT_URL</code> dal pannello Render.
         </div>

@@ -1,7 +1,0 @@
-# Ignore test files and generated artifacts for the quick eslint run
-**/*.test.js
-**/*.workflow.test.js
-**/*.import.test.js
-coverage/
-build/
-node_modules/

@@ -509,7 +509,7 @@ export async function parseInitiativeWorkbook(file, catalog) {
 // CONTESTO APPLICATIVO (port da applicationContextFor r.137)
 // ============================================================
 
-export function applicationContextFor(system, lotApplications, _lot) {
+export function applicationContextFor(system, lotApplications, lot) {
   const apps = lotApplications ?? [];
   const sys = String(system || "").trim();
   if (!sys) return [];

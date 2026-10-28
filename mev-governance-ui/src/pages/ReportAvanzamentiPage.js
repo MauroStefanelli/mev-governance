@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
-import "./reportAvanzamenti.css";
-import { getMevList, getReleaseSchedules, upsertReleaseSchedule, deleteReleaseSchedule, renameReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
+import { getMevList, getReleaseSchedules, upsertReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta } from "../services/mevService";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
   bg:       "#F4F6FA",
   surface:  "#FFFFFF",
   border:   "#E3E8EF",
-  accent:   "#4F46E5",
-  accentLt: "#EEF2FF",
+  accent:   "#1A6EBD",
+  accentLt: "#EAF2FB",
   success:  "#166534",
   successLt:"#DCFCE7",
   warn:     "#92400E",
@@ -18,11 +17,12 @@ const C = {
   dangerLt: "#FEE2E2",
   muted:    "#64748B",
   text:     "#0F172A",
-  head:     "#172554",
+  head:     "#1E3A5F",
 };
 
-const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// fmtDate was declared but unused; remove to avoid lint warning
+const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const fmtPct = (v) => v != null && v !== "" ? `${v}%` : "—";
+const fmtDate = (v) => v || "—";
 
 // ── Stato colori ─────────────────────────────────────────────────────────────
 const statoStyle = (s) => {
@@ -111,9 +111,6 @@ const EXCEL_COL_MAP = {
   "note":                       { key: "note",                 type: "text"    },
 };
 
-// Colonna ID_MEV — identifica le colonne che contengono l'ID diretto della MEV
-const ID_MEV_HEADERS = new Set(["id_mev", "id mev", "idmev", "mev id", "mev_id"]);
-
 // Converte serial Excel o stringa data in "YYYY-MM-DD" (o stringa vuota)
 const excelDateToISO = (v) => {
   if (v == null || v === "") return "";
@@ -121,7 +118,7 @@ const excelDateToISO = (v) => {
   if (typeof v === "string") {
     const s = v.trim();
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    const itMatch = s.match(new RegExp('^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$'));
+    const itMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (itMatch) return `${itMatch[3]}-${itMatch[2].padStart(2,"0")}-${itMatch[1].padStart(2,"0")}`;
     return "";
   }
@@ -141,8 +138,7 @@ const normHeader = (h) =>
 // ── Normalizzazione per match testuale (rimuove punteggiatura, spazi multipli) ─
 const normText = (s) =>
   String(s || "").trim().toLowerCase()
-    // Replace any character that is not letter (including basic Latin-1), number or whitespace
-    .replace(/[^A-Za-z0-9\u00C0-\u017F\s]/g, " ")
+    .replace(/[()[\]{}<>\/\\'",.;:!?#@€$%&*+=|~`^]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -174,13 +170,12 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         if (raw.length < 2) { resolve({ matched: [], unmatched: [], sheetUsed: sheetName }); return; }
 
-        // Trova riga header (prima delle prime 5 righe che contiene "goto" oppure "id_mev")
+        // Trova riga header (prima delle prime 5 righe che contiene "goto")
         let headerRowIdx = 0;
         for (let i = 0; i < Math.min(5, raw.length); i++) {
-          if (raw[i].some(c => normHeader(c) === "goto" || ID_MEV_HEADERS.has(normHeader(c)))) { headerRowIdx = i; break; }
+          if (raw[i].some(c => normHeader(c) === "goto")) { headerRowIdx = i; break; }
         }
         const headers = raw[headerRowIdx].map(normHeader);
-        const idMevIdx   = headers.findIndex(h => ID_MEV_HEADERS.has(h));
         const gotoIdx    = headers.indexOf("goto");
         const titoloIdx  = headers.findIndex(h =>
           h === "titolo" || h === "titolo / descr." || h === "titolo/descr." ||
@@ -192,20 +187,12 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
           h === "applicativo"
         );
 
-        if (gotoIdx === -1 && idMevIdx === -1) {
-          reject(new Error(`Colonna "GOTO" o "ID_MEV" non trovata nel foglio "${sheetName}".`));
+        if (gotoIdx === -1) {
+          reject(new Error(`Colonna "GOTO" non trovata nel foglio "${sheetName}".`));
           return;
         }
 
         // ── Indici di ricerca sul dataset MEV ────────────────────────────────
-        // idMap: excelId (valore colonna ID/ID_MEV del file Excel) → r.id (DB id usato come mevId)
-        const idMap = {};
-        mevRows.forEach(r => {
-          // Mappa sia excelId (es. "105") che id DB come chiavi per massima copertura
-          if (r.excelId) idMap[String(r.excelId).trim()] = String(r.id);
-          idMap[String(r.id)] = String(r.id);
-        });
-
         // goToMap: match esatto GoTo → mevId
         const goToMap = {};
         mevRows.forEach(r => {
@@ -230,23 +217,8 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
         });
 
         // ── Risolve mevId per una riga Excel ─────────────────────────────────
-        // Strategia: ID_MEV diretto → GoTo esatto → Titolo fuzzy → Sistemi+GoTo incrociato
-        const resolveMevId = (idMevRaw, goToRaw, titoloRaw, sistemiRaw) => {
-          // 0) ID_MEV diretto — priorità assoluta
-          if (idMevRaw) {
-            // Normalizza: "18.0" → "18", "18" → "18", "  18  " → "18"
-            const rawStr = String(idMevRaw).trim();
-            // Se è un numero con .0 lo converte in intero
-            const asNum = parseFloat(rawStr);
-            const key = !isNaN(asNum) && String(asNum) !== rawStr
-              ? String(Math.round(asNum))   // 18.0 → "18"
-              : rawStr;
-            // Prova anche come stringa originale e come intero
-            if (idMap[key]) return { id: idMap[key], method: "id_mev" };
-            if (idMap[rawStr]) return { id: idMap[rawStr], method: "id_mev" };
-            if (!isNaN(asNum) && idMap[String(Math.round(asNum))]) return { id: idMap[String(Math.round(asNum))], method: "id_mev" };
-          }
-
+        // Strategia: GoTo esatto → Titolo fuzzy → Sistemi+GoTo incrociato
+        const resolveMevId = (goToRaw, titoloRaw, sistemiRaw) => {
           // 1) GoTo esatto
           const goToKey = goToRaw.toUpperCase();
           if (goToMap[goToKey]) return { id: goToMap[goToKey], method: "goto" };
@@ -290,24 +262,18 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
 
         for (let i = headerRowIdx + 1; i < raw.length; i++) {
           const row = raw[i];
-          const idMevRaw  = idMevIdx >= 0  ? String(row[idMevIdx]   || "").trim() : "";
-          const goToRaw   = gotoIdx >= 0   ? String(row[gotoIdx]    || "").trim() : "";
+          const goToRaw   = String(row[gotoIdx]    || "").trim();
           const titoloRaw = titoloIdx >= 0  ? String(row[titoloIdx]  || "").trim() : "";
           const sistemiRaw = sistemiIdx >= 0 ? String(row[sistemiIdx] || "").trim() : "";
 
           // Salta righe completamente vuote
-          if (!idMevRaw && !goToRaw && !titoloRaw && !sistemiRaw) continue;
+          if (!goToRaw && !titoloRaw && !sistemiRaw) continue;
 
-          // Salta (e interrompe) righe "TOTALE" — stesso comportamento del backend MEV
-          const isTotale = (s) => s.toLowerCase().includes("totale");
-          if (isTotale(idMevRaw) || isTotale(goToRaw) || isTotale(titoloRaw)) break;
-
-          const resolved = resolveMevId(idMevRaw, goToRaw, titoloRaw, sistemiRaw);
+          const resolved = resolveMevId(goToRaw, titoloRaw, sistemiRaw);
 
           if (!resolved || usedMevIds.has(resolved.id)) {
-            // Etichetta per "non trovato": preferisce ID_MEV, poi GoTo, poi titolo
-            const label = idMevRaw || goToRaw || titoloRaw;
-            if (label) unmatchedSet.add(label);
+            if (goToRaw) unmatchedSet.add(goToRaw);
+            else if (titoloRaw) unmatchedSet.add(titoloRaw);
             continue;
           }
           usedMevIds.add(resolved.id);
@@ -331,7 +297,7 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
             }
           });
 
-          matched.push({ mevId: resolved.id, idMev: idMevRaw, goTo: goToRaw || titoloRaw, method: resolved.method, fields });
+          matched.push({ mevId: resolved.id, goTo: goToRaw || titoloRaw, method: resolved.method, fields });
         }
 
         resolve({ matched, unmatched: [...unmatchedSet], sheetUsed: sheetName });
@@ -344,17 +310,17 @@ const parseExcelToProgress = (file, mevRows, releaseName) =>
   });
 
 // ── Componente cella editabile ────────────────────────────────────────────────
-function EditCell({ value, type, onChange, saving, label }) {
+function EditCell({ value, type, onChange, saving }) {
   if (type === "percent") return (
-    <input aria-label={label} type="number" min={0} max={100} step={1}
+    <input type="number" min={0} max={100} step={1}
       value={value ?? ""}
-      onChange={e => onChange(e.target.value === "" ? "" : Math.min(100, Math.max(0, Number(e.target.value))))}
+      onChange={e => onChange(e.target.value === "" ? "" : Number(e.target.value))}
       disabled={saving}
       style={{ width: 64, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
         fontSize: 12, textAlign: "center", background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
   );
   if (type === "date") return (
-    <input aria-label={label} type="date"
+    <input type="date"
       value={value ?? ""}
       onChange={e => onChange(e.target.value)}
       disabled={saving}
@@ -362,7 +328,7 @@ function EditCell({ value, type, onChange, saving, label }) {
         fontSize: 12, background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
   );
   return (
-    <textarea aria-label={label} value={value ?? ""} onChange={e => onChange(e.target.value)} disabled={saving} rows={2}
+    <textarea value={value ?? ""} onChange={e => onChange(e.target.value)} disabled={saving} rows={2}
       style={{ width: 180, padding: "4px 6px", border: `1px solid ${C.border}`, borderRadius: 6,
         fontSize: 12, resize: "vertical", background: saving ? "#f8fafc" : "#fff", outline: "none" }} />
   );
@@ -371,7 +337,7 @@ function EditCell({ value, type, onChange, saving, label }) {
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, sub, accent }) {
   return (
-    <div className="ra-kpi" style={{ "--card-accent": accent || C.accent, background: C.surface, borderRadius: 14, padding: "18px 24px",
+    <div style={{ background: C.surface, borderRadius: 14, padding: "18px 24px",
       border: `1px solid ${C.border}`, flex: "1 1 180px", minWidth: 0,
       boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: accent || C.accent,
@@ -387,9 +353,9 @@ function KpiCard({ label, value, sub, accent }) {
 function ProgressBar({ value, color = C.accent }) {
   const pct = Math.min(100, Math.max(0, Number(value) || 0));
   return (
-    <div className="ra-progress" role="progressbar" aria-label="Avanzamento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <div style={{ flex: 1, height: 6, background: "#E2E8F0", borderRadius: 99, overflow: "hidden" }}>
-        <div className="ra-progress-fill" style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99 }} />
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .3s" }} />
       </div>
       <span style={{ fontSize: 11, color: C.muted, minWidth: 30, textAlign: "right" }}>{pct}%</span>
     </div>
@@ -397,30 +363,21 @@ function ProgressBar({ value, color = C.accent }) {
 }
 
 // ── Pagina principale ─────────────────────────────────────────────────────────
-export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role, roles }) {
-  // Helper ruolo
-  const isAdminOrSuper = (() => {
-    const myRoles = (roles && roles.length > 0) ? roles : (role ? [role] : []);
-    return myRoles.some(r => r === "Admin" || r === "SuperAdmin");
-  })();
-
+export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId }) {
   const [mevRows, setMevRows]           = useState([]);
-  const [releases, setReleases]         = useState([]); // array di stringhe (nomi)
-  const [releaseRecords, setReleaseRecords] = useState([]); // array di { id, title } per rename/delete
+  const [releases, setReleases]         = useState([]);
   const LS_KEY = `reportAvanzamenti_release_${ambienteId || "default"}`;
   const [selectedRelease, setSelectedReleaseState] = useState(() => {
     try { return localStorage.getItem(LS_KEY) || ""; } catch { return ""; }
   });
-  const setSelectedRelease = useCallback((val) => {
+  const setSelectedRelease = (val) => {
     setSelectedReleaseState(val);
     try { if (val) localStorage.setItem(LS_KEY, val); else localStorage.removeItem(LS_KEY); } catch {}
-  }, [LS_KEY]);
+  };
   const [progressData, setProgressData] = useState({}); // { mevId: { ...campi } }
   const [dirty, setDirty]               = useState({});  // { mevId: true }
   const [saving, setSaving]             = useState({});   // { mevId: true }
-  // savedOk removed: transient save indicator not used in UI. Keep setter noop.
-  const setSavedOk = () => {};
-  void setSavedOk;
+  const [savedOk, setSavedOk]           = useState({});
   const [rtiRows, setRtiRows]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [loadingProg, setLoadingProg]   = useState(false);
@@ -430,44 +387,12 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const [importPreview, setImportPreview] = useState(null);
   const [importing, setImporting]         = useState(false);
   // Popup dettaglio riga
-  const detailModalRef = useRef(null);
   const [detailRow, setDetailRow]         = useState(null); // { mevId, r } | null
   // Nuova release
   const [showNewRelease, setShowNewRelease] = useState(false);
   const [newReleaseName, setNewReleaseName] = useState("");
   const [savingRelease, setSavingRelease]   = useState(false);
   const newReleaseInputRef = useRef(null);
-  // Rinomina release
-  const [renameRelease, setRenameRelease]   = useState(null); // { id, oldName } | null
-  const [renameValue, setRenameValue]       = useState("");
-  const [savingRename, setSavingRename]     = useState(false);
-  const renameInputRef = useRef(null);
-  // Elimina release (il record dal calendario, non i dati progress)
-  const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(null); // { id, name } | null
-  const [deletingRelease, setDeletingRelease]           = useState(false);
-  // Elimina dati
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [deleting, setDeleting]                   = useState(false);
-
-  useEffect(() => {
-    if (!detailRow) return;
-    const previous = document.activeElement;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    detailModalRef.current?.focus();
-    const handleKey = (event) => {
-      if (event.key === "Escape") setDetailRow(null);
-      if (event.key === "Tab") {
-        const items = detailModalRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)');
-        if (!items?.length) { event.preventDefault(); return; }
-        const first = items[0], last = items[items.length - 1];
-        if (event.shiftKey && (document.activeElement === first || document.activeElement === detailModalRef.current)) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && (document.activeElement === last || document.activeElement === detailModalRef.current)) { event.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", handleKey); previous?.focus(); };
-  }, [detailRow]);
 
   // Le release_calendar sono salvate con contract_id = ambienteId (es. "1")
   const releaseContractId = ambienteId ? String(ambienteId) : "poste-tet-2025";
@@ -482,10 +407,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       getRtiSocieta().catch(() => []),
     ]).then(([mev, relData, rti]) => {
       setMevRows(mev || []);
-      const recs = (relData.records || []).filter(r => r.title).sort((a, b) => (a.title || "").localeCompare(b.title || ""))
-        .map(r => ({ id: r.Id || r.id, title: r.title })); // normalizza sempre a id minuscolo
-      const rel = recs.map(r => r.title);
-      setReleaseRecords(recs);
+      const rel = (relData.records || []).map(r => r.title || "").filter(Boolean).sort();
       setReleases(rel);
       setRtiRows(rti || []);
       // Ripristina l'ultima release visitata; se non è più disponibile usa __ALL__
@@ -497,7 +419,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     }).catch(e => {
       if (e?.status === 401) onUnauthorized?.();
     }).finally(() => setLoading(false));
-  }, [ambienteId, onUnauthorized, releaseContractId]);
+  }, [ambienteId]); // eslint-disable-line
 
   // Carica progressData quando cambia la release selezionata
   useEffect(() => {
@@ -531,7 +453,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         .catch(e => { if (e?.status === 401) onUnauthorized?.(); })
         .finally(() => setLoadingProg(false));
     }
-  }, [selectedRelease, contractId, onUnauthorized, releaseContractId]);
+  }, [selectedRelease]); // eslint-disable-line
 
   // Filtra righe MEV per la release selezionata
   // Esclude: stato "Eliminato"/vuoto; sistemi RECUPERO, Collaudo, Presidio
@@ -581,7 +503,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   const saveRow = useCallback(async (mevId) => {
     // Su __ALL__ determina la release di appartenenza dalla mappa
     const targetRelease = selectedRelease === "__ALL__" ? (mevReleaseMap[mevId] || "") : selectedRelease;
-    if (!targetRelease) { setMsg({ type: "err", text: "Release non determinabile per la riga " + mevId }); return false; }
+    if (!targetRelease) { setMsg({ type: "err", text: "Release non determinabile per la riga " + mevId }); return; }
     setSaving(prev => ({ ...prev, [mevId]: true }));
     try {
       const allRows = { ...progressData, [mevId]: progressData[mevId] || {} };
@@ -589,35 +511,12 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       setDirty(prev => { const n = { ...prev }; delete n[mevId]; return n; });
       setSavedOk(prev => ({ ...prev, [mevId]: true }));
       setTimeout(() => setSavedOk(prev => { const n = { ...prev }; delete n[mevId]; return n; }), 2000);
-      return true;
     } catch {
       setMsg({ type: "err", text: "Errore salvataggio riga " + mevId });
-      return false;
     } finally {
       setSaving(prev => { const n = { ...prev }; delete n[mevId]; return n; });
     }
   }, [progressData, selectedRelease, mevReleaseMap, contractId]);
-
-  // Elimina i dati di avanzamento di una singola riga (azzeramento campi + salvataggio)
-  const deleteRow = useCallback(async (mevId) => {
-    const targetRelease = selectedRelease === "__ALL__" ? (mevReleaseMap[mevId] || "") : selectedRelease;
-    if (!targetRelease) return;
-    setSaving(prev => ({ ...prev, [mevId]: true }));
-    try {
-      // Rimuovi i dati locali
-      const next = { ...progressData };
-      delete next[mevId];
-      setProgressData(next);
-      setDirty(prev => { const n = { ...prev }; delete n[mevId]; return n; });
-      // Salva il record con payload vuoto (sovrascrive)
-      await putReleaseProgress(contractId, targetRelease, { rows: next });
-      setDetailRow(null);
-    } catch (e) {
-      setMsg({ type: "err", text: "Errore eliminazione riga: " + e.message });
-    } finally {
-      setSaving(prev => { const n = { ...prev }; delete n[mevId]; return n; });
-    }
-  }, [progressData, selectedRelease, mevReleaseMap, contractId]); // eslint-disable-line
 
   // Salva tutto
   const saveAll = useCallback(async () => {
@@ -659,9 +558,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     setImporting(true);
     try {
       const releaseLabel = selectedRelease === "__ALL__" ? "Tutte le release" : selectedRelease;
-      // Passa mevRows completo (non filteredRows): il match deve cercare su tutto il dataset,
-      // indipendentemente da stato/applicativo/release della MEV
-      const result = await parseExcelToProgress(file, mevRows, releaseLabel);
+      const result = await parseExcelToProgress(file, filteredRows, releaseLabel);
       // Auto-crea release rilevate dall'Excel che non esistono ancora in lista
       if (result?.detectedRelease && result.detectedRelease !== releaseLabel) {
         const detected = result.detectedRelease.trim();
@@ -678,7 +575,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     } finally {
       setImporting(false);
     }
-  }, [mevRows, selectedRelease, releases, releaseContractId]);
+  }, [filteredRows, selectedRelease, releases, releaseContractId]);
 
   // Applica i dati importati al progressData
   const applyImport = useCallback(() => {
@@ -702,42 +599,6 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
 
   const hasDirty = Object.keys(dirty).length > 0;
 
-  // Elimina dati avanzamenti della release corrente (o tutti se __ALL__)
-  const handleDeleteAll = useCallback(async () => {
-    setDeleting(true);
-    const targetRelease = selectedRelease === "__ALL__" ? null : selectedRelease;
-    try {
-      await deleteAllReleaseProgress(contractId, targetRelease);
-      if (targetRelease) {
-        // Rimuovi solo le righe della release cancellata da progressData
-        setProgressData(prev => {
-          const next = { ...prev };
-          filteredRows.forEach(r => { delete next[String(r.id)]; });
-          return next;
-        });
-        setDirty(prev => {
-          const next = { ...prev };
-          filteredRows.forEach(r => { delete next[String(r.id)]; });
-          return next;
-        });
-      } else {
-        setProgressData({});
-        setDirty({});
-        setReleases([]);
-        setSelectedRelease("");
-      }
-      setMsg({ type: "ok", text: targetRelease
-        ? `Dati avanzamenti della release "${targetRelease}" eliminati.`
-        : "Tutti i dati avanzamenti sono stati eliminati." });
-      setTimeout(() => setMsg(null), 4000);
-    } catch (e) {
-      setMsg({ type: "err", text: e.message || "Errore eliminazione." });
-    } finally {
-      setDeleting(false);
-      setShowConfirmDelete(false);
-    }
-  }, [contractId, selectedRelease, filteredRows, setSelectedRelease]); // eslint-disable-line
-
   // Crea una nuova release nella lista
   const handleCreateRelease = useCallback(async (name) => {
     const trimmed = name.trim();
@@ -760,46 +621,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     } finally {
       setSavingRelease(false);
     }
-  }, [releases, releaseContractId, setSelectedRelease]);
-
-  // Rinomina release esistente
-  const handleRenameRelease = useCallback(async () => {
-    if (!renameRelease || !renameValue.trim()) return;
-    const newName = renameValue.trim();
-    if (newName === renameRelease.oldName) { setRenameRelease(null); setRenameValue(""); return; }
-    setSavingRename(true);
-    try {
-      await renameReleaseSchedule(releaseContractId, renameRelease.id, renameRelease.oldName, newName);
-      setReleaseRecords(prev => prev.map(r => r.id === renameRelease.id ? { ...r, title: newName } : r));
-      setReleases(prev => prev.map(r => r === renameRelease.oldName ? newName : r).sort());
-      if (selectedRelease === renameRelease.oldName) setSelectedRelease(newName);
-      setRenameRelease(null);
-      setRenameValue("");
-    } catch {
-      setMsg({ type: "err", text: "Errore rinomina release." });
-    } finally {
-      setSavingRename(false);
-    }
-  }, [renameRelease, renameValue, releaseContractId, selectedRelease, setSelectedRelease]); // eslint-disable-line
-
-  // Elimina release dal calendario (non elimina i dati progress)
-  const handleDeleteRelease = useCallback(async () => {
-    if (!confirmDeleteRelease) return;
-    setDeletingRelease(true);
-    try {
-      await deleteReleaseSchedule(confirmDeleteRelease.id);
-      const newRecs = releaseRecords.filter(r => r.id !== confirmDeleteRelease.id);
-      const newRel  = newRecs.map(r => r.title);
-      setReleaseRecords(newRecs);
-      setReleases(newRel);
-      if (selectedRelease === confirmDeleteRelease.name) setSelectedRelease("__ALL__");
-      setConfirmDeleteRelease(null);
-    } catch {
-      setMsg({ type: "err", text: "Errore eliminazione release." });
-    } finally {
-      setDeletingRelease(false);
-    }
-  }, [confirmDeleteRelease, releaseRecords, selectedRelease, setSelectedRelease]); // eslint-disable-line
+  }, [releases, releaseContractId]);
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: C.muted, fontSize: 15 }}>
@@ -808,21 +630,20 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
   );
 
   return (
-    <div className="ra-dashboard">
+    <div style={{ background: C.bg, minHeight: "100vh", padding: "28px 24px 60px" }}>
 
       {/* ── Intestazione ── */}
-      <div className="ra-hero">
-        <span className="ra-eyebrow">GOVERNANCE / RELEASE MANAGEMENT</span>
+      <div style={{ marginBottom: 24 }}>
         <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: C.head, letterSpacing: "-0.4px" }}>
           Report Avanzamenti Attività
         </h1>
         <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>
-          Ogni release, una visione chiara. Monitora le attività e accompagna il lavoro fino al rilascio.
+          Monitora lo stato di avanzamento delle attività per release. I dati MEV sono in sola lettura; i campi di avanzamento sono modificabili.
         </p>
       </div>
 
       {/* ── Selezione release + Salva tutto ── */}
-      <div className="ra-toolbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface,
           border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 16px",
           boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
@@ -844,27 +665,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                 fontSize: 14, outline: "none", minWidth: 160 }} />
           )}
           {loadingProg && <span style={{ fontSize: 11, color: C.muted }}>…</span>}
-          {/* Pulsanti rinomina/elimina release (solo Admin/SuperAdmin, solo su release specifica) */}
-          {isAdminOrSuper && selectedRelease && selectedRelease !== "__ALL__" && (() => {
-            const rec = releaseRecords.find(r => r.title === selectedRelease);
-            if (!rec) return null;
-            return (
-              <>
-                <button type="button" title="Rinomina release"
-                  onClick={() => { setRenameRelease({ id: rec.id, oldName: rec.title }); setRenameValue(rec.title); setTimeout(() => renameInputRef.current?.focus(), 50); }}
-                  style={{ background: "transparent", border: "none", color: C.danger,
-                    borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
-                  >✏️</button>
-                <button type="button" title="Elimina release dal calendario"
-                  onClick={() => setConfirmDeleteRelease({ id: rec.id, name: rec.title })}
-                  style={{ background: "transparent", border: "none", color: C.danger,
-                    borderRadius: 7, padding: "5px 9px", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
-                  >🗑</button>
-              </>
-            );
-          })()}
           {/* Bottone nuova release */}
-          {!showNewRelease && !renameRelease && (
+          {!showNewRelease && (
             <button type="button" onClick={() => { setShowNewRelease(true); setTimeout(() => newReleaseInputRef.current?.focus(), 50); }}
               title="Crea nuova release"
               style={{ background: C.accentLt, border: `1px solid ${C.accent}`, color: C.accent,
@@ -874,32 +676,6 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
             </button>
           )}
         </div>
-
-        {/* Form rinomina release inline */}
-        {renameRelease && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface,
-            border: "1px solid #FDE047", borderRadius: 12, padding: "8px 14px",
-            boxShadow: "0 1px 4px rgba(234,179,8,0.2)" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#854D0E" }}>Rinomina:</span>
-            <input
-              ref={renameInputRef}
-              value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleRenameRelease(); if (e.key === "Escape") { setRenameRelease(null); setRenameValue(""); } }}
-              style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 10px",
-                fontSize: 13, outline: "none", minWidth: 140 }} />
-            <button type="button" onClick={handleRenameRelease}
-              disabled={savingRename || !renameValue.trim()}
-              style={{ background: "#EAB308", color: "#fff", border: "none", borderRadius: 8,
-                padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                opacity: (savingRename || !renameValue.trim()) ? 0.6 : 1 }}>
-              {savingRename ? "…" : "Salva"}
-            </button>
-            <button type="button" onClick={() => { setRenameRelease(null); setRenameValue(""); }}
-              style={{ background: "none", border: "none", color: C.muted, fontSize: 18,
-                cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>✕</button>
-          </div>
-        )}
 
         {/* Form nuova release inline */}
         {showNewRelease && (
@@ -963,16 +739,6 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
             {msg.text}
           </div>
         )}
-
-        {/* ── Elimina dati — solo Admin/SuperAdmin ── */}
-        {isAdminOrSuper && (
-          <button onClick={() => setShowConfirmDelete(true)}
-            style={{ padding: "10px 18px", background: "transparent", color: C.danger,
-              border: "none",  fontWeight: 700, fontSize: 13,
-              cursor: "pointer", marginLeft: "auto", whiteSpace: "nowrap" }}>
-            🗑 Elimina dati
-          </button>
-        )}
       </div>
 
       {/* ── KPI bar — visibile solo con release selezionata ── */}
@@ -1000,12 +766,11 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
           padding: "60px 24px", textAlign: "center", color: C.muted }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Nessuna attività per questa release</div>
-            <div style={{ fontSize: 13, marginTop: 6 }}>Le righe con stato &quot;Eliminato&quot; o vuoto sono escluse. Verifica i dati MEV.</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Le righe con stato "Eliminato" o vuoto sono escluse. Verifica i dati MEV.</div>
         </div>
       ) : (
-        <div className="ra-table" style={{ overflowX: "auto", borderRadius: 14,
+        <div style={{ overflowX: "auto", borderRadius: 14,
           boxShadow: "0 2px 12px rgba(0,0,0,0.07)", border: `1px solid ${C.border}` }}>
-            <div className="ra-table-heading"><div><span className="ra-eyebrow">PANORAMICA OPERATIVA</span><h2>Attività della release <span>{filteredRows.length}</span></h2></div><p>Seleziona un&apos;attività per aprire il dettaglio →</p></div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: C.surface }}>
             <thead>
               <tr style={{ background: C.head, color: "#fff", position: "sticky", top: 0, zIndex: 5 }}>
@@ -1020,23 +785,28 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                    ["Importo",             "110px"],
                    ["Mandataria/Mandante","160px"],
                  ].map(([lbl, w]) => (
-                   <th key={lbl} style={{ padding: "12px 14px", textAlign: lbl === "Importo" ? "right" : "left", whiteSpace: "nowrap",
+                   <th key={lbl} style={{ padding: "12px 14px", textAlign: "left", whiteSpace: "nowrap",
                      fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: w, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
                      {lbl}
                    </th>
                  ))}
+                 {/* Colonna dettaglio popup */}
+                 <th style={{ padding: "12px 10px", textAlign: "center", fontSize: 11,
+                   fontWeight: 700, minWidth: 44, borderRight: `1px solid rgba(255,255,255,0.1)` }}>
+                   Det.
+                 </th>
                 {/* Separatore */}
                 <th style={{ padding: "12px 6px", background: "#152C4A", minWidth: 4, borderRight: "2px solid #4A90C4" }}></th>
-                {/* Colonne avanzamento (read-only summary) */}
-                {EDITABLE_FIELDS.filter(f => f.type === "percent").map(f => (
+                {/* Colonne editabili */}
+                {EDITABLE_FIELDS.map(f => (
                   <th key={f.key} style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap",
-                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: "90px",
+                    fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", minWidth: f.type === "text" ? "200px" : f.type === "date" ? "140px" : "90px",
                     background: "#1E4976", borderRight: `1px solid rgba(255,255,255,0.1)` }}>
-                    {f.label} <span style={{ fontWeight: 400, opacity: 0.7 }}>%</span>
+                    {f.label}
+                    {f.type === "percent" && <span style={{ fontWeight: 400, opacity: 0.7 }}> %</span>}
                   </th>
                 ))}
-                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 110, whiteSpace: "nowrap" }}>Data Aggiorn.</th>
-                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 60 }}></th>
+                <th style={{ padding: "12px 10px", background: "#1E4976", minWidth: 80 }}>Salva</th>
               </tr>
             </thead>
             <tbody>
@@ -1044,53 +814,102 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                 const mevId    = String(r.id);
                 const prog     = progressData[mevId] || {};
                 const isDirty  = !!dirty[mevId];
+                const isSaving = !!saving[mevId];
+                const isOk     = !!savedOk[mevId];
                 const mandataria = resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ") || "—";
                 const bg = isDirty ? "#FFFBEB" : idx % 2 === 0 ? C.surface : "#F8FAFC";
                 const PERCENT_COLORS = {
-                  requisito: "#7C3AED", analisi: "#4F46E5", progettazione: "#0891B2", sviluppo: "#166534",
+                  requisito:     "#7C3AED",
+                  analisi:       "#1A6EBD",
+                  progettazione: "#0891B2",
+                  sviluppo:      "#166534",
                 };
+
                 return (
-                  <tr key={mevId} tabIndex={0} aria-label={`Apri dettaglio ${r.goTo || r.descrizione || mevId}`}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailRow({ mevId, r }); } }}
-                    onClick={() => setDetailRow({ mevId, r })}
-                    style={{ background: bg, transition: "background .15s", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#EFF6FF"}
-                    onMouseLeave={e => e.currentTarget.style.background = bg}>
-                    <td style={{ padding: "12px 14px", fontWeight: 700, color: C.accent, whiteSpace: "nowrap" }}>{r.goTo || "—"}</td>
+                  <tr key={mevId} style={{ background: bg, transition: "background .15s",
+                    borderBottom: `1px solid ${C.border}` }}>
+                    {/* GoTo */}
+                    <td style={{ padding: "12px 14px", fontWeight: 700, color: C.accent, whiteSpace: "nowrap" }}>
+                      {r.goTo || "—"}
+                    </td>
+                    {/* Titolo */}
                     <td style={{ padding: "12px 14px", maxWidth: 220 }}>
                       <div style={{ fontWeight: 600, color: C.text, lineHeight: 1.4,
                         overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                         {r.descrizione || r.goTo || "—"}
                       </div>
                     </td>
-                    <td style={{ padding: "12px 14px", color: C.muted, whiteSpace: "nowrap" }}>{r.applicativo || "—"}</td>
+                    {/* Sistemi */}
+                    <td style={{ padding: "12px 14px", color: C.muted, whiteSpace: "nowrap" }}>
+                      {r.applicativo || "—"}
+                    </td>
+                    {/* PM Poste */}
                     <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>{r.pmPoste || "—"}</td>
+                    {/* PM CAP */}
                     <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>{r.pmCap || "—"}</td>
+                    {/* Stato */}
                     <td style={{ padding: "12px 14px" }}>
                       {r.stato ? (
-                        <span style={{ ...statoStyle(r.stato), borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                        <span style={{ ...statoStyle(r.stato), borderRadius: 20,
+                          padding: "3px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
                           {r.stato}
                         </span>
                       ) : <span style={{ color: C.muted }}>—</span>}
                     </td>
-                    <td style={{ padding: "12px 14px", fontWeight: 600, whiteSpace: "nowrap", textAlign: "right",
+                    {/* Importo */}
+                    <td style={{ padding: "12px 14px", fontWeight: 600, whiteSpace: "nowrap",
                       color: r.importoExcel ? C.text : C.muted }}>
                       {r.importoExcel ? euro.format(r.importoExcel) : "—"}
                     </td>
-                    <td style={{ padding: "12px 14px", maxWidth: 160, color: C.muted, fontSize: 11 }}>{mandataria}</td>
+                    {/* Mandataria */}
+                    <td style={{ padding: "12px 14px", maxWidth: 160, color: C.muted, fontSize: 11 }}>
+                      {mandataria}
+                    </td>
+                    {/* Dettaglio — icona click popup */}
+                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                      <button
+                        onClick={() => setDetailRow({ mevId, r })}
+                        title="Apri dettaglio date e deploy"
+                        style={{ background: "#EBF4FF", border: `1px solid #93C5FD`, borderRadius: 7,
+                          padding: "5px 9px", cursor: "pointer", fontSize: 13, color: C.accent,
+                          lineHeight: 1 }}>
+                        ⋯
+                      </button>
+                    </td>
                     {/* Separatore */}
                     <td style={{ padding: 0, borderRight: "2px solid #4A90C4", background: "#EBF4FF" }}></td>
-                    {/* Avanzamento % — sola lettura con progress bar */}
-                    {EDITABLE_FIELDS.filter(f => f.type === "percent").map(f => (
-                      <td key={f.key} style={{ padding: "8px 10px", verticalAlign: "middle", minWidth: 90 }}>
-                        <ProgressBar value={prog[f.key]} color={PERCENT_COLORS[f.key] || C.accent} />
+
+                    {/* Campi editabili in tabella */}
+                    {EDITABLE_FIELDS.map(f => (
+                      <td key={f.key} style={{ padding: "8px 10px", verticalAlign: "middle" }}>
+                        {f.type === "percent" ? (
+                          <div>
+                            <EditCell value={prog[f.key]} type={f.type}
+                              onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                            <ProgressBar value={prog[f.key]}
+                              color={PERCENT_COLORS[f.key] || C.accent} />
+                          </div>
+                        ) : (
+                          <EditCell value={prog[f.key]} type={f.type}
+                            onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
+                        )}
                       </td>
                     ))}
-                    <td style={{ padding: "8px 14px", color: C.muted, fontSize: 11, whiteSpace: "nowrap" }}>
-                      {prog.dataAggiornamento || "—"}
-                    </td>
+
+                    {/* Bottone salva riga */}
                     <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                      {isDirty && <span style={{ fontSize: 10, background: "#FEF3C7", color: "#92400E", borderRadius: 4, padding: "2px 6px", fontWeight: 700 }}>●</span>}
+                      {isOk ? (
+                        <span style={{ fontSize: 18, color: C.success }}>✓</span>
+                      ) : (
+                        <button onClick={() => saveRow(mevId)}
+                          disabled={!isDirty || isSaving}
+                          style={{ padding: "6px 14px", background: isDirty ? C.accent : "#E2E8F0",
+                            color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
+                            fontWeight: 700, fontSize: 12, cursor: isDirty ? "pointer" : "default",
+                            opacity: isSaving ? 0.6 : 1, transition: "all .15s", whiteSpace: "nowrap" }}>
+                          {isSaving ? "…" : "Salva"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1113,96 +932,60 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
         </div>
       )}
 
-      {/* ── Modal dettaglio riga (modifica + elimina) ── */}
+      {/* ── Modal dettaglio riga ── */}
       {detailRow && (() => {
         const { mevId, r } = detailRow;
         const prog     = progressData[mevId] || {};
         const isSaving = !!saving[mevId];
         const isDirty  = !!dirty[mevId];
-        const ALL_FIELDS = [...EDITABLE_FIELDS, ...DETAIL_FIELDS];
         return (
-          <div className="ra-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
             display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
             onClick={() => setDetailRow(null)}>
-            <div className="ra-detail-modal" role="dialog" aria-modal="true" aria-labelledby="ra-detail-title" tabIndex={-1} ref={detailModalRef} style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
-              width: "100%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto", padding: "28px 28px 24px" }}
+            <div style={{ background: C.surface, borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+              width: "100%", maxWidth: 520, padding: "28px 28px 24px" }}
               onClick={e => e.stopPropagation()}>
 
               {/* Intestazione */}
-              <div style={{ marginBottom: 20, borderBottom: `1px solid ${C.border}`, paddingBottom: 16 }}>
+              <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 11, color: C.muted, fontWeight: 700,
                   textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
-                  Avanzamento attività
+                  Dettaglio date e deploy
                 </div>
-                <div id="ra-detail-title" style={{ fontSize: 20, fontWeight: 800, color: C.head }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.head }}>
                   {r.goTo} — {r.descrizione || ""}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 4, display: "flex", gap: 16 }}>
-                  <span>{r.applicativo || ""}</span>
-                  {r.stato && <span style={{ ...statoStyle(r.stato), borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{r.stato}</span>}
-                  {r.importoExcel && <span style={{ fontWeight: 600, color: C.text }}>{euro.format(r.importoExcel)}</span>}
-                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{r.applicativo}</div>
               </div>
 
-              <section className="ra-section ra-mev-section">
-                <div className="ra-section-title"><div><span className="ra-eyebrow">01 / ANAGRAFICA</span><h3>Dati MEV</h3></div><span className="ra-section-badge">Sola lettura</span></div>
-                <dl className="ra-mev-grid">
-                  {[["GoTo", r.goTo], ["Sistema", r.applicativo], ["PM Poste", r.pmPoste], ["PM CAP", r.pmCap], ["Importo fornitura", r.importoExcel != null ? euro.format(r.importoExcel) : null], ["Mandataria / Mandante", resolveMandataria(r.capgemini, r.iet, rtiRows).join(", ")]].map(([label, value]) => (
-                    <div key={label}><dt>{label}</dt><dd>{value || "—"}</dd></div>
-                  ))}
-                </dl>
-              </section>
-              {[
-                { title: "Avanzamento attività", subtitle: "02 / COMPLETAMENTO", fields: ALL_FIELDS.filter(f => f.type === "percent") },
-                { title: "Documenti e aggiornamenti", subtitle: "03 / DOCUMENTAZIONE", fields: EDITABLE_FIELDS.filter(f => f.type !== "percent") },
-                { title: "Pianificazione e rilasci", subtitle: "04 / MILESTONE", fields: DETAIL_FIELDS },
-              ].map(section => (
-                <section className="ra-section ra-edit-section" key={section.title}>
-                  <div className="ra-section-title"><div><span className="ra-eyebrow">{section.subtitle}</span><h3>{section.title}</h3></div><span className="ra-section-badge">{isAdminOrSuper ? "Modificabile" : "Sola lettura"}</span></div>
-                  <div className="ra-field-grid">
-                    {section.fields.map(f => (
-                      <div className={`ra-field ${f.type === "text" ? "ra-field-wide" : ""}`} key={f.key}>
-                        <label>{f.label}
-                          {isAdminOrSuper
-                            ? <EditCell label={f.label} value={prog[f.key]} type={f.type} onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
-                            : <div className="ra-read-value">{prog[f.key] != null && prog[f.key] !== "" ? `${prog[f.key]}${f.type === "percent" ? "%" : ""}` : "—"}</div>}
-                        </label>
-                        {f.type === "percent" && <ProgressBar value={prog[f.key]} color={f.key === "sviluppo" ? "#059669" : f.key === "progettazione" ? "#0891B2" : C.accent} />}
-                      </div>
-                    ))}
+              {/* Campi dettaglio */}
+              <div style={{ display: "grid", gap: 14 }}>
+                {DETAIL_FIELDS.map(f => (
+                  <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text,
+                      minWidth: 200, flexShrink: 0 }}>{f.label}</label>
+                    <EditCell value={prog[f.key]} type={f.type}
+                      onChange={v => handleFieldChange(mevId, f.key, v)} saving={isSaving} />
                   </div>
-                </section>
-              ))}
+                ))}
+              </div>
 
-              {msg?.type === "err" && <p role="alert" className="ra-error">{msg.text}</p>}
               {/* Azioni */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
-                {isAdminOrSuper
-                  ? <button onClick={() => deleteRow(mevId)} disabled={isSaving}
-                      style={{ padding: "9px 18px", background: "transparent", color: C.danger,
-                        border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
-                        cursor: isSaving ? "wait" : "pointer", opacity: isSaving ? 0.6 : 1 }}>
-                      🗑 Elimina dati riga
-                    </button>
-                  : <div />
-                }
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setDetailRow(null)}
-                    style={{ padding: "9px 20px", background: "#F1F5F9", color: C.muted,
-                      border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                    Chiudi
-                  </button>
-                  {isAdminOrSuper && (
-                    <button onClick={async () => { if (await saveRow(mevId)) setDetailRow(null); }}
-                      disabled={!isDirty || isSaving}
-                      style={{ padding: "9px 22px", background: isDirty ? C.accent : "#E2E8F0",
-                        color: isDirty ? "#fff" : C.muted, border: "none", borderRadius: 8,
-                        fontWeight: 700, fontSize: 13, cursor: isDirty ? "pointer" : "default",
-                        opacity: isSaving ? 0.6 : 1 }}>
-                      {isSaving ? "Salvataggio…" : "Salva"}
-                    </button>
-                  )}
-                </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
+                <button onClick={() => setDetailRow(null)}
+                  style={{ padding: "9px 20px", background: "#F1F5F9", color: C.muted,
+                    border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Chiudi
+                </button>
+                <button onClick={async () => { await saveRow(mevId); setDetailRow(null); }}
+                  disabled={!isDirty || isSaving}
+                  style={{ padding: "9px 22px",
+                    background: isDirty ? C.accent : "#E2E8F0",
+                    color: isDirty ? "#fff" : C.muted,
+                    border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                    cursor: isDirty ? "pointer" : "default", opacity: isSaving ? 0.6 : 1 }}>
+                  {isSaving ? "Salvataggio…" : "Salva"}
+                </button>
               </div>
             </div>
           </div>
@@ -1230,13 +1013,13 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               <div style={{ flex: 1, minWidth: 120, background: C.successLt, border: `1px solid #86EFAC`,
                 borderRadius: 10, padding: "12px 16px" }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: C.success }}>{importPreview.matched.length}</div>
-                <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginTop: 2 }}>Righe abbinate</div>
+                <div style={{ fontSize: 11, color: C.success, fontWeight: 600, marginTop: 2 }}>GoTo trovati</div>
               </div>
               {importPreview.unmatched.length > 0 && (
                 <div style={{ flex: 1, minWidth: 120, background: C.warnLt, border: `1px solid #FCD34D`,
                   borderRadius: 10, padding: "12px 16px" }}>
                   <div style={{ fontSize: 22, fontWeight: 800, color: C.warn }}>{importPreview.unmatched.length}</div>
-                  <div style={{ fontSize: 11, color: C.warn, fontWeight: 600, marginTop: 2 }}>ID / GoTo non trovati</div>
+                  <div style={{ fontSize: 11, color: C.warn, fontWeight: 600, marginTop: 2 }}>GoTo non trovati</div>
                 </div>
               )}
             </div>
@@ -1249,29 +1032,17 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                   Righe da importare {importPreview.matched.length > 10 ? `(prime 10 di ${importPreview.matched.length})` : ""}
                 </div>
                 <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
-                  {importPreview.matched.slice(0, 10).map(({ mevId, idMev, goTo, method, fields }) => (
-                    <div key={mevId} style={{ display: "flex", alignItems: "flex-start", gap: 8,
+                  {importPreview.matched.slice(0, 10).map(({ goTo, method, fields }) => (
+                    <div key={goTo} style={{ display: "flex", alignItems: "flex-start", gap: 10,
                       padding: "8px 12px", borderBottom: `1px solid ${C.border}`,
                       background: C.surface, fontSize: 12 }}>
-                      {/* ID MEV */}
-                      <span style={{ fontWeight: 700, color: "#16a34a", minWidth: 42, fontSize: 11, flexShrink: 0 }}>
-                        #{idMev || mevId}
-                      </span>
-                      {/* GoTo */}
-                      {goTo && (
-                        <span style={{ fontWeight: 600, color: C.accent, minWidth: 70, fontSize: 11, flexShrink: 0 }}>
-                          {goTo}
-                        </span>
-                      )}
-                      {/* Badge metodo */}
+                      <span style={{ fontWeight: 700, color: C.accent, minWidth: 80 }}>{goTo}</span>
                       <span style={{ fontSize: 10, color: "#fff", background:
-                        method === "id_mev" ? "#16a34a" :
                         method === "goto" ? C.accent :
                         method?.startsWith("titolo") ? "#7C3AED" : "#0891b2",
-                        borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center", flexShrink: 0 }}>
-                        {method === "id_mev" ? "ID MEV" : method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
+                        borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", alignSelf: "center" }}>
+                        {method === "goto" ? "GoTo" : method?.startsWith("titolo") ? "Titolo" : "Sistemi"}
                       </span>
-                      {/* Campi importati */}
                       <span style={{ color: C.muted, fontSize: 11, lineHeight: 1.5 }}>
                         {Object.entries(fields).map(([k, v]) => {
                           const f = EDITABLE_FIELDS.find(ef => ef.key === k);
@@ -1289,7 +1060,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.warn, marginBottom: 6,
                   textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                 GoTo / ID non trovati nel dataset MEV (verranno ignorati)
+                  GoTo non presenti in questa release (verranno ignorati)
                 </div>
                 <div style={{ background: C.warnLt, border: `1px solid #FCD34D`, borderRadius: 8,
                   padding: "10px 14px", fontSize: 12, color: C.warn, lineHeight: 1.8 }}>
@@ -1312,76 +1083,6 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
                   border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
                   cursor: importPreview.matched.length > 0 ? "pointer" : "default" }}>
                 Applica {importPreview.matched.length} righe
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal conferma Elimina dati ── */}
-      {showConfirmDelete && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-          onClick={() => !deleting && setShowConfirmDelete(false)}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 440, width: "100%",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 32, marginBottom: 12, textAlign: "center" }}>⚠️</div>
-            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: C.danger, textAlign: "center" }}>
-              {selectedRelease === "__ALL__"
-                ? "Elimina tutti i dati avanzamenti"
-                : `Elimina dati release "${selectedRelease}"`}
-            </h3>
-            <p style={{ margin: "0 0 24px", fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 1.6 }}>
-              {selectedRelease === "__ALL__"
-                ? <>Questa operazione elimina <strong>tutti</strong> i dati di avanzamento per <strong>tutte le release</strong>.</>
-                : <>Questa operazione elimina i dati di avanzamento importati per la release <strong>{selectedRelease}</strong>.</>}
-              <br />L&apos;azione è <strong>irreversibile</strong>.
-            </p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button onClick={() => setShowConfirmDelete(false)} disabled={deleting}
-                style={{ padding: "10px 24px", background: "#F1F5F9", color: C.muted,
-                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                Annulla
-              </button>
-              <button onClick={handleDeleteAll} disabled={deleting}
-                style={{ padding: "10px 24px", background: C.danger, color: "#fff",
-                  border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
-                  cursor: deleting ? "wait" : "pointer", opacity: deleting ? 0.7 : 1 }}>
-                {deleting ? "Eliminazione…" : "Sì, elimina tutto"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal conferma Elimina release dal calendario ── */}
-      {confirmDeleteRelease && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1001,
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-          onClick={() => !deletingRelease && setConfirmDeleteRelease(null)}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 420, width: "100%",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 32, marginBottom: 12, textAlign: "center" }}>🗑</div>
-            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: C.danger, textAlign: "center" }}>
-              Elimina release dal calendario
-            </h3>
-            <p style={{ margin: "0 0 24px", fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 1.6 }}>
-              La release <strong>{confirmDeleteRelease.name}</strong> verrà rimossa dal calendario.<br />
-              I dati di avanzamento associati <strong>non</strong> vengono eliminati.
-            </p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button onClick={() => setConfirmDeleteRelease(null)} disabled={deletingRelease}
-                style={{ padding: "10px 24px", background: "#F1F5F9", color: C.muted,
-                  border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                Annulla
-              </button>
-              <button onClick={handleDeleteRelease} disabled={deletingRelease}
-                style={{ padding: "10px 24px", background: C.danger, color: "#fff",
-                  border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
-                  cursor: deletingRelease ? "wait" : "pointer", opacity: deletingRelease ? 0.7 : 1 }}>
-                {deletingRelease ? "Eliminazione…" : "Sì, elimina"}
               </button>
             </div>
           </div>

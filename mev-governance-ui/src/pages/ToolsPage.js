@@ -1,9 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 import JSZip from "jszip";
-import { fmtItIT } from "../utils";
+import { fmtItIT, fmtEuroIt } from "../utils";
 import { tryRefreshToken, updateOrdineConsegna } from "../services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
+
+// Deriva l'URL diretto del parser dall'URL del backend:
+//   https://mev-governance-backend-dev.onrender.com → https://mev-pdf-parser-dev.onrender.com
+//   https://mev-governance-backend.onrender.com     → https://mev-pdf-parser.onrender.com
+const PDF_PARSER_URL = (() => {
+  try {
+    return API_BASE_URL.replace("mev-governance-backend", "mev-pdf-parser");
+  } catch {
+    return "";
+  }
+})();
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("jwt") || ""}`,
@@ -557,6 +569,7 @@ export default function ToolsPage({ onUnauthorized }) {
           const oldRid = existingMatch[0].match(/r:id="([^"]+)"/)?.[1];
           cleanWbXml = wbXml.replace(existingMatch[0], "");
           if (oldRid) {
+            const oldIdx = wbXml.match(new RegExp(`<sheet[^>]*r:id="${oldRid}"[^>]*/>`));
             const sheetNum = oldRid.replace(/\D/g, "");
             zip.remove(`xl/worksheets/sheet${sheetNum}.xml`);
           }
@@ -1639,7 +1652,7 @@ export default function ToolsPage({ onUnauthorized }) {
               PDF già presente
             </div>
             <div style={{ fontSize: "13px", color: "#333", marginBottom: "20px", lineHeight: 1.6 }}>
-             Il file <strong>&quot;{confirmReplace.file.name}&quot;</strong> è già stato caricato in precedenza.<br />
+              Il file <strong>"{confirmReplace.file.name}"</strong> è già stato caricato in precedenza.<br />
               I dati esistenti verranno <strong>eliminati</strong> e sostituiti con quelli del nuovo file.<br /><br />
               Vuoi procedere?
             </div>
@@ -1674,13 +1687,13 @@ export default function ToolsPage({ onUnauthorized }) {
             background: "white", borderRadius: "12px", padding: "28px 32px",
             width: "400px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
           }}>
-              <div style={{ fontSize: "16px", fontWeight: 700, color: "#ea4335", marginBottom: "14px" }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#ea4335", marginBottom: "14px" }}>
               Conferma eliminazione
             </div>
             <div style={{ fontSize: "13px", color: "#333", marginBottom: "20px", lineHeight: 1.5 }}>
-               Vuoi eliminare tutte le righe importate dal file:<br />
-               <strong>&quot;{confirmDel}&quot;</strong>?<br />
-               L&apos;operazione non può essere annullata.
+              Vuoi eliminare tutte le righe importate dal file:<br />
+              <strong>"{confirmDel}"</strong>?<br />
+              L'operazione non può essere annullata.
             </div>
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
               <button

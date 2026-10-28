@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders login prompt', () => {
+test('renders learn react link', () => {
   render(<App />);
-  const prompt = screen.getByText(/Accedi con le tue credenziali/i);
-  expect(prompt).toBeInTheDocument();
+  const linkElement = screen.getByText(/learn react/i);
+  expect(linkElement).toBeInTheDocument();
 });

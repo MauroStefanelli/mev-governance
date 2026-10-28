@@ -30,7 +30,6 @@ public class AppDbContext : DbContext
     public DbSet<UserPagePermission> UserPagePermissions => Set<UserPagePermission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<AppRolePermission> AppRolePermissions => Set<AppRolePermission>();
-    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

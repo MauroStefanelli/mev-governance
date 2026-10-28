@@ -71,7 +71,7 @@ function ContrattiPage({ onUnauthorized, ambienteId }) {
 
       {contratti.length === 0 && (
         <div style={{ textAlign: "center", padding: "60px", color: "#888", fontSize: "14px" }}>
-          Nessun contratto. Carica il file Excel e clicca &quot;Allinea Dati&quot; nella pagina MEV.
+          Nessun contratto. Carica il file Excel e clicca "Allinea Dati" nella pagina MEV.
         </div>
       )}
 

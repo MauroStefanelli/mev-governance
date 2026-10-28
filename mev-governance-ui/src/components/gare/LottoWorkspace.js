@@ -13,7 +13,7 @@ export default function LottoWorkspace({ lotto, deadline, mode = "documenti", on
   const change = (group, key, patch) => onChange({ ...workflow, [group]: { ...workflow[group], [key]: { ...workflow[group]?.[key], ...patch } } });
   const stats = lottoProgress(lotto, deadline);
   if (mode === "requisiti") return <div className="gara-workspace">
-    <div className="gara-section-title"><div><h3>Verifica dei requisiti · {lotto.nome}</h3><p>Registra l&apos;esito della verifica e il riferimento che lo dimostra.</p></div><span className="gara-tag">{stats.requirementsPending} da verificare</span></div>
+    <div className="gara-section-title"><div><h3>Verifica dei requisiti · {lotto.nome}</h3><p>Registra l'esito della verifica e il riferimento che lo dimostra.</p></div><span className="gara-tag">{stats.requirementsPending} da verificare</span></div>
     {!requirements.length && <p className="gara-empty">Nessun requisito tecnico estratto per questo lotto. Verifica il capitolato importato.</p>}
     {requirements.map((r, i) => {
       const key = itemKey(r, i, requirements, "req");
@@ -30,14 +30,8 @@ export default function LottoWorkspace({ lotto, deadline, mode = "documenti", on
   const visible = docs.map((doc, i) => ({ doc, i, key: itemKey(doc, i, docs) })).filter(({ doc, key }) => {
     const state = workflow.documenti?.[key] || {};
     const approved = state.stato === "Approvato" && !!doc._docAttachment;
-    // Esplicita la precedenza degli operatori per chiarezza e per evitare warning no-mixed-operators
-    const matchesSearch = `${doc.nome || doc.name} ${doc.tipo || ""}`.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter =
-      filter === "Tutti" ||
-      (filter === "Da completare" && !approved) ||
-      (filter === "Obbligatori" && doc.obbligatorio !== false) ||
-      (filter === "In ritardo" && !approved && scaduto(scadenzaEffettiva(state.scadenza, deadline)));
-    return matchesSearch && matchesFilter;
+    return `${doc.nome || doc.name} ${doc.tipo || ""}`.toLowerCase().includes(search.toLowerCase()) &&
+      (filter === "Tutti" || filter === "Da completare" && !approved || filter === "Obbligatori" && doc.obbligatorio !== false || filter === "In ritardo" && !approved && scaduto(scadenzaEffettiva(state.scadenza, deadline)));
   });
   return <div className="gara-workspace">
     <div className="gara-section-title"><div><h3>Documenti da produrre · {lotto.nome}</h3><p>{stats.approved} approvati su {stats.total}. Un allegato resta da revisionare finché non viene approvato.</p></div></div>

@@ -1,4 +1,3 @@
-/* eslint-disable testing-library/no-node-access, testing-library/no-container */
 import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import GaraSections, { buildSectionsTree } from "./GaraSections";
@@ -48,4 +47,3 @@ test("ordina ogni livello numericamente, gestisce duplicati e antenati mancanti 
   const leaf = screen.getByText("1.4.1 — Paragrafo").closest("details");
   expect(within(leaf).getByText(/Sintesi non disponibile/)).toBeInTheDocument();
 });
-/* eslint-disable testing-library/no-node-access, testing-library/no-container */

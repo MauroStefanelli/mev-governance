@@ -64,7 +64,7 @@ function ChecklistSidebar({ checklist, onToggle, lottoNome }) {
       <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: "1px solid #f0f0f0", overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", background: "linear-gradient(135deg, #102a43, #1e3a5f)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Attivita&apos; da fare{lottoNome ? ` — ${lottoNome}` : ""}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Attivita' da fare{lottoNome ? ` — ${lottoNome}` : ""}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{doneCount} / {checklist.length} completate</div>
           </div>
           <div style={{ fontSize: 22 }}>✅</div>
@@ -81,9 +81,9 @@ function ChecklistSidebar({ checklist, onToggle, lottoNome }) {
             if (!items.length) return null;
             return (
               <div key={prio} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#bbb", marginBottom: 6, marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#bbb", marginBottom: 6, marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: prio === "Alta" ? "#dc2626" : prio === "Media" ? AMBER : "#16a34a", flexShrink: 0 }} />
-                  Priorita&apos; {prio}
+                  Priorita' {prio}
                 </div>
                 {items.map(item => (
                   <div key={item.id} role="checkbox" aria-checked={!!item.done} tabIndex={0} onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onToggle(item.id); } }} onClick={() => onToggle(item.id)} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "7px 9px", borderRadius: 8, cursor: "pointer", marginBottom: 4, background: item.done ? "#f0fdf4" : "#fafafa", border: "1px solid " + (item.done ? "#86efac" : "#f0f0f0"), transition: "all 0.15s" }}>
@@ -134,9 +134,9 @@ function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
 
       {/* Contatore */}
       <div style={{ padding: "24px 36px 0" }}>
-            <div style={{ fontSize: 13, color: "#888", fontWeight: 500 }}>
-            {gare.length === 0 ? "Nessuna gara ancora" : gare.length + " gara" + (gare.length > 1 ? "e" : "") + " in archivio"}
-          </div>
+        <div style={{ fontSize: 13, color: "#888", fontWeight: 500 }}>
+          {gare.length === 0 ? "Nessuna gara ancora" : gare.length + " gara" + (gare.length > 1 ? "e" : "") + " in archivio"}
+        </div>
       </div>
 
       {/* Empty state */}
@@ -144,7 +144,7 @@ function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 72, marginBottom: 24, opacity: 0.35 }}>📋</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#374151", marginBottom: 10 }}>Nessuna gara ancora</div>
-            <div style={{ fontSize: 15, color: "#9ca3af", marginBottom: 32, maxWidth: 400, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 15, color: "#9ca3af", marginBottom: 32, maxWidth: 400, lineHeight: 1.6 }}>
             Crea la tua prima gara per iniziare a caricare documenti e ottenere analisi AI sul bando.
           </div>
           <button onClick={onNuova} style={{ background: "linear-gradient(135deg, " + AMBER + ", " + AMBER_DARK + ")", color: "#fff", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 16, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 16px rgba(245,158,11,0.4)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -197,7 +197,7 @@ function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, color: "#9ca3af" }}>Attivita&apos;</span>
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>Attivita'</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: AMBER_DARK }}>{pct}%</span>
                     </div>
                     <div style={{ height: 5, background: "#f3f4f6", borderRadius: 3, overflow: "hidden" }}>
@@ -595,7 +595,7 @@ function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara, lottoSelezio
         </div>
       </div>
       {!eco ? (
-        <div style={{ padding: "24px", color: "#6b7280", fontSize: 13 }}>Nessun dato offerta economica per questo lotto. Carica l&apos;Excel dal modale Modifica.</div>
+        <div style={{ padding: "24px", color: "#6b7280", fontSize: 13 }}>Nessun dato offerta economica per questo lotto. Carica l'Excel dal modale Modifica.</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -667,10 +667,8 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
   const [towFiles,     setTowFiles]           = React.useState({});     // { 1: File, 2: File, ... }
   const [catalogFiles, setCatalogFiles]       = React.useState({});     // { 1: File, 2: File, ... }
   const [capFile,      setCapFile]            = React.useState(null);   // File capitolato tenuto in memoria
-  void capFile; // currently stored for on-demand analysis; may be unused in some flows
   const [analyzingProposte, setAnalyzingProposte] = React.useState({}); // { lottoIdx: bool }
   const towFileRefs    = React.useRef({});
-  void towFileRefs; // ref kept for optional upload flows; mark used to avoid linter warning
   const docFileRefs = React.useRef({});
   const capFileInputRef = useRef(null);
 
@@ -717,7 +715,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
     try {
       const result = await analizzaCapitolatoGara(file, towFiles, catalogFiles);
       const a = result.analysis || {};
-      // debug: chiavi analisi capitolato
+      console.log("[GarePage] analisi capitolato - chiavi:", Object.keys(a));
 
       const get    = (obj, ...ks) => { for (const k of ks) if (obj[k] != null) return obj[k]; return null; };
       const getArr = (obj, ...ks) => { const v = get(obj, ...ks); return Array.isArray(v) ? v : []; };
@@ -757,7 +755,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       });
       const normCatalog = (c, i) => {
         // debug: log primo elemento
-        if (i === 0) { /* debug: primo elemento catalogo */ }
+        if (i === 0) console.log("[normCatalog] raw[0]:", JSON.stringify(c).slice(0, 300));
         return {
           _id: i,
           id: c.id ?? i,
@@ -833,21 +831,21 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
 
       // Debug: log errori parser dal backend
       const rawLotti = getArr(a,"lotti","Lotti","lots","lotto");
-       rawLotti.forEach((l) => {
-          if (l._catalogError) { void l._catalogError; /* catalog error (debug) */ }
-          if (l._towError)     { void l._towError; /* tow error (debug) */ }
-          /* lotto debug: counts available in l._towCapitolatoCount / l._towPricesCount / l._catalogCount */
+      rawLotti.forEach((l, i) => {
+        if (l._catalogError) console.error(`[GarePage] Lotto ${i+1} catalogError:`, l._catalogError);
+        if (l._towError)     console.error(`[GarePage] Lotto ${i+1} towError:`, l._towError);
+        console.log(`[GarePage] Lotto ${i+1} debug:`, { towCapitolato: l._towCapitolatoCount, towPrices: l._towPricesCount, catalogCount: l._catalogCount });
         // debug pesoEffort: mostra i primi 3 TOW normalizzati
         const rawTow = l.tow || [];
-        if (rawTow.length > 0) { /* debug: rawTow sample available */ }
+        if (rawTow.length > 0) console.log(`[GarePage] Lotto ${i+1} TOW raw[0..2]:`, JSON.stringify(rawTow.slice(0,3)));
         // debug catalogo: mostra raw
         const rawCat = l.catalogo || [];
-        void rawCat; // mark used to silence no-unused-vars where applicable
+        console.log(`[GarePage] Lotto ${i+1} catalogo raw length=${rawCat.length}`, rawCat.length > 0 ? JSON.stringify(rawCat[0]).slice(0,200) : "(vuoto)");
       });
-      // debug: capData summary available in capData.lotti
+      console.log("[GarePage] capData:", { nLotti: capData.lotti.length, lotti: capData.lotti.map(l => ({ nome: l.nome, nTow: l.tow.length, nDoc: l.documentiRichiesti.length, nCatalog: (l.catalogo||[]).length, importoBase: l.importoBase, tow0: l.tow[0] })) });
       // Preserva importoBase e catalogo già inseriti dall'utente nei lotti precedenti
       const lottiPrecedenti = latestGara.current.capitolato?.lotti || [];
-       capData.lotti = capData.lotti.map((l) => {
+      capData.lotti = capData.lotti.map((l, i) => {
         const identity = name => name?.match(/lotto\s*(\d+)/i)?.[1];
         const prev = lottiPrecedenti.find(previous => previous.nome?.trim().toLowerCase() === l.nome?.trim().toLowerCase())
           || lottiPrecedenti.find(previous => identity(l.nome) && identity(previous.nome) === identity(l.nome));
@@ -875,7 +873,6 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
       capData.lotti = lottiConBaseAsta(capData.lotti, latestGara.current.offertaLotti);
       onUpdate({ ...latestGara.current, capitolato: capData, catalogFileNames: catalogFileNamesUpd });
     } catch (err) {
-      // console error preserved intentionally for runtime error visibility
       console.error("[GarePage] errore analisi capitolato:", err?.message || err);
       setCapError(err?.message || "Errore analisi capitolato");
     } finally {
@@ -1023,7 +1020,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
           { label: "Documenti caricati", value: files.length, color: AMBER_DARK },
           { label: "Documenti approvati", value: progressAttivo ? `${progressAttivo.approved}/${progressAttivo.total}` : "Seleziona lotto", color: "#1d4ed8" },
           { label: "Requisiti da verificare", value: progressAttivo ? progressAttivo.requirementsPending : "—", color: "#b45309" },
-          { label: "Attivita&apos; completate", value: (checklistAttiva.filter(c=>c.done).length) + "/" + checklistAttiva.length, color: "#1d4ed8" },
+          { label: "Attivita' completate", value: (checklistAttiva.filter(c=>c.done).length) + "/" + checklistAttiva.length, color: "#1d4ed8" },
         ].filter(Boolean).map((k, i) => (
           <div key={i} style={{ background: "#fff", borderRadius: 10, padding: "14px 20px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", border: "1px solid #f0f0f0", minWidth: 140 }}>
             <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{k.label}</div>
@@ -1133,7 +1130,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                       ))}
                     </div>
                     <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
-                      I listini TOW e Catalogo vengono letti con lo stesso parser di &quot;Gestione Contratti&quot; — dati precisi senza AI.
+                      I listini TOW e Catalogo vengono letti con lo stesso parser di "Gestione Contratti" — dati precisi senza AI.
                     </div>
                   </div>
                 );
@@ -1275,7 +1272,6 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                             const hasPeso = d.tow.some(t => t.pesoEffort != null);
                             // Pre-calcola importo per ogni TOW
                             const sommaPeso = d.tow.reduce((s, t) => s + (t.pesoEffort != null ? Number(t.pesoEffort) : 0), 0);
-                            void sommaPeso; // usato solo per debug/analisi visiva in passato, mantenuto per chiarezza
                             const importiConPeso = d.tow.reduce((s, t) => s + (t.pesoEffort != null && baseAsta > 0 ? (Number(t.pesoEffort) / 100) * baseAsta : 0), 0);
                             const towCalc = d.tow.map(t => {
                               if (t.pesoEffort != null) {
@@ -1293,7 +1289,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                   <span style={{ fontSize: 16 }}>📋</span>
                                   <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>TOW — Transazioni di Lavoro ({d.tow.length})</div>
                                   {!baseAsta && hasPeso && (
-                                    <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Base d&apos;asta non rilevata nei documenti importati</span>
+                                    <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Base d'asta non rilevata nei documenti importati</span>
                                   )}
                                   <span style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>Estratti dal capitolato</span>
                                 </div>
@@ -1379,14 +1375,14 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                   {catalogo.length > 0
                                     ? <><span style={{ background: "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>{catalogo.length} voci</span>
                                         <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, marginLeft: 6 }}>{catOpen ? "▲" : "▼"}</span></>
-                                        : <span style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)", borderRadius: 20, padding: "2px 10px", fontSize: 11 }}>Nessun file caricato</span>
+                                    : <span style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)", borderRadius: 20, padding: "2px 10px", fontSize: 11 }}>Nessun file caricato</span>
                                   }
                                 </div>
                                 {/* Corpo */}
                                 {catalogo.length === 0 ? (
                                   <div style={{ padding: "16px 18px", fontSize: 13, color: "#6b7280", background: "#f8faff", borderTop: "1px solid #e0e7ff" }}>
                                     <div style={{ fontWeight: 600, color: "#1d4ed8", marginBottom: 6 }}>Catalogo non ancora caricato per questo lotto.</div>
-                                    <div>Carica il PDF del catalogo nel pannello sopra (<strong>📦 Catalogo (PDF)</strong>) e rilancia l&apos;analisi del capitolato per visualizzare le voci con ID, ambito, nome componente e prezzi Realizzazione/Modifica.</div>
+                                    <div>Carica il PDF del catalogo nel pannello sopra (<strong>📦 Catalogo (PDF)</strong>) e rilancia l'analisi del capitolato per visualizzare le voci con ID, ambito, nome componente e prezzi Realizzazione/Modifica.</div>
                                   </div>
                                 ) : catOpen && (
                                   <div style={{ overflowX: "auto" }}>
@@ -1685,7 +1681,7 @@ export default function GarePage({ onUnauthorized }) {
         setError("Errore caricamento gare");
         setLoading(false);
       });
-  }, [onUnauthorized]);
+  }, []);
 
   const handleCreaGara = async (form) => {
     const nuova = {
@@ -1741,7 +1737,7 @@ export default function GarePage({ onUnauthorized }) {
   };
 
   const handleDeleteGara = async (gara) => {
-    if (!window.confirm("Eliminare la gara \"" + gara.nome + "\"? L&apos;operazione non è reversibile.")) return;
+    if (!window.confirm("Eliminare la gara \"" + gara.nome + "\"? L'operazione non è reversibile.")) return;
     setGare(prev => prev.filter(g => g.id !== gara.id));
     if (selectedId === gara.id) setSelectedId(null);
     if (gara._recordId) {
