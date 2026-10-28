@@ -497,7 +497,7 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
     }).catch(e => {
       if (e?.status === 401) onUnauthorized?.();
     }).finally(() => setLoading(false));
-  }, [ambienteId, onUnauthorized]);
+  }, [ambienteId, onUnauthorized, releaseContractId]);
 
   // Carica progressData quando cambia la release selezionata
   useEffect(() => {
