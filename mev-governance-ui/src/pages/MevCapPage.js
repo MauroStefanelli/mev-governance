@@ -1350,6 +1350,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const [editRow, setEditRow] = useState(null);
   const [createModal, setCreateModal] = useState(false);
   const [savedRows, setSavedRows] = useState({});
+  // savedRows is used to provide transient UI feedback when rows are saved.
+  // Some views don't read it; mark as used to avoid lint noise.
+  void savedRows;
   const [notePopover, setNotePopover] = useState(null);
   const [towImpattoAll, setTowImpattoAll] = useState({});
   const [rtiRows, setRtiRows] = useState([]);
@@ -1635,9 +1638,10 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   };
 
   const checkMark = (val) =>
-    val?.trim().toLowerCase() === "x"
+    val?.trim?.().toLowerCase() === "x"
       ? <span title="ok" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#e6f4ea", color: "#2e7d32", fontSize: "13px", fontWeight: 700 }}>V</span>
       : (val ?? "");
+  void checkMark;
 
   // ── Render principale ─────────────────────────────────────────────────────
   return (
