@@ -595,6 +595,9 @@ public class MevController : BaseController
                 existing.Stato                  = stato;
                 existing.AnnoCompetenza         = GetInt("Anno Competenza");
                 existing.ReleaseExcel           = releaseExcel;
+                // Aggiorna anche i campi PAnno / PRelease dal file Excel come richiesto
+                existing.PAnno                  = GetInt("Anno Competenza");
+                existing.PRelease               = releaseExcel;
                 existing.Capgemini              = cap;
                 existing.Iet                    = iet;
                 existing.ImportoExcel           = importo;
@@ -690,6 +693,9 @@ public class MevController : BaseController
                     Nel                     = nel,
                     InVita                  = inVita,
                     Cm                      = cm,
+                    PAnno                   = GetInt("Anno Competenza"),
+                    PRelease                = releaseExcel,
+                    // Popola anche PAnno / PRelease per le nuove righe importate
                     PAnno                   = GetInt("Anno Competenza"),
                     PRelease                = releaseExcel,
                     SubcoImporti            = impSubco,
