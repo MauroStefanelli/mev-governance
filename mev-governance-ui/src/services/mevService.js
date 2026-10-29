@@ -158,6 +158,7 @@ export const exportMev = async (rows, filters = {}) => {
     "Cap":               r.capgemini ?? "",
     "IET":               r.iet ?? "",
     "Subco":             r.subco ?? "",
+    "Imp. Subco":        r.impSubco ?? "",
     "P Anno":            r.pAnno,
     "P Release":         r.pRelease,
     "P Importo":         r.pImporto,

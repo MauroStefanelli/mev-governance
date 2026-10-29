@@ -623,7 +623,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
              </tr>
              {/* Intestazioni */}
              <tr style={{ background: "#f8f9fa" }}>
-               {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h, i) => (
+                {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "Imp. Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h, i) => (
                  <th key={h} style={{
                    padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
                    borderBottom: "2px solid #dadce0",
@@ -692,8 +692,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                    <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{r.atId ?? ""}</td>
                    <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "13px" }}>{formatEuro(r.ordinatoBdo)}</td>
 
-                  <td style={{ ...TD }}>
-                    {resolveSubco(r.subco, rtiRows).length > 0
+                   <td style={{ ...TD }}>
+                     {resolveSubco(r.subco, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
                           {resolveSubco(r.subco, rtiRows).map(s => (
                             <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
@@ -702,6 +702,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
                     }
                   </td>
+
+                  <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{r.impSubco != null ? formatEuro(r.impSubco) : '—'}</td>
 
                   <td style={{ ...TD }}>
                     <input type="number" value={r.pAnno}
