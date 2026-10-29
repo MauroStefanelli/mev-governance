@@ -613,7 +613,16 @@ public class MevController : BaseController
                 existing.Recupero               = recupero;
                 existing.Subco                  = subco;
                 existing.SubcoImporti           = impSubco;
-                if (decimal.TryParse(impSubco, out var tmpImp)) existing.ImpSubco = tmpImp;
+                // normalizza il valore numerico accettando formati con virgola/migliaia
+                var impNorm = (impSubco ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(impNorm)) {
+                    // se contiene sia '.' che ',', assumiamo '.' come migliaia e ',' come decimale
+                    var forParse = impNorm.Contains(",") && impNorm.Contains(".")
+                        ? impNorm.Replace(".", "").Replace(",", ".")
+                        : impNorm.Replace(",", ".");
+                    if (decimal.TryParse(forParse, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var tmpImp))
+                        existing.ImpSubco = tmpImp;
+                }
                 existing.Tbd                    = tbd;
                 existing.Bc                     = bc;
                 existing.Contratto              = contratto;
@@ -694,7 +703,9 @@ public class MevController : BaseController
                     PAnno                   = GetInt("Anno Competenza"),
                     PRelease                = releaseExcel,
                     SubcoImporti            = impSubco,
-                    ImpSubco                = decimal.TryParse(impSubco, out var tmpImp) ? (decimal?)tmpImp : null,
+                    ImpSubco                = (decimal.TryParse(
+                        (string.IsNullOrWhiteSpace(impSubco) ? "" : (impSubco.Contains(",") && impSubco.Contains(".") ? impSubco.Replace(".", "").Replace(",", ".") : impSubco.Replace(",", "."))),
+                        System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var tmpVal) ? (decimal?)tmpVal : null),
                     PImporto                = importo,
                     ImportoBdo              = ordinatoBdo,
                     AmbienteId              = ambienteId,
