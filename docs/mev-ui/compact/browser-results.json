@@ -1,0 +1,19 @@
+{
+  "viewports": [
+    1440,
+    768
+  ],
+  "alignedAfterHorizontalAndVerticalScroll": true,
+  "documentHorizontalOverflow": false,
+  "freezeThroughImportoCap": {
+    "MEV": 7,
+    "MEV-CAP": 12
+  },
+  "freezeThroughRda": {
+    "MEV": 10,
+    "MEV-CAP": 15
+  },
+  "filteredSubcoCorrect": true,
+  "consoleErrors": [],
+  "dataset": "35 synthetic initiatives"
+}

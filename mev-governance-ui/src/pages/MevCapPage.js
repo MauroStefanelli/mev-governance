@@ -191,8 +191,8 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption, a
         onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
         onClick={handleToggle}
         style={{
-          padding: "4px 6px", border: "1px solid #dadce0", borderRadius: "4px",
-          fontSize: "12px", background: "white", cursor: "pointer",
+          padding: "3px 4px", border: "1px solid #dadce0", borderRadius: "4px",
+          fontSize: "11px", background: "white", cursor: "pointer",
           color: selected.length ? "#1a73e8" : "#333",
           fontWeight: selected.length ? 600 : 400,
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
@@ -1645,7 +1645,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     };
     const s = map[stato] || { bg: "#f1f3f4", color: "#555" };
     return (
-      <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "12px", fontSize: "12px", background: s.bg, color: s.color }}>
+      <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", background: s.bg, color: s.color }}>
         {stato || "(vuoto)"}
       </span>
     );
@@ -1753,17 +1753,17 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         </button>
 
 
-      </div>
       <FinancialSummary supply={totCap} oda={totOda} subco={totSubco} format={formatEuro} approved />
+      </div>
 
 
       {/* Contatore */}
       <div style={{ fontSize: "12px", color: "#526174", marginBottom: "8px" }}>
-        {filteredRows.length} righe{hasActive ? ` (filtrate su ${rows.length} totali)` : ""}
+        {filteredRows.length} Iniziative{hasActive ? ` (filtrate su ${rows.length} totali)` : ""}
       </div>
 
       {/* Tabella */}
-      <MevTableView label="Tabella MevCapPage" widths={[60, 110, 150, 260, 140, 140, 80, 130, 130, 130, 100, 150, 90, 140, 140, 150, 150, 200, 160, 150, 90, 90, 90, 90, 90, 90, 110, 100, 130, 220]} rdaIndex={14}>
+      <MevTableView label="Tabella MevCapPage" widths={[42, 85, 110, 190, 100, 100, 60, 90, 115, 90, 65, 115, 60, 100, 95, 115, 115, 135, 110, 110, 65, 65, 65, 65, 65, 65, 85, 65, 85, 150]} capIndex={11} rdaIndex={14}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Riga filtri */}
