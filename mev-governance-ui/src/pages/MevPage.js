@@ -556,13 +556,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             <div style={{ fontSize: "11px", color: "#12c937", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale ODA</div>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
           </div>
-          <div style={{
-            background: "#e6f4ea",
-            borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px"
-          }}>
-            <div style={{ fontSize: "11px", color: "#34a853", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Poste</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#34a853" }}>{formatEuro(totPoste)}</div>
-          </div>
+          {/* Totale Poste removed as requested */}
         </div>
       </div>
 
