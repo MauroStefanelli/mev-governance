@@ -47,4 +47,5 @@ public class CreateMevRequest
     public string? Capgemini    { get; set; }
     public string? CapImporti   { get; set; }
     public string? SubcoImporti { get; set; }
+    public decimal? ImpSubco { get; set; }
 }

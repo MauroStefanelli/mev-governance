@@ -44,4 +44,5 @@ public class UpdateMevRequest
     // ── Partecipazione: importi € per società ────────────────────────────────
     public string? CapImporti { get; set; }
     public string? SubcoImporti { get; set; }
+    public decimal? ImpSubco { get; set; }
 }
