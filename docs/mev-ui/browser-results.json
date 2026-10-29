@@ -1,0 +1,32 @@
+{
+  "dataset": "35 synthetic rows, no live backend",
+  "browser": "Chrome headless",
+  "viewports": [
+    1440,
+    768
+  ],
+  "scroll": {
+    "left": 700,
+    "top": 160
+  },
+  "pages": {
+    "MEV": {
+      "columns": 19,
+      "allBandsAligned": true,
+      "noDocumentHorizontalOverflow": true,
+      "freezeThroughRda": 10,
+      "freezeOnlyId": true,
+      "filteredSubco": 1000
+    },
+    "MEV-CAP": {
+      "columns": 30,
+      "allBandsAligned": true,
+      "noDocumentHorizontalOverflow": true,
+      "freezeThroughRda": 15,
+      "freezeOnlyId": true,
+      "filteredSubco": 1000
+    }
+  },
+  "rdaTestViewport": 3000,
+  "redesignConsoleErrors": []
+}
