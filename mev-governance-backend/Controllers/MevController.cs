@@ -92,7 +92,6 @@ public class MevController : BaseController
         if (request.SubcoImporti != null) item.SubcoImporti = request.SubcoImporti;
         if (request.ImpSubco    != null) item.ImpSubco    = request.ImpSubco;
         if (request.CapImporti   != null) item.CapImporti   = request.CapImporti;
-        if (request.SubcoImporti != null) item.SubcoImporti = request.SubcoImporti;
         if (request.Tbd        != null) item.Tbd        = request.Tbd;
         if (request.Bc         != null) item.Bc         = request.Bc;
         if (request.Contratto  != null) item.Contratto  = request.Contratto;
@@ -666,7 +665,6 @@ public class MevController : BaseController
                     NoteExcel               = noteExcel,
                     Recupero                = recupero,
                     Subco                   = subco,
-                    SubcoImporti            = impSubco,
                     Tbd                     = tbd,
                     Bc                      = bc,
                     Contratto               = contratto,

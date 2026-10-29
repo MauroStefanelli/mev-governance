@@ -514,7 +514,7 @@ using (var scope = app.Services.CreateScope())
         try
         {
 #pragma warning disable EF1002
-            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}""."MevItems" ADD COLUMN IF NOT EXISTS ""ImpSubco"" NUMERIC NULL;");
+            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}"".""MevItems"" ADD COLUMN IF NOT EXISTS ""ImpSubco"" NUMERIC NULL;");
 #pragma warning restore EF1002
             Console.WriteLine("[PRE-PATCH] Colonna ImpSubco verificata.");
         }
