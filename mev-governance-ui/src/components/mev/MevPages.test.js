@@ -34,3 +34,38 @@ test.each([["MEV", MevPage, 19, 7], ["MEV-CAP", MevCapPage, 30, 12]])("%s: table
   await waitFor(() => expect(within(summary).getByText("€ 12,500")).toBeInTheDocument());
   expect(table.querySelectorAll("tbody tr")).toHaveLength(1); expect(trigger).toHaveFocus(); expect(service.updateMev).not.toHaveBeenCalled();
 });
+
+
+test("remembers a separate frozen-column preference when returning to each page", async () => {
+  let view = render(<MevPage ambienteId="1" />);
+  await screen.findByLabelText("Colonne fisse");
+  fireEvent.change(screen.getByLabelText("Colonne fisse"), { target: { value: "cap" } });
+  view.unmount();
+  view = render(<MevCapPage ambienteId="1" />);
+  expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("goto");
+  fireEvent.change(screen.getByLabelText("Colonne fisse"), { target: { value: "rda" } });
+  view.unmount();
+  view = render(<MevPage ambienteId="1" />);
+  expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("cap");
+  view.unmount();
+  render(<MevCapPage ambienteId="1" />);
+  expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("rda");
+});
+
+test("keeps the saved choice on narrow screens and ignores invalid saved values", async () => {
+  localStorage.setItem("mevPageFrozenColumns", "rda");
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(768);
+  let view = render(<MevPage ambienteId="1" />);
+  expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("rda");
+  expect(screen.getByText("Ora: ID/GoTo")).toBeInTheDocument();
+  expect(localStorage.getItem("mevPageFrozenColumns")).toBe("rda");
+  view.unmount();
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(3000);
+  view = render(<MevPage ambienteId="1" />);
+  expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("rda");
+  expect(screen.queryByText("Ora: ID/GoTo")).not.toBeInTheDocument();
+  view.unmount();
+  localStorage.setItem("mevPageFrozenColumns", "obsolete");
+  render(<MevPage ambienteId="1" />);
+  expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("goto");
+});

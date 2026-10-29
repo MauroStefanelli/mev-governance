@@ -1763,7 +1763,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
       </div>
 
       {/* Tabella */}
-      <MevTableView label="Tabella MevCapPage" widths={[42, 85, 110, 190, 100, 100, 60, 90, 115, 90, 65, 115, 60, 100, 95, 115, 115, 135, 110, 110, 65, 65, 65, 65, 65, 65, 85, 65, 85, 150]} capIndex={11} rdaIndex={14}>
+      <MevTableView preferenceKey="mevCapPageFrozenColumns" label="Tabella MevCapPage" widths={[42, 85, 110, 190, 100, 100, 60, 90, 115, 90, 65, 115, 60, 100, 95, 115, 115, 135, 110, 110, 65, 65, 65, 65, 65, 65, 85, 65, 85, 150]} capIndex={11} rdaIndex={14}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Riga filtri */}

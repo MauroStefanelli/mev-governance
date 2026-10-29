@@ -17,10 +17,22 @@ export function FinancialSummary({ supply, oda, subco, format, approved = false 
 
 // All three table bands use the same width and offset model. On narrow screens
 // fall back to ID/GoTo when the selected prefix leaves too little space to scroll.
-export default function MevTableView({ children, widths, capIndex, rdaIndex, label }) {
+export default function MevTableView({ children, widths, capIndex, rdaIndex, label, preferenceKey }) {
   const viewport = useRef(null);
   const [available, setAvailable] = useState(0);
-  const [freeze, setFreeze] = useState("goto");
+  const [freeze, setFreeze] = useState(() => {
+    try {
+      const saved = localStorage.getItem(preferenceKey);
+      return ["id", "goto", "cap", "rda"].includes(saved) ? saved : "goto";
+    } catch {
+      return "goto";
+    }
+  });
+  const changeFreeze = value => {
+    setFreeze(value);
+    // A narrow viewport changes only the displayed prefix, never this preference.
+    try { localStorage.setItem(preferenceKey, value); } catch { /* Storage can be unavailable. */ }
+  };
   useLayoutEffect(() => {
     const update = () => setAvailable(viewport.current?.clientWidth || 0);
     update();
@@ -52,7 +64,7 @@ export default function MevTableView({ children, widths, capIndex, rdaIndex, lab
     }));
   });
   return <section style={{ minWidth: 0, border: "1px solid #dce4ef", borderRadius: 10, background: "#fff", boxShadow: "0 4px 18px #18345b08" }}>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #dce4ef" }}><div><strong style={{ fontSize: 13 }}>Dettaglio iniziative</strong><div style={{ fontSize: 12, color: "#526581", marginTop: 4 }}>Scorri in orizzontale per esplorare tutte le colonne.</div></div><label style={{ fontSize: 12, color: "#334155", display: "flex", alignItems: "center", gap: 8 }}>Colonne fisse<select aria-label="Colonne fisse" value={freeze} onChange={e => setFreeze(e.target.value)} style={{ padding: "6px 8px", border: "1px solid #b6c6dc", background: "#fff", borderRadius: 6, color: "#185abc", font: "inherit" }}><option value="id">ID</option><option value="goto">ID/GoTo</option><option value="cap" disabled={!canFreezeCap}>Fino a Importo CAP{!canFreezeCap ? " (schermo ampio)" : ""}</option><option value="rda" disabled={!canFreezeRda}>Fino a RDA{!canFreezeRda ? " (schermo ampio)" : ""}</option></select>{limited && <span>Ora: ID/GoTo</span>}</label></div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #dce4ef" }}><div><strong style={{ fontSize: 13 }}>Dettaglio iniziative</strong><div style={{ fontSize: 12, color: "#526581", marginTop: 4 }}>Scorri in orizzontale per esplorare tutte le colonne.</div></div><label style={{ fontSize: 12, color: "#334155", display: "flex", alignItems: "center", gap: 8 }}>Colonne fisse<select aria-label="Colonne fisse" value={freeze} onChange={e => changeFreeze(e.target.value)} style={{ padding: "6px 8px", border: "1px solid #b6c6dc", background: "#fff", borderRadius: 6, color: "#185abc", font: "inherit" }}><option value="id">ID</option><option value="goto">ID/GoTo</option><option value="cap" disabled={!canFreezeCap}>Fino a Importo CAP{!canFreezeCap ? " (schermo ampio)" : ""}</option><option value="rda" disabled={!canFreezeRda}>Fino a RDA{!canFreezeRda ? " (schermo ampio)" : ""}</option></select>{limited && <span>Ora: ID/GoTo</span>}</label></div>
     <div ref={viewport} role="region" aria-label={label} tabIndex={0} style={{ overflow: "auto", maxHeight: "70vh", minWidth: 0, borderRadius: "0 0 10px 10px" }}>
       {cloneElement(table, { style: { tableLayout: "fixed", width: widths.reduce((a, b) => a + b, 0), borderCollapse: "separate", borderSpacing: 0, fontSize: 12 } }, <colgroup>{widths.map((width, i) => <col key={i} style={{ width }} />)}</colgroup>, bands)}
     </div>

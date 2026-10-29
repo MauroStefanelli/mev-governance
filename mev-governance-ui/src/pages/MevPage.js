@@ -562,7 +562,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       </div>
 
       {/* ── Tabella ── */}
-      <MevTableView label="Tabella MevPage" widths={[42, 85, 110, 190, 60, 115, 115, 60, 100, 95, 115, 110, 110, 65, 85, 115, 150, 150, 80]} capIndex={6} rdaIndex={9}>
+      <MevTableView preferenceKey="mevPageFrozenColumns" label="Tabella MevPage" widths={[42, 85, 110, 190, 60, 115, 115, 60, 100, 95, 115, 110, 110, 65, 85, 115, 150, 150, 80]} capIndex={6} rdaIndex={9}>
         <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
 
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
