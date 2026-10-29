@@ -926,6 +926,13 @@ export const analyzeDevelopmentWithAi = async (context) => {
   return data;
 };
 
+// New helper endpoints to support Configuratore POC
+export const analyzeInitiativeWithAiFast = async (context) => {
+  // convenience wrapper to same endpoint; kept for backward compatibility
+  return analyzeInitiativeWithAi(context);
+};
+
+
 export const getUserAccessLogSafe = async (username) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/auth/editor-logins`, {
     headers: authHeaders()

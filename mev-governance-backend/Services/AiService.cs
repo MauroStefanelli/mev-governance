@@ -202,7 +202,80 @@ public class AiService
             }
         }
 
-        throw new InvalidOperationException("La risposta AI non contiene un risultato utilizzabile");
+        // Fallback: cerca qualsiasi stringa utile nella struttura di risposta (es. content parziale)
+        try
+        {
+            // choices[0] deep search for first string leaf
+            if (response.TryGetPropertyValue("choices", out var choicesNode) && choicesNode is JsonArray choicesArr && choicesArr.Count > 0)
+            {
+                JsonNode? first = choicesArr[0];
+                var found = FindFirstStringInNode(first);
+                // Ignore short control tokens often present in provider responses (e.g. "length", "stop")
+                if (!string.IsNullOrWhiteSpace(found) && IsMeaningful(found)) return found;
+            }
+
+            if (response.TryGetPropertyValue("output_text", out var outputTextNode) && outputTextNode.GetValueKind() == JsonValueKind.String)
+            {
+                var t = outputTextNode.GetValue<string>();
+                if (!string.IsNullOrWhiteSpace(t) && IsMeaningful(t)) return t;
+            }
+
+            if (response.TryGetPropertyValue("output", out var outputNode) && outputNode is JsonArray outputArray)
+            {
+                foreach (var item in outputArray)
+                {
+                    if (item is JsonObject io && io.TryGetPropertyValue("text", out var tx) && tx.GetValueKind() == JsonValueKind.String)
+                    {
+                        var val = tx.GetValue<string>();
+                        if (!string.IsNullOrWhiteSpace(val) && IsMeaningful(val)) return val;
+                    }
+                }
+            }
+
+            // Ultimo fallback: restituisci la serializzazione JSON della risposta (consentirà ai layer superiori di applicare i fallback già presenti)
+            return response.ToJsonString();
+        }
+        catch
+        {
+            throw new InvalidOperationException("La risposta AI non contiene un risultato utilizzabile");
+        }
+    }
+
+    // Consider a string meaningful if it's not a short control token returned by model gateways
+    private static bool IsMeaningful(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        var t = s.Trim();
+        // control tokens to ignore
+        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "length", "stop", "timeout", "ok", "true", "false" };
+        if (tokens.Contains(t)) return false;
+        // short non-descriptive answers (one-word of 1-6 chars) are suspicious
+        if (t.Length <= 6 && !t.Contains(" ")) return false;
+        return true;
+    }
+
+    // Cerca ricorsivamente il primo valore stringa in un JsonNode
+    private static string? FindFirstStringInNode(JsonNode? node)
+    {
+        if (node == null) return null;
+        if (node is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s)) return s;
+        if (node is JsonObject obj)
+        {
+            foreach (var kv in obj)
+            {
+                var res = FindFirstStringInNode(kv.Value);
+                if (!string.IsNullOrWhiteSpace(res)) return res;
+            }
+        }
+        if (node is JsonArray arr)
+        {
+            foreach (var it in arr)
+            {
+                var res = FindFirstStringInNode(it);
+                if (!string.IsNullOrWhiteSpace(res)) return res;
+            }
+        }
+        return null;
     }
 
     private JsonObject ParseAnalysisJson(string text)

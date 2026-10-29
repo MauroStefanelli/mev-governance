@@ -84,6 +84,8 @@ public class MevItem
     /// Formato: { "NomeSocietà": 12345.67, ... }
     /// </summary>
     public string? SubcoImporti { get; set; }
+    // Imp. Subco importato (valore numerico)
+    public decimal? ImpSubco { get; set; }
 
     // ── Ambiente ─────────────────────────────────────────────────────────────
     public int AmbienteId { get; set; }

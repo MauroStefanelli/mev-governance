@@ -89,6 +89,8 @@ public class MevController : BaseController
         if (request.Recupero   != null) item.Recupero   = request.Recupero;
         if (request.Capgemini  != null) item.Capgemini  = request.Capgemini;
         if (request.Subco      != null) item.Subco      = request.Subco;
+        if (request.SubcoImporti != null) item.SubcoImporti = request.SubcoImporti;
+        if (request.ImpSubco    != null) item.ImpSubco    = request.ImpSubco;
         if (request.CapImporti   != null) item.CapImporti   = request.CapImporti;
         if (request.SubcoImporti != null) item.SubcoImporti = request.SubcoImporti;
         if (request.Tbd        != null) item.Tbd        = request.Tbd;
@@ -520,6 +522,9 @@ public class MevController : BaseController
             string noteExcel   = GetString("Note");
             string recupero    = GetString("Recupero");
             string subco       = GetString("SUBCO");
+            // Supporta anche la colonna "Imp. Subco" (importo subco)
+            string impSubco    = GetString("Imp. Subco");
+            if (string.IsNullOrWhiteSpace(impSubco)) impSubco = GetString("Imp Subco");
             string tbd         = GetString("TBD");
             string bc          = GetString("BC");
             string contratto   = GetString("Contratto");
@@ -599,6 +604,17 @@ public class MevController : BaseController
                 existing.NoteExcel              = noteExcel;
                 existing.Recupero               = recupero;
                 existing.Subco                  = subco;
+                existing.SubcoImporti           = impSubco;
+                // normalizza il valore numerico accettando formati con virgola/migliaia
+                var impNorm = (impSubco ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(impNorm)) {
+                    // se contiene sia '.' che ',', assumiamo '.' come migliaia e ',' come decimale
+                    var forParse = impNorm.Contains(",") && impNorm.Contains(".")
+                        ? impNorm.Replace(".", "").Replace(",", ".")
+                        : impNorm.Replace(",", ".");
+                    if (decimal.TryParse(forParse, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var tmpImp))
+                        existing.ImpSubco = tmpImp;
+                }
                 existing.Tbd                    = tbd;
                 existing.Bc                     = bc;
                 existing.Contratto              = contratto;
@@ -650,6 +666,7 @@ public class MevController : BaseController
                     NoteExcel               = noteExcel,
                     Recupero                = recupero,
                     Subco                   = subco,
+                    SubcoImporti            = impSubco,
                     Tbd                     = tbd,
                     Bc                      = bc,
                     Contratto               = contratto,
@@ -677,6 +694,10 @@ public class MevController : BaseController
                     Cm                      = cm,
                     PAnno                   = GetInt("Anno Competenza"),
                     PRelease                = releaseExcel,
+                    SubcoImporti            = impSubco,
+                    ImpSubco                = (decimal.TryParse(
+                        (string.IsNullOrWhiteSpace(impSubco) ? "" : (impSubco.Contains(",") && impSubco.Contains(".") ? impSubco.Replace(".", "").Replace(",", ".") : impSubco.Replace(",", "."))),
+                        System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var tmpVal) ? (decimal?)tmpVal : null),
                     PImporto                = importo,
                     ImportoBdo              = ordinatoBdo,
                     AmbienteId              = ambienteId,
@@ -849,4 +870,3 @@ public class MevController : BaseController
     }
 
 }
-

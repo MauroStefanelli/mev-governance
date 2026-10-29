@@ -7,7 +7,7 @@ services:
     dockerfilePath: ./mev-pdf-parser/Dockerfile
     dockerContext: ./mev-pdf-parser
     branch: develop
-    autoDeploy: true
+    autoDeploy: false
     plan: free
 
   # ── Backend ASP.NET Core (dev) ────────────────────────────────────────────────
@@ -17,7 +17,7 @@ services:
     dockerfilePath: ./mev-governance-backend/Dockerfile
     dockerContext: ./mev-governance-backend
     branch: develop
-    autoDeploy: true
+    autoDeploy: false
     plan: free
     envVars:
       - key: JWT_KEY
@@ -49,8 +49,11 @@ services:
     dockerfilePath: ./mev-governance-ui/Dockerfile
     dockerContext: ./mev-governance-ui
     branch: develop
-    autoDeploy: true
+    autoDeploy: false
     plan: free
     envVars:
       - key: REACT_APP_API_URL
         value: https://mev-governance-backend-dev.onrender.com
+      - key: REACT_APP_RELEASE
+        value: "DEV_REL_{{SHORT_SHA}}"
+      # Redeploy trigger: updated to force new build on Render when we push this change

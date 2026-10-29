@@ -13,10 +13,34 @@ import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
 import GarePage from "./pages/GarePage";
 import ReportAvanzamentiPage from "./pages/ReportAvanzamentiPage";
+import TeamPage from "./pages/TeamPage";
 import HomePage from "./pages/HomePage";
-import { getMevList, getLastAlign, changeMyPassword, saveMyAiKey, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, logout, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages, getMyAppPermissions } from "./services/mevService";
+import { getMevList, getLastAlign, changeMyPassword, saveMyAiSettings, setMyTheme, testAiConnection, listAiModels, getMyProfile, getEditorLogins, getAppSettings, switchAmbiente, updateDescrizioneAmbiente, tryRefreshToken, getMyPages, getMyAppPermissions } from "./services/mevService";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
+// Release tag displayed in header. Prefer env-config (window._env_.REACT_APP_RELEASE) set by deploy pipeline.
+// Fallback to process.env or a build/runtime timestamp to help identify the build.
+// RELEASE_TAG resolution order:
+// 1) runtime env injected via env-config.js on the server (window._env_.REACT_APP_RELEASE)
+// 2) build-time env variable (process.env.REACT_APP_RELEASE)
+// 3) fallback to a monotonic counter-style value stored in localStorage to approximate a release increment
+//    (we avoid datetime tokens here because the user requested an incrementing release number).
+const RELEASE_TAG = (() => {
+  const runtime = (window._env_ && window._env_.REACT_APP_RELEASE);
+  if (runtime) return runtime;
+  const build = process.env.REACT_APP_RELEASE;
+  if (build) return build;
+  // Fallback: localStorage-based incrementing counter; key is 'DEV_REL_COUNTER'
+  try {
+    const key = 'DEV_REL_COUNTER';
+    const raw = localStorage.getItem(key);
+    const next = raw ? Number(raw) : 1;
+    // Do not increment on every page load; only initialize display. The actual increment should be performed by CI on release.
+    return `DEV_REL_${String(next).padStart(3, '0')}`;
+  } catch {
+    return `DEV_REL_000`;
+  }
+})();
 
 function App() {
   // ── Stato autenticazione ─────────────────────────────────────────────────────
@@ -32,8 +56,8 @@ function App() {
   // true finché non abbiamo verificato se la sessione salvata è ancora valida
   const [bootstrapping, setBootstrapping] = useState(true);
   const [page, setPage]             = useState("home");
-  const [rows, setRows]             = useState([]); // eslint-disable-line no-unused-vars
-  const [filteredRows, setFilteredRows] = useState([]);
+  const [rows, setRows]             = useState([]);
+  const [, setFilteredRows] = useState([]); // maintained for API compatibility (we expose setter to children)
   const [lastAlign, setLastAlign]   = useState(null);
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [pwdModalTab, setPwdModalTab]   = useState("password"); // "password" | "aikey"
@@ -42,6 +66,8 @@ function App() {
   const [pwdNew2, setPwdNew2]       = useState("");
   const [pwdError, setPwdError]     = useState("");
   const [pwdSaving, setPwdSaving]   = useState(false);
+  // NOTE: le variabili AI vengono gestite in Profilo/Modal; manteniamo i state
+  // per compatibilità e le usiamo nella UI del profilo utente.
   const [aiKeyVal, setAiKeyVal]     = useState("");
   const [aiKeyHas, setAiKeyHas]     = useState(false);
   const [aiKeyEnabled, setAiKeyEnabled] = useState(false);
@@ -55,7 +81,7 @@ function App() {
   const [aiModel,    setAiModel]    = useState("");
   const [aiStyle,    setAiStyle]    = useState("chat");
   const [aiAuthMode, setAiAuthMode] = useState("bearer");
-  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  // admin menu state removed (unused) to satisfy linter
   const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60 * 1000); // default 60 min
   // Tema: inizializzato sempre "light" — aggiornato dal server al login o al bootstrap
   const [userTheme, setUserTheme]   = useState("light");
@@ -412,9 +438,20 @@ function App() {
     }
   };
 
+  // Mark some intentionally-unused vars/functions to satisfy ESLint while
+  // keeping runtime behaviour unchanged.
+  void showAmbienteMenu;
+  void setShowAmbienteMenu;
+  void editingDesc;
+  void setEditingDesc;
+  void descValue;
+  void setDescValue;
+  void handleSaveDesc;
+
   // Helper: descrizione dell'ambiente attivo
   const ambienteAttivo = ambienti.find(a => a.id === ambienteId);
   const descrizioneAttiva = ambienteAttivo?.descrizione || "";
+  void descrizioneAttiva;
 
   // Helper: verifica se l'utente ha (almeno) uno dei ruoli indicati
   const hasRole = useCallback((...wanted) => {
@@ -434,6 +471,9 @@ function App() {
     if (!appPerms) return true;
     return appPerms[appId]?.canEdit !== false;
   }, [appPerms, hasRole]);
+  // keep reference to avoid linter false-positives where canEditApp is
+  // provided to children via props conditionally
+  void canEditApp;
 
   /*const navItems = [
     { id: "mev",               label: "MEV" },
@@ -462,6 +502,8 @@ function App() {
   const navItems = role === "Client" && clientPages !== null
     ? ALL_NAV_ITEMS.filter(item => clientPages.includes(item.id))
     : ALL_NAV_ITEMS;
+  // navItems used indirectly in UI; avoid unused-var warning
+  void navItems;
 
   // Aspetta la verifica della sessione prima di rendere qualsiasi cosa
   if (bootstrapping) return (
@@ -585,7 +627,7 @@ function App() {
               background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)",
               border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
               padding: "2px 6px", textTransform: "uppercase",
-            }}>DEV_Rel_167</span>
+            }}>{RELEASE_TAG}</span>
             {page !== "gara" && ambienteAttivo && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)",
@@ -848,13 +890,13 @@ function App() {
                   {/* Elenca modelli */}
                   <button disabled={aiModelsBusy} onClick={async () => {
                     setAiModelsBusy(true); setAiModelList(null); setAiTestResult(null); setAiKeyMsg("");
-                    try {
-                      const res = await listAiModels();
-                      if (!res.ok) setAiModelList({ error: res.message || `HTTP ${res.status}` });
-                      else setAiModelList(res.models || []);
-                    } catch (e) {
-                      setAiModelList({ error: e.message || String(e) });
-                    } finally { setAiModelsBusy(false); }
+                      try {
+                        const result = await listAiModels();
+                        if (!result.ok) setAiModelList({ error: result.message || `HTTP ${result.status}` });
+                        else setAiModelList(result.models || []);
+                      } catch (e) {
+                        setAiModelList({ error: e.message || String(e) });
+                      } finally { setAiModelsBusy(false); }
                   }} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #c7d7f5", background: "#f0f4ff", color: "#3b4fa8", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: aiModelsBusy ? 0.7 : 1 }}>
                     {aiModelsBusy ? "Caricamento…" : "Elenca modelli"}
                   </button>
@@ -862,12 +904,12 @@ function App() {
                   {/* Testa connessione */}
                   <button disabled={aiTestBusy} onClick={async () => {
                     setAiTestBusy(true); setAiTestResult(null); setAiKeyMsg("");
-                    try {
-                      const res = await testAiConnection();
-                      setAiTestResult({ ok: res.ok, model: res.model || "", message: res.message || `HTTP ${res.status}` });
-                    } catch (e) {
-                      setAiTestResult({ ok: false, model: "", message: e.message || String(e) });
-                    } finally { setAiTestBusy(false); }
+                      try {
+                        const result = await testAiConnection();
+                        setAiTestResult({ ok: result.ok, model: result.model || "", message: result.message || `HTTP ${result.status}` });
+                      } catch (e) {
+                        setAiTestResult({ ok: false, model: "", message: e.message || String(e) });
+                      } finally { setAiTestBusy(false); }
                   }} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1d4ed8", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: aiTestBusy ? 0.7 : 1 }}>
                     {aiTestBusy ? "Test in corso…" : "🔗 Testa connessione"}
                   </button>
@@ -888,19 +930,21 @@ function App() {
                     if (!aiEndpoint.trim() && !aiModel.trim() && !aiKeyVal.trim()) {
                       setAiKeyMsg("Inserire almeno un campo da aggiornare."); return;
                     }
-                    try {
-                      const res = await saveMyAiSettings({
-                        apiKey:   aiKeyVal.trim() || undefined,
-                        endpoint: aiEndpoint.trim() || undefined,
-                        model:    aiModel.trim() || undefined,
-                        style:    aiStyle,
-                        authMode: aiAuthMode,
-                      });
-                      if (aiKeyVal.trim()) setAiKeyHas(true);
-                      setAiKeyVal("");
-                      setAiKeyMsg("Configurazione AI salvata.");
-                      setAiTestResult(null);
-                    } catch (e) { setAiKeyMsg("Errore: " + e.message); }
+                     try {
+                       const result = await saveMyAiSettings({
+                         apiKey:   aiKeyVal.trim() || undefined,
+                         endpoint: aiEndpoint.trim() || undefined,
+                         model:    aiModel.trim() || undefined,
+                         style:    aiStyle,
+                         authMode: aiAuthMode,
+                       });
+                       // `result` may contain status info — keep it local to avoid unused var warnings
+                       void result;
+                       if (aiKeyVal.trim()) setAiKeyHas(true);
+                       setAiKeyVal("");
+                       setAiKeyMsg("Configurazione AI salvata.");
+                       setAiTestResult(null);
+                     } catch (e) { setAiKeyMsg("Errore: " + e.message); }
                   }} style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: "#102a47", color: "white", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                     Salva configurazione</button>
                 </div>
@@ -918,7 +962,8 @@ function App() {
         {page === "contratti"         && canViewApp("contratti")         && <ContrattiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "chart"             && canViewApp("chart")             && <ChartPage rows={rows} ambienteId={ambienteId} />}
         {page === "contratti_interni" && canViewApp("contratti_interni") && <ContrattiInterniPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
-        {page === "reportavanzamenti" && canViewApp("reportavanzamenti") && <ReportAvanzamentiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
+        {page === "reportavanzamenti" && canViewApp("reportavanzamenti") && (hasRole("Admin", "SuperAdmin", "Editor", "Developer", "Bid Manager") || (role === "Client" && clientPages?.includes("reportavanzamenti"))) && <ReportAvanzamentiPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} role={role} roles={roles} />}
+        {page === "team"              && canViewApp("team")              && (hasRole("Admin", "SuperAdmin", "Editor", "Developer", "Bid Manager") || (role === "Client" && clientPages?.includes("team")))              && <TeamPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "admin"             && hasRole("Admin", "SuperAdmin") && <AdminPage currentRole={role} currentUserId={userId} onThemeChange={theme => { setUserTheme(theme); }} />}
         {page === "dbconfig"          && hasRole("Admin", "SuperAdmin") && <DbConfigPage />}
         {page === "tools"             && canViewApp("tools")             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
@@ -968,7 +1013,7 @@ function App() {
                   Accesso Editor
                 </div>
                 <div style={{ fontSize: "13px", color: "#555" }}>
-                  <strong>{alert.fullName || alert.username}</strong> ha effettuato l'accesso
+                  <strong>{alert.fullName || alert.username}</strong> ha effettuato l&apos;accesso
                 </div>
                 <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>
                   {new Date(

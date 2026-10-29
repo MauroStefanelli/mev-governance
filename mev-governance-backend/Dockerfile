@@ -9,7 +9,11 @@ RUN dotnet restore mev-governance-backend.csproj
 
 # Ora copia il resto del codice e compila
 COPY . .
-RUN find . -name '._*' -delete && dotnet publish mev-governance-backend.csproj -c Release -o /app/publish --no-restore
+# Esegui build separata con output verboso minimo per ottenere log più utili in caso di errore,
+# poi pubblica. Non rimuoviamo --no-restore perché il restore è stato eseguito sopra.
+RUN find . -name '._*' -delete \
+    && dotnet build mev-governance-backend.csproj -c Release -o /app/build --no-restore -v minimal \
+    && dotnet publish mev-governance-backend.csproj -c Release -o /app/publish --no-restore -v minimal
 
 # ── Stage 2: runtime .NET puro (senza Python) ─────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
@@ -35,4 +39,3 @@ ENV DOTNET_GCConserve=1
 RUN mkdir -p /data && chmod 777 /data
 
 CMD ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-5000} dotnet mev-governance-backend.dll"]
-
