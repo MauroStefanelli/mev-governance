@@ -695,9 +695,6 @@ public class MevController : BaseController
                     Cm                      = cm,
                     PAnno                   = GetInt("Anno Competenza"),
                     PRelease                = releaseExcel,
-                    // Popola anche PAnno / PRelease per le nuove righe importate
-                    PAnno                   = GetInt("Anno Competenza"),
-                    PRelease                = releaseExcel,
                     SubcoImporti            = impSubco,
                     ImpSubco                = (decimal.TryParse(
                         (string.IsNullOrWhiteSpace(impSubco) ? "" : (impSubco.Contains(",") && impSubco.Contains(".") ? impSubco.Replace(".", "").Replace(",", ".") : impSubco.Replace(",", "."))),
