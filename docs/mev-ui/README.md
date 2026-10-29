@@ -64,3 +64,9 @@ Screenshot attuali con dati dimostrativi:
 |---|---|---|
 | MEV | [Compatta](compact/mev-dopo.png) | [768 px](compact/mev-scroll-768.png) |
 | MEV-CAP | [Compatta](compact/mev-cap-dopo.png) | [768 px](compact/mev-cap-scroll-768.png) |
+
+## Preferenza colonne fisse
+
+La selezione viene salvata in localStorage con chiavi separate per MEV e MEV-CAP. Rientrare nella pagina o ricaricarla ripristina la scelta sullo stesso browser e dominio. Il fallback responsive a ID/GoTo non sovrascrive la preferenza. Valori non validi o storage non disponibile usano il default ID/GoTo.
+
+Verifica: scegliere Importo CAP in MEV e RDA in MEV-CAP, navigare tra le due pagine e ricaricare. Ogni pagina deve conservare la propria scelta. Ridurre la finestra e poi riallargarla: il blocco scelto deve tornare attivo.
