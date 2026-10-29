@@ -1934,7 +1934,12 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       <main style={{ minWidth: 0 }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
-        <p style={styles.hint}>{["Definisci il contesto dell&apos;iniziativa e collega i dati del cliente.", "Valuta gli interventi e integra le proposte del catalogo.", "Componi la valorizzazione e verifica il totale dell&apos;offerta.", "Verifica il riepilogo e prepara i documenti finali."][step - 1]}</p>
+        <p style={styles.hint}>{[
+          "Definisci il contesto dell'iniziativa e collega i dati del cliente.",
+          "Valuta gli interventi e integra le proposte del catalogo.",
+          "Componi la valorizzazione e verifica il totale dell'offerta.",
+          "Verifica il riepilogo e prepara i documenti finali."
+        ][step - 1]}</p>
       </div>
       {/* Form contratto */}
       {showContractForm && (
