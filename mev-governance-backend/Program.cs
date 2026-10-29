@@ -559,6 +559,16 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PRE-PATCH] Colonna AiKeyEnabled verificata.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AiKeyEnabled ERROR] {ex.Message}"); }
+
+        // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw($@"ALTER TABLE ""{sch}""."MevItems" ADD COLUMN IF NOT EXISTS ""ImpSubco"" NUMERIC NULL;");
+#pragma warning restore EF1002
+            Console.WriteLine("[PRE-PATCH] Colonna ImpSubco verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH ImpSubco ERROR] {ex.Message}"); }
     }
 
     try
