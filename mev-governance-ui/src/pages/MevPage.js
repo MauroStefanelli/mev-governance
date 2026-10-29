@@ -198,19 +198,27 @@ const isScostamento = (excel, pianificato) =>
 const TD = { padding: "6px 8px", fontSize: "13px", color: "#333", verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" };
 
 // Sticky columns: left offset cumulativi per le prime 11 colonne (ID → Importo ODA)
-const SC_LEFT  = [0, 50, 130, 240, 440, 500, 600, 730, 790, 870, 950];
-const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60, 80, 80, 120];
+// Recompute sticky offsets for the first 8 columns (ID → Note). The table
+// header should be sticky only for the columns that remain fixed when the
+// body scrolls; the rest (ODA onward) must scroll horizontally with rows.
+const SC_LEFT  = [0, 50, 130, 240, 440, 500, 600, 730];
+const SC_WIDTH = [50, 80, 110, 200, 60, 100, 130, 60];
 const stickyTh = (i, extra = {}) => ({
-  position: "sticky", left: SC_LEFT[i], zIndex: 11,
-  background: "inherit",
-  borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
+  position: i < SC_LEFT.length ? "sticky" : undefined,
+  left: i < SC_LEFT.length ? SC_LEFT[i] : undefined,
+  zIndex: i < SC_LEFT.length ? 11 : undefined,
+  background: i < SC_LEFT.length ? "inherit" : undefined,
+  borderRight: i === SC_LEFT.length - 1 ? "2px solid #c7d2e8" : undefined,
   borderBottom: "inherit",
   ...extra,
 });
 const stickyTd = (i, bg, extra = {}) => ({
-  ...TD, position: "sticky", left: SC_LEFT[i], zIndex: 1,
-  background: bg || "white",
-  borderRight: i === 10 ? "2px solid #c7d2e8" : undefined,
+  ...TD,
+  position: i < SC_LEFT.length ? "sticky" : undefined,
+  left: i < SC_LEFT.length ? SC_LEFT[i] : undefined,
+  zIndex: i < SC_LEFT.length ? 1 : undefined,
+  background: i < SC_LEFT.length ? (bg || "white") : undefined,
+  borderRight: i === SC_LEFT.length - 1 ? "2px solid #c7d2e8" : undefined,
   ...extra,
 });
 
@@ -391,6 +399,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
   const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
   const totOda = filteredRows.reduce((s, r) => s + (Number(r.ordinatoBdo) || 0), 0);
+  const totSubco = filteredRows.reduce((s, r) => s + (Number(r.impSubco) || 0), 0);
   const hasActiveFilters = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : v !== "");
 
   useEffect(() => { onFilteredRowsChange?.(filteredRows); }, [filteredRows]); // eslint-disable-line
@@ -556,7 +565,10 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
             <div style={{ fontSize: "11px", color: "#12c937", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale ODA</div>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
           </div>
-          {/* Totale Poste removed as requested */}
+          <div style={{ background: "#fffbeb", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
+            <div style={{ fontSize: "11px", color: "#d97706", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Subco</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#d97706" }}>{formatEuro(totSubco)}</div>
+          </div>
         </div>
       </div>
 
@@ -634,7 +646,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <th key={h} style={{
                     padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
                     borderBottom: "2px solid #dadce0",
-                    ...(i < 11 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
+                    ...(i < 8 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
                     minWidth: h === "Importo CAP" ? "130px" : undefined,
                   }}>{h}</th>
                 ))}
