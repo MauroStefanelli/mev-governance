@@ -184,8 +184,8 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption, a
         onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
         onClick={handleToggle}
         style={{
-          padding: "4px 6px", border: "1px solid #dadce0", borderRadius: "4px",
-          fontSize: "12px", background: "white", cursor: "pointer",
+          padding: "3px 4px", border: "1px solid #dadce0", borderRadius: "4px",
+          fontSize: "11px", background: "white", cursor: "pointer",
           color: selected.length ? "#1a73e8" : "#333",
           fontWeight: selected.length ? 600 : 400,
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
@@ -238,7 +238,7 @@ const btn = (variant = "default") => {
 
 const inputStyle = (extra = {}) => ({
   padding: "5px 8px", border: "1px solid #dadce0", borderRadius: "4px",
-  fontSize: "13px", background: "white", color: "#333", ...extra,
+  fontSize: "12px", background: "white", color: "#333", ...extra, maxWidth: "100%", boxSizing: "border-box",
 });
 
 // ── Modale dettaglio sola lettura ─────────────────────────────────────────────
@@ -552,17 +552,17 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
         )}
 
 
-      </div>
       <FinancialSummary supply={totCap} oda={totOda} subco={totSubco} format={formatEuro} />
+      </div>
 
 
       {/* ── Contatore righe ── */}
       <div style={{ fontSize: "12px", color: "#526174", marginBottom: "8px" }}>
-        {filteredRows.length} righe{hasActiveFilters ? ` (filtrate su ${rows.length} totali)` : ""}
+        {filteredRows.length} Iniziative{hasActiveFilters ? ` (filtrate su ${rows.length} totali)` : ""}
       </div>
 
       {/* ── Tabella ── */}
-      <MevTableView label="Tabella MevPage" widths={[60, 110, 150, 260, 80, 130, 150, 90, 140, 140, 150, 160, 150, 100, 130, 150, 220, 220, 110]} rdaIndex={9}>
+      <MevTableView label="Tabella MevPage" widths={[42, 85, 110, 190, 60, 115, 115, 60, 100, 95, 115, 110, 110, 65, 85, 115, 150, 150, 80]} capIndex={6} rdaIndex={9}>
         <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
 
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
@@ -645,7 +645,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                    <td style={rowCell(5, scost ? "#fff5f5" : index % 2 === 0 ? "white" : "#fafafa")}>
                      <span style={{
                        display: "inline-block", padding: "2px 8px", borderRadius: "12px",
-                       fontSize: "13px",
+                       fontSize: "11px",
                        background: r.stato === "Approvato" ? "#e6f4ea" : r.stato === "In approvazione" ? "#fff8e1" : "#f1f3f4",
                        color: r.stato === "Approvato" ? "#2e7d32" : r.stato === "In approvazione" ? "#9a3c00" : "#555",
                      }}>{r.stato || "(vuoto)"}</span>
@@ -679,7 +679,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                      {resolveSubco(r.subco, rtiRows).length > 0
                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
                           {resolveSubco(r.subco, rtiRows).map(s => (
-                            <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                            <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "normal", overflowWrap: "anywhere", maxWidth: "100%" }}>{s}</span>
                           ))}
                         </div>
                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
@@ -731,7 +731,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                       onChange={(e) => handleChange(r.id, "pNote", e.target.value)}
                       rows={2}
                       style={{
-                        ...inputStyle({ width: "100%", minWidth: "150px" }),
+                        ...inputStyle({ width: "100%", minWidth: 0 }),
                         resize: "vertical",
                         whiteSpace: "pre-wrap",
                         overflowY: "auto",
@@ -747,7 +747,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                       onChange={(e) => handleChange(r.id, "noteCap", e.target.value)}
                       rows={2}
                       style={{
-                        ...inputStyle({ width: "100%", minWidth: "150px" }),
+                        ...inputStyle({ width: "100%", minWidth: 0 }),
                         resize: "vertical",
                         whiteSpace: "pre-wrap",
                         overflowY: "auto",
