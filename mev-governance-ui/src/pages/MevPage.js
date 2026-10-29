@@ -630,14 +630,14 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
              </tr>
              {/* Intestazioni */}
              <tr style={{ background: "#f8f9fa" }}>
-                {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "Imp. Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h, i) => (
-                 <th key={h} style={{
-                   padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
-                   borderBottom: "2px solid #dadce0",
-                   ...(i < 8 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
-                   minWidth: h === "Importo CAP" ? "130px" : undefined,
-                 }}>{h}</th>
-               ))}
+                 {["ID", "GoTo", "Applicativo", "Descrizione", "Anno", "Stato", "Importo CAP", "Note", "ODA", "RDA", "Importo ODA", "Subco", "Imp. Subco", "P Anno", "P Release", "P Importo", "P Note", "Note CAP", "Azioni"].map((h, i) => (
+                  <th key={h} style={{
+                    padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "13px", color: "#444", whiteSpace: "nowrap",
+                    borderBottom: "2px solid #dadce0",
+                    ...(i < 11 ? stickyTh(i, { background: "#f8f9fa", borderBottom: "2px solid #dadce0" }) : {}),
+                    minWidth: h === "Importo CAP" ? "130px" : undefined,
+                  }}>{h}</th>
+                ))}
             </tr>
           </thead>
 
