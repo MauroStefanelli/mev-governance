@@ -1,3 +1,4 @@
+import MevTableView, { PageHeading, FinancialSummary, pageStyle, toolbarStyle } from "../components/mev/MevTableView";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -68,7 +69,7 @@ const serializeSocietà = (arr) =>
 
 // ── MultiSelect dropdown con checkbox ────────────────────────────────────────
 // ── MultiSelect dropdown con checkbox ────────────────────────────────────────
-function MultiSelect({ options, selected, onChange, placeholder, formatOption }) {
+function MultiSelect({ options, selected, onChange, placeholder, formatOption, ariaLabel }) {
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
   const [pos, setPos]       = useState({ top: 0, left: 0, width: 0 });
@@ -87,10 +88,23 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = e => {
+      if (e.target instanceof Node && dropRef.current?.contains(e.target)) return;
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPos({ top: rect.bottom, left: Math.max(8, Math.min(rect.left, window.innerWidth - 328)), width: Math.min(320, Math.max(rect.width, 220)) });
+    };
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => { window.removeEventListener("scroll", updatePosition, true); window.removeEventListener("resize", updatePosition); };
+  }, [open]);
+
   const handleToggle = () => {
     if (!open && triggerRef.current) {
       const r = triggerRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + window.scrollY, left: r.left + window.scrollX, width: Math.max(r.width, 220) });
+      setPos({ top: r.bottom, left: Math.max(8, Math.min(r.left, window.innerWidth - 328)), width: Math.min(320, Math.max(r.width, 220)) });
     }
     setOpen(v => { if (v) setSearch(""); return !v; });
   };
@@ -111,8 +125,8 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
       : `${selected.length} selezionati`;
 
   const dropdown = open && createPortal(
-    <div ref={dropRef} style={{
-      position: "absolute",
+    <div ref={dropRef} role="dialog" aria-label="Seleziona valori filtro" onKeyDown={e => { if (e.key === "Escape") { setOpen(false); triggerRef.current?.querySelector('[role="button"]')?.focus(); } }} style={{
+      position: "fixed",
       top: pos.top + 2,
       left: pos.left,
       zIndex: 99999,
@@ -127,6 +141,7 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
     }}>
       <div style={{ padding: "6px 8px", borderBottom: "1px solid #f0f0f0" }}>
         <input
+          aria-label="Cerca valori filtro"
           autoFocus
           type="text"
           value={search}
@@ -136,25 +151,25 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
           style={{
             width: "100%", boxSizing: "border-box",
             padding: "4px 8px", fontSize: "12px",
-            border: "1px solid #dadce0", borderRadius: "3px", outline: "none",
+            border: "1px solid #dadce0", borderRadius: "3px",
           }}
         />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #e8e8e8", background: "#fafafa" }}>
-        <div
+        <button type="button"
           onMouseDown={e => e.preventDefault()}
           onClick={() => onChange(filtered.map(o => String(o)))}
-          style={{ padding: "6px 10px", color: "#34a853", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}
-        >Seleziona tutti</div>
-        <div
+          style={{ border: 0, background: "transparent", padding: "6px 10px", color: "#176b2b", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}
+        >Seleziona tutti</button>
+        <button type="button"
           onMouseDown={e => e.preventDefault()}
           onClick={() => onChange([])}
-          style={{ padding: "6px 10px", color: "#ea4335", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}
-        >Deseleziona tutti</div>
+          style={{ border: 0, background: "transparent", padding: "6px 10px", color: "#b42318", cursor: "pointer", fontSize: "11px", fontWeight: 600 }}
+        >Deseleziona tutti</button>
       </div>
       <div style={{ maxHeight: "240px", overflowY: "auto" }}>
         {filtered.length === 0 && (
-          <div style={{ padding: "10px", fontSize: "12px", color: "#999", textAlign: "center" }}>Nessun risultato</div>
+          <div style={{ padding: "10px", fontSize: "12px", color: "#526174", textAlign: "center" }}>Nessun risultato</div>
         )}
         {filtered.map(opt => (
           <label key={opt} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 10px", fontSize: "12px", cursor: "pointer" }}
@@ -172,7 +187,8 @@ function MultiSelect({ options, selected, onChange, placeholder, formatOption })
 
   return (
     <div ref={triggerRef} style={{ position: "relative", width: "100%" }}>
-      <div
+      <div role="button" tabIndex={0} aria-haspopup="dialog" aria-expanded={open} aria-label={`Filtra ${ariaLabel || "colonna"}: ${label}`}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
         onClick={handleToggle}
         style={{
           padding: "4px 6px", border: "1px solid #dadce0", borderRadius: "4px",
@@ -339,7 +355,7 @@ const btn = (variant = "default") => {
     primary: { ...base, background: "#1a73e8", color: "#fff", boxShadow: "0 1px 3px rgba(26,115,232,.35)" },
     danger: { ...base, background: "#ea4335", color: "#fff", boxShadow: "0 1px 3px rgba(234,67,53,.35)" },
     ghost: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
-    success: { ...base, background: "#34a853", color: "#fff", boxShadow: "0 1px 3px rgba(52,168,83,.35)" },
+    success: { ...base, background: "#176b2b", color: "#fff", boxShadow: "0 1px 3px rgba(52,168,83,.35)" },
     default: { ...base, background: "#f1f3f4", color: "#444", border: "1px solid #dadce0" },
   };
   return variants[variant] || variants.default;
@@ -1492,6 +1508,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const approvedRows = filteredRows.filter((r) => (r.stato || "").trim().toLowerCase() === "approvato");
   const totCap = approvedRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
   const totPoste = approvedRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);
+  const totSubco = filteredRows.reduce((sum, row) => sum + (Number(row.impSubco) || 0), 0);
   const totOda = filteredRows.reduce((s, r) => s + (Number(r.ordinatoBdo) || 0), 0);
   const hasActive = Object.values(filters).some((v) => Array.isArray(v) ? v.length > 0 : !!v);
 
@@ -1615,8 +1632,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   );
 
   // ── Helper colonne ────────────────────────────────────────────────────────
-  const TH = ({ children, minW }) => (
-    <th style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW }}>
+  const TH = ({ children, minW, style, scope }) => (
+    <th scope={scope} style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, fontSize: "12px", color: "#444", whiteSpace: "nowrap", minWidth: minW, ...style }}>
       {children}
     </th>
   );
@@ -1624,7 +1641,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const statoBadge = (stato) => {
     const map = {
       "Approvato": { bg: "#e6f4ea", color: "#2e7d32" },
-      "In approvazione": { bg: "#fff8e1", color: "#e65100" },
+      "In approvazione": { bg: "#fff8e1", color: "#9a3c00" },
     };
     const s = map[stato] || { bg: "#f1f3f4", color: "#555" };
     return (
@@ -1641,10 +1658,11 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
 
   // ── Render principale ─────────────────────────────────────────────────────
   return (
-    <div style={{ padding: "20px 24px 40px" }}>
+    <div style={pageStyle}>
+      <PageHeading title="MEV-CAP · Gestione attività" />
 
       {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
+      <div style={toolbarStyle}>
         <button style={btn("primary")} disabled={aligning}
           onClick={async () => {
             if (!window.confirm("Riallineare i dati MEV con l'Excel ufficiale?\nLe modifiche PMO verranno preservate.")) return;
@@ -1734,54 +1752,45 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
           Nuovo GoTo
         </button>
 
-        {/* KPI Totali (solo righe Approvate) — allineati a destra */}
-        <div style={{ marginLeft: "auto", display: "flex", gap: "16px", flexWrap: "wrap" }}>
-          <div style={{ background: "#e8f0fe", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
-            <div style={{ fontSize: "11px", color: "#1a73e8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale Fornitura <span style={{ fontWeight: 400, textTransform: "none" }}>(Approvati)</span></div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a73e8" }}>{formatEuro(totCap)}</div>
-          </div>
-          <div style={{ background: "#e6f9f0", borderRadius: "8px", padding: "8px 16px", textAlign: "right", minWidth: "160px" }}>
-            <div style={{ fontSize: "11px", color: "#12c937", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Totale ODA</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#12c937" }}>{formatEuro(totOda)}</div>
-          </div>
-          {/* Totale Poste removed as requested */}
-        </div>
+
       </div>
+      <FinancialSummary supply={totCap} oda={totOda} subco={totSubco} format={formatEuro} approved />
+
 
       {/* Contatore */}
-      <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
+      <div style={{ fontSize: "12px", color: "#526174", marginBottom: "8px" }}>
         {filteredRows.length} righe{hasActive ? ` (filtrate su ${rows.length} totali)` : ""}
       </div>
 
       {/* Tabella */}
-      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", borderRadius: "8px", border: "1px solid #dadce0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+      <MevTableView label="Tabella MevCapPage" widths={[60, 110, 150, 260, 140, 140, 80, 130, 130, 130, 100, 150, 90, 140, 140, 150, 150, 200, 160, 150, 90, 90, 90, 90, 90, 90, 110, 100, 130, 220]} rdaIndex={14}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
              {/* Riga filtri */}
              <tr style={{ background: "#fff" }}>
                <th style={{ padding: "4px 6px", minWidth: "60px" }}></th>
-               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="goTo" options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect ariaLabel="applicativo" options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "200px" }}></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmPoste" options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmCap" options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect ariaLabel="annoCompetenza" options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="releaseExcel" options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="stato" options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="tipoContratto" options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="recupero" options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "130px" }}></th>
                <th style={{ padding: "4px 6px" }}></th>
-               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect ariaLabel="oda" options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="rda" options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}></th>
                <th style={{ padding: "4px 6px" }}></th>
-                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
-                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("impSubco"), "impSubco")} selected={filters.impSubco} onChange={(v) => handleFilterChange("impSubco", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="capgemini" options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="subco" options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="impSubco" options={withVuoto(buildOptions("impSubco"), "impSubco")} selected={filters.impSubco} onChange={(v) => handleFilterChange("impSubco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="pAnno" options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="pRelease" options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
                <th style={{ padding: "4px 6px" }}></th>
              </tr>
              {/* Intestazioni */}
@@ -1874,9 +1883,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                     ) : null}
                   </td>
 
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
-                  <td style={{ ...TD, color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
-                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#12c937", fontWeight: "bold", fontSize: "12px" }}>{formatEuro(r.ordinatoBdo)}</td>
+                  <td style={{ ...TD, color: "#176b2b", fontWeight: "bold", fontSize: "12px" }}>{r.bc ?? ""}</td>
+                  <td style={{ ...TD, color: "#176b2b", fontWeight: "bold", fontSize: "12px" }}>{r.atId ?? ""}</td>
+                  <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", color: "#176b2b", fontWeight: "bold", fontSize: "12px" }}>{formatEuro(r.ordinatoBdo)}</td>
                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.pImporto)}</td>
                   <td style={{ ...TD }}>
                     {resolveCapMandanti(r.capgemini, r.iet, rtiRows).length > 0
@@ -1918,11 +1927,12 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
             })}
           </tbody>
         </table>
+      </MevTableView>
 
         {filteredRows.length === 0 && (
           <div style={{ textAlign: "center", padding: "40px", color: "#888", fontSize: "14px" }}>Nessun risultato trovato</div>
         )}
-      </div>
+
 
       {/* ── Modale progress Allinea Dati ── */}
       {alignStatus && (
