@@ -1361,6 +1361,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     goTo: [], applicativo: [], stato: [], annoCompetenza: [],
     tipoContratto: [], releaseExcel: [], pmPoste: [], pmCap: [],
     oda: [], rda: [], capgemini: [], iet: [], subco: [],
+    impSubco: [],
     recupero: [], pAnno: [], pRelease: [], importoExcel: []
   };
 
@@ -1480,6 +1481,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     matchMandataria(r) &&
     matchField(r, "iet", "iet") &&
     matchField(r, "subco", "subco") &&
+    matchField(r, "impSubco", "impSubco") &&
     matchField(r, "recupero", "recupero") &&
     matchField(r, "pAnno", "pAnno") &&
     matchField(r, "pRelease", "pRelease") &&
@@ -1774,8 +1776,9 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}></th>
                <th style={{ padding: "4px 6px" }}></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("impSubco"), "impSubco")} selected={filters.impSubco} onChange={(v) => handleFilterChange("impSubco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}><MultiSelect options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
@@ -1801,7 +1804,8 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                <TH minW="120px">Importo ODA</TH>
                <TH minW="120px">P Importo</TH>
                <TH minW="140px">Mandataria/Mandante</TH>
-               <TH minW="120px">Subco</TH>
+                <TH minW="120px">Subco</TH>
+                <TH minW="120px">Imp. Subco</TH>
                <TH minW="75px">TOW01</TH>
                <TH minW="75px">TOW02</TH>
                <TH minW="75px">TOW03</TH>
@@ -1884,16 +1888,17 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
                     }
                   </td>
-                  <td style={{ ...TD }}>
-                    {parseSocietà(r.subco).length > 0
-                      ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                        {parseSocietà(r.subco).map(s => (
-                          <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
-                        ))}
-                      </div>
-                      : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
-                    }
-                  </td>
+                   <td style={{ ...TD }}>
+                     {parseSocietà(r.subco).length > 0
+                       ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                         {parseSocietà(r.subco).map(s => (
+                           <span key={s} style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a", borderRadius: "10px", padding: "1px 7px", fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap" }}>{s}</span>
+                         ))}
+                       </div>
+                       : <span style={{ color: "#cbd5e1", fontSize: "11px" }}>—</span>
+                     }
+                   </td>
+                   <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{formatEuro(r.impSubco)}</td>
 
                   {/* TOW */}
                   <td style={{ ...TD, textAlign: "right", fontSize: "12px" }}>{fmtNum(r.tow021)}</td>
