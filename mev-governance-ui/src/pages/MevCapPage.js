@@ -1389,7 +1389,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const role = localStorage.getItem("role") || "";
 
   const defaultFilters = {
-    goTo: [], applicativo: [], stato: [], annoCompetenza: [],
+    goTo: [], applicativo: [], descrizione: [], stato: [], annoCompetenza: [],
     tipoContratto: [], releaseExcel: [], pmPoste: [], pmCap: [],
     oda: [], rda: [], capgemini: [], iet: [], subco: [],
     impSubco: [],
@@ -1463,6 +1463,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   const { options, filteredRows } = createMevFilters(rows, filters, {
     goTo: "goTo",
     applicativo: "applicativo",
+    descrizione: "descrizione",
     stato: "stato",
     annoCompetenza: "annoCompetenza",
     pAnno: "pAnno",
@@ -1747,7 +1748,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
                <th style={{ padding: "4px 6px", minWidth: "60px" }}></th>
                <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="goTo" options={options("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect ariaLabel="applicativo" options={options("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "200px" }}></th>
+               <th style={{ padding: "4px 6px", minWidth: "200px" }}><MultiSelect ariaLabel="descrizione" options={options("descrizione", true)} selected={filters.descrizione} onChange={(v) => handleFilterChange("descrizione", v)} placeholder="Tutte" /></th>
                <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmPoste" options={options("pmPoste", true)} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmCap" options={options("pmCap", true)} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect ariaLabel="annoCompetenza" options={options("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
