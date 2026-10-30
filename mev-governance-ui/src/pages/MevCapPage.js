@@ -1,3 +1,4 @@
+import { createMevFilters } from "../utils/mevFilters";
 import MevTableView, { PageHeading, FinancialSummary, pageStyle, toolbarStyle } from "../components/mev/MevTableView";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -61,6 +62,20 @@ const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => {
   const combined = [...fromCap];
   fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
   return combined;
+};
+
+// Risolve i nomi delle Subco (JSON con ID RTI o elenco di nomi).
+const resolveSubco = (subcoVal, rtiRows = []) => {
+  if (!subcoVal) return [];
+  const byId = (id) => {
+    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
+    return found?.societa || null;
+  };
+  try {
+    const parsed = JSON.parse(subcoVal);
+    if (Array.isArray(parsed)) return parsed.map(id => byId(id) || String(id)).filter(Boolean);
+  } catch {}
+  return subcoVal.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
 };
 
 // Serializza array → JSON string (o "" se vuoto)
@@ -1445,95 +1460,26 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     return () => document.removeEventListener("mousedown", handler);
   }, [notePopover]);
 
-  // ── Options per filtri (dinamiche: mostrano solo valori compatibili con gli altri filtri)
-  const matchesExcept = (r, exclude) => {
-    if (exclude !== "goTo" && filters.goTo.length > 0 && !filters.goTo.includes(String(r.goTo))) return false;
-    if (exclude !== "applicativo" && filters.applicativo.length > 0 && !filters.applicativo.includes(String(r.applicativo))) return false;
-    if (exclude !== "stato" && filters.stato.length > 0) {
-      const val = r.stato ?? "";
-      if (!val.trim() && filters.stato.includes("(vuoto)")) { /* ok */ }
-      else if (!filters.stato.includes(String(val))) return false;
-    }
-    if (exclude !== "annoCompetenza" && filters.annoCompetenza.length > 0 && !filters.annoCompetenza.includes(String(r.annoCompetenza))) return false;
-    if (exclude !== "releaseExcel" && filters.releaseExcel.length > 0 && !filters.releaseExcel.includes(String(r.releaseExcel))) return false;
-    if (exclude !== "pmPoste" && filters.pmPoste.length > 0 && !filters.pmPoste.includes(String(r.pmPoste))) return false;
-    if (exclude !== "pmCap" && filters.pmCap.length > 0 && !filters.pmCap.includes(String(r.pmCap))) return false;
-    if (exclude !== "recupero" && filters.recupero.length > 0 && !filters.recupero.includes(String(r.recupero))) return false;
-    if (exclude !== "bc" && filters.oda.length > 0 && !filters.oda.includes(String(r.bc))) return false;
-    if (exclude !== "atId" && filters.rda.length > 0 && !filters.rda.includes(String(r.atId))) return false;
-    if (exclude !== "capgemini" && filters.capgemini.length > 0) {
-      const resolved = resolveCapMandanti(r.capgemini, r.iet, rtiRows);
-      if (resolved.length === 0 && filters.capgemini.includes("(vuoto)")) { /* ok */ }
-      else if (!resolved.some(s => filters.capgemini.includes(s))) return false;
-    }
-    if (exclude !== "subco" && filters.subco.length > 0 && !resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) return false;
-    if (exclude !== "pAnno" && filters.pAnno.length > 0 && !filters.pAnno.includes(String(r.pAnno))) return false;
-    if (exclude !== "pRelease" && filters.pRelease.length > 0 && !filters.pRelease.includes(String(r.pRelease))) return false;
-    if (exclude !== "importoExcel" && filters.importoExcel.length > 0 && !filters.importoExcel.includes(String(r.importoExcel))) return false;
-    return true;
-  };
-
-  const buildOptions = (field) => {
-    const vals = [];
-    rows.forEach(r => { if (!matchesExcept(r, field)) return; const v = r[field]; if (v !== null && v !== undefined && v !== "") vals.push(v); });
-    return [...new Set(vals)].sort();
-  };
-
-  // Opzioni filtro Mandataria/Mandante: risolve i valori legacy "x" nei nomi reali
-  const buildOptionsMandataria = () => {
-    const names = new Set();
-    rows.forEach(r => {
-      resolveCapMandanti(r.capgemini, r.iet, rtiRows).forEach(s => { if (s && s.trim()) names.add(s); });
-    });
-    return [...names].sort();
-  };
-
-  const withVuoto = (opts, field) => {
-    const hasEmpty = rows.some((r) => !r[field] || String(r[field]).trim() === "");
-    return [...opts, ...(hasEmpty ? ["(vuoto)"] : [])];
-  };
-
-  const withVuotoMandataria = (opts) => {
-    const hasEmpty = rows.some(r => resolveCapMandanti(r.capgemini, r.iet, rtiRows).length === 0);
-    return [...opts, ...(hasEmpty ? ["(vuoto)"] : [])];
-  };
-
-  const matchField = (r, filterKey, rowField) => {
-    if (filters[filterKey].length === 0) return true;
-    const val = r[rowField] ?? "";
-    if (!String(val).trim() && filters[filterKey].includes("(vuoto)")) return true;
-    return filters[filterKey].includes(String(val));
-  };
-
-  // Filtro Mandataria/Mandante: usa i nomi risolti (gestisce legacy "x")
-  const matchMandataria = (r) => {
-    if (filters.capgemini.length === 0) return true;
-    const resolved = resolveCapMandanti(r.capgemini, r.iet, rtiRows);
-    if (resolved.length === 0 && filters.capgemini.includes("(vuoto)")) return true;
-    return resolved.some(s => filters.capgemini.includes(s));
-  };
-
-  const filteredRows = rows.filter((r) =>
-    matchField(r, "goTo", "goTo") &&
-    matchField(r, "applicativo", "applicativo") &&
-    matchField(r, "stato", "stato") &&
-    matchField(r, "annoCompetenza", "annoCompetenza") &&
-    matchField(r, "tipoContratto", "tipoContratto") &&
-    matchField(r, "releaseExcel", "releaseExcel") &&
-    matchField(r, "pmPoste", "pmPoste") &&
-    matchField(r, "pmCap", "pmCap") &&
-    matchField(r, "oda", "bc") &&
-    matchField(r, "rda", "atId") &&
-    matchMandataria(r) &&
-    matchField(r, "iet", "iet") &&
-    matchField(r, "subco", "subco") &&
-    matchField(r, "impSubco", "impSubco") &&
-    matchField(r, "recupero", "recupero") &&
-    matchField(r, "pAnno", "pAnno") &&
-    matchField(r, "pRelease", "pRelease") &&
-    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel)))
-  );
-
+  const { options, filteredRows } = createMevFilters(rows, filters, {
+    goTo: "goTo",
+    applicativo: "applicativo",
+    stato: "stato",
+    annoCompetenza: "annoCompetenza",
+    pAnno: "pAnno",
+    pRelease: "pRelease",
+    importoExcel: "importoExcel",
+    tipoContratto: "tipoContratto",
+    releaseExcel: "releaseExcel",
+    pmPoste: "pmPoste",
+    pmCap: "pmCap",
+    iet: "iet",
+    impSubco: "impSubco",
+    recupero: "recupero",
+    oda: "bc",
+    rda: "atId",
+    capgemini: r => resolveCapMandanti(r.capgemini, r.iet, rtiRows),
+    subco: r => resolveSubco(r.subco, rtiRows),
+  });
   // Tot CAP: solo righe con stato "Approvato"
   const approvedRows = filteredRows.filter((r) => (r.stato || "").trim().toLowerCase() === "approvato");
   const totCap = approvedRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
@@ -1799,28 +1745,28 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
              {/* Riga filtri */}
              <tr style={{ background: "#fff" }}>
                <th style={{ padding: "4px 6px", minWidth: "60px" }}></th>
-               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="goTo" options={buildOptions("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect ariaLabel="applicativo" options={buildOptions("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="goTo" options={options("goTo")} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "110px" }}><MultiSelect ariaLabel="applicativo" options={options("applicativo")} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "200px" }}></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmPoste" options={withVuoto(buildOptions("pmPoste"), "pmPoste")} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmCap" options={withVuoto(buildOptions("pmCap"), "pmCap")} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect ariaLabel="annoCompetenza" options={buildOptions("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="releaseExcel" options={withVuoto(buildOptions("releaseExcel"), "releaseExcel")} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="stato" options={withVuoto(buildOptions("stato"), "stato")} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="tipoContratto" options={withVuoto(buildOptions("tipoContratto"), "tipoContratto")} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="recupero" options={withVuoto(buildOptions("recupero"), "recupero")} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmPoste" options={options("pmPoste", true)} selected={filters.pmPoste} onChange={(v) => handleFilterChange("pmPoste", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="pmCap" options={options("pmCap", true)} selected={filters.pmCap} onChange={(v) => handleFilterChange("pmCap", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "70px" }}><MultiSelect ariaLabel="annoCompetenza" options={options("annoCompetenza")} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="releaseExcel" options={options("releaseExcel", true)} selected={filters.releaseExcel} onChange={(v) => handleFilterChange("releaseExcel", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="stato" options={options("stato", true)} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="tipoContratto" options={options("tipoContratto", true)} selected={filters.tipoContratto} onChange={(v) => handleFilterChange("tipoContratto", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "80px" }}><MultiSelect ariaLabel="recupero" options={options("recupero", true)} selected={filters.recupero || []} onChange={(v) => handleFilterChange("recupero", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", minWidth: "130px" }}></th>
                <th style={{ padding: "4px 6px" }}></th>
-               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect ariaLabel="oda" options={withVuoto(buildOptions("bc"), "bc")} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="rda" options={withVuoto(buildOptions("atId"), "atId")} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "120px" }}><MultiSelect ariaLabel="oda" options={options("oda", true)} selected={filters.oda} onChange={(v) => handleFilterChange("oda", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px", minWidth: "100px" }}><MultiSelect ariaLabel="rda" options={options("rda", true)} selected={filters.rda} onChange={(v) => handleFilterChange("rda", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}></th>
                <th style={{ padding: "4px 6px" }}></th>
-                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="capgemini" options={withVuotoMandataria(buildOptionsMandataria())} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
-                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="subco" options={withVuoto(buildOptions("subco"), "subco")} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
-                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="impSubco" options={withVuoto(buildOptions("impSubco"), "impSubco")} selected={filters.impSubco} onChange={(v) => handleFilterChange("impSubco", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="capgemini" options={options("capgemini", true)} selected={filters.capgemini} onChange={(v) => handleFilterChange("capgemini", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="subco" options={options("subco", true)} selected={filters.subco} onChange={(v) => handleFilterChange("subco", v)} placeholder="Tutti" /></th>
+                <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="impSubco" options={options("impSubco", true)} selected={filters.impSubco} onChange={(v) => handleFilterChange("impSubco", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th><th style={{ padding: "4px 6px" }}></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="pAnno" options={buildOptions("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="pRelease" options={withVuoto(buildOptions("pRelease"), "pRelease")} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="pAnno" options={options("pAnno")} selected={filters.pAnno} onChange={(v) => handleFilterChange("pAnno", v)} placeholder="Tutti" /></th>
+               <th style={{ padding: "4px 6px" }}><MultiSelect ariaLabel="pRelease" options={options("pRelease", true)} selected={filters.pRelease} onChange={(v) => handleFilterChange("pRelease", v)} placeholder="Tutte" /></th>
                <th style={{ padding: "4px 6px" }}></th>
              </tr>
              {/* Intestazioni */}
