@@ -100,3 +100,26 @@ test.each([["MEV", MevPage], ["MEV-CAP", MevCapPage]])("%s: options follow other
   open("oda"); expect(screen.getByRole("checkbox", { name: "(vuoto)" })).toBeInTheDocument();
   expect(screen.queryByRole("checkbox", { name: "ODA-1" })).not.toBeInTheDocument(); close();
 });
+
+test.each([["MEV", MevPage], ["MEV-CAP", MevCapPage]])("%s: description filters rows and follows the other facets", async (_, Page) => {
+  service.getMevList.mockResolvedValue([
+    { id: 1, goTo: "A", applicativo: "Portale", descrizione: "Prima attività" },
+    { id: 2, goTo: "B", applicativo: "Ordini", descrizione: "Seconda attività" },
+    { id: 3, goTo: "C", applicativo: "Portale", descrizione: "Terza attività" },
+  ]);
+  render(<Page ambienteId="1" />);
+  await screen.findByText("3 Iniziative");
+  const open = key => fireEvent.click(screen.getByRole("button", { name: new RegExp(`^Filtra ${key}:`) }));
+  const close = () => fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  open("applicativo"); fireEvent.click(screen.getByRole("checkbox", { name: "Portale" })); close();
+  open("descrizione");
+  expect(screen.queryByRole("checkbox", { name: "Seconda attività" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Prima attività" }));
+  expect(screen.getByRole("checkbox", { name: "Terza attività" })).toBeInTheDocument(); close();
+  expect(screen.getByText("1 Iniziative (filtrate su 3 totali)")).toBeInTheDocument();
+  open("goTo");
+  expect(screen.getByRole("checkbox", { name: "A" })).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", { name: "C" })).not.toBeInTheDocument(); close();
+  fireEvent.click(screen.getByRole("button", { name: /Reset filtri/i }));
+  expect(screen.getByText("3 Iniziative")).toBeInTheDocument();
+});

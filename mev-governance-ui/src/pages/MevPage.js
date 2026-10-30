@@ -275,7 +275,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
 
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
-    const defaults = { goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" };
+    const defaults = { goTo: [], applicativo: [], descrizione: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" };
     if (!saved) return defaults;
     const parsed = JSON.parse(saved);
     return { ...defaults, ...parsed };
@@ -303,7 +303,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   useEffect(() => { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
 
   const resetFilters = () => {
-    setFilters({ goTo: [], applicativo: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" });
+    setFilters({ goTo: [], applicativo: [], descrizione: [], stato: [], annoCompetenza: [], pAnno: [], pRelease: [], oda: [], rda: [], mandataria: [], subco: [], importoExcel: [], pNote: "", noteCap: "" });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
   };
 
@@ -313,6 +313,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const { options, filteredRows } = createMevFilters(rows, filters, {
     goTo: "goTo",
     applicativo: "applicativo",
+    descrizione: "descrizione",
     stato: "stato",
     annoCompetenza: "annoCompetenza",
     pAnno: "pAnno",
@@ -506,7 +507,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
       </div>
 
       {/* ── Tabella ── */}
-      <MevTableView preferenceKey="mevPageFrozenColumns" label="Tabella MevPage" widths={[42, 85, 110, 190, 60, 115, 115, 60, 100, 95, 115, 110, 110, 65, 85, 115, 150, 150, 80]} capIndex={6} rdaIndex={9}>
+      <MevTableView preferenceKey="mevPageFrozenColumns" label="Tabella MevPage" widths={[42, 85, 110, 190, 60, 115, 115, 60, 100, 95, 115, 110, 110, 96, 85, 115, 150, 150, 80]} capIndex={6} rdaIndex={9}>
         <table style={{ tableLayout: "fixed", width: "max-content", borderCollapse: "separate", borderSpacing: 0, fontSize: "13px" }}>
 
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
@@ -515,7 +516,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                <th style={{ padding: "4px 6px", ...headerCell(0, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* ID */}</th>
                <th style={{ padding: "4px 6px", ...headerCell(1, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect ariaLabel="goTo" options={goToOptions} selected={filters.goTo} onChange={(v) => handleFilterChange("goTo", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", ...headerCell(2, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect ariaLabel="applicativo" options={applicativoOptions} selected={filters.applicativo} onChange={(v) => handleFilterChange("applicativo", v)} placeholder="Tutti" /></th>
-               <th style={{ padding: "4px 6px", ...headerCell(3, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}>{/* Descrizione */}</th>
+               <th style={{ padding: "4px 6px", ...headerCell(3, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect ariaLabel="descrizione" options={options("descrizione", true)} selected={filters.descrizione} onChange={(v) => handleFilterChange("descrizione", v)} placeholder="Tutte" /></th>
                <th style={{ padding: "4px 6px", ...headerCell(4, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect ariaLabel="annoCompetenza" options={annoOptions} selected={filters.annoCompetenza} onChange={(v) => handleFilterChange("annoCompetenza", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", ...headerCell(5, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect ariaLabel="stato" options={statoOptions} selected={filters.stato} onChange={(v) => handleFilterChange("stato", v)} placeholder="Tutti" /></th>
                <th style={{ padding: "4px 6px", ...headerCell(6, { background: "#fff", borderBottom: "1px solid #dadce0" }) }}><MultiSelect ariaLabel="importoExcel" options={importoExcelOptions} selected={filters.importoExcel} onChange={(v) => handleFilterChange("importoExcel", v)} placeholder="Tutti" formatOption={(v) => `€ ${fmtItIT(parseFloat(v))}`} /></th>
@@ -633,9 +634,9 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                   <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }}>{r.impSubco != null ? formatEuro(r.impSubco) : '—'}</td>
 
                   <td style={{ ...TD }}>
-                    <input type="number" value={r.pAnno}
+                    <input aria-label={`P Anno MEV ${r.excelId || r.id}`} type="number" value={r.pAnno}
                       onChange={(e) => handleChange(r.id, "pAnno", e.target.value)}
-                      style={inputStyle({ width: "68px", textAlign: "center" })}
+                      style={inputStyle({ width: "100%", minWidth: "80px", padding: "5px 4px", textAlign: "center", fontVariantNumeric: "tabular-nums" })}
                     />
                   </td>
 
