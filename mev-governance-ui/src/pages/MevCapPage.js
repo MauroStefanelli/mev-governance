@@ -63,6 +63,20 @@ const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => {
   return combined;
 };
 
+// Risolve i nomi delle Subco (simile a MevPage.resolveSubco)
+const resolveSubco = (subcoVal, rtiRows = []) => {
+  if (!subcoVal) return [];
+  const byId = (id) => {
+    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
+    return found?.societa || null;
+  };
+  try {
+    const parsed = JSON.parse(subcoVal);
+    if (Array.isArray(parsed)) return parsed.map(id => byId(id) || String(id)).filter(Boolean);
+  } catch {}
+  return subcoVal.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+};
+
 // Serializza array → JSON string (o "" se vuoto)
 const serializeSocietà = (arr) =>
   arr.length === 0 ? "" : arr.length === 1 ? arr[0] : JSON.stringify(arr);
