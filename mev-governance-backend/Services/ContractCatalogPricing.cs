@@ -25,7 +25,7 @@ public static class ContractCatalogPricing
 
     // Only fill absent values, matching the stable contract driver ID. Never replace
     // an existing price (including zero) or guess a match by name or array order.
-    public static int RecoverMissing(JsonArray catalog, JsonArray source)
+    public static int RecoverMissing(JsonArray catalog, JsonArray source, bool offered = false)
     {
         int recovered = 0;
         foreach (var entry in catalog.OfType<JsonObject>())
@@ -34,8 +34,15 @@ public static class ContractCatalogPricing
             if (string.IsNullOrWhiteSpace(id)) continue;
             var matches = source.Where(s => s?["id"]?.ToString() == id).ToList();
             if (matches.Count != 1 || matches[0] == null) continue;
-            var prices = Prices(matches[0]!, true);
+            var prices = Prices(matches[0]!, offered);
+            if (!offered) entry["basePrices"] = prices.DeepClone();
             if (entry["prezzi"] is not JsonObject) entry["prezzi"] = new JsonObject();
+            if (!offered && entry["priceBasis"]?.ToString() == "offerto")
+            {
+                entry["offeredPrices"] = entry["prezzi"]!.DeepClone();
+                entry["prezzi"] = new JsonObject();
+                entry["priceBasis"] = "base-asta";
+            }
             var target = entry["prezzi"]!.AsObject();
             foreach (var type in new[] { "REALIZZAZIONE", "MODIFICA" })
             {

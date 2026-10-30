@@ -866,7 +866,7 @@ public class ConfiguratoreController : ControllerBase
                     ["catalog"] = payload.GetValueOrDefault("catalog") ?? new List<object?>(),
                     ["towPrices"] = payload.GetValueOrDefault("towPrices") ?? new Dictionary<string, object?>(),
                 };
-                // Compatibility projection for old imports: obtain only missing offered
+                // Compatibility projection for old imports: obtain only missing catalog base
                 // prices from the original linked tender, without rewriting stored contracts.
                 var garaId = payload.GetValueOrDefault("garaId")?.ToString();
                 if (!string.IsNullOrWhiteSpace(garaId))
@@ -886,7 +886,7 @@ public class ConfiguratoreController : ControllerBase
                                 if (recovered > 0)
                                 {
                                     lot["catalog"] = catalogNode;
-                                    lot["catalogPriceRecovery"] = new { garaId, recoveredPrices = recovered, mode = "missing-offered-prices" };
+                                    lot["catalogPriceRecovery"] = new { garaId, recoveredPrices = recovered, mode = "catalog-base-prices" };
                                 }
                             }
                         }

@@ -514,9 +514,10 @@ public class GareController : ControllerBase
                         ["nome"]        = voce["nome"]?.DeepClone(),
                         ["ambito"]      = voce["ambito"]?.DeepClone(),
                         ["descrizione"] = voce["descrizione"]?.DeepClone() ?? "",
-                        ["priceBasis"] = "offerto",
+                        ["priceBasis"] = "base-asta",
                         ["basePrices"] = ContractCatalogPricing.Prices(voce, false),
-                        ["prezzi"] = ContractCatalogPricing.Prices(voce, true)
+                        ["offeredPrices"] = ContractCatalogPricing.Prices(voce, true),
+                        ["prezzi"] = ContractCatalogPricing.Prices(voce, false)
                     };
                     catalogArray.Add(entry);
                 }

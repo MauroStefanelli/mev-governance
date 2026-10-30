@@ -9,10 +9,10 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
   return <section aria-label="Confronto prezzi Excel e catalogo" style={{ background: '#fff', padding: 16, border: '1px solid #cbd5e1', borderRadius: 8, margin: '16px 0' }}>
     <h2 style={{ fontSize: 18, marginTop: 0 }}>Confronto Excel e Voci Catalogo</h2>
     <p>Contratto: <strong>{contractName || 'Non selezionato'}</strong> · Lotto {lot}{builtin ? ' · Catalogo predefinito: verificare il contratto di sistema' : ''}</p>
-    <p>{result.lines.length} righe importate · Totale originale: <strong>{money(result.originalTotal)}</strong> · Totale ai prezzi di catalogo, con quantità correnti: <strong>{money(result.catalogTotal)}</strong></p>
+    <p>{result.lines.length} righe importate · Totale originale: <strong>{money(result.originalTotal)}</strong> · Totale a base d’asta del catalogo, con quantità correnti: <strong>{money(result.catalogTotal)}</strong></p>
     {!!result.missing && <p role="alert">{result.missing} righe senza prezzo di catalogo valido: il confronto complessivo non è disponibile. Le righe sono conservate.</p>}
-    {recovery && <p role="status">{recovery.recoveredPrices} prezzi mancanti recuperati dalla gara collegata {recovery.garaId}. I prezzi già presenti nel contratto sono conservati.</p>}
-    <p>I prezzi originali restano conservati. Il confronto riguarda il dettaglio a catalogo (TOW .5), non le altre TOW. Applica un prezzo solo dopo aver verificato il contratto.</p>
+    {recovery && <p role="status">{recovery.recoveredPrices} prezzi di base d’asta recuperati dal catalogo della gara collegata {recovery.garaId}. I prezzi già presenti nel contratto sono conservati.</p>}
+    <p>Il riferimento della stima è la base d’asta delle Voci Catalogo del contratto selezionato. I prezzi offerti della gara sono separati. I prezzi originali restano conservati. Il confronto riguarda il dettaglio a catalogo (TOW .5), non le altre TOW. Applica un prezzo solo dopo aver verificato il contratto.</p>
     {onAssign && !builtin && <details><summary>Associare i codici Excel alle Voci Catalogo del contratto</summary>
       <p>L'associazione vale per le righe di questa offerta con lo stesso codice originale. I prezzi in uso restano invariati finché non scegli «Usa catalogo».</p>
       {originalCodes.map(code => <div key={code} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
