@@ -1,3 +1,4 @@
+import { createMevFilters } from "../utils/mevFilters";
 import MevTableView, { PageHeading, FinancialSummary, pageStyle, toolbarStyle } from "../components/mev/MevTableView";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -309,101 +310,30 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const handleFilterChange = (field, value) =>
     setFilters((prev) => ({ ...prev, [field]: value }));
 
-  // options generation moved below match helpers to avoid TDZ errors
-  const matchesExcept = (r, exclude) => {
-    if (exclude !== "goTo" && filters.goTo.length > 0 && !filters.goTo.includes(String(r.goTo))) return false;
-    if (exclude !== "applicativo" && filters.applicativo.length > 0 && !filters.applicativo.includes(String(r.applicativo))) return false;
-    if (exclude !== "stato" && !matchStato(r)) return false;
-    if (exclude !== "annoCompetenza" && filters.annoCompetenza.length > 0 && !filters.annoCompetenza.includes(String(r.annoCompetenza))) return false;
-    if (exclude !== "oda" && !matchOda(r)) return false;
-    if (exclude !== "rda" && !matchRda(r)) return false;
-    if (exclude !== "pAnno" && filters.pAnno.length > 0 && !filters.pAnno.includes(String(r.pAnno))) return false;
-    if (exclude !== "pRelease" && filters.pRelease.length > 0 && !filters.pRelease.includes(String(r.pRelease))) return false;
-    if (exclude !== "mandataria" && filters.mandataria.length > 0 && !resolveCapMandanti(r.capgemini, r.iet, rtiRows).some(s => filters.mandataria.includes(s))) return false;
-    if (exclude !== "subco" && filters.subco.length > 0 && !resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) return false;
-    if (exclude !== "importoExcel" && filters.importoExcel.length > 0 && !filters.importoExcel.includes(String(r.importoExcel))) return false;
-    if (exclude !== "pNote" && filters.pNote && !(r.pNote ?? "").toLowerCase().includes(filters.pNote.toLowerCase())) return false;
-    if (exclude !== "noteCap" && filters.noteCap && !(r.noteCap ?? "").toLowerCase().includes(filters.noteCap.toLowerCase())) return false;
-    return true;
-  };
-
-  const buildOptions = (field) => {
-    const vals = [];
-    rows.forEach(r => {
-      if (!matchesExcept(r, field)) return;
-      const v = r[field];
-      if (v !== null && v !== undefined && v !== "") vals.push(v);
-    });
-    return [...new Set(vals)].sort();
-  };
-
-  // Opzioni filtro Mandataria/Mandante: nomi reali risolti da rtiRows
-  const mandatariaOptions = [...new Set(
-    rows.flatMap(r => resolveCapMandanti(r.capgemini, r.iet, rtiRows))
-  )].filter(Boolean).sort();
-
-  // Stato: include "(vuoto)" se esistono righe con stato vuoto/null
-  const hasEmptyStato = rows.some((r) => !r.stato || r.stato.trim() === "");
-  const statoOptions = [
-    ...buildOptions("stato"),
-    ...(hasEmptyStato ? ["(vuoto)"] : []),
-  ];
-
-  // RDA: include "(vuoto)" se esistono righe con RDA vuoto/null
-  const hasEmptyOda = rows.some(
-    (r) => !r.bc || String(r.bc).trim() === ""
-  );
-
-  const odaOptions = [
-    ...buildOptions("bc"),
-    ...(hasEmptyOda ? ["(vuoto)"] : []),
-  ];
-
-  const hasEmptyRda = rows.some((r) => !r.atId || String(r.atId).trim() === "");
-  const rdaOptions = [
-    ...buildOptions("atId"),
-    ...(hasEmptyRda ? ["(vuoto)"] : []),
-  ];
-
-
-  // ── Filtering ──────────────────────────────────────────────────────────────
-  const matchStato = (r) => {
-    if (filters.stato.length === 0) return true;
-    const val = r.stato ?? "";
-    if (!val.trim() && filters.stato.includes("(vuoto)")) return true;
-    return filters.stato.includes(String(val));
-  };
-
-  const matchOda = (r) => {
-    if (filters.oda.length === 0) return true;
-    const val = r.bc ?? "";
-    if (!String(val).trim() && filters.oda.includes("(vuoto)")) return true;
-    return filters.oda.includes(String(val));
-  };
-
-  const matchRda = (r) => {
-    if (filters.rda.length === 0) return true;
-    const val = r.atId ?? "";
-    if (!String(val).trim() && filters.rda.includes("(vuoto)")) return true;
-    return filters.rda.includes(String(val));
-  };
-
-
-  const filteredRows = rows.filter((r) =>
-    (filters.goTo.length === 0 || filters.goTo.includes(String(r.goTo))) &&
-    (filters.applicativo.length === 0 || filters.applicativo.includes(String(r.applicativo))) &&
-    matchStato(r) &&
-    (filters.annoCompetenza.length === 0 || filters.annoCompetenza.includes(String(r.annoCompetenza))) &&
-    matchOda(r) &&
-    matchRda(r) &&
-    (filters.pAnno.length === 0 || filters.pAnno.includes(String(r.pAnno))) &&
-    (filters.pRelease.length === 0 || filters.pRelease.includes(String(r.pRelease))) &&
-    (filters.mandataria.length === 0 || resolveCapMandanti(r.capgemini, r.iet, rtiRows).some(s => filters.mandataria.includes(s))) &&
-    (filters.subco.length === 0 || resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) &&
-    (filters.importoExcel.length === 0 || filters.importoExcel.includes(String(r.importoExcel))) &&
-    (!filters.pNote   || (r.pNote   ?? "").toLowerCase().includes(filters.pNote.toLowerCase())) &&
-    (!filters.noteCap || (r.noteCap ?? "").toLowerCase().includes(filters.noteCap.toLowerCase()))
-  );
+  const { options, filteredRows } = createMevFilters(rows, filters, {
+    goTo: "goTo",
+    applicativo: "applicativo",
+    stato: "stato",
+    annoCompetenza: "annoCompetenza",
+    pAnno: "pAnno",
+    pRelease: "pRelease",
+    importoExcel: "importoExcel",
+    oda: "bc",
+    rda: "atId",
+    mandataria: r => resolveCapMandanti(r.capgemini, r.iet, rtiRows),
+    subco: r => resolveSubco(r.subco, rtiRows),
+  }, ["pNote", "noteCap"]);
+  const goToOptions = options("goTo");
+  const applicativoOptions = options("applicativo");
+  const annoOptions = options("annoCompetenza");
+  const pAnnoOptions = options("pAnno");
+  const pReleaseOptions = options("pRelease");
+  const importoExcelOptions = options("importoExcel");
+  const mandatariaOptions = options("mandataria");
+  const subcoOptions = options("subco");
+  const statoOptions = options("stato", true);
+  const odaOptions = options("oda", true);
+  const rdaOptions = options("rda", true);
 
   const totCap = filteredRows.reduce((s, r) => s + (Number(r.importoExcel) || 0), 0);
   const totPoste = filteredRows.reduce((s, r) => s + (Number(r.pImporto) || 0), 0);

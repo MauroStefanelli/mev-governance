@@ -69,3 +69,34 @@ test("keeps the saved choice on narrow screens and ignores invalid saved values"
   render(<MevPage ambienteId="1" />);
   expect(await screen.findByLabelText("Colonne fisse")).toHaveValue("goto");
 });
+
+test.each([["MEV", MevPage], ["MEV-CAP", MevCapPage]])("%s: options follow other filters, allow multiple values and expand after reset", async (_, Page) => {
+  service.getMevList.mockResolvedValue([
+    { id: 1, goTo: "A", applicativo: "Portale", stato: "Approvato", bc: "ODA-1", atId: "RDA-1", subco: '[3]', capgemini: "x", tipoContratto: "T1", impSubco: 0 },
+    { id: 2, goTo: "B", applicativo: "Portale", stato: "In corso", bc: "ODA-2", atId: "RDA-2", subco: '[4]', tipoContratto: "T2", impSubco: 10 },
+    { id: 3, goTo: "C", applicativo: "Ordini", stato: "", bc: null, atId: "", subco: "", tipoContratto: "T3", impSubco: 20 },
+  ]);
+  service.getRtiSocieta.mockResolvedValue([{ id: 3, societa: "Società Alfa" }, { id: 4, societa: "Società Beta" }]);
+  render(<Page ambienteId="1" />);
+  await screen.findByText("3 Iniziative");
+  const open = key => fireEvent.click(screen.getByRole("button", { name: new RegExp(`^Filtra ${key}:`) }));
+  const close = () => fireEvent.keyDown(screen.getByRole("dialog", { name: "Seleziona valori filtro" }), { key: "Escape" });
+  open("applicativo"); fireEvent.click(screen.getByRole("checkbox", { name: "Portale" })); close();
+  open("stato");
+  expect(screen.queryByRole("checkbox", { name: "(vuoto)" })).not.toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "Approvato" })).toBeInTheDocument(); close();
+  open("oda"); fireEvent.click(screen.getByRole("checkbox", { name: "ODA-1" }));
+  // A facet excludes its own criterion so another compatible value can be added.
+  expect(screen.getByRole("checkbox", { name: "ODA-2" })).toBeInTheDocument(); close();
+  expect(screen.getByText("1 Iniziative (filtrate su 3 totali)")).toBeInTheDocument();
+  open("subco");
+  expect(screen.getByRole("checkbox", { name: "Società Alfa" })).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", { name: "Società Beta" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Società Alfa" })); close();
+  expect(screen.getByText("1 Iniziative (filtrate su 3 totali)")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Reset filtri/i }));
+  expect(screen.getByText("3 Iniziative")).toBeInTheDocument();
+  open("stato"); fireEvent.click(screen.getByRole("checkbox", { name: "(vuoto)" })); close();
+  open("oda"); expect(screen.getByRole("checkbox", { name: "(vuoto)" })).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", { name: "ODA-1" })).not.toBeInTheDocument(); close();
+});
