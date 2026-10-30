@@ -1,3 +1,4 @@
+import { catalogEntryInScope } from "./suggestionScope";
 import { catalogUnitPrice } from "./catalogReconciliation";
 // ============================================================
 // Configuratore Offerta TOW — modulo core (logica pura portata
@@ -267,6 +268,8 @@ export function scoreIntervention({ intervention, detailText, catalog, applicati
   });
   profileCatalogIds.forEach((id) => { if (!existing.has(id)) scores.set(id, (scores.get(id) || 0) + 6); });
   historicalCounts.forEach((count, id) => { if (!existing.has(id)) scores.set(id, (scores.get(id) || 0) + Math.min(12, count * 4)); });
+  const scopeEvidence = [intervention.sistema, intervention.titolo, intervention.descrizione, intervention.attivita, detailText].join(" ");
+  catalog.forEach(c => { if (!catalogEntryInScope(c, scopeEvidence)) scores.delete(c.id); });
   return { scores, existing, source };
 }
 

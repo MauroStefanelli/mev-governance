@@ -1,0 +1,13 @@
+.offer-price-comparison { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.offer-price-scroll { width: 100%; max-width: 100%; overflow: auto; max-height: 480px; margin-top: 16px; border: 1px solid #dce4ef; border-radius: 8px; }
+.offer-price-table { table-layout: fixed; width: 1535px; min-width: 1535px; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.5; }
+.offer-price-table th { position: sticky; top: 0; z-index: 1; background: #edf2f8; color: #243247; vertical-align: middle; }
+.offer-price-table th, .offer-price-table td { box-sizing: border-box; padding: 12px; vertical-align: top; border-bottom: 1px solid #dce4ef; overflow-wrap: normal; word-break: normal; }
+.offer-price-table td:first-child { white-space: normal; overflow-wrap: anywhere; }
+.offer-price-table td:first-child strong { display: block; margin-bottom: 4px; }
+.offer-price-table td:first-child > div { margin-top: 4px; }
+.offer-price-table tr:nth-child(even) td { background: #f8fafc; }
+.offer-price-table .offer-price-number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.offer-price-table .offer-price-code { overflow-wrap: anywhere; }
+.offer-price-table button { white-space: nowrap; padding: 8px 10px; min-height: 36px; }
+.offer-price-scroll:focus-visible { outline: 2px solid #1a73e8; outline-offset: 2px; }

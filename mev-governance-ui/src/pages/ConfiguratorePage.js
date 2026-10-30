@@ -1,3 +1,4 @@
+import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
 import { catalogUnitPrice } from "../configuratore/catalogReconciliation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -573,7 +574,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         });
       });
       const appText = applicationsText(apps);
-      const { scores } = scoreIntervention({ intervention, detailText, catalog, applicationContextText: appText, historicalCounts, profileCatalogIds });
+      const { scores } = scoreIntervention({ intervention, detailText: detailText + " " + initiativeScopeText(initiative), catalog, applicationContextText: appText, historicalCounts, profileCatalogIds });
       [...scores]
         .map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score }))
         .filter((x) => x.c && !new Set((intervention.mappings || []).map((m) => m.catalogId)).has(x.c.id) && x.score >= 2)
@@ -634,8 +635,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       const hits = tokens.filter((t) => hay.includes(t)).length;
       if (hits) scores.set(c.id, (scores.get(c.id) || 0) + Math.min(hits, 5));
     });
-    let ranked = [...scores].map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score })).filter((x) => x.c).sort((a, b) => b.score - a.score).slice(0, 10);
-    if (!ranked.length) ranked = catalog.slice(0, 6).map((c) => ({ c, score: 1 }));
+    let ranked = [...scores].map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score })).filter((x) => x.c && catalogEntryInScope(x.c, initiativeScopeText(initiative))).sort((a, b) => b.score - a.score).slice(0, 10);
+    if (!ranked.length) ranked = catalog.filter(c => catalogEntryInScope(c, initiativeScopeText(initiative))).slice(0, 6).map((c) => ({ c, score: 1 }));
     setSuggestions(
       ranked.map(({ c, score }, i) => ({
         id: c.id,
@@ -777,7 +778,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       // nel contesto applicativo (riduce le allucinazioni tipo "SAP" quando
       // l'iniziativa è su IPERSUITE/IPER).
       const rawProposals = (data.analysis?.proposals || []).filter((p) =>
-        catalog.some((c) => String(c.id) === String(p.catalogId))
+        catalog.some((c) => String(c.id) === String(p.catalogId) && catalogEntryInScope(c, initiativeScopeText(initiative) + " " + importedInterventions.map(iv => [iv.sistema, iv.titolo, iv.descrizione, iv.attivita].join(" ")).join(" ")))
       );
 
       // Auto-apply high-confidence AI proposals if enabled
