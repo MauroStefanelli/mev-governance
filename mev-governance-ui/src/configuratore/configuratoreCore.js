@@ -1,5 +1,5 @@
 import { catalogEntryInScope } from "./suggestionScope";
-import { catalogUnitPrice } from "./catalogReconciliation";
+import { catalogUnitPrice, resolveCatalogEntry } from "./catalogReconciliation";
 // ============================================================
 // Configuratore Offerta TOW — modulo core (logica pura portata
 // dal Configuratore standalone: parsing, calcolo, suggerimenti,
@@ -458,7 +458,7 @@ export async function parseInitiativeWorkbook(file, catalog) {
       }
       const driverName = String(read(r, "nomedriver") || "").trim();
       const catalogId = Number(read(r, "iddicatalogo", "idcatalogo")) || 0;
-      const component = catalogId ? catalog.find(x => String(x.id) === String(catalogId)) : catalog.find(x => appNorm(x.nome) === appNorm(driverName));
+      const component = resolveCatalogEntry({ id: catalogId || undefined, name: driverName, ambit: String(read(r, "ambitodriver") || "").trim() }, catalog);
       const resolvedId = component?.id ?? (catalogId || driverName || "SANS-CATALOGUE");
       const rawType = String(read(r, "tipointervento2", "tipointervento") || "MODIFICA").toUpperCase();
       const type = rawType.includes("REALIZZ") ? "REALIZZAZIONE" : rawType.includes("MODIFICA") ? "MODIFICA" : rawType;

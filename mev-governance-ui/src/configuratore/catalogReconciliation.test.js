@@ -51,3 +51,18 @@ test('retains unmapped rows and original zero prices instead of dropping or repl
   const report = reconcileCatalog(parsed.items,catalog);
   expect(report.missing).toBe(1); expect(report.catalogTotal).toBeNull(); expect(report.originalTotal).toBe(70);
 });
+
+test('resolves Excel codes against unique named drivers in the selected system contract', async () => {
+ const systemCatalog = [{ id:'driver-api',nome:'Servizio/API/Microservizio',ambito:'Backend',prezzi:{REALIZZAZIONE:{Medio:3000},MODIFICA:{Medio:900}} }];
+ const row=detail(239,360,'Medio','MODIFICA');
+ const parsed=await parseInitiativeWorkbook(await workbook([row]),systemCatalog);
+ expect(parsed.items[0].id).toBe('driver-api');
+ expect(parsed.items[0].original.catalogId).toBe(239);
+ expect(parsed.items[0].unit).toBe(360);
+ expect(reconcileCatalog(parsed.items,systemCatalog).catalogTotal).toBe(900);
+ // Old saved estimates that still have numeric IDs also resolve on read.
+ expect(catalogUnitPrice({...parsed.items[0],id:239},systemCatalog)).toBe(900);
+ expect(catalogUnitPrice({...parsed.items[0],id:239},[...systemCatalog,{...systemCatalog[0],id:'ambiguous'}])).toBeNull();
+ expect(catalogUnitPrice({...parsed.items[0],id:239},[{...systemCatalog[0],ambito:'SAP'}])).toBeNull();
+ expect(catalogUnitPrice({...parsed.items[0],id:239},[])).toBeNull();
+});

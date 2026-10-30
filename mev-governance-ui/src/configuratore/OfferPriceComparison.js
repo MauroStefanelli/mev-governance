@@ -1,6 +1,6 @@
 import "./offerPriceComparison.css";
 import React, { useState } from 'react';
-import { reconcileCatalog } from './catalogReconciliation';
+import { reconcileCatalog, resolveCatalogEntry } from './catalogReconciliation';
 const money = value => value == null ? 'Non disponibile' : new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
 export default function CatalogReconciliation({ items, catalog, contractName, lot, builtin, onApply, onAssign, recovery }) {
   const [choices, setChoices] = useState({});
@@ -29,7 +29,7 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
       <thead><tr>{['Intervento / attività', 'Voce catalogo', 'Tipo / complessità', 'Quantità', 'Prezzo Excel', 'Prezzo catalogo', 'Differenza unitaria', 'Prezzo in uso', 'Azione'].map(h => <th key={h} style={{ textAlign: 'left', padding: 8 }}>{h}</th>)}</tr></thead>
       <tbody>{result.lines.map(({ item, price, original, difference }, index) => <tr key={item.key ?? index} style={{ borderTop: '1px solid #e2e8f0' }}>
         <td style={{ padding: 8, minWidth: 230 }}><strong>{item.interventionId}</strong><div>{item.detail?.componentApplication}</div><div>{item.detail?.detailDescription || item.reason}</div></td>
-        <td className="offer-price-code">{item.id}</td><td>{item.type}<br />{item.complexity}</td><td className="offer-price-number">{item.qty}</td>
+        <td className="offer-price-code">{resolveCatalogEntry(item, catalog)?.nome || item.detail?.name || item.id}<div style={{fontSize:11,color:"#52657d"}}>ID Excel {original?.catalogId ?? item.id}</div></td><td>{item.type}<br />{item.complexity}</td><td className="offer-price-number">{item.qty}</td>
         <td className="offer-price-number">{money(original?.unit)}</td><td className="offer-price-number">{money(price)}</td><td className="offer-price-number">{money(difference)}</td><td className="offer-price-number">{money(item.unit)}</td>
         <td><button type="button" disabled={price == null || builtin} onClick={() => onApply(item.key, price)} aria-label={`Applica prezzo catalogo riga ${index + 1}`}>Usa catalogo</button></td>
       </tr>)}</tbody>
