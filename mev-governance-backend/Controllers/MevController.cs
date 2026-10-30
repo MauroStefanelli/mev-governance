@@ -702,7 +702,6 @@ public class MevController : BaseController
                     Cm                      = cm,
                     PAnno                   = GetInt("Anno Competenza"),
                     PRelease                = releaseExcel,
-                    SubcoImporti            = impSubco,
                     ImpSubco                = (decimal.TryParse(
                         (string.IsNullOrWhiteSpace(impSubco) ? "" : (impSubco.Contains(",") && impSubco.Contains(".") ? impSubco.Replace(".", "").Replace(",", ".") : impSubco.Replace(",", "."))),
                         System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var tmpVal) ? (decimal?)tmpVal : null),

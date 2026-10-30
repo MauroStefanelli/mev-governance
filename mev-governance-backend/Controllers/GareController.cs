@@ -514,21 +514,9 @@ public class GareController : ControllerBase
                         ["nome"]        = voce["nome"]?.DeepClone(),
                         ["ambito"]      = voce["ambito"]?.DeepClone(),
                         ["descrizione"] = voce["descrizione"]?.DeepClone() ?? "",
-                        ["prezzi"] = new JsonObject
-                        {
-                            ["REALIZZAZIONE"] = new JsonObject
-                            {
-                                ["Semplice"]  = voce["prezzoRealizzazioneSemplice"]?.DeepClone() ?? voce["prezziSemplice"]?.DeepClone(),
-                                ["Medio"]     = voce["prezzoRealizzazioneMedio"]?.DeepClone() ?? voce["prezziMedio"]?.DeepClone(),
-                                ["Complesso"] = voce["prezzoRealizzazioneComplesso"]?.DeepClone() ?? voce["prezziComplesso"]?.DeepClone(),
-                            },
-                            ["MODIFICA"] = new JsonObject
-                            {
-                                ["Semplice"]  = voce["prezzoModificaSemplice"]?.DeepClone() ?? voce["modSemplice"]?.DeepClone(),
-                                ["Medio"]     = voce["prezzoModificaMedio"]?.DeepClone() ?? voce["modMedio"]?.DeepClone(),
-                                ["Complesso"] = voce["prezzoModificaComplesso"]?.DeepClone() ?? voce["modComplesso"]?.DeepClone(),
-                            }
-                        }
+                        ["priceBasis"] = "offerto",
+                        ["basePrices"] = ContractCatalogPricing.Prices(voce, false),
+                        ["prezzi"] = ContractCatalogPricing.Prices(voce, true)
                     };
                     catalogArray.Add(entry);
                 }

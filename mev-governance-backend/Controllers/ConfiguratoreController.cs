@@ -866,6 +866,32 @@ public class ConfiguratoreController : ControllerBase
                     ["catalog"] = payload.GetValueOrDefault("catalog") ?? new List<object?>(),
                     ["towPrices"] = payload.GetValueOrDefault("towPrices") ?? new Dictionary<string, object?>(),
                 };
+                // Compatibility projection for old imports: obtain only missing offered
+                // prices from the original linked tender, without rewriting stored contracts.
+                var garaId = payload.GetValueOrDefault("garaId")?.ToString();
+                if (!string.IsNullOrWhiteSpace(garaId))
+                {
+                    var catalogNode = System.Text.Json.JsonSerializer.SerializeToNode(lot["catalog"]) as System.Text.Json.Nodes.JsonArray;
+                    if (catalogNode != null)
+                    {
+                        var garaRows = await QueryAsync(cs, $@"SELECT ""payload""::text AS ""payload"" FROM ""{sch}"".""PC_DataRecords"" WHERE ""entity_type"" = 'gara' AND ""record_key"" = @rk LIMIT 1",
+                            new List<NpgsqlParameter> { new("rk", $"gara|{garaId}") }, sch);
+                        if (garaRows.Count == 1)
+                        {
+                            var gara = System.Text.Json.JsonSerializer.SerializeToNode(garaRows[0].GetValueOrDefault("payload"));
+                            var source = gara?["offertaLotti"]?[lotId]?["offertaCatalogo"] as System.Text.Json.Nodes.JsonArray;
+                            if (source != null)
+                            {
+                                var recovered = MevGovernanceBackend.Services.ContractCatalogPricing.RecoverMissing(catalogNode, source);
+                                if (recovered > 0)
+                                {
+                                    lot["catalog"] = catalogNode;
+                                    lot["catalogPriceRecovery"] = new { garaId, recoveredPrices = recovered, mode = "missing-offered-prices" };
+                                }
+                            }
+                        }
+                    }
+                }
                 if (byContract.TryGetValue(cid, out var contract))
                     (contract["lots"] as List<Dictionary<string, object?>>)?.Add(lot);
             }

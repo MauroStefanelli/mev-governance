@@ -156,6 +156,7 @@ var withFooter = GaraSectionContext.Build(new List<(int, string)> { (1, "Testo u
 Check(withFooter.Contains("Testo utile") && withFooter.Contains("seguito utile") && !withFooter.Contains("boilerplate"), "Il riquadro editoriale non sostituisce il contenuto utile");
 checks += RealLayoutRegression.Run();
 checks += await GaraAiRegression.Run();
+checks += ContractPricingRegression.Run();
 Console.WriteLine($"PASS: {checks} verifiche backend.");
 
 sealed class FakeClientFactory(string response) : IHttpClientFactory
