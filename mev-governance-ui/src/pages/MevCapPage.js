@@ -1445,9 +1445,39 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
     return () => document.removeEventListener("mousedown", handler);
   }, [notePopover]);
 
-  // ── Options per filtri ───────────────────────────────────────────────────
-  const buildOptions = (field) =>
-    [...new Set(rows.map((r) => r[field]).filter((v) => v !== null && v !== undefined && v !== ""))].sort();
+  // ── Options per filtri (dinamiche: mostrano solo valori compatibili con gli altri filtri)
+  const matchesExcept = (r, exclude) => {
+    if (exclude !== "goTo" && filters.goTo.length > 0 && !filters.goTo.includes(String(r.goTo))) return false;
+    if (exclude !== "applicativo" && filters.applicativo.length > 0 && !filters.applicativo.includes(String(r.applicativo))) return false;
+    if (exclude !== "stato" && filters.stato.length > 0) {
+      const val = r.stato ?? "";
+      if (!val.trim() && filters.stato.includes("(vuoto)")) { /* ok */ }
+      else if (!filters.stato.includes(String(val))) return false;
+    }
+    if (exclude !== "annoCompetenza" && filters.annoCompetenza.length > 0 && !filters.annoCompetenza.includes(String(r.annoCompetenza))) return false;
+    if (exclude !== "releaseExcel" && filters.releaseExcel.length > 0 && !filters.releaseExcel.includes(String(r.releaseExcel))) return false;
+    if (exclude !== "pmPoste" && filters.pmPoste.length > 0 && !filters.pmPoste.includes(String(r.pmPoste))) return false;
+    if (exclude !== "pmCap" && filters.pmCap.length > 0 && !filters.pmCap.includes(String(r.pmCap))) return false;
+    if (exclude !== "recupero" && filters.recupero.length > 0 && !filters.recupero.includes(String(r.recupero))) return false;
+    if (exclude !== "bc" && filters.oda.length > 0 && !filters.oda.includes(String(r.bc))) return false;
+    if (exclude !== "atId" && filters.rda.length > 0 && !filters.rda.includes(String(r.atId))) return false;
+    if (exclude !== "capgemini" && filters.capgemini.length > 0) {
+      const resolved = resolveCapMandanti(r.capgemini, r.iet, rtiRows);
+      if (resolved.length === 0 && filters.capgemini.includes("(vuoto)")) { /* ok */ }
+      else if (!resolved.some(s => filters.capgemini.includes(s))) return false;
+    }
+    if (exclude !== "subco" && filters.subco.length > 0 && !resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) return false;
+    if (exclude !== "pAnno" && filters.pAnno.length > 0 && !filters.pAnno.includes(String(r.pAnno))) return false;
+    if (exclude !== "pRelease" && filters.pRelease.length > 0 && !filters.pRelease.includes(String(r.pRelease))) return false;
+    if (exclude !== "importoExcel" && filters.importoExcel.length > 0 && !filters.importoExcel.includes(String(r.importoExcel))) return false;
+    return true;
+  };
+
+  const buildOptions = (field) => {
+    const vals = [];
+    rows.forEach(r => { if (!matchesExcept(r, field)) return; const v = r[field]; if (v !== null && v !== undefined && v !== "") vals.push(v); });
+    return [...new Set(vals)].sort();
+  };
 
   // Opzioni filtro Mandataria/Mandante: risolve i valori legacy "x" nei nomi reali
   const buildOptionsMandataria = () => {

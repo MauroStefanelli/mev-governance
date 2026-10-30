@@ -309,19 +309,42 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const handleFilterChange = (field, value) =>
     setFilters((prev) => ({ ...prev, [field]: value }));
 
-  // ── Options ────────────────────────────────────────────────────────────────
-  const buildOptions = (field) =>
-    [...new Set(rows.map((r) => r[field]).filter((v) => v !== null && v !== undefined && v !== ""))].sort();
+  // ── Options (dynamic: each filter shows values compatible with other active filters)
+  const matchesExcept = (r, exclude) => {
+    // reuse existing match helpers but skip the excluded filter
+    if (exclude !== "goTo" && filters.goTo.length > 0 && !filters.goTo.includes(String(r.goTo))) return false;
+    if (exclude !== "applicativo" && filters.applicativo.length > 0 && !filters.applicativo.includes(String(r.applicativo))) return false;
+    if (exclude !== "stato" && !matchStato(r)) return false;
+    if (exclude !== "annoCompetenza" && filters.annoCompetenza.length > 0 && !filters.annoCompetenza.includes(String(r.annoCompetenza))) return false;
+    if (exclude !== "oda" && !matchOda(r)) return false;
+    if (exclude !== "rda" && !matchRda(r)) return false;
+    if (exclude !== "pAnno" && filters.pAnno.length > 0 && !filters.pAnno.includes(String(r.pAnno))) return false;
+    if (exclude !== "pRelease" && filters.pRelease.length > 0 && !filters.pRelease.includes(String(r.pRelease))) return false;
+    if (exclude !== "mandataria" && filters.mandataria.length > 0 && !resolveCapMandanti(r.capgemini, r.iet, rtiRows).some(s => filters.mandataria.includes(s))) return false;
+    if (exclude !== "subco" && filters.subco.length > 0 && !resolveSubco(r.subco, rtiRows).some(s => filters.subco.includes(s))) return false;
+    if (exclude !== "importoExcel" && filters.importoExcel.length > 0 && !filters.importoExcel.includes(String(r.importoExcel))) return false;
+    if (exclude !== "pNote" && filters.pNote && !(r.pNote ?? "").toLowerCase().includes(filters.pNote.toLowerCase())) return false;
+    if (exclude !== "noteCap" && filters.noteCap && !(r.noteCap ?? "").toLowerCase().includes(filters.noteCap.toLowerCase())) return false;
+    return true;
+  };
+
+  const buildOptions = (field) => {
+    const vals = [];
+    rows.forEach(r => {
+      if (!matchesExcept(r, field)) return;
+      const v = r[field];
+      if (v !== null && v !== undefined && v !== "") vals.push(v);
+    });
+    return [...new Set(vals)].sort();
+  };
 
   const goToOptions = buildOptions("goTo");
   const applicativoOptions = buildOptions("applicativo");
   const annoOptions = buildOptions("annoCompetenza");
   const pAnnoOptions = buildOptions("pAnno");
   const pReleaseOptions = buildOptions("pRelease");
-  const subcoOptions = [...new Set(
-    rows.flatMap(r => resolveSubco(r.subco, rtiRows))
-  )].filter(Boolean).sort();
-  const importoExcelOptions = [...new Set(rows.map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
+  const subcoOptions = [...new Set(rows.filter(r => matchesExcept(r, "subco")).flatMap(r => resolveSubco(r.subco, rtiRows)))].filter(Boolean).sort();
+  const importoExcelOptions = [...new Set(rows.filter(r => matchesExcept(r, "importoExcel")).map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
 
   // Opzioni filtro Mandataria/Mandante: nomi reali risolti da rtiRows
   const mandatariaOptions = [...new Set(
