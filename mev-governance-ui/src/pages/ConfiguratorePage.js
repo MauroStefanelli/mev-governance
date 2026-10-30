@@ -1035,6 +1035,12 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setItems(prev => prev.map(it => it.key === key ? { ...it, ...patch } : it));
     if (source?.sourceRowId) setImportedInterventions(prev => prev.map(iv => ({ ...iv, mappings: iv.mappings.map(m => m.sourceRowId === source.sourceRowId ? { ...m, ...patch } : m) })));
   };
+  const assignCatalog = (originalId, catalogId) => {
+    const entry = catalog.find(c => String(c.id) === String(catalogId));
+    if (!entry) return;
+    setItems(prev => prev.map(it => String(it.original?.catalogId) === String(originalId) ? { ...it, id: entry.id, catalogAssociation: { originalId, catalogId: entry.id, contractId: selectedContractId, lot } } : it));
+    setImportedInterventions(prev => prev.map(iv => ({ ...iv, mappings: iv.mappings.map(m => String(m.original?.catalogId) === String(originalId) ? { ...m, catalogId: entry.id, name: entry.nome } : m) })));
+  };
   const removeItem = (key) => setItems((prev) => prev.filter((it) => it.key !== key));
 
   // ── Calcolo ──
@@ -2335,7 +2341,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             })()}
           </div>
 
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} onApply={(key, unit) => updateItem(key, { unit })} />
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           {importedInterventions.length > 0 && (
             <div style={styles.card}>
               <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
@@ -2755,7 +2761,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 3: OFFERTA */}
       {step === 3 && (
         <div>
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} onApply={(key, unit) => updateItem(key, { unit })} />
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

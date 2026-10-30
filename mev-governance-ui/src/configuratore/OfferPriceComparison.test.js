@@ -20,3 +20,12 @@ test('keeps missing and builtin catalog prices explicit and disables application
   view.rerender(<OfferPriceComparison items={[item]} catalog={catalog} lot="2" builtin onApply={jest.fn()} />);
   expect(screen.getByRole('button')).toBeDisabled();
 });
+test('associates legacy Excel codes with a different system catalog identifier explicitly', () => {
+ const onAssign=jest.fn();
+ render(<OfferPriceComparison items={[{...item,original:{...item.original,catalogId:239}}]} catalog={[{id:'driver-api',nome:'Servizio API',prezzi:{MODIFICA:{Medio:400}}}]} lot="2" onAssign={onAssign} onApply={jest.fn()}/>);
+ fireEvent.click(screen.getByText('Associare i codici Excel alle Voci Catalogo del contratto'));
+ fireEvent.change(screen.getByRole('combobox',{name:'Voce contratto per ID Excel 239'}),{target:{value:'driver-api'}});
+ expect(onAssign).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Associa righe ID Excel 239'}));
+ expect(onAssign).toHaveBeenCalledWith(239,'driver-api');
+});
