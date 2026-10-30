@@ -46,7 +46,9 @@ test('pilot preserves all 24 rows and reconciles the two totals without deduplic
   expect(reconcileCatalog(JSON.parse(JSON.stringify(parsed.items)),catalog)).toEqual(report);
 });
 test('retains unmapped rows and original zero prices instead of dropping or replacing them', async () => {
-  const parsed = await parseInitiativeWorkbook(await workbook([detail(999,70,'Medio','MODIFICA'),detail(239,0,'Medio','REALIZZAZIONE')]),catalog);
+  const unknown = detail(999,70,'Medio','MODIFICA');
+  unknown[7] = 'Voce assente dal contratto';
+  const parsed = await parseInitiativeWorkbook(await workbook([unknown,detail(239,0,'Medio','REALIZZAZIONE')]),catalog);
   expect(parsed.items).toHaveLength(2); expect(parsed.items[0].id).toBe(999); expect(parsed.items[1].unit).toBe(0);
   const report = reconcileCatalog(parsed.items,catalog);
   expect(report.missing).toBe(1); expect(report.catalogTotal).toBeNull(); expect(report.originalTotal).toBe(70);
@@ -65,4 +67,23 @@ test('resolves Excel codes against unique named drivers in the selected system c
  expect(catalogUnitPrice({...parsed.items[0],id:239},[...systemCatalog,{...systemCatalog[0],id:'ambiguous'}])).toBeNull();
  expect(catalogUnitPrice({...parsed.items[0],id:239},[{...systemCatalog[0],ambito:'SAP'}])).toBeNull();
  expect(catalogUnitPrice({...parsed.items[0],id:239},[])).toBeNull();
+ expect(catalogUnitPrice({...parsed.items[0],id:239},[{...systemCatalog[0],ambito:''}])).toBe(900);
+});
+
+test('imports and reopens estimates against a unique contract driver with no ambit', async () => {
+  const contractCatalog = [{ id: 'contract-api', nome: 'Servizio/API/Microservizio', ambito: '', prezzi: { MODIFICA: { Medio: 900 } } }];
+  const parsed = await parseInitiativeWorkbook(await workbook([detail(239, 360, 'Medio', 'MODIFICA')]), contractCatalog);
+  expect(parsed.items[0].id).toBe('contract-api');
+  expect(parsed.items[0].original.catalogId).toBe(239);
+  expect(parsed.items[0].unit).toBe(360);
+  const saved = JSON.parse(JSON.stringify(parsed.items));
+  saved[0].id = 239;
+  const report = reconcileCatalog(saved, contractCatalog);
+  expect(report.missing).toBe(0);
+  expect(report.catalogTotal).toBe(900);
+  expect(report.originalTotal).toBe(360);
+  expect(defaultPrice(saved[0], { catalog: contractCatalog })).toBe(900);
+  expect(catalogUnitPrice(saved[0], [...contractCatalog, { ...contractCatalog[0], id: 'duplicate' }])).toBeNull();
+  expect(catalogUnitPrice(saved[0], [...contractCatalog, { ...contractCatalog[0], id: 'backend', ambito: 'Backend' }])).toBeNull();
+  expect(catalogUnitPrice(saved[0], [{ ...contractCatalog[0], ambito: 'SAP' }])).toBeNull();
 });

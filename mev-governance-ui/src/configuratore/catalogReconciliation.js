@@ -3,6 +3,8 @@ const normalizeDriver = value => String(value || '').normalize('NFD').replace(/[
 
 // Spreadsheet codes and system driver IDs can differ. Resolve only a unique
 // named driver within the selected contract, never prices from another catalog.
+// A missing ambit permits a name-only match; conflicting ambits and multiple
+// compatible entries must remain unresolved.
 export function resolveCatalogEntry(item, catalog) {
   const id = item.id ?? item.catalogId;
   const exact = catalog.filter(c => String(c.id) === String(id));
@@ -11,7 +13,7 @@ export function resolveCatalogEntry(item, catalog) {
   const name = normalizeDriver(item.detail?.name || item.name || item.driverName);
   if (!name) return null;
   const ambit = normalizeDriver(item.detail?.ambit || item.ambit);
-  const matches = catalog.filter(c => normalizeDriver(c.nome) === name && (!ambit || normalizeDriver(c.ambito) === ambit));
+  const matches = catalog.filter(c => normalizeDriver(c.nome) === name && (!ambit || !normalizeDriver(c.ambito) || normalizeDriver(c.ambito) === ambit));
   return matches.length === 1 ? matches[0] : null;
 }
 
