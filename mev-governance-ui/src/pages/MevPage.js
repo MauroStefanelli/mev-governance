@@ -309,9 +309,8 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   const handleFilterChange = (field, value) =>
     setFilters((prev) => ({ ...prev, [field]: value }));
 
-  // ── Options (dynamic: each filter shows values compatible with other active filters)
+  // options generation moved below match helpers to avoid TDZ errors
   const matchesExcept = (r, exclude) => {
-    // reuse existing match helpers but skip the excluded filter
     if (exclude !== "goTo" && filters.goTo.length > 0 && !filters.goTo.includes(String(r.goTo))) return false;
     if (exclude !== "applicativo" && filters.applicativo.length > 0 && !filters.applicativo.includes(String(r.applicativo))) return false;
     if (exclude !== "stato" && !matchStato(r)) return false;
@@ -337,14 +336,6 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
     });
     return [...new Set(vals)].sort();
   };
-
-  const goToOptions = buildOptions("goTo");
-  const applicativoOptions = buildOptions("applicativo");
-  const annoOptions = buildOptions("annoCompetenza");
-  const pAnnoOptions = buildOptions("pAnno");
-  const pReleaseOptions = buildOptions("pRelease");
-  const subcoOptions = [...new Set(rows.filter(r => matchesExcept(r, "subco")).flatMap(r => resolveSubco(r.subco, rtiRows)))].filter(Boolean).sort();
-  const importoExcelOptions = [...new Set(rows.filter(r => matchesExcept(r, "importoExcel")).map((r) => r.importoExcel).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a, b) => Number(a) - Number(b)).map(String);
 
   // Opzioni filtro Mandataria/Mandante: nomi reali risolti da rtiRows
   const mandatariaOptions = [...new Set(
