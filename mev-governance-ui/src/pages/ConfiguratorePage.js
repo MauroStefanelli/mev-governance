@@ -1,3 +1,5 @@
+import CatalogReconciliation from "../configuratore/OfferPriceComparison";
+import { catalogUnitPrice } from "../configuratore/catalogReconciliation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   getConfiguratoreContracts,
@@ -274,6 +276,15 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     return [builtinContract, ...list.filter((c) => c.contractId !== "poste-tet-2025")];
   }, [contracts, builtinContract]);
 
+  useEffect(() => {
+    if (!codiceContratto) return;
+    const matches = contracts.flatMap(c => (c.lots || []).filter(l => l.active !== false && l.codiceContratto === codiceContratto).map(l => ({ contractId: c.contractId, lotId: String(l.lotId) })));
+    if (matches.length === 1) {
+      setSelectedContractId(matches[0].contractId);
+      setLot(matches[0].lotId);
+    }
+  }, [contracts, codiceContratto]);
+
   const activeLot = useMemo(() => {
     const c = activeContract || builtinContract;
     if (!c) return null;
@@ -444,6 +455,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         lot,
         priceMode,
         sourceWorkbookName,
+        catalogSource: { contractId: selectedContractId, lot },
         initiative,
         importedInterventions,
         items,
@@ -508,7 +520,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     if (!file) return;
     setMappedLoading(true);
     try {
-      const parsed = await parseInitiativeWorkbook(file, catalog);
+      let parsed = await parseInitiativeWorkbook(file, catalog);
+      const importContract = allContracts.find(c => c.contractId === selectedContractId);
+      const importLot = importContract?.lots?.find(l => l.active !== false && String(l.lotId) === parsed.lot);
+      if (parsed.lot && !importLot) throw new Error("Il lotto del file non è disponibile nel contratto selezionato");
+      if (importLot) parsed = await parseInitiativeWorkbook(file, importLot.catalog || []);
       if (parsed.lot && allContracts.find((c) => c.contractId === selectedContractId)?.lots?.some((l) => l.active !== false && String(l.lotId) === parsed.lot)) {
         setLot(parsed.lot);
       }
@@ -964,6 +980,10 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   // ── Step 3: compose (port da compose r.379) ──
   const compose = () => {
     const imported = items.filter((x) => x.imported);
+    if (imported.some(it => it.unit == null && catalogUnitPrice(it, catalog) == null)) {
+      toast("Completa i prezzi mancanti prima di comporre l'offerta");
+      return;
+    }
     const added = suggestions.filter((s) => s.selected).map((s, i) => ({ ...s, key: Date.now() + i, unit: null, imported: false }));
     setItems([...imported, ...added]);
     setStep(3);
@@ -1010,7 +1030,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     }
   };
 
-  const updateItem = (key, patch) => setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  const updateItem = (key, patch) => {
+    const source = items.find(it => it.key === key);
+    setItems(prev => prev.map(it => it.key === key ? { ...it, ...patch } : it));
+    if (source?.sourceRowId) setImportedInterventions(prev => prev.map(iv => ({ ...iv, mappings: iv.mappings.map(m => m.sourceRowId === source.sourceRowId ? { ...m, ...patch } : m) })));
+  };
   const removeItem = (key) => setItems((prev) => prev.filter((it) => it.key !== key));
 
   // ── Calcolo ──
@@ -1087,7 +1111,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     // NON cambiare selectedContractId: è usato per caricare gli applicativi (sempre "poste-tet-2025").
     // Il contract_id del record è solo per identificare l'iniziativa nel DB — già gestito da
     // initiativeContractId (calcolato da codiceContratto/ambienteId) e da editingRecordKey.
-    // setSelectedContractId(record.contract_id || payload.contractId || selectedContractId);
+    if (payload.catalogSource?.contractId && allContracts.some(c => c.contractId === payload.catalogSource.contractId)) setSelectedContractId(payload.catalogSource.contractId);
     setLot(String(record.lot_id || payload.lot || lot));
     if (payload.initiative) setInitiative(payload.initiative);
     if (payload.importedInterventions) setImportedInterventions(payload.importedInterventions);
@@ -1502,7 +1526,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       sourceWorkbookName,
       initiative,
       importedInterventions,
-      items: items.map((it) => ({ ...it, unit: defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }) })),
+      items: items.map((it) => ({ ...it, unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }) })),
       tow,
       discount,
       contingency,
@@ -1602,6 +1626,25 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
 
       <div style={styles.eyebrow}>Contesto di lavoro</div>
       <section aria-label="Applicativi e archivio" style={{ background: "#edf1f6", padding: 12, borderRadius: 18, border: "1px solid #dce3eb", marginBottom: 28 }}>
+      <section aria-label="Catalogo contrattuale della stima" style={{ ...styles.card, marginBottom: 16 }}>
+        <label style={styles.label}>Catalogo del contratto di sistema
+          <select aria-label="Catalogo del contratto di sistema" style={styles.input} value={selectedContractId} disabled={items.length > 0} onChange={e => {
+            setSelectedContractId(e.target.value);
+            const lots = allContracts.find(c => c.contractId === e.target.value)?.lots || [];
+            setLot(String((lots.find(l => l.codiceContratto === codiceContratto) || lots.find(l => l.active !== false))?.lotId || "1"));
+          }}>
+            {allContracts.map(c => <option key={c.contractId} value={c.contractId}>{c.name}{c.builtin ? " · predefinito" : ""}</option>)}
+          </select>
+        </label>
+        <label style={styles.label}>Lotto catalogo
+          <select aria-label="Lotto catalogo" style={styles.input} value={lot} disabled={items.length > 0} onChange={e => setLot(e.target.value)}>
+            {(allContracts.find(c => c.contractId === selectedContractId)?.lots || []).filter(l => l.active !== false).map(l => <option key={l.lotId} value={l.lotId}>{l.name || l.lotId}</option>)}
+          </select>
+        </label>
+        {isBuiltin && <p role="status">Catalogo predefinito: seleziona il contratto di sistema per applicare i suoi prezzi. Se non compare, verifica accesso e configurazione del contratto.</p>}
+        {items.length > 0 && <p>Per cambiare contratto o lotto avvia una nuova iniziativa. I prezzi Excel non vengono sostituiti automaticamente.</p>}
+      </section>
+
       {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}
       <div style={{ ...styles.card, marginTop: 0, marginBottom: 10, padding: 18 }}>
         <div
@@ -2292,6 +2335,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             })()}
           </div>
 
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} onApply={(key, unit) => updateItem(key, { unit })} />
           {importedInterventions.length > 0 && (
             <div style={styles.card}>
               <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
@@ -2322,9 +2366,13 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                               const cc = catalog.find(c => c.id === m.catalogId || c.nome === m.name);
                               const validC = cc ? validComplexities(cc, m.type) : ["Semplice", "Medio", "Complesso"];
                               const unitPrice = m.unit ?? (m.qty ? (m.total || 0) / m.qty : 0);
-                              const updMapping = (patch) => setImportedInterventions(prev => prev.map((iv, ivi) =>
-                                ivi !== xi ? iv : { ...iv, mappings: iv.mappings.map((mm, mmi) => mmi !== mi ? mm : { ...mm, ...patch }) }
-                              ));
+                              const updMapping = (patch) => {
+                                const changed = { ...m, ...patch };
+                                if (patch.type || patch.complexity) changed.unit = catalogUnitPrice({ id: m.catalogId, ...changed }, catalog);
+                                const row = items.find(it => m.sourceRowId ? it.sourceRowId === m.sourceRowId : it.detail === m);
+                                if (row) updateItem(row.key, { type: changed.type, complexity: changed.complexity, qty: changed.qty, unit: changed.unit });
+                                setImportedInterventions(prev => prev.map((iv, ivi) => ivi !== xi ? iv : { ...iv, mappings: iv.mappings.map((mm, mmi) => mmi !== mi ? mm : changed) }));
+                              };
                               const qty = m.qty ?? 1;
                               const unit = m.unit ?? unitPrice;
                               return (
@@ -2707,6 +2755,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 3: OFFERTA */}
       {step === 3 && (
         <div>
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

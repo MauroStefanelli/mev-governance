@@ -1,3 +1,4 @@
+import { catalogUnitPrice } from "./catalogReconciliation";
 // ============================================================
 // Configuratore Offerta TOW — modulo core (logica pura portata
 // dal Configuratore standalone: parsing, calcolo, suggerimenti,
@@ -237,7 +238,7 @@ export const reasonFor = (c, source) => {
   return terms.length ? `Rilevati riferimenti a ${[...new Set(terms)].slice(0, 4).join(", ")}.` : `Corrispondenza con l'ambito ${c.ambito}.`;
 };
 
-export const validComplexities = (c, type) => ["Semplice", "Medio", "Complesso"].filter((k) => (c?.prezzi?.[type]?.[k] ?? 0) > 0);
+export const validComplexities = (c, type) => ["Semplice", "Medio", "Complesso"].filter(complexity => catalogUnitPrice({ id: c?.id, type, complexity }, c ? [c] : []) != null);
 
 // ============================================================
 // ANALISI / SUGGERIMENTI (scoring r.344)
@@ -274,8 +275,7 @@ export function scoreIntervention({ intervention, detailText, catalog, applicati
 // ============================================================
 
 export function defaultPrice(it, { catalog, priceMode, builtin }) {
-  const c = catalog.find((x) => String(x.id) === String(it.id));
-  const base = c?.prezzi?.[it.type]?.[it.complexity] ?? 0;
+  const base = catalogUnitPrice(it, catalog) ?? 0;
   const histKey = `${String(it.id)}|${it.type}|${it.complexity}`;
   const hist = builtin ? APP_DATA.historical_offered_prices?.[histKey] : null;
   return priceMode === "historical" && hist != null ? hist : base;
@@ -455,18 +455,22 @@ export async function parseInitiativeWorkbook(file, catalog) {
       }
       const driverName = String(read(r, "nomedriver") || "").trim();
       const catalogId = Number(read(r, "iddicatalogo", "idcatalogo")) || 0;
-      const component = catalog.find((x) => String(x.id) === String(catalogId)) || catalog.find((x) => appNorm(x.nome) === appNorm(driverName));
-      if (!component) continue;
+      const component = catalogId ? catalog.find(x => String(x.id) === String(catalogId)) : catalog.find(x => appNorm(x.nome) === appNorm(driverName));
+      const resolvedId = component?.id ?? (catalogId || driverName || "SANS-CATALOGUE");
       const rawType = String(read(r, "tipointervento2", "tipointervento") || "MODIFICA").toUpperCase();
-      const type = rawType.includes("REALIZZ") ? "REALIZZAZIONE" : "MODIFICA";
+      const type = rawType.includes("REALIZZ") ? "REALIZZAZIONE" : rawType.includes("MODIFICA") ? "MODIFICA" : rawType;
       const rawComplexity = appNorm(read(r, "complessita"));
-      const complexity = rawComplexity === "semplice" ? "Semplice" : rawComplexity === "complesso" ? "Complesso" : "Medio";
+      const complexity = rawComplexity === "semplice" ? "Semplice" : rawComplexity === "complesso" ? "Complesso" : rawComplexity === "medio" ? "Medio" : String(read(r, "complessita") || "");
       const qty = Number(read(r, "quantita")) || 0;
-      const unit = Number(read(r, "prezzounitario")) || component.prezzi[type]?.[complexity] || 0;
-      const total = Number(read(r, "prezzototale")) || qty * unit;
-      if (!qty) continue;
+      const numberOrNull = value => value == null || String(value).trim() === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+      const originalUnit = numberOrNull(read(r, "prezzounitario"));
+      const originalTotal = numberOrNull(read(r, "prezzototale"));
+      const unit = originalUnit ?? catalogUnitPrice({ id: resolvedId, type, complexity }, catalog);
+      const total = originalTotal ?? (unit == null ? null : qty * unit);
+      const sourceRowId = `detail-${importedItems.length + 1}`;
+      const original = { catalogId, type, complexity, qty, unit: originalUnit, total: originalTotal };
       const mapping = {
-        catalogId: component.id, name: driverName || component.nome, type, complexity, qty, unit, total,
+        catalogId: resolvedId, name: driverName || component?.nome || String(resolvedId), type, complexity, qty, unit, total, sourceRowId, original,
         componentApplication: String(read(r, "componenteapplicativo") || "").trim(),
         technology: String(read(r, "tecnologia") || "").trim(),
         unitName: String(read(r, "unita") || "").trim(),
@@ -475,10 +479,10 @@ export async function parseInitiativeWorkbook(file, catalog) {
       };
       intervention.mappings.push(mapping);
       importedItems.push({
-        id: component.id, type, complexity, qty, score: 0,
+        id: resolvedId, type, complexity, qty, score: 0, sourceRowId, original,
         reason: [interventionId, mapping.componentApplication, mapping.detailDescription].filter(Boolean).join(" — "),
         interventionId, interventionTitle: intervention.titolo,
-        key: Date.now() + importedItems.length, unit, imported: true, detail: mapping,
+        key: sourceRowId, unit, imported: true, detail: mapping,
       });
     }
   }
