@@ -2,6 +2,8 @@ import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
 import InitiativeHeading from "../configuratore/InitiativeHeading";
+import { resolveTowPrices } from "../configuratore/towPriceResolution";
+import { getConsumoTow } from "../services/mevService";
 import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
@@ -55,6 +57,13 @@ const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
 export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
   const [contracts, setContracts] = useState([]);
+  const [operationalTowRows, setOperationalTowRows] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    setOperationalTowRows([]);
+    getConsumoTow().then(rows => { if (alive) setOperationalTowRows(rows); }).catch(() => {});
+    return () => { alive = false; };
+  }, [ambienteId]);
   const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
   const catalogSelectionInitialized = useRef(false);
   const [lot, setLot] = useState("1");
@@ -320,7 +329,13 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   }, [activeContract, builtinContract, lot]);
 
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
-  const towPricesMap = useMemo(() => activeLot?.towPrices || {}, [activeLot]);
+  const towPriceResolution = useMemo(() => {
+    try {
+      const linkedToEnvironment = activeLot?.codiceContratto && String(activeLot.codiceContratto) === String(codiceContratto);
+      return { prices: resolveTowPrices(activeLot?.towPrices || {}, linkedToEnvironment ? operationalTowRows : [], initiative.contractType || ''), error: '' };
+    } catch (e) { return { prices: {}, error: e.message }; }
+  }, [activeLot, operationalTowRows, initiative.contractType, codiceContratto]);
+  const towPricesMap = towPriceResolution.prices;
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
   // isBuiltin: sincrono, non dipende da activeContract (che può essere null durante il caricamento)
   const isBuiltin = selectedContractId === "poste-tet-2025" || !!(activeContract?.builtin);
@@ -3050,7 +3065,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       )}
 
       {/* STEP 4: REVISIONE */}
-      {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} />}
+      {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} priceError={towPriceResolution.error} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />

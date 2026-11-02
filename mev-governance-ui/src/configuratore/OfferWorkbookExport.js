@@ -32,7 +32,7 @@ export function offerTowQuantities(details, id, { lot, prices, percentages, mult
   return quantities;
 }
 
-export default function OfferWorkbookExport({ initiative, items, interventions, catalog, lot, prices, discount, contingency, percentages, multiplier, tow }) {
+export default function OfferWorkbookExport({ initiative, items, interventions, catalog, lot, prices, priceError, discount, contingency, percentages, multiplier, tow }) {
   const [template, setTemplate] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,6 +41,7 @@ export default function OfferWorkbookExport({ initiative, items, interventions, 
   const generate = async () => {
     setError(''); setBusy(true);
     try {
+      if (priceError) throw new Error(priceError);
       if (discount || contingency) throw new Error('Il template non contiene campi sconto/contingency: azzerali o concorda un modello che li rappresenti prima di esportare.');
       if (Number(tow?.[`TOW0${lot}.6`] || 0)) throw new Error('Il modello contiene solo TOW .1–.5 e non può rappresentare la TOW .6 valorizzata.');
       const details = offerWorkbookDetails(items, catalog);
@@ -59,6 +60,9 @@ export default function OfferWorkbookExport({ initiative, items, interventions, 
     <label>Modello Excel originale<input type="file" accept=".xlsx" onChange={e => setTemplate(e.target.files?.[0] || null)} /></label>
     <p>TOW .1, .3 e .4 sono calcolate dal valore di catalogo di ogni intervento, con moltiplicatore e percentuali della stima contrattuale. Le quantità equivalenti derivano dall’importo diviso per il prezzo unitario. TOW .2 usa la quantità già inserita in Offerta, ripartita in proporzione al valore di catalogo.</p>
     <div>{[1, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>TOW 0{lot}.{n}: {percentages?.[n] ?? 'non configurata'}%</span>)}</div>
+    <div>{[1, 2, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>Prezzo TOW 0{lot}.{n}: {prices[`TOW0${lot}.${n}`] > 0 ? new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(prices[`TOW0${lot}.${n}`]) : 'non disponibile'}</span>)}</div>
+    {priceError && <p role="alert">{priceError}</p>}
+    {[1, 3, 4].some(n => !(prices[`TOW0${lot}.${n}`] > 0)) && <p>Le percentuali di impatto non sono prezzi unitari. Verifica il listino TOW del lotto in Archivio Contrattuale e il Tipo contratto nei dati iniziativa. Il listino dell’esempio Excel non viene utilizzato.</p>}
     {rows.map(i => <p key={i.id}><strong>{i.id}</strong> · {i.titolo}</p>)}
     {error && <p role="alert">{error}</p>}
     <button type="button" disabled={!template || !items.length || !initiative.code || busy} onClick={generate}>{busy ? 'Generazione…' : 'Genera Tabella di offerta XLSX'}</button>
