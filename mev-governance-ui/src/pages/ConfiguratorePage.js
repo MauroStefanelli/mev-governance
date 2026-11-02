@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
 import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
@@ -3052,6 +3053,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       )}
 
       {/* STEP 4: REVISIONE */}
+      {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={towPricesMap} discount={discount} contingency={contingency} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />

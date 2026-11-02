@@ -95,6 +95,15 @@ export async function workspaceDocument(code, { file, id, remove = false } = {})
   return id && !remove ? response.blob() : response.json();
 }
 
+export async function exportOfferWorkbook(template, payload) {
+  const body = new FormData(); body.append('template', template); body.append('payload', JSON.stringify(payload));
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/offer-workbook`, {
+    method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` }, body,
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Esportazione Excel non riuscita');
+  return response.blob();
+}
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
