@@ -1,4 +1,5 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
+import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
 import { catalogUnitPrice } from "../configuratore/catalogReconciliation";
@@ -65,6 +66,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [initiative, setInitiative] = useState({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
   const [importedInterventions, setImportedInterventions] = useState([]);
   const [items, setItems] = useState([]);
+  const [workspaceContext, setWorkspaceContext] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [contingency, setContingency] = useState(0);
@@ -74,7 +76,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [aiProposals, setAiProposals] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   // Auto-approve AI proposals with high confidence
-  const [autoApproveAi, setAutoApproveAi] = useState(true);
+  const [autoApproveAi, setAutoApproveAi] = useState(false);
   const aiAutoApproveThreshold = 0.85; // confidence threshold for auto-adding proposals
   const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
@@ -768,7 +770,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       applicationContext,
       // Snippet codice sorgente per verifica tecnica
       sourceCode: sourceSnippets,
-      priorEvaluations: [],
+      initiativeWorkspace: workspaceContext,
+      priorEvaluations: workspaceContext?.priorEvaluations || [],
+      evidencePolicy: 'Cita le fonti con GOTO e revisione o file/pagina/commit. Distingui fatti verificati, ipotesi e punti da confermare con Poste. Le proposte AI richiedono approvazione umana; non dichiarare eseguite query o verifiche non presenti nelle evidenze.',
     };
   };
 
@@ -1638,6 +1642,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       </div>
 
       <div style={styles.eyebrow}>Contesto di lavoro</div>
+      <InitiativeWorkspace key={ambienteId} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
+        estimate={{ items, importedInterventions, catalogSource: { contractId: selectedContractId, lot }, discount, contingency, tow, towPercentages }} />
       <section aria-label="Applicativi e archivio" style={{ background: "#edf1f6", padding: 12, borderRadius: 18, border: "1px solid #dce3eb", marginBottom: 28 }}>
       <section aria-label="Catalogo contrattuale della stima" style={{ ...styles.card, marginBottom: 16 }}>
         <label style={styles.label}>Catalogo del contratto di sistema
@@ -1655,7 +1661,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </select>
         </label>
         {isBuiltin && <p role="status">Poste TeT è un catalogo incluso nell’app, distinto dai contratti dell’Archivio Contrattuale. Seleziona il contratto di sistema per applicare i suoi prezzi.</p>}
-        {items.length > 0 && <p>Per cambiare contratto o lotto avvia una nuova iniziativa. I prezzi Excel non vengono sostituiti automaticamente.</p>}
+        {items.length > 0 && <p role="status">Selezione contratto e lotto bloccata: questa stima contiene già delle voci. Per scegliere un altro catalogo avvia una nuova iniziativa. I prezzi Excel non vengono sostituiti automaticamente.</p>}
       </section>
 
       {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}

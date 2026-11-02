@@ -22,7 +22,7 @@ public class ConfiguratoreAiController : ControllerBase
 
     private bool CanAccess()
     {
-        return User.IsInRole("SuperAdmin") || User.IsInRole("Developer");
+        return User.IsInRole("SuperAdmin") || User.IsInRole("Developer") || User.IsInRole("Admin");
     }
 
     // Legge le impostazioni AI personali dell'utente corrente

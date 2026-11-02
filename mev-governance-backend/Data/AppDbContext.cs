@@ -31,6 +31,7 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<AppRolePermission> AppRolePermissions => Set<AppRolePermission>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<InitiativeRevision> InitiativeRevisions => Set<InitiativeRevision>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -560,6 +560,20 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AiKeyEnabled ERROR] {ex.Message}"); }
 
+        // Immutable initiative revisions, scoped to the configured database schema.
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""InitiativeRevisions"" (
+                ""Id"" BIGSERIAL PRIMARY KEY,
+                ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" VARCHAR(120) NOT NULL,
+                ""Version"" INTEGER NOT NULL,
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                ""Author"" TEXT NOT NULL,
+                ""Reason"" TEXT NOT NULL,
+                ""Payload"" TEXT NOT NULL,
+                UNIQUE (""AmbienteId"", ""Goto"", ""Version"")
+            );");
+
         // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
         try
         {

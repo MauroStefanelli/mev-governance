@@ -19,6 +19,8 @@ void Check(bool condition, string name) { if (!condition) throw new Exception(na
 var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Jwt:Key"] = new string('x', 64), ["Jwt:Issuer"] = "test", ["Jwt:Audience"] = "test" }).Build();
 using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite("Data Source=:memory:").Options, config);
 db.Database.OpenConnection(); db.Database.EnsureCreated();
+await WorkspaceRegression.Run(db, Check);
+if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }
 var user = new AppUser { Username = "operator", Role = "Admin" };
 var super = new AppUser { Username = "super", Role = "SuperAdmin" };
 var bid = new AppUser { Username = "bid", Role = "Bid Manager" };

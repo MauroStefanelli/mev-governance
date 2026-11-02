@@ -79,7 +79,7 @@ public class ConfiguratoreController : ControllerBase
     [HttpGet("contracts")]
     public async Task<IActionResult> GetContracts()
     {
-        if (!CanAccess()) return Forbid();
+        if (!CanAccessRecords()) return Forbid();
 
         try
         {

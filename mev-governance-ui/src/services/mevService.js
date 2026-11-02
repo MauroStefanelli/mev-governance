@@ -66,6 +66,20 @@ const fetchWithRefresh = async (url, options = {}) => {
   return res;
 };
 
+export async function workspaceRequest(path, body) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/workspaces/${path}`, {
+    method: body ? 'POST' : 'GET', headers: authHeaders(),
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || `Workspace: errore ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
