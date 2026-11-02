@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
@@ -81,6 +82,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const aiAutoApproveThreshold = 0.85; // confidence threshold for auto-adding proposals
   const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
+  const [workspaceRecords, setWorkspaceRecords] = useState([]);
+  const refreshWorkspaceArchive = useCallback(() => {
+    workspaceRequest('').then(setWorkspaceRecords).catch(() => setWorkspaceRecords([]));
+  }, []);
+  useEffect(() => { refreshWorkspaceArchive(); }, [ambienteId, refreshWorkspaceArchive]);
   const [showArchive, setShowArchive] = useState(false);
   const initiativeFieldsRef = useRef(null);
   const focusInitiative = () => requestAnimationFrame(() => {
@@ -1164,6 +1170,33 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     focusInitiative();
   };
 
+  const restoreWorkspace = (state, code) => {
+    const snapshot = state.estimate || {};
+    const source = snapshot.catalogSource;
+    if (source && !allContracts.some(c => c.contractId === source.contractId && c.lots.some(l => String(l.lotId) === String(source.lot) && l.active !== false))) {
+      setError('Il catalogo della revisione non è disponibile. Il lavoro corrente è stato conservato.');
+      return false;
+    }
+    if (source) { setSelectedContractId(source.contractId); setLot(String(source.lot)); }
+    setInitiative({ ...(snapshot.initiative || {}), code, title: state.title || '', system: state.system || '' });
+    setItems(snapshot.items || []);
+    setImportedInterventions(snapshot.importedInterventions || []);
+    setSuggestions(snapshot.suggestions || []);
+    setDiscount(snapshot.discount ?? 0); setContingency(snapshot.contingency ?? 0);
+    setTow(snapshot.tow || {}); setTowPercentages(snapshot.towPercentages || {});
+    setEconomyNotes(snapshot.economicNotes || ''); setSourceWorkbookName(snapshot.sourceWorkbookName || '');
+    setAiProposals(snapshot.aiProposals || null);
+    setSelectedAppIds(snapshot.selectedAppIds || []); setSelectedAppId(snapshot.selectedAppIds?.[0] || '');
+    setTechProfile(null);
+    return true;
+  };
+
+  const openWorkspace = revision => {
+    if ((initiative.code || items.length) && !window.confirm('Aprire questa iniziativa? Le modifiche locali non salvate saranno sostituite.')) return;
+    if (restoreWorkspace(JSON.parse(revision.payload), revision.goto) === false) return;
+    setEditingRecordKey(null); setShowArchive(false); setStep(1); focusInitiative();
+  };
+
   // ── Applicativi (port da addApplicationV39/saveApplication/delete r.159-160) ──
 
   // Salva applicativi sia in localStorage (offline) sia in DB (condivisione)
@@ -1903,7 +1936,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                 {showArchive ? "▾" : "▸"} Archivio iniziative
               </span>
               <span style={{ fontSize: 12, color: "#667482" }}>
-                {archiveRecords.length === 0 ? "Nessuna" : `${archiveRecords.length} iniziativ${archiveRecords.length === 1 ? "a" : "e"}`}
+                 {archiveRecords.length + workspaceRecords.length} schede salvate
               </span>
             </button>
             {editingRecordKey && (
@@ -1913,7 +1946,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={btnStyles.secondary} onClick={loadArchive}>↻ Aggiorna</button>
+            <button style={btnStyles.secondary} onClick={() => { loadArchive(); refreshWorkspaceArchive(); }}>↻ Aggiorna</button>
             <button
               style={{ ...btnStyles.primary, background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
               onClick={() => {
@@ -1930,6 +1963,14 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             </button>
           </div>
         </div>
+        {showArchive && <div className="workspace-library">
+          <h4>Analisi condivise e revisioni ({workspaceRecords.length})</h4>
+          {!workspaceRecords.length && <p>Nessuna analisi condivisa salvata in questo ambiente.</p>}
+          {workspaceRecords.map(r => <button type="button" className="workspace-library-row" key={r.id} onClick={() => openWorkspace(r)}>
+            <strong>{r.goto} · {JSON.parse(r.payload).title}</strong>
+            <span>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')}</span>
+          </button>)}
+        </div>}
         {showArchive && archiveRecords.length > 0 && (
           <div style={{ display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
             {archiveRecords.map((rec) => {
@@ -2252,7 +2293,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       )}
       <div hidden={step !== 1}>
         <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
-          estimate={{ items, importedInterventions, catalogSource: { contractId: selectedContractId, lot }, discount, contingency, tow, towPercentages }} />
+          onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
+          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot }, discount, contingency, tow, towPercentages }} />
       </div>
       {step === 1 && (
         <div>

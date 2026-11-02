@@ -33,5 +33,8 @@ public static class WorkspaceRegression
         var stored = System.Text.Json.JsonSerializer.Deserialize<WorkspaceState>(rows[0].Payload, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
         check(await Controller("Bid Manager").Save("GOTO-1", new() { ExpectedVersion = 1, Reason = "Revisione verificata", State = stored, Approve = true }) is OkObjectResult, "Bid Manager approves exact saved revision");
         check(await db.InitiativeRevisions.CountAsync(r => r.Goto == "GOTO-1") == 2, "Approval preserves original revision");
+        var archive = ((OkObjectResult)await admin.List()).Value as List<InitiativeRevision>;
+        check(archive?.Count == 1 && archive[0].Version == 2, "Archive returns only latest revision per initiative");
+        check((((OkObjectResult)await Controller("Admin", 2).List()).Value as List<InitiativeRevision>)?.Count == 0, "Archive is isolated by environment");
     }
 }

@@ -14,7 +14,7 @@ export function changedWorkspaceFields(left, right) {
 }
 const input = { display: 'block', width: '100%', boxSizing: 'border-box', padding: 8, border: '1px solid #aebdd0', borderRadius: 6, font: 'inherit' };
 
-export default function InitiativeWorkspace({ initiative, estimate, roles = [], onContextChange }) {
+export default function InitiativeWorkspace({ initiative, estimate, roles = [], onContextChange, onRestore, onSaved }) {
   const code = String(initiative.code || '').trim();
   const [revisions, setRevisions] = useState([]);
   const [draft, setDraft] = useState({});
@@ -66,6 +66,7 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
         state: approve ? parse(revisions[0]) : { ...draft, estimate },
       });
       apply([revision, ...revisions]);
+      onSaved?.();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const reload = async () => {
@@ -106,7 +107,13 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       <button type="button" onClick={exportAnalysis}>Esporta ANALISI Markdown</button>
       </div>
       <details><summary>Storico e confronto versioni ({revisions.length})</summary>
-        {revisions.map(r => <p key={r.version}>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')} · {r.reason} <button onClick={() => { setDraft(parse(r)); setBase(revisions[0].version); setDirty(true); }}>Usa come bozza</button></p>)}
+        {revisions.map(r => <p key={r.version}>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')} · {r.reason} <button disabled={busy || !canEdit} onClick={() => {
+          if (!window.confirm(`Riprendere la revisione ${r.version}? Analisi e stima correnti saranno sostituite nella bozza. Lo storico salvato rimane invariato.`)) return;
+          const state = parse(r);
+          if (onRestore && onRestore(state, code) === false) return;
+          setDraft(state); setBase(revisions[0].version); setDirty(true);
+          setReason(`Ripresa dalla revisione ${r.version}`);
+        }}>Riprendi analisi e stima · v{r.version}</button></p>)}
         <label>Versione<select value={comparison} onChange={e => setComparison(e.target.value)}><option value="">Seleziona</option>{revisions.map(r => <option key={r.version}>{r.version}</option>)}</select></label>
         <label>Confronta con<select value={against} onChange={e => setAgainst(e.target.value)}><option value="">Seleziona</option>{revisions.map(r => <option key={r.version}>{r.version}</option>)}</select></label>
         {compared && previous && changedWorkspaceFields(parse(previous), parse(compared)).map(key => <div key={key}><h4>{fields[key] || key}</h4><pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(parse(previous)[key], null, 2)} → {JSON.stringify(parse(compared)[key], null, 2)}</pre></div>)}

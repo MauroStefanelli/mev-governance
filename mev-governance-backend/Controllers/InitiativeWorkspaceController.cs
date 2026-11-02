@@ -19,6 +19,14 @@ public class InitiativeWorkspaceController : BaseController
     private bool CanApprove => User.IsInRole("Bid Manager") || User.IsInRole("SuperAdmin");
     private IQueryable<InitiativeRevision> Scope => db.InitiativeRevisions.AsNoTracking().Where(r => r.AmbienteId == GetAmbienteId());
 
+    [HttpGet]
+    public async Task<IActionResult> List()
+    {
+        if (!CanRead || GetAmbienteId() <= 0) return Forbid();
+        var latestIds = Scope.GroupBy(r => r.Goto).Select(g => g.Max(r => r.Id));
+        return Ok(await Scope.Where(r => latestIds.Contains(r.Id)).OrderByDescending(r => r.Id).ToListAsync());
+    }
+
     [HttpGet("{code}/revisions")]
     public async Task<IActionResult> Revisions(string code)
     {

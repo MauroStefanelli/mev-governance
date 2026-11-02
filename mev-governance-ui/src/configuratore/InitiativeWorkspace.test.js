@@ -32,3 +32,27 @@ test('supervisors can approve a saved version without editing the analysis', asy
 test('version comparison includes decisions and the estimate as well as analyses', () => {
   expect(changedWorkspaceFields({ toBe: 'a', decisions: [], estimate: { total: 1 } }, { toBe: 'b', decisions: [{ text: 'API' }], estimate: { total: 2 } })).toEqual(['toBe', 'decisions', 'estimate']);
 });
+
+test('restores analysis and estimate explicitly without changing saved history', async () => {
+  const snapshot = { title: 'Pilota', decisions: [], estimate: { items: [{ id: 239, qty: 2 }], catalogSource: { contractId: 'accordo', lot: '2' } } };
+  workspaceRequest.mockResolvedValue([{ ...revision, payload: JSON.stringify(snapshot) }]);
+  const restore = jest.fn();
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<InitiativeWorkspace initiative={{ code: '145480' }} roles={['Admin']} onContextChange={() => {}} onRestore={restore} />);
+  fireEvent.click(await screen.findByText('Riprendi analisi e stima · v1'));
+  expect(restore).toHaveBeenCalledWith(snapshot, '145480');
+  expect(screen.getByLabelText('Modifiche e motivazione della revisione')).toHaveValue('Ripresa dalla revisione 1');
+  expect(workspaceRequest.mock.calls.every(([, body]) => !body)).toBe(true);
+  confirm.mockRestore();
+});
+
+test('leaves the analysis untouched when the snapshot catalog is unavailable', async () => {
+  workspaceRequest.mockResolvedValue([revision]);
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<InitiativeWorkspace initiative={{ code: '145480' }} roles={['Admin']} onContextChange={() => {}} onRestore={() => false} />);
+  await screen.findByText(/Revisione di lavoro: 1/);
+  fireEvent.change(screen.getByLabelText('Analisi TO-BE'), { target: { value: 'Bozza corrente' } });
+  fireEvent.click(screen.getByText('Riprendi analisi e stima · v1'));
+  expect(screen.getByLabelText('Analisi TO-BE')).toHaveValue('Bozza corrente');
+  confirm.mockRestore();
+});
