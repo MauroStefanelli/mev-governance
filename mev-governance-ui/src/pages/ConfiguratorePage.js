@@ -1,3 +1,4 @@
+import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
 import { catalogUnitPrice } from "../configuratore/catalogReconciliation";
@@ -50,6 +51,7 @@ const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
   const [contracts, setContracts] = useState([]);
   const [selectedContractId, setSelectedContractId] = useState("poste-tet-2025");
+  const catalogSelectionInitialized = useRef(false);
   const [lot, setLot] = useState("1");
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -279,13 +281,16 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   }, [contracts, builtinContract]);
 
   useEffect(() => {
-    if (!codiceContratto) return;
-    const matches = contracts.flatMap(c => (c.lots || []).filter(l => l.active !== false && l.codiceContratto === codiceContratto).map(l => ({ contractId: c.contractId, lotId: String(l.lotId) })));
-    if (matches.length === 1) {
-      setSelectedContractId(matches[0].contractId);
-      setLot(matches[0].lotId);
+    if (!contracts.length || catalogSelectionInitialized.current) return;
+    catalogSelectionInitialized.current = true;
+    // Defaults apply only to a new estimate, not to a restored catalog choice.
+    if (items.length || selectedContractId !== "poste-tet-2025") return;
+    const selection = initialCatalogSelection(contracts, codiceContratto);
+    if (selection) {
+      setSelectedContractId(selection.contractId);
+      setLot(selection.lotId);
     }
-  }, [contracts, codiceContratto]);
+  }, [contracts, codiceContratto, items.length, selectedContractId]);
 
   const activeLot = useMemo(() => {
     const c = activeContract || builtinContract;
@@ -1641,7 +1646,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             const lots = allContracts.find(c => c.contractId === e.target.value)?.lots || [];
             setLot(String((lots.find(l => l.codiceContratto === codiceContratto) || lots.find(l => l.active !== false))?.lotId || "1"));
           }}>
-            {allContracts.map(c => <option key={c.contractId} value={c.contractId}>{c.name}{c.builtin ? " · predefinito" : ""}</option>)}
+            {allContracts.map(c => <option key={c.contractId} value={c.contractId}>{c.name}{c.contractId === "poste-tet-2025" ? " · catalogo incluso nell’app" : ""}</option>)}
           </select>
         </label>
         <label style={styles.label}>Lotto catalogo
@@ -1649,7 +1654,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             {(allContracts.find(c => c.contractId === selectedContractId)?.lots || []).filter(l => l.active !== false).map(l => <option key={l.lotId} value={l.lotId}>{l.name || l.lotId}</option>)}
           </select>
         </label>
-        {isBuiltin && <p role="status">Catalogo predefinito: seleziona il contratto di sistema per applicare i suoi prezzi. Se non compare, verifica accesso e configurazione del contratto.</p>}
+        {isBuiltin && <p role="status">Poste TeT è un catalogo incluso nell’app, distinto dai contratti dell’Archivio Contrattuale. Seleziona il contratto di sistema per applicare i suoi prezzi.</p>}
         {items.length > 0 && <p>Per cambiare contratto o lotto avvia una nuova iniziativa. I prezzi Excel non vengono sostituiti automaticamente.</p>}
       </section>
 
