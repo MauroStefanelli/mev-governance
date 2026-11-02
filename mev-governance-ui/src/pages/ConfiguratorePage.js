@@ -58,6 +58,8 @@ const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
 export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
   const [contracts, setContracts] = useState([]);
+  const [towPriceSourceId, setTowPriceSourceId] = useState('');
+  useEffect(() => { setTowPriceSourceId(''); }, [ambienteId]);
   const [operationalTowRows, setOperationalTowRows] = useState([]);
   useEffect(() => {
     let alive = true;
@@ -329,12 +331,16 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   }, [activeContract, builtinContract, lot]);
 
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
+  const towPriceSources = useMemo(() => contracts.flatMap(contract => (contract.lots || [])
+    .filter(entry => entry.active !== false && !entry.deleted && String(entry.lotId) === String(lot))
+    .map(entry => ({ id: contract.contractId, name: contract.name, lot: entry }))), [contracts, lot]);
+  const selectedTowPriceSource = towPriceSources.find(source => source.id === towPriceSourceId);
   const towPriceResolution = useMemo(() => {
     try {
       const linkedToEnvironment = activeLot?.codiceContratto && String(activeLot.codiceContratto) === String(codiceContratto);
-      return { prices: resolveTowPrices(activeLot?.towPrices || {}, linkedToEnvironment ? operationalTowRows : [], initiative.contractType || ''), error: '' };
+      return { prices: resolveTowPrices(selectedTowPriceSource?.lot.towPrices || activeLot?.towPrices || {}, linkedToEnvironment && !selectedTowPriceSource ? operationalTowRows : [], initiative.contractType || ''), error: '' };
     } catch (e) { return { prices: {}, error: e.message }; }
-  }, [activeLot, operationalTowRows, initiative.contractType, codiceContratto]);
+  }, [activeLot, operationalTowRows, initiative.contractType, codiceContratto, selectedTowPriceSource]);
   const towPricesMap = towPriceResolution.prices;
   const tow5Share = useMemo(() => Number(activeLot?.tow5Share ?? 65), [activeLot]);
   // isBuiltin: sincrono, non dipende da activeContract (che può essere null durante il caricamento)
@@ -497,7 +503,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         lot,
         priceMode,
         sourceWorkbookName,
-        catalogSource: { contractId: selectedContractId, lot },
+        catalogSource: { contractId: selectedContractId, lot, towPriceSourceId },
         initiative,
         importedInterventions,
         items,
@@ -1162,6 +1168,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     // Il contract_id del record è solo per identificare l'iniziativa nel DB — già gestito da
     // initiativeContractId (calcolato da codiceContratto/ambienteId) e da editingRecordKey.
     if (payload.catalogSource?.contractId && allContracts.some(c => c.contractId === payload.catalogSource.contractId)) setSelectedContractId(payload.catalogSource.contractId);
+    setTowPriceSourceId(payload.catalogSource?.towPriceSourceId || '');
     setLot(String(record.lot_id || payload.lot || lot));
     if (payload.initiative) setInitiative(payload.initiative);
     if (payload.importedInterventions) setImportedInterventions(payload.importedInterventions);
@@ -1199,6 +1206,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       return false;
     }
     if (source) { setSelectedContractId(source.contractId); setLot(String(source.lot)); }
+    setTowPriceSourceId(source?.towPriceSourceId || '');
     setInitiative({ ...(snapshot.initiative || {}), code, title: state.title || '', system: state.system || '' });
     setItems(snapshot.items || []);
     setImportedInterventions(snapshot.importedInterventions || []);
@@ -2055,6 +2063,15 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       )}
 
       <main className="tow-main" style={{ minWidth: 0 }}>
+      {(step === 3 || step === 4) && <section className="initiative-workspace" aria-label="Listino TOW per la stima">
+        <h3>Listino TOW per la stima</h3>
+        <p>Catalogo selezionato: <strong>{activeContract?.name || builtinContract.name}</strong> · Lotto {lot}. Se il listino è sul contratto di sistema dell’Archivio, selezionalo esplicitamente qui.</p>
+        <label>Contratto di origine dei prezzi TOW<select style={styles.input} value={selectedTowPriceSource?.id || ''} onChange={e => setTowPriceSourceId(e.target.value)}>
+          <option value="">Usa il listino del catalogo selezionato</option>
+          {towPriceSources.map(source => <option key={source.id} value={source.id}>{source.name} · Lotto {lot} · {Object.keys(source.lot.towPrices || {}).length} prezzi</option>)}
+        </select></label>
+        {selectedTowPriceSource && <p>Fonte prezzi: {selectedTowPriceSource.name} · Lotto {lot}</p>}
+      </section>}
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
         <p style={styles.hint}>{[
@@ -2307,7 +2324,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       <div hidden={step !== 1}>
         <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
           onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
-          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot }, discount, contingency, tow, towPercentages }} />
+          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
       </div>
       {step === 1 && (
         <div>
