@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
 import { catalogUnitPrice } from "../configuratore/catalogReconciliation";
@@ -81,6 +82,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [analyzeBusy, setAnalyzeBusy] = useState(false);
   const [archiveRecords, setArchiveRecords] = useState([]);
   const [showArchive, setShowArchive] = useState(false);
+  const initiativeFieldsRef = useRef(null);
+  const focusInitiative = () => requestAnimationFrame(() => {
+    initiativeFieldsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    initiativeFieldsRef.current?.querySelector('input')?.focus({ preventScroll: true });
+  });
   const [showDescModal, setShowDescModal] = useState(false);
   const [releaseList, setReleaseList] = useState([]);
   const [towImpattoDb, setTowImpattoDb] = useState({});
@@ -1154,7 +1160,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setEditingRecordKey(record.record_key || null);
     setStep(1);
     toast(`Valutazione "${record.title}" riaperta — modifica e premi "Salva valutazione" per aggiornarla`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setShowArchive(false);
+    focusInitiative();
   };
 
   // ── Applicativi (port da addApplicationV39/saveApplication/delete r.159-160) ──
@@ -1626,7 +1633,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
   };
 
   return (
-    <div style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
+    <div className="tow-workbench" style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 28, paddingBottom: 24, borderBottom: "1px solid #dce3eb" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "clamp(22px, 3vw, 30px)", letterSpacing: "-0.7px", fontWeight: 750 }}>Configuratore Offerta TOW</h2>
@@ -1641,10 +1648,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         </button>
       </div>
 
-      <div style={styles.eyebrow}>Contesto di lavoro</div>
-      <InitiativeWorkspace key={ambienteId} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
-        estimate={{ items, importedInterventions, catalogSource: { contractId: selectedContractId, lot }, discount, contingency, tow, towPercentages }} />
-      <section aria-label="Applicativi e archivio" style={{ background: "#edf1f6", padding: 12, borderRadius: 18, border: "1px solid #dce3eb", marginBottom: 28 }}>
+      <details className="tow-resources">
+      <summary>Risorse e configurazione <span>Catalogo contrattuale · applicativi · tecnologie</span></summary>
       <section aria-label="Catalogo contrattuale della stima" style={{ ...styles.card, marginBottom: 16 }}>
         <label style={styles.label}>Catalogo del contratto di sistema
           <select aria-label="Catalogo del contratto di sistema" style={styles.input} value={selectedContractId} disabled={items.length > 0} onChange={e => {
@@ -1885,8 +1890,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         )}
        </div>
 
+      </details>
       {/* ── Valutazioni salvate + Nuova Iniziativa ── */}
-      <div style={{ ...styles.card, marginBottom: 0, padding: "16px 18px" }}>
+      <div className="tow-initiative-library" style={{ ...styles.card, marginBottom: 0, padding: "16px 18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
@@ -1917,7 +1923,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                 resetInitiative();
                 setEditingRecordKey(null);
                 setStep(1);
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                 setShowArchive(false);
+                 focusInitiative();
               }}>
               + Nuova Iniziativa
             </button>
@@ -1930,7 +1937,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
               const ini = payload.initiative || {};
               const isCurrentlyEditing = editingRecordKey && editingRecordKey === rec.record_key;
               return (
-                <div key={rec.Id || rec.id} style={{
+                 <div key={rec.Id || rec.id} className="tow-archive-row" tabIndex={0} role="button"
+                   aria-label={`Seleziona iniziativa ${ini.code || ""} ${ini.title || rec.title || "Senza titolo"}`}
+                   aria-pressed={!!isCurrentlyEditing}
+                   onClick={() => reworkInitiative(rec)}
+                   onKeyDown={e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); reworkInitiative(rec); } }} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "12px 14px", borderRadius: 10, gap: 10, flexWrap: "wrap",
                   background: isCurrentlyEditing ? "#fff8e1" : "#f8f9fa",
@@ -1950,10 +1961,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button style={{ ...btnStyles.secondary, fontSize: 12, padding: "5px 12px" }} onClick={() => reworkInitiative(rec)}>
-                      {isCurrentlyEditing ? "Già aperta" : "Apri"}
-                    </button>
-                    <button style={{ ...btnStyles.danger, fontSize: 12, padding: "10px 12px" }} onClick={() => deleteArchiveRecord(rec.Id || rec.id)}>✕</button>
+                     {isCurrentlyEditing && <span className="tow-active-tag">Iniziativa attiva</span>}
+                     <button aria-label={`Elimina iniziativa ${ini.code || ini.title || rec.title}`} style={{ ...btnStyles.danger, fontSize: 12, padding: "10px 12px" }} onClick={e => { e.stopPropagation(); deleteArchiveRecord(rec.Id || rec.id); }}>✕</button>
                   </div>
                 </div>
               );
@@ -1962,8 +1971,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         )}
       </div>
 
-       </section>
-       <div style={styles.eyebrow}>Preparazione offerta</div>
        {/* Stepper */}
        <nav aria-label="Fasi di configurazione offerta" style={{ display: "flex", gap: 8, margin: "12px 0 20px", flexWrap: "wrap", alignItems: "stretch", padding: 12, background: "#fff", border: "1px solid #dce3eb", borderRadius: 14 }}>
          {STEPS.map((s, i) => {
@@ -1993,7 +2000,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         </p>
       )}
 
-      <main style={{ minWidth: 0 }}>
+      <main className="tow-main" style={{ minWidth: 0 }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
         <p style={styles.hint}>{[
@@ -2070,10 +2077,10 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                 Carica il workbook dell&apos;iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).
             </p>
           </div>
-          <div style={{ ...styles.card, marginTop: 12 }}>
+          <div ref={initiativeFieldsRef} style={{ ...styles.card, marginTop: 12, scrollMarginTop: 20 }}>
             <h3 style={{ margin: "0 0 12px" }}>Dati iniziativa</h3>
             <div style={styles.grid2}>
-              <label style={styles.label}>Codice
+              <label style={styles.label}>Codice GOTO
                 <input style={styles.input} value={initiative.code} onChange={(e) => setInitiative((i) => ({ ...i, code: e.target.value }))} />
               </label>
               <label style={styles.label}>Titolo
@@ -2241,6 +2248,14 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             </div>
           </div>
 
+        </div>
+      )}
+      <div hidden={step !== 1}>
+        <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
+          estimate={{ items, importedInterventions, catalogSource: { contractId: selectedContractId, lot }, discount, contingency, tow, towPercentages }} />
+      </div>
+      {step === 1 && (
+        <div>
           {/* ── Codice sorgente: una riga per app selezionata ── */}
           <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#102a47", marginBottom: selectedAppIds.length > 0 ? 10 : 0 }}>⌘ Codice sorgente</div>

@@ -82,15 +82,15 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
   };
   const compared = revisions.find(r => String(r.version) === comparison);
   const previous = revisions.find(r => String(r.version) === against);
-  return <section aria-label="Workspace collaborativo iniziativa" style={{ background: '#fff', padding: 18, borderRadius: 12, border: '1px solid #bccde0', marginBottom: 20 }}>
-    <h3>Workspace collaborativo · {code || 'Inserisci il GOTO'}</h3>
-    {!code ? <p>Compila il codice dell’iniziativa per aprire analisi, memoria e revisioni condivise.</p> : <>
+  return <section className="initiative-workspace" aria-label="Workspace collaborativo iniziativa">
+    <header className="workspace-heading"><div><span className="workspace-eyebrow">Analisi condivisa</span><h3>{code ? `Iniziativa ${code}` : 'Dall’iniziativa alla soluzione'}</h3></div><span className="workspace-version">{base ? `Revisione ${base}` : 'Nuova analisi'}</span></header>
+    {!code ? <p>Inserisci il Codice GOTO nei dati iniziativa qui sopra: analisi, decisioni e storico saranno collegati automaticamente.</p> : <>
       <p>Revisione di lavoro: {base || 'nuova'} · {dirty ? 'Modifiche locali non salvate' : draft.status || 'In analisi'}</p>
       {error && <p role="alert">{error} Il contenuto locale è conservato.</p>}
       <button type="button" disabled={busy} onClick={reload}>Aggiorna storico senza perdere la bozza</button>
-      <details><summary>Analisi, fonti e decisioni</summary>
+      <details open><summary>Analisi, fonti e decisioni</summary>
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
-          {Object.entries(fields).map(([key, label]) => <label key={key} style={{ display: 'block', marginTop: 12 }}>{label}<textarea style={input} rows={['title', 'system', 'family', 'pmPoste'].includes(key) ? 1 : 3} value={draft[key] || ''} onChange={e => edit(key, e.target.value)} /></label>)}
+          <div className="workspace-fields">{Object.entries(fields).map(([key, label]) => <label key={key} className={['title', 'system', 'family', 'pmPoste'].includes(key) ? 'workspace-short-field' : ''}>{label}<textarea style={input} rows={['title', 'system', 'family', 'pmPoste'].includes(key) ? 1 : 3} value={draft[key] || ''} onChange={e => edit(key, e.target.value)} /></label>)}</div>
           <h4>Decisioni (approvazione esplicita)</h4>
           {(draft.decisions || []).map((d, i) => <div key={d.id} style={{ padding: 10, border: '1px solid #dce3eb', marginBottom: 8 }}>
             <label>Decisione<textarea style={input} disabled={!!d.approvedAt} value={d.text} onChange={e => edit('decisions', draft.decisions.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} /></label>
@@ -100,10 +100,11 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
           <button type="button" onClick={() => edit('decisions', [...(draft.decisions || []), { id: crypto.randomUUID(), text: '', source: '' }])}>Aggiungi decisione</button>
         </fieldset>
       </details>
-      <label style={{ display: 'block', margin: '12px 0' }}>Modifiche e motivazione della revisione<input style={input} value={reason} onChange={e => setReason(e.target.value)} /></label>
+      <div className="workspace-save-bar"><label style={{ display: 'block', margin: '12px 0' }}>Modifiche e motivazione della revisione<input style={input} placeholder="Es. Integrati gli impatti sulle API" value={reason} onChange={e => setReason(e.target.value)} /></label>
       {canEdit && <button disabled={!loaded || busy || !reason.trim()} onClick={() => save(false)}>Salva nuova revisione con stima corrente</button>}
       {canApprove && <button disabled={busy || dirty || !base || !reason.trim()} onClick={() => save(true)}>Approva revisione {base}</button>}
       <button type="button" onClick={exportAnalysis}>Esporta ANALISI Markdown</button>
+      </div>
       <details><summary>Storico e confronto versioni ({revisions.length})</summary>
         {revisions.map(r => <p key={r.version}>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')} · {r.reason} <button onClick={() => { setDraft(parse(r)); setBase(revisions[0].version); setDirty(true); }}>Usa come bozza</button></p>)}
         <label>Versione<select value={comparison} onChange={e => setComparison(e.target.value)}><option value="">Seleziona</option>{revisions.map(r => <option key={r.version}>{r.version}</option>)}</select></label>
