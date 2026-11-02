@@ -33,6 +33,7 @@ public class AppDbContext : DbContext
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<InitiativeRevision> InitiativeRevisions => Set<InitiativeRevision>();
     public DbSet<InitiativeDocument> InitiativeDocuments => Set<InitiativeDocument>();
+    public DbSet<InitiativeConversation> InitiativeConversations => Set<InitiativeConversation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

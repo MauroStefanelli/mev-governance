@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { workspaceRequest } from '../services/mevService';
 import InitiativeDocuments from './InitiativeDocuments';
+import InitiativeConversation from './InitiativeConversation';
 
 const fields = {
   title: 'Titolo', system: 'Sistema', family: 'Famiglia applicativa', pmPoste: 'PM Poste',
@@ -90,7 +91,7 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       <p>Revisione di lavoro: {base || 'nuova'} · {dirty ? 'Modifiche locali non salvate' : draft.status || 'In analisi'}</p>
       {error && <p role="alert">{error} Il contenuto locale è conservato.</p>}
       <button type="button" disabled={busy} onClick={reload}>Aggiorna storico senza perdere la bozza</button>
-      <InitiativeDocuments key={code} code={code} canEdit={canEdit} evidence={draft.documentEvidence || []} onUseExtract={(document, extraction) => {
+      <InitiativeDocuments key={`documents:${code}`} code={code} canEdit={canEdit} evidence={draft.documentEvidence || []} onUseExtract={(document, extraction) => {
         const other = (draft.documentEvidence || []).filter(item => item.documentId !== document.id);
         const selected = extraction ? extraction.passages.map(p => ({ documentId: document.id, fileName: document.fileName, sha256: document.sha256, location: p.location, text: p.text })) : [];
         if ([...other, ...selected].reduce((n, p) => n + p.text.length, 0) > 48000) { setError('Il contesto documentale supera 48.000 caratteri. Rimuovi un estratto prima di aggiungerne altri.'); return; }
@@ -115,6 +116,9 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       {canApprove && <button disabled={busy || dirty || !base || !reason.trim()} onClick={() => save(true)}>Approva revisione {base}</button>}
       <button type="button" onClick={exportAnalysis}>Esporta ANALISI Markdown</button>
       </div>
+      <InitiativeConversation key={`conversation:${code}`} code={code} version={base} dirty={dirty} canEdit={canEdit} onDecision={proposal => {
+        edit('decisions', [...(draft.decisions || []), { id: crypto.randomUUID(), text: proposal.text, source: proposal.source }]);
+      }} />
       <details><summary>Storico e confronto versioni ({revisions.length})</summary>
         {revisions.map(r => <p key={r.version}>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')} · {r.reason} <button disabled={busy || !canEdit} onClick={() => {
           if (!window.confirm(`Riprendere la revisione ${r.version}? Analisi e stima correnti saranno sostituite nella bozza. Lo storico salvato rimane invariato.`)) return;

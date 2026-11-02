@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import InitiativeWorkspace, { changedWorkspaceFields } from './InitiativeWorkspace';
 import { workspaceRequest, workspaceDocument } from '../services/mevService';
 jest.mock('../services/mevService', () => ({ workspaceRequest: jest.fn(), workspaceDocument: jest.fn(() => Promise.resolve([])) }));
+jest.mock('./InitiativeConversation', () => () => null);
 const revision = { id: 1, version: 1, author: 'analista', createdAt: '2026-11-02T12:00:00Z', reason: 'Prima analisi', payload: JSON.stringify({ title: 'Pilota', system: 'NPSO', decisions: [] }) };
 beforeEach(() => { workspaceRequest.mockReset(); workspaceDocument.mockResolvedValue([]); });
 test('a concurrent save retains the local analysis and the original expected version', async () => {

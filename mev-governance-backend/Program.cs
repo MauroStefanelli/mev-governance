@@ -560,6 +560,17 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AiKeyEnabled ERROR] {ex.Message}"); }
 
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""InitiativeConversations"" (
+                ""Id"" UUID PRIMARY KEY, ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" TEXT NOT NULL, ""Revision"" INTEGER NOT NULL,
+                ""Author"" TEXT NOT NULL, ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                ""Question"" TEXT NOT NULL, ""Answer"" TEXT NOT NULL,
+                ""Model"" TEXT NOT NULL, ""Context"" TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_InitiativeConversations_AmbienteId_Goto""
+                ON ""{sch}"".""InitiativeConversations"" (""AmbienteId"", ""Goto"");");
+
         // Documents live in PostgreSQL, not on Render's ephemeral container disk.
         db.Database.ExecuteSqlRaw($@"
             CREATE TABLE IF NOT EXISTS ""{sch}"".""InitiativeDocuments"" (

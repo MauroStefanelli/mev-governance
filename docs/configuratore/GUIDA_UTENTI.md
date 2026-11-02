@@ -50,4 +50,10 @@ Un nuovo lavoro dopo l'approvazione crea una revisione “In analisi”: non alt
 
 Il catalogo contrattuale valorizza le righe economiche. I valori Excel originali restano distinti per il confronto. L'esportazione ANALISI Markdown conserva analisi e decisioni; importazione ed esportazioni economiche già presenti restano parte del flusso.
 
-Restano da completare conversazioni AI persistenti, ricerca semantica, connettori Git in sola lettura, compilazione HLD validata sul template autorevole e accessi VPN. Non considerare queste capacità già disponibili. L'obiettivo finale è collegare requisito → evidenza → decisione → intervento → stima → documento finale, mantenendo persone e revisioni responsabili di ogni passaggio.
+Restano da completare ricerca semantica, connettori Git in sola lettura, compilazione HLD validata sul template autorevole e accessi VPN. Non considerare queste capacità già disponibili. L'obiettivo finale è collegare requisito → evidenza → decisione → intervento → stima → documento finale, mantenendo persone e revisioni responsabili di ogni passaggio.
+
+## 8. Confronto AI condiviso
+
+Prima di porre una domanda salvare la revisione corrente. In “Confronto AI condiviso” scrivere la domanda e usare “Invia e salva lo scambio”. Il server legge l'ultima revisione salvata e gli ultimi sei scambi della stessa iniziativa; non usa automaticamente i documenti non selezionati. Le risposte conservano autore della domanda, data, modello e revisione di riferimento. La cronologia completa è consultabile da tutti gli utenti autorizzati; “Consulta contesto usato” mostra lo snapshot effettivamente inviato.
+
+Una risposta può essere trasferita nelle decisioni da valutare: questo crea una bozza, non un'approvazione. Verificare il testo e le fonti, poi approvare esplicitamente e salvare una nuova revisione. La conversazione usa la configurazione AI personale dell'utente che invia la domanda. Il Bid Manager può consultarla ma non inviare richieste di analisi. In caso di errore la domanda resta nel campo per consentire un nuovo tentativo. Le risposte generate non sono fatti verificati e le fonti citate devono essere controllate.

@@ -89,5 +89,15 @@ public static class WorkspaceRegression
         check(await db.InitiativeDocuments.CountAsync(d => d.Goto == "GOTO-1") == 2, "Removal preserves originals for historical evidence");
         check((await admin.DownloadDocument("GOTO-1", document.Id) as FileContentResult)?.FileContents.SequenceEqual(bytes) == true, "Historical original remains retrievable by reference");
         check(await admin.ExtractDocument("GOTO-1", document.Id) is NotFoundResult, "Removed originals cannot generate new extracts");
+        InitiativeConversationController Conversation(string role, int environment = 1) => new(db, null!) { ControllerContext = Controller(role, environment).ControllerContext };
+        db.InitiativeConversations.Add(new InitiativeConversation { AmbienteId = 1, Goto = "GOTO-1", Revision = 2, Author = "analista", CreatedAt = DateTime.UtcNow, Question = "Impatto?", Answer = "{\"proposta\":\"API\"}", Context = "{\"source\":\"workspace:GOTO-1:v2\"}" });
+        await db.SaveChangesAsync();
+        var conversations = ((OkObjectResult)await Conversation("Bid Manager").History("GOTO-1")).Value as List<InitiativeConversation>;
+        check(conversations?.Count == 1, "Supervisor can reopen shared AI conversation");
+        check((((OkObjectResult)await Conversation("Admin", 2).History("GOTO-1")).Value as List<InitiativeConversation>)?.Count == 0, "AI conversation isolated by environment");
+        check(await Conversation("Admin", 2).Context("GOTO-1", conversations![0].Id) is NotFoundResult, "AI context isolated by environment");
+        check(await Conversation("Admin").Context("OTHER", conversations[0].Id) is NotFoundResult, "AI context isolated by initiative");
+        check(await Conversation("Bid Manager").Ask("GOTO-1", new("Impatto?", 2)) is ForbidResult, "Supervisor cannot send analyst AI requests");
+        check(await Conversation("Admin").Ask("GOTO-1", new("Impatto?", 1)) is ConflictObjectResult, "Stale AI requests blocked before invoking provider");
     }
 }
