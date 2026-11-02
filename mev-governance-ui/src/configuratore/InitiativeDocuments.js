@@ -8,11 +8,14 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseE
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [extractions, setExtractions] = useState({});
+  const [selected, setSelected] = useState({});
+  const [search, setSearch] = useState({});
   const extract = async (document, generate) => {
     setBusy(true); setError('');
     try {
       const result = await workspaceRequest(`${encodeURIComponent(code)}/documents/${document.id}/extraction`, generate ? {} : undefined);
       setExtractions(previous => ({ ...previous, [document.id]: result }));
+      setSelected(previous => ({ ...previous, [document.id]: result.passages.map((p, index) => evidence.some(e => e.documentId === document.id && e.location === p.location && e.text === p.text) ? index : null).filter(index => index !== null) }));
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   useEffect(() => {
@@ -43,6 +46,7 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseE
   return <details className="workspace-documents" open>
     <summary>Documentazione ricevuta · {documents.length} allegati</summary>
     <p>Originali condivisi per questa iniziativa. Ogni caricamento conserva un file distinto, con autore, data e impronta SHA-256.</p>
+    <p>Contesto documentale AI: {evidence.reduce((sum, p) => sum + p.text.length, 0).toLocaleString('it-IT')} / 48.000 caratteri. Solo le sezioni aggiunte esplicitamente saranno inviate all’AI.</p>
     {canEdit && <label className="workspace-upload">{busy ? 'Caricamento in corso…' : 'Carica documento (massimo 10 MB)'}<input aria-label="Carica documento iniziativa" type="file" disabled={busy} onChange={upload} /></label>}
     {error && <p role="alert">{error}</p>}
     {!documents.length && !error && <p>Nessun documento caricato.</p>}
@@ -56,10 +60,18 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseE
       {canEdit && <button type="button" disabled={busy} onClick={() => extract(document, true)}>Estrai testo</button>}</div>
       {extractions[document.id] && <div>
         <p role="status">{extractions[document.id].message}</p>
+        {extractions[document.id].extractorVersion !== '2' && canEdit && <p>Estratto precedente: premi “Estrai testo” per leggere fino a 500.000 caratteri senza ricaricare il file.</p>}
+        <label>Cerca nel documento<input value={search[document.id] || ''} onChange={e => setSearch(previous => ({ ...previous, [document.id]: e.target.value }))} /></label>
         <details><summary>Anteprima del testo · {extractions[document.id].passages.length} riferimenti</summary>
-          {extractions[document.id].passages.map((passage, index) => <div key={index}><strong>{passage.location}</strong><pre style={{ whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>{passage.text}</pre></div>)}
+          <div style={{ maxHeight: 480, overflow: 'auto' }}>{extractions[document.id].passages.map((passage, index) =>
+            (!search[document.id] || `${passage.location} ${passage.text}`.toLowerCase().includes(search[document.id].toLowerCase())) && <div key={index}>
+            <label><input type="checkbox" disabled={!canEdit} aria-label={`Includi ${passage.location}`} checked={(selected[document.id] || []).includes(index)} onChange={e => setSelected(previous => ({ ...previous, [document.id]: e.target.checked ? [...(previous[document.id] || []), index] : (previous[document.id] || []).filter(i => i !== index) }))} />{passage.location} · {passage.text.length} caratteri</label>
+            <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>{passage.text}</pre></div>)}</div>
         </details>
-        {canEdit && extractions[document.id].passages.length > 0 && <button type="button" onClick={() => onUseExtract?.(document, extractions[document.id])}>Usa estratto nel contesto AI</button>}
+        {canEdit && extractions[document.id].passages.length > 0 && <>
+          <button type="button" onClick={() => onUseExtract?.(document, { ...extractions[document.id], passages: extractions[document.id].passages.filter((_, index) => (selected[document.id] || []).includes(index)) })}>Usa sezioni selezionate ({(selected[document.id] || []).length}) nel contesto AI</button>
+          <button type="button" onClick={() => onUseExtract?.(document, extractions[document.id])}>Usa estratto nel contesto AI</button>
+        </>}
       </div>}
       {evidence.some(item => item.documentId === document.id) && <p>Estratto incluso nella bozza dell’analisi · <button type="button" disabled={!canEdit} onClick={() => onUseExtract?.(document, null)}>Rimuovi dal contesto AI</button></p>}
     </article>)}

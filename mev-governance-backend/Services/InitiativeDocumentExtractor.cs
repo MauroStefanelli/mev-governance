@@ -7,11 +7,11 @@ using UglyToad.PdfPig;
 namespace MevGovernanceBackend.Services;
 
 public record DocumentPassage(string Location, string Text);
-public record DocumentExtraction(string Status, string Message, List<DocumentPassage> Passages, string ExtractorVersion = "1");
+public record DocumentExtraction(string Status, string Message, List<DocumentPassage> Passages, string ExtractorVersion = "2");
 
 public static class InitiativeDocumentExtractor
 {
-    public const int MaxCharacters = 24000;
+    public const int MaxCharacters = 500000;
     public static DocumentExtraction Extract(string fileName, byte[] content)
     {
         var passages = new List<DocumentPassage>();
@@ -22,7 +22,11 @@ public static class InitiativeDocumentExtractor
             if (string.IsNullOrWhiteSpace(text)) return;
             if (remaining <= 0) { truncated = true; return; }
             if (text.Length > remaining) { text = text[..remaining]; truncated = true; }
-            passages.Add(new(location, text)); remaining -= text.Length;
+            // Keep sections small enough to select individual portions for AI.
+            for (var offset = 0; offset < text.Length; offset += 6000)
+                passages.Add(new(text.Length > 6000 ? $"{location} · parte {offset / 6000 + 1}" : location,
+                    text.Substring(offset, Math.Min(6000, text.Length - offset))));
+            remaining -= text.Length;
         }
         try
         {

@@ -88,7 +88,7 @@ public class InitiativeWorkspaceController : BaseController
         if (!CanWork || GetAmbienteId() <= 0) return Forbid();
         var document = await db.InitiativeDocuments.SingleOrDefaultAsync(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId());
         if (document == null) return NotFound();
-        if (document.Extraction != null) return Ok(JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions));
+        if (document.Extraction != null && JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions) is { ExtractorVersion: "2" } saved) return Ok(saved);
         var extraction = InitiativeDocumentExtractor.Extract(document.FileName, document.Content);
         document.Extraction = JsonSerializer.Serialize(extraction, JsonOptions);
         await db.SaveChangesAsync();
@@ -146,7 +146,8 @@ public class InitiativeWorkspaceController : BaseController
                 .Select(d => new { d.FileName, d.Sha256, d.Extraction }).SingleOrDefaultAsync();
             var extraction = document?.Extraction == null ? null : JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions);
             if (document == null || extraction == null || group.Any(e => e.FileName != document.FileName || e.Sha256 != document.Sha256
-                || !extraction.Passages.Any(p => p.Location == e.Location && p.Text == e.Text)))
+                || !(extraction.Passages.Any(p => p.Location == e.Location && p.Text == e.Text)
+                    || previous.DocumentEvidence.Any(p => p.DocumentId == e.DocumentId && p.Sha256 == e.Sha256 && p.FileName == e.FileName && p.Location == e.Location && p.Text == e.Text))))
                 return BadRequest(new { message = "Una fonte documentale non corrisponde all’estratto originale dell’iniziativa." });
         }
         var author = User.Identity?.Name ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";

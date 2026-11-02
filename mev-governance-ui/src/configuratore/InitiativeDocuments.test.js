@@ -46,6 +46,9 @@ test('previews extracted passages and only includes them in AI after explicit se
   await screen.findByText('Requisito API');
   expect(workspaceRequest).toHaveBeenCalledWith('145480/documents/doc-1/extraction', {});
   expect(useExtract).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText('Includi riga 1'));
+  fireEvent.click(screen.getByText('Usa sezioni selezionate (1) nel contesto AI'));
+  expect(useExtract).toHaveBeenCalledWith(document, extraction);
   fireEvent.click(screen.getByText('Usa estratto nel contesto AI'));
   expect(useExtract).toHaveBeenCalledWith(document, extraction);
 });

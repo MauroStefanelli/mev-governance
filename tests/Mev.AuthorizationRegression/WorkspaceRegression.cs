@@ -60,8 +60,10 @@ public static class WorkspaceRegression
         check(MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("image.png", bytes).Status == "unsupported", "Unsupported file explicitly reported");
         check(MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("broken.pdf", bytes).Status == "error", "Broken PDF explicitly reported");
         check(MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("empty.txt", Array.Empty<byte>()).Status == "empty", "Empty extraction explicitly reported");
-        var large = MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("large.txt", System.Text.Encoding.UTF8.GetBytes(new string('a', 25000)));
-        check(large.Status == "partial" && large.Passages.Sum(p => p.Text.Length) == 24000, "Extract respects character limit and reports truncation");
+        var large = MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("large.txt", System.Text.Encoding.UTF8.GetBytes(new string('a', 510000)));
+        check(large.Status == "partial" && large.Passages.Sum(p => p.Text.Length) == 500000, "Extract respects expanded character limit and reports truncation");
+        var complete = MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("complete.txt", System.Text.Encoding.UTF8.GetBytes(new string('b', 30000)));
+        check(complete.Status == "ready" && complete.Passages.Sum(p => p.Text.Length) == 30000 && complete.Passages.All(p => p.Text.Length <= 6000), "Documents beyond old limit extracted into selectable sections");
         using var docx = new MemoryStream();
         using (var zip = new System.IO.Compression.ZipArchive(docx, System.IO.Compression.ZipArchiveMode.Create, true))
         {
