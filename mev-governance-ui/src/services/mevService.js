@@ -80,6 +80,21 @@ export async function workspaceRequest(path, body) {
   return response.json();
 }
 
+export async function workspaceDocument(code, { file, id } = {}) {
+  const form = file ? new FormData() : null;
+  if (file) form.append('file', file);
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/workspaces/${encodeURIComponent(code)}/documents${id ? `/${encodeURIComponent(id)}` : ''}`, {
+    method: file ? 'POST' : 'GET',
+    headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` },
+    ...(form ? { body: form } : {}),
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    throw new Error(details.message || `Documenti: errore ${response.status}`);
+  }
+  return id ? response.blob() : response.json();
+}
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",

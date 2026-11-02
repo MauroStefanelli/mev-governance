@@ -36,5 +36,20 @@ public static class WorkspaceRegression
         var archive = ((OkObjectResult)await admin.List()).Value as List<InitiativeRevision>;
         check(archive?.Count == 1 && archive[0].Version == 2, "Archive returns only latest revision per initiative");
         check((((OkObjectResult)await Controller("Admin", 2).List()).Value as List<InitiativeRevision>)?.Count == 0, "Archive is isolated by environment");
+        var bytes = System.Text.Encoding.UTF8.GetBytes("Requisito Poste originale");
+        var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "requisiti.md");
+        var upload = await admin.UploadDocument("GOTO-1", file) as OkObjectResult;
+        var document = upload?.Value as InitiativeDocument;
+        check(document != null && document.Size == bytes.Length && document.Author == "analista", "Original document persisted with server attribution");
+        check(document!.Sha256 == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(), "Document hash matches original bytes");
+        check(!System.Text.Json.JsonSerializer.Serialize(document).Contains("Content\""), "Document metadata never serializes original content");
+        var downloaded = await Controller("Bid Manager").DownloadDocument("GOTO-1", document.Id) as FileContentResult;
+        check(downloaded?.FileContents.SequenceEqual(bytes) == true, "Supervisor downloads exact original");
+        check(await Controller("Admin", 2).DownloadDocument("GOTO-1", document.Id) is NotFoundResult, "Document download isolated by environment");
+        check(await admin.DownloadDocument("OTHER", document.Id) is NotFoundResult, "Document download isolated by initiative");
+        check(await Controller("Bid Manager").UploadDocument("GOTO-1", file) is ForbidResult, "Supervisor cannot upload documents");
+        check(await admin.UploadDocument("GOTO-1", new FormFile(new MemoryStream(), 0, 0, "file", "empty")) is BadRequestObjectResult, "Empty document rejected");
+        check(await admin.UploadDocument("GOTO-1", new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "requisiti.md")) is OkObjectResult, "Repeated names preserve distinct originals");
+        check(await db.InitiativeDocuments.CountAsync(d => d.Goto == "GOTO-1") == 2, "Uploading does not overwrite previous originals");
     }
 }

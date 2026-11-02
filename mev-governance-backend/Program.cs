@@ -560,6 +560,23 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH AiKeyEnabled ERROR] {ex.Message}"); }
 
+        // Documents live in PostgreSQL, not on Render's ephemeral container disk.
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""InitiativeDocuments"" (
+                ""Id"" UUID PRIMARY KEY,
+                ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" VARCHAR(120) NOT NULL,
+                ""FileName"" TEXT NOT NULL,
+                ""ContentType"" TEXT NOT NULL,
+                ""Size"" BIGINT NOT NULL,
+                ""Sha256"" TEXT NOT NULL,
+                ""Author"" TEXT NOT NULL,
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                ""Content"" BYTEA NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_InitiativeDocuments_AmbienteId_Goto""
+                ON ""{sch}"".""InitiativeDocuments"" (""AmbienteId"", ""Goto"");");
+
         // Immutable initiative revisions, scoped to the configured database schema.
         db.Database.ExecuteSqlRaw($@"
             CREATE TABLE IF NOT EXISTS ""{sch}"".""InitiativeRevisions"" (

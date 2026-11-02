@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { workspaceRequest } from '../services/mevService';
+import InitiativeDocuments from './InitiativeDocuments';
 
 const fields = {
   title: 'Titolo', system: 'Sistema', family: 'Famiglia applicativa', pmPoste: 'PM Poste',
@@ -89,6 +90,9 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       <p>Revisione di lavoro: {base || 'nuova'} · {dirty ? 'Modifiche locali non salvate' : draft.status || 'In analisi'}</p>
       {error && <p role="alert">{error} Il contenuto locale è conservato.</p>}
       <button type="button" disabled={busy} onClick={reload}>Aggiorna storico senza perdere la bozza</button>
+      <InitiativeDocuments key={code} code={code} canEdit={canEdit} onUseSource={source => {
+        if (!(draft.sources || '').includes(source)) edit('sources', [draft.sources, source].filter(Boolean).join('\n'));
+      }} />
       <details open><summary>Analisi, fonti e decisioni</summary>
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
           <div className="workspace-fields">{Object.entries(fields).map(([key, label]) => <label key={key} className={['title', 'system', 'family', 'pmPoste'].includes(key) ? 'workspace-short-field' : ''}>{label}<textarea style={input} rows={['title', 'system', 'family', 'pmPoste'].includes(key) ? 1 : 3} value={draft[key] || ''} onChange={e => edit(key, e.target.value)} /></label>)}</div>

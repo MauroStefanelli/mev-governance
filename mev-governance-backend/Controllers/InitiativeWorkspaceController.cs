@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Security.Cryptography;
 using MevGovernanceBackend.Data;
 using MevGovernanceBackend.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,48 @@ public class InitiativeWorkspaceController : BaseController
     private bool CanRead => CanWork || User.IsInRole("Bid Manager");
     private bool CanApprove => User.IsInRole("Bid Manager") || User.IsInRole("SuperAdmin");
     private IQueryable<InitiativeRevision> Scope => db.InitiativeRevisions.AsNoTracking().Where(r => r.AmbienteId == GetAmbienteId());
+
+    [HttpGet("{code}/documents")]
+    public async Task<IActionResult> Documents(string code)
+    {
+        if (!CanRead || GetAmbienteId() <= 0) return Forbid();
+        return Ok(await db.InitiativeDocuments.AsNoTracking()
+            .Where(d => d.AmbienteId == GetAmbienteId() && d.Goto == code)
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(d => new { d.Id, d.Goto, d.FileName, d.ContentType, d.Size, d.Sha256, d.Author, d.CreatedAt }).ToListAsync());
+    }
+
+    [HttpPost("{code}/documents")]
+    [RequestSizeLimit(11 * 1024 * 1024)]
+    public async Task<IActionResult> UploadDocument(string code, IFormFile file)
+    {
+        if (!CanWork || GetAmbienteId() <= 0) return Forbid();
+        if (string.IsNullOrWhiteSpace(code) || code.Length > 120 || file == null || file.Length == 0 || file.Length > 10 * 1024 * 1024)
+            return BadRequest(new { message = "GOTO e file obbligatori. Dimensione massima: 10 MB." });
+        var author = User.Identity?.Name ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        if (string.IsNullOrWhiteSpace(author)) return Forbid();
+        // Store a new immutable original on every upload, even when names repeat.
+        await using var content = new MemoryStream();
+        await file.CopyToAsync(content);
+        var bytes = content.ToArray();
+        var name = Path.GetFileName(file.FileName.Replace('\\', '/'));
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 255) return BadRequest(new { message = "Nome file non valido." });
+        var document = new InitiativeDocument { AmbienteId = GetAmbienteId(), Goto = code, FileName = name,
+            ContentType = "application/octet-stream", Size = bytes.LongLength, Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+            Author = author, CreatedAt = DateTime.UtcNow, Content = bytes };
+        db.InitiativeDocuments.Add(document);
+        await db.SaveChangesAsync();
+        return Ok(document);
+    }
+
+    [HttpGet("{code}/documents/{id:guid}")]
+    public async Task<IActionResult> DownloadDocument(string code, Guid id)
+    {
+        if (!CanRead || GetAmbienteId() <= 0) return Forbid();
+        var document = await db.InitiativeDocuments.AsNoTracking()
+            .SingleOrDefaultAsync(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId());
+        return document == null ? NotFound() : File(document.Content, "application/octet-stream", document.FileName);
+    }
 
     [HttpGet]
     public async Task<IActionResult> List()

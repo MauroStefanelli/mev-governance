@@ -2,10 +2,10 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import InitiativeWorkspace, { changedWorkspaceFields } from './InitiativeWorkspace';
-import { workspaceRequest } from '../services/mevService';
-jest.mock('../services/mevService', () => ({ workspaceRequest: jest.fn() }));
+import { workspaceRequest, workspaceDocument } from '../services/mevService';
+jest.mock('../services/mevService', () => ({ workspaceRequest: jest.fn(), workspaceDocument: jest.fn(() => Promise.resolve([])) }));
 const revision = { id: 1, version: 1, author: 'analista', createdAt: '2026-11-02T12:00:00Z', reason: 'Prima analisi', payload: JSON.stringify({ title: 'Pilota', system: 'NPSO', decisions: [] }) };
-beforeEach(() => { workspaceRequest.mockReset(); });
+beforeEach(() => { workspaceRequest.mockReset(); workspaceDocument.mockResolvedValue([]); });
 test('a concurrent save retains the local analysis and the original expected version', async () => {
   workspaceRequest.mockImplementation(path => Promise.resolve(path.includes('related?') ? [] : [revision]));
   render(<InitiativeWorkspace initiative={{ code: '145480' }} roles={['Admin']} onContextChange={() => {}} estimate={{ items: [] }} />);

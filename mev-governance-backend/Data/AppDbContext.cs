@@ -32,6 +32,7 @@ public class AppDbContext : DbContext
     public DbSet<AppRolePermission> AppRolePermissions => Set<AppRolePermission>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<InitiativeRevision> InitiativeRevisions => Set<InitiativeRevision>();
+    public DbSet<InitiativeDocument> InitiativeDocuments => Set<InitiativeDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
