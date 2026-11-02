@@ -3050,7 +3050,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       )}
 
       {/* STEP 4: REVISIONE */}
-      {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={towPricesMap} discount={discount} contingency={contingency} />}
+      {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />
