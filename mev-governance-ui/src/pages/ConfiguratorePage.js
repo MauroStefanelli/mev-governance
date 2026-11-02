@@ -3,6 +3,7 @@ import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
 import InitiativeHeading from "../configuratore/InitiativeHeading";
 import { resolveTowPrices } from "../configuratore/towPriceResolution";
+import { activeContractLot } from "../configuratore/activeContractLot";
 import { getConsumoTow } from "../services/mevService";
 import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
@@ -159,7 +160,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   // ── Contratti ──
   const activeContract = useMemo(
-    () => contracts.find((c) => c.contractId === selectedContractId) || contractToApp(contracts.find((c) => c.contractId === selectedContractId)) || null,
+    () => contractToApp(contracts.find((c) => c.contractId === selectedContractId)) || null,
     [contracts, selectedContractId]
   );
 
@@ -324,8 +325,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const activeLot = useMemo(() => {
     const c = activeContract || builtinContract;
     if (!c) return null;
-    const lots = (c.lots || []).filter((l) => l.active !== false && l.lotId === lot);
-    return lots[0] || (c.lots || []).filter((l) => l.active !== false)[0] || c.lots?.[0] || null;
+    return activeContractLot(c, lot);
   }, [activeContract, builtinContract, lot]);
 
   const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
