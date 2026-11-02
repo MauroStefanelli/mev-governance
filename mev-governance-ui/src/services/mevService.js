@@ -80,11 +80,11 @@ export async function workspaceRequest(path, body) {
   return response.json();
 }
 
-export async function workspaceDocument(code, { file, id } = {}) {
+export async function workspaceDocument(code, { file, id, remove = false } = {}) {
   const form = file ? new FormData() : null;
   if (file) form.append('file', file);
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/workspaces/${encodeURIComponent(code)}/documents${id ? `/${encodeURIComponent(id)}` : ''}`, {
-    method: file ? 'POST' : 'GET',
+    method: remove ? 'DELETE' : file ? 'POST' : 'GET',
     headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` },
     ...(form ? { body: form } : {}),
   });
@@ -92,7 +92,7 @@ export async function workspaceDocument(code, { file, id } = {}) {
     const details = await response.json().catch(() => ({}));
     throw new Error(details.message || `Documenti: errore ${response.status}`);
   }
-  return id ? response.blob() : response.json();
+  return id && !remove ? response.blob() : response.json();
 }
 
 export const login = async (username, password) => {

@@ -576,7 +576,9 @@ using (var scope = app.Services.CreateScope())
             );
             CREATE INDEX IF NOT EXISTS ""IX_InitiativeDocuments_AmbienteId_Goto""
                 ON ""{sch}"".""InitiativeDocuments"" (""AmbienteId"", ""Goto"");
-            ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""Extraction"" TEXT NULL;");
+            ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""Extraction"" TEXT NULL;
+            ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""RemovedAt"" TIMESTAMPTZ NULL;
+            ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""RemovedBy"" TEXT NOT NULL DEFAULT '';");
 
         // Immutable initiative revisions, scoped to the configured database schema.
         db.Database.ExecuteSqlRaw($@"

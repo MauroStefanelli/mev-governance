@@ -18,4 +18,6 @@ public class InitiativeDocument
     public DateTime CreatedAt { get; set; }
     [JsonIgnore] public byte[] Content { get; set; } = Array.Empty<byte>();
     [JsonIgnore] public string? Extraction { get; set; }
+    public DateTime? RemovedAt { get; set; }
+    public string RemovedBy { get; set; } = "";
 }

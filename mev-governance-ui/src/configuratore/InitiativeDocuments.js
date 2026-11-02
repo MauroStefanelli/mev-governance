@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { workspaceDocument, workspaceRequest } from '../services/mevService';
+import DocumentReader from './DocumentReader';
 
 export const documentReference = document => `document:${document.id} · ${document.fileName} · SHA256:${document.sha256}`;
 
@@ -9,7 +10,15 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseE
   const [error, setError] = useState('');
   const [extractions, setExtractions] = useState({});
   const [selected, setSelected] = useState({});
-  const [search, setSearch] = useState({});
+  const removeDocument = async document => {
+    if (!window.confirm(`Eliminare l’allegato “${document.fileName}” dall’elenco attivo? Le fonti delle revisioni già salvate restano conservate.`)) return;
+    setBusy(true); setError('');
+    try {
+      await workspaceDocument(code, { id: document.id, remove: true });
+      setDocuments(previous => previous.filter(d => d.id !== document.id));
+      onUseExtract?.(document, null);
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
   const extract = async (document, generate) => {
     setBusy(true); setError('');
     try {
@@ -53,21 +62,16 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseE
     {documents.map(document => <article key={document.id}>
       <strong>{document.fileName}</strong>
       <p>{(document.size / 1024).toFixed(1)} KB · {document.author} · {new Date(document.createdAt).toLocaleString('it-IT')}</p>
-      <code style={{ overflowWrap: 'anywhere' }}>{documentReference(document)}</code>
+      <details className="document-provenance"><summary>Identificativo e impronta originale</summary><code style={{ overflowWrap: 'anywhere' }}>{documentReference(document)}</code></details>
       <div><button type="button" onClick={() => download(document)}>Scarica originale</button>
       {canEdit && <button type="button" onClick={() => onUseSource(documentReference(document))}>Collega alle fonti dell’analisi</button>}</div>
       <div><button type="button" disabled={busy} onClick={() => extract(document, false)}>Consulta estratto salvato</button>
-      {canEdit && <button type="button" disabled={busy} onClick={() => extract(document, true)}>Estrai testo</button>}</div>
+      {canEdit && <button type="button" disabled={busy} onClick={() => extract(document, true)}>Estrai testo</button>}
+      {canEdit && <button className="document-remove" type="button" disabled={busy} onClick={() => removeDocument(document)}>Elimina allegato</button>}</div>
       {extractions[document.id] && <div>
-        <p role="status">{extractions[document.id].message}</p>
         {extractions[document.id].extractorVersion !== '2' && canEdit && <p>Estratto precedente: premi “Estrai testo” per leggere fino a 500.000 caratteri senza ricaricare il file.</p>}
-        <label>Cerca nel documento<input value={search[document.id] || ''} onChange={e => setSearch(previous => ({ ...previous, [document.id]: e.target.value }))} /></label>
-        <details><summary>Anteprima del testo · {extractions[document.id].passages.length} riferimenti</summary>
-          <div style={{ maxHeight: 480, overflow: 'auto' }}>{extractions[document.id].passages.map((passage, index) =>
-            (!search[document.id] || `${passage.location} ${passage.text}`.toLowerCase().includes(search[document.id].toLowerCase())) && <div key={index}>
-            <label><input type="checkbox" disabled={!canEdit} aria-label={`Includi ${passage.location}`} checked={(selected[document.id] || []).includes(index)} onChange={e => setSelected(previous => ({ ...previous, [document.id]: e.target.checked ? [...(previous[document.id] || []), index] : (previous[document.id] || []).filter(i => i !== index) }))} />{passage.location} · {passage.text.length} caratteri</label>
-            <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>{passage.text}</pre></div>)}</div>
-        </details>
+        <DocumentReader document={document} extraction={extractions[document.id]} selected={selected[document.id] || []}
+          canEdit={canEdit} onSelect={indices => setSelected(previous => ({ ...previous, [document.id]: indices }))} />
         {canEdit && extractions[document.id].passages.length > 0 && <>
           <button type="button" onClick={() => onUseExtract?.(document, { ...extractions[document.id], passages: extractions[document.id].passages.filter((_, index) => (selected[document.id] || []).includes(index)) })}>Usa sezioni selezionate ({(selected[document.id] || []).length}) nel contesto AI</button>
           <button type="button" onClick={() => onUseExtract?.(document, extractions[document.id])}>Usa estratto nel contesto AI</button>

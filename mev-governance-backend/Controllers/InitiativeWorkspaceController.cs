@@ -26,7 +26,7 @@ public class InitiativeWorkspaceController : BaseController
     {
         if (!CanRead || GetAmbienteId() <= 0) return Forbid();
         return Ok(await db.InitiativeDocuments.AsNoTracking()
-            .Where(d => d.AmbienteId == GetAmbienteId() && d.Goto == code)
+            .Where(d => d.AmbienteId == GetAmbienteId() && d.Goto == code && d.RemovedAt == null)
             .OrderByDescending(d => d.CreatedAt)
             .Select(d => new { d.Id, d.Goto, d.FileName, d.ContentType, d.Size, d.Sha256, d.Author, d.CreatedAt }).ToListAsync());
     }
@@ -63,6 +63,23 @@ public class InitiativeWorkspaceController : BaseController
         return document == null ? NotFound() : File(document.Content, "application/octet-stream", document.FileName);
     }
 
+    [HttpDelete("{code}/documents/{id:guid}")]
+    public async Task<IActionResult> RemoveDocument(string code, Guid id)
+    {
+        if (!CanWork || GetAmbienteId() <= 0) return Forbid();
+        var author = User.Identity?.Name ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        if (string.IsNullOrWhiteSpace(author)) return Forbid();
+        var document = await db.InitiativeDocuments.SingleOrDefaultAsync(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId());
+        if (document == null) return NotFound();
+        if (document.RemovedAt == null)
+        {
+            document.RemovedAt = DateTime.UtcNow;
+            document.RemovedBy = author;
+            await db.SaveChangesAsync();
+        }
+        return Ok(new { document.Id, document.RemovedAt, document.RemovedBy });
+    }
+
     [HttpGet]
     public async Task<IActionResult> List()
     {
@@ -87,7 +104,7 @@ public class InitiativeWorkspaceController : BaseController
     {
         if (!CanWork || GetAmbienteId() <= 0) return Forbid();
         var document = await db.InitiativeDocuments.SingleOrDefaultAsync(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId());
-        if (document == null) return NotFound();
+        if (document == null || document.RemovedAt != null) return NotFound();
         if (document.Extraction != null && JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions) is { ExtractorVersion: "2" } saved) return Ok(saved);
         var extraction = InitiativeDocumentExtractor.Extract(document.FileName, document.Content);
         document.Extraction = JsonSerializer.Serialize(extraction, JsonOptions);

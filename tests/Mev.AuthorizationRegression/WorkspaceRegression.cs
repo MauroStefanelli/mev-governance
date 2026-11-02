@@ -80,5 +80,14 @@ public static class WorkspaceRegression
         }
         var xlsx = MevGovernanceBackend.Services.InitiativeDocumentExtractor.Extract("stima.xlsx", excel.ToArray());
         check(xlsx.Status == "ready" && xlsx.Passages[0].Location.Contains("Stima") && xlsx.Passages[0].Text.Contains("=2+3"), "XLSX retains sheet and formulas without recalculating");
+        check(await Controller("Bid Manager").RemoveDocument("GOTO-1", document.Id) is ForbidResult, "Supervisor cannot remove documents");
+        check(await Controller("Admin", 2).RemoveDocument("GOTO-1", document.Id) is NotFoundResult, "Removal isolated by environment");
+        check(await admin.RemoveDocument("OTHER", document.Id) is NotFoundResult, "Removal isolated by GOTO");
+        check(await admin.RemoveDocument("GOTO-1", document.Id) is OkObjectResult, "Analyst removes attachment from active list");
+        var activeDocuments = System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)await admin.Documents("GOTO-1")).Value);
+        check(!activeDocuments.Contains(document.Id.ToString()), "Removed document absent from active list");
+        check(await db.InitiativeDocuments.CountAsync(d => d.Goto == "GOTO-1") == 2, "Removal preserves originals for historical evidence");
+        check((await admin.DownloadDocument("GOTO-1", document.Id) as FileContentResult)?.FileContents.SequenceEqual(bytes) == true, "Historical original remains retrievable by reference");
+        check(await admin.ExtractDocument("GOTO-1", document.Id) is NotFoundResult, "Removed originals cannot generate new extracts");
     }
 }

@@ -52,3 +52,16 @@ test('previews extracted passages and only includes them in AI after explicit se
   fireEvent.click(screen.getByText('Usa estratto nel contesto AI'));
   expect(useExtract).toHaveBeenCalledWith(document, extraction);
 });
+
+test('removes an attachment and excludes its extract from the current draft only after confirmation', async () => {
+  workspaceDocument.mockResolvedValueOnce([document]).mockResolvedValueOnce({ id: document.id });
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  const useExtract = jest.fn();
+  render(<InitiativeDocuments code="145480" canEdit onUseExtract={useExtract} />);
+  await screen.findByText('requisiti.md');
+  fireEvent.click(screen.getByText('Elimina allegato'));
+  await screen.findByText('Nessun documento caricato.');
+  expect(workspaceDocument).toHaveBeenCalledWith('145480', { id: 'doc-1', remove: true });
+  expect(useExtract).toHaveBeenCalledWith(document, null);
+  confirm.mockRestore();
+});
