@@ -11,7 +11,7 @@ const fields = {
 };
 const parse = revision => revision ? JSON.parse(revision.payload) : null;
 export function changedWorkspaceFields(left, right) {
-  return [...Object.keys(fields), 'decisions', 'estimate', 'status', 'approvedBy'].filter(key => JSON.stringify(left?.[key]) !== JSON.stringify(right?.[key]));
+  return [...Object.keys(fields), 'decisions', 'documentEvidence', 'estimate', 'status', 'approvedBy'].filter(key => JSON.stringify(left?.[key]) !== JSON.stringify(right?.[key]));
 }
 const input = { display: 'block', width: '100%', boxSizing: 'border-box', padding: 8, border: '1px solid #aebdd0', borderRadius: 6, font: 'inherit' };
 
@@ -90,7 +90,12 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       <p>Revisione di lavoro: {base || 'nuova'} · {dirty ? 'Modifiche locali non salvate' : draft.status || 'In analisi'}</p>
       {error && <p role="alert">{error} Il contenuto locale è conservato.</p>}
       <button type="button" disabled={busy} onClick={reload}>Aggiorna storico senza perdere la bozza</button>
-      <InitiativeDocuments key={code} code={code} canEdit={canEdit} onUseSource={source => {
+      <InitiativeDocuments key={code} code={code} canEdit={canEdit} evidence={draft.documentEvidence || []} onUseExtract={(document, extraction) => {
+        const other = (draft.documentEvidence || []).filter(item => item.documentId !== document.id);
+        const selected = extraction ? extraction.passages.map(p => ({ documentId: document.id, fileName: document.fileName, sha256: document.sha256, location: p.location, text: p.text })) : [];
+        if ([...other, ...selected].reduce((n, p) => n + p.text.length, 0) > 48000) { setError('Il contesto documentale supera 48.000 caratteri. Rimuovi un estratto prima di aggiungerne altri.'); return; }
+        edit('documentEvidence', [...other, ...selected]);
+      }} onUseSource={source => {
         if (!(draft.sources || '').includes(source)) edit('sources', [draft.sources, source].filter(Boolean).join('\n'));
       }} />
       <details open><summary>Analisi, fonti e decisioni</summary>

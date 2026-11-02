@@ -17,4 +17,5 @@ public class InitiativeDocument
     public string Author { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     [JsonIgnore] public byte[] Content { get; set; } = Array.Empty<byte>();
+    [JsonIgnore] public string? Extraction { get; set; }
 }

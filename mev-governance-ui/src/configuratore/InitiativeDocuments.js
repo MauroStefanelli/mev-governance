@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { workspaceDocument } from '../services/mevService';
+import { workspaceDocument, workspaceRequest } from '../services/mevService';
 
 export const documentReference = document => `document:${document.id} · ${document.fileName} · SHA256:${document.sha256}`;
 
-export default function InitiativeDocuments({ code, canEdit, onUseSource }) {
+export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseExtract, evidence = [] }) {
   const [documents, setDocuments] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [extractions, setExtractions] = useState({});
+  const extract = async (document, generate) => {
+    setBusy(true); setError('');
+    try {
+      const result = await workspaceRequest(`${encodeURIComponent(code)}/documents/${document.id}/extraction`, generate ? {} : undefined);
+      setExtractions(previous => ({ ...previous, [document.id]: result }));
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
   useEffect(() => {
     let alive = true;
     setDocuments([]); setError('');
@@ -44,6 +52,16 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource }) {
       <code style={{ overflowWrap: 'anywhere' }}>{documentReference(document)}</code>
       <div><button type="button" onClick={() => download(document)}>Scarica originale</button>
       {canEdit && <button type="button" onClick={() => onUseSource(documentReference(document))}>Collega alle fonti dell’analisi</button>}</div>
+      <div><button type="button" disabled={busy} onClick={() => extract(document, false)}>Consulta estratto salvato</button>
+      {canEdit && <button type="button" disabled={busy} onClick={() => extract(document, true)}>Estrai testo</button>}</div>
+      {extractions[document.id] && <div>
+        <p role="status">{extractions[document.id].message}</p>
+        <details><summary>Anteprima del testo · {extractions[document.id].passages.length} riferimenti</summary>
+          {extractions[document.id].passages.map((passage, index) => <div key={index}><strong>{passage.location}</strong><pre style={{ whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>{passage.text}</pre></div>)}
+        </details>
+        {canEdit && extractions[document.id].passages.length > 0 && <button type="button" onClick={() => onUseExtract?.(document, extractions[document.id])}>Usa estratto nel contesto AI</button>}
+      </div>}
+      {evidence.some(item => item.documentId === document.id) && <p>Estratto incluso nella bozza dell’analisi · <button type="button" disabled={!canEdit} onClick={() => onUseExtract?.(document, null)}>Rimuovi dal contesto AI</button></p>}
     </article>)}
   </details>;
 }

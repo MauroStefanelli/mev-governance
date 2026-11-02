@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Security.Cryptography;
+using MevGovernanceBackend.Services;
 using MevGovernanceBackend.Data;
 using MevGovernanceBackend.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -70,6 +71,30 @@ public class InitiativeWorkspaceController : BaseController
         return Ok(await Scope.Where(r => latestIds.Contains(r.Id)).OrderByDescending(r => r.Id).ToListAsync());
     }
 
+    [HttpGet("{code}/documents/{id:guid}/extraction")]
+    public async Task<IActionResult> ReadExtraction(string code, Guid id)
+    {
+        if (!CanRead || GetAmbienteId() <= 0) return Forbid();
+        var row = await db.InitiativeDocuments.AsNoTracking().Where(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId())
+            .Select(d => new { d.Extraction }).SingleOrDefaultAsync();
+        if (row == null) return NotFound();
+        return Ok(row.Extraction == null ? new DocumentExtraction("pending", "Estrazione non ancora richiesta.", new())
+            : JsonSerializer.Deserialize<DocumentExtraction>(row.Extraction, JsonOptions));
+    }
+
+    [HttpPost("{code}/documents/{id:guid}/extraction")]
+    public async Task<IActionResult> ExtractDocument(string code, Guid id)
+    {
+        if (!CanWork || GetAmbienteId() <= 0) return Forbid();
+        var document = await db.InitiativeDocuments.SingleOrDefaultAsync(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId());
+        if (document == null) return NotFound();
+        if (document.Extraction != null) return Ok(JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions));
+        var extraction = InitiativeDocumentExtractor.Extract(document.FileName, document.Content);
+        document.Extraction = JsonSerializer.Serialize(extraction, JsonOptions);
+        await db.SaveChangesAsync();
+        return Ok(extraction);
+    }
+
     [HttpGet("{code}/revisions")]
     public async Task<IActionResult> Revisions(string code)
     {
@@ -113,6 +138,17 @@ public class InitiativeWorkspaceController : BaseController
         // A supervisor can approve the reviewed revision but cannot silently edit it.
         if (!CanWork && JsonSerializer.Serialize(state, JsonOptions) != JsonSerializer.Serialize(previous, JsonOptions)) return Forbid();
         if (request.Approve && !CanApprove) return Forbid();
+        if (state.DocumentEvidence == null || state.DocumentEvidence.Sum(e => e.Text?.Length ?? 0) > 48000)
+            return BadRequest(new { message = "Contesto documentale non valido o superiore a 48.000 caratteri." });
+        foreach (var group in state.DocumentEvidence.GroupBy(e => e.DocumentId))
+        {
+            var document = await db.InitiativeDocuments.AsNoTracking().Where(d => d.Id == group.Key && d.AmbienteId == GetAmbienteId() && d.Goto == code)
+                .Select(d => new { d.FileName, d.Sha256, d.Extraction }).SingleOrDefaultAsync();
+            var extraction = document?.Extraction == null ? null : JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions);
+            if (document == null || extraction == null || group.Any(e => e.FileName != document.FileName || e.Sha256 != document.Sha256
+                || !extraction.Passages.Any(p => p.Location == e.Location && p.Text == e.Text)))
+                return BadRequest(new { message = "Una fonte documentale non corrisponde all’estratto originale dell’iniziativa." });
+        }
         var author = User.Identity?.Name ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
         if (string.IsNullOrWhiteSpace(author)) return Forbid();
         state.ApprovedBy = request.Approve ? author : "";
@@ -173,7 +209,16 @@ public class WorkspaceState
     public string ApprovedBy { get; set; } = "";
     public DateTime? ApprovedAt { get; set; }
     public List<WorkspaceDecision> Decisions { get; set; } = new();
+    public List<WorkspaceDocumentEvidence> DocumentEvidence { get; set; } = new();
     public JsonElement? Estimate { get; set; }
+}
+public class WorkspaceDocumentEvidence
+{
+    public Guid DocumentId { get; set; }
+    public string FileName { get; set; } = "";
+    public string Sha256 { get; set; } = "";
+    public string Location { get; set; } = "";
+    public string Text { get; set; } = "";
 }
 public class WorkspaceDecision
 {
