@@ -1,6 +1,7 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
+import InitiativeHeading from "../configuratore/InitiativeHeading";
 import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
@@ -91,7 +92,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [showArchive, setShowArchive] = useState(false);
   const initiativeFieldsRef = useRef(null);
   const focusInitiative = () => requestAnimationFrame(() => {
-    initiativeFieldsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (initiativeFieldsRef.current) {
+      const heading = initiativeFieldsRef.current.closest('.tow-workbench')?.querySelector('.tow-sticky-heading');
+      initiativeFieldsRef.current.style.scrollMarginTop = `${48 + (heading?.getBoundingClientRect().height || 0) + 16}px`;
+      initiativeFieldsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     initiativeFieldsRef.current?.querySelector('input')?.focus({ preventScroll: true });
   });
   const [showDescModal, setShowDescModal] = useState(false);
@@ -1668,19 +1673,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
 
   return (
     <div className="tow-workbench" style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 28, paddingBottom: 24, borderBottom: "1px solid #dce3eb" }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: "clamp(22px, 3vw, 30px)", letterSpacing: "-0.7px", fontWeight: 750 }}>Configuratore Offerta TOW</h2>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-            <span style={styles.badge}>Contratto {initiativeContractId}</span>
-            <span style={styles.badge}>Lotto {lot}</span>
-            <span style={styles.badge}>Catalogo · {catalog.length} voci</span>
-          </div>
-        </div>
+      <InitiativeHeading initiative={initiative} contractId={initiativeContractId} lot={lot} catalogCount={catalog.length}>
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}
         </button>
-      </div>
+      </InitiativeHeading>
 
       <details className="tow-resources">
       <summary>Risorse e configurazione <span>Catalogo contrattuale · applicativi · tecnologie</span></summary>
