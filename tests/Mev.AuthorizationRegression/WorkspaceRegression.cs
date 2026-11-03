@@ -10,6 +10,14 @@ public static class WorkspaceRegression
 {
     public static async Task Run(AppDbContext db, Action<bool, string> check)
     {
+        var rowResponse = System.Text.Json.Nodes.JsonNode.Parse("{\"rowId\":\"d1\",\"status\":\"da_verificare\",\"reason\":\"Mancano criteri\"}")!.AsObject();
+        check(MevGovernanceBackend.Services.OfferReviewResponse.ValidRow(MevGovernanceBackend.Services.OfferReviewResponse.Normalize(rowResponse), "d1") != null, "AI accepts single-row JSON response");
+        var wrapped = new System.Text.Json.Nodes.JsonObject { ["analysis"] = new System.Text.Json.Nodes.JsonObject { ["reviews"] = new System.Text.Json.Nodes.JsonArray(rowResponse.DeepClone()) } };
+        check(MevGovernanceBackend.Services.OfferReviewResponse.Normalize(wrapped).Count == 1, "AI accepts nested review envelope");
+        var rawResponse = new System.Text.Json.Nodes.JsonObject { ["rawText"] = "```json\n[" + rowResponse.ToJsonString() + "]\n```" };
+        check(MevGovernanceBackend.Services.OfferReviewResponse.Normalize(rawResponse).Count == 1, "AI recovers JSON array from response text");
+        check(MevGovernanceBackend.Services.OfferReviewResponse.ValidRow(new System.Text.Json.Nodes.JsonArray(rowResponse.DeepClone(), rowResponse.DeepClone()), "d1") == null, "AI rejects duplicate row responses");
+        check(MevGovernanceBackend.Services.OfferReviewResponse.ValidRow(new System.Text.Json.Nodes.JsonArray(rowResponse.DeepClone()), "other") == null, "AI never assigns a different row verdict");
         InitiativeWorkspaceController Controller(string role, int environment = 1) => new(db) {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] {
                 new Claim(ClaimTypes.Name, "analista"), new Claim(ClaimTypes.Role, role), new Claim("ambienteId", environment.ToString())

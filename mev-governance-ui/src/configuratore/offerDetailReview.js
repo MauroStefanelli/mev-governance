@@ -20,7 +20,7 @@ export function parseDetailReviews(response, rows) {
   return rows.map(input => {
     const matches = reviews.filter(review => String(review.rowId) === input.rowId);
     const review = matches[0];
-    if (matches.length !== 1 || !['coerente', 'da_verificare', 'non_coerente'].includes(review.status) || typeof review.reason !== 'string' || !review.reason.trim())
+    if (matches.length !== 1 || !['coerente', 'da_verificare', 'non_coerente', 'error'].includes(review.status) || typeof review.reason !== 'string' || !review.reason.trim())
       return { rowId: input.rowId, signature: detailReviewSignature(input), status: 'error', reason: 'Risposta AI mancante o non valida per questa riga. Ripetere la verifica.' };
     return { rowId: input.rowId, signature: detailReviewSignature(input), status: review.status, reason: review.reason,
       suggestion: typeof review.suggestion === 'string' ? review.suggestion : '', evidence: typeof review.evidence === 'string' ? review.evidence : '',

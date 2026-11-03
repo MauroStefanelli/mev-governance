@@ -631,7 +631,7 @@ public class AiService
 
         JsonObject analysis;
         try { analysis = ParseAnalysisJson(responseText); }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or JsonException)
         {
             analysis = new JsonObject
             {
