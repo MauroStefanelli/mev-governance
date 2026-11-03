@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import OfferPriceComparison from './OfferPriceComparison';
+import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
 const item = { key:'row-1', id:239, imported:true, interventionId:'INT-1', type:'MODIFICA', complexity:'Medio',qty:1,unit:360,original:{unit:360,total:360} };
 const catalog = [{id:239,prezzi:{MODIFICA:{Medio:400}}}];
 test('shows original and contract prices and only applies a price on explicit click', () => {
@@ -12,6 +13,15 @@ test('shows original and contract prices and only applies a price on explicit cl
   expect(onApply).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button',{name:'Applica prezzo catalogo riga 1'}));
   expect(onApply).toHaveBeenCalledWith('row-1',400);
+});
+test('shows per-row AI rationale and marks it stale after changing complexity', () => {
+  const signature = detailReviewSignature(detailReviewInput(item, catalog, [], 'system', '2', 0));
+  const reviews = { 'row-1': { signature, status: 'da_verificare', reason: 'Manca il criterio di complessità', suggestion: 'Verificare il requisito' } };
+  const view = render(<OfferPriceComparison items={[item]} catalog={catalog} contractId="system" lot="2" reviews={reviews} onApply={jest.fn()} />);
+  expect(screen.getByRole('columnheader', { name: 'Verifica AI attività / catalogo' })).toBeInTheDocument();
+  expect(screen.getByText('Manca il criterio di complessità')).toBeInTheDocument();
+  view.rerender(<OfferPriceComparison items={[{ ...item, complexity: 'Complesso' }]} catalog={catalog} contractId="system" lot="2" reviews={reviews} onApply={jest.fn()} />);
+  expect(screen.getByText('Da aggiornare: dati modificati dopo la verifica')).toBeInTheDocument();
 });
 test('keeps missing and builtin catalog prices explicit and disables application', () => {
   const view=render(<OfferPriceComparison items={[item]} catalog={[]} lot="2" onApply={jest.fn()} />);

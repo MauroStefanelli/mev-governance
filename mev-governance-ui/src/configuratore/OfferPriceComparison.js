@@ -1,8 +1,9 @@
 import "./offerPriceComparison.css";
 import React, { useState } from 'react';
 import { reconcileCatalog, resolveCatalogEntry } from './catalogReconciliation';
+import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
 const money = value => value == null ? 'Non disponibile' : new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
-export default function CatalogReconciliation({ items, catalog, contractName, lot, builtin, onApply, onAssign, recovery }) {
+export default function CatalogReconciliation({ items, catalog, contractName, lot, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, reviewProgress, onReview }) {
   const [choices, setChoices] = useState({});
   const result = reconcileCatalog(items, catalog);
   const originalCodes = [...new Set(result.lines.map(l => l.original?.catalogId).filter(Boolean))];
@@ -15,7 +16,7 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
     {recovery && <p role="status">{recovery.recoveredPrices} prezzi di base d’asta recuperati dal catalogo della gara collegata {recovery.garaId}. I prezzi già presenti nel contratto sono conservati.</p>}
     <p>Il riferimento della stima è la base d’asta delle Voci Catalogo del contratto selezionato. I prezzi offerti della gara sono separati. I prezzi originali restano conservati. Il confronto riguarda il dettaglio a catalogo (TOW .5), non le altre TOW. Applica un prezzo solo dopo aver verificato il contratto.</p>
     {onAssign && !builtin && <details><summary>Associare i codici Excel alle Voci Catalogo del contratto</summary>
-      <p>L'associazione vale per le righe di questa offerta con lo stesso codice originale. I prezzi in uso restano invariati finché non scegli «Usa catalogo».</p>
+      <p>L’associazione vale per le righe di questa offerta con lo stesso codice originale. I prezzi in uso restano invariati finché non scegli «Usa catalogo».</p>
       {originalCodes.map(code => <div key={code} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
         <label>ID Excel {code} <select aria-label={`Voce contratto per ID Excel ${code}`} value={choices[code] || ''} onChange={e => setChoices(prev => ({ ...prev, [code]: e.target.value }))}>
           <option value="">Seleziona la voce del contratto</option>
@@ -24,15 +25,22 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
         <button type="button" disabled={!catalog.some(c => String(c.id) === choices[code])} onClick={() => onAssign(code, choices[code])}>Associa righe ID Excel {code}</button>
       </div>)}
     </details>}
+    {onReview && <div className="offer-review-toolbar"><button type="button" disabled={reviewBusy} onClick={onReview}>{reviewBusy ? 'Verifica AI in corso…' : 'Verifica / aggiorna coerenza AI delle righe'}</button><span role="status">{reviewProgress}</span><p>Giudizio AI sulla coerenza attività/catalogo, da confermare dall’analista. Non modifica interventi, complessità o prezzi.</p></div>}
     <div className="offer-price-scroll" role="region" aria-label="Dettaglio confronto prezzi" tabIndex={0}><table className="offer-price-table">
-      <colgroup>{[450, 160, 180, 80, 125, 135, 140, 125, 140].map((width,i) => <col key={i} style={{ width }} />)}</colgroup>
-      <thead><tr>{['Intervento / attività', 'Voce catalogo', 'Tipo / complessità', 'Quantità', 'Prezzo Excel', 'Prezzo catalogo', 'Differenza unitaria', 'Prezzo in uso', 'Azione'].map(h => <th key={h} style={{ textAlign: 'left', padding: 8 }}>{h}</th>)}</tr></thead>
-      <tbody>{result.lines.map(({ item, price, original, difference }, index) => <tr key={item.key ?? index} style={{ borderTop: '1px solid #e2e8f0' }}>
+      <colgroup>{[450, 160, 180, 80, 125, 135, 140, 125, 140, 380].map((width,i) => <col key={i} style={{ width }} />)}</colgroup>
+      <thead><tr>{['Intervento / attività', 'Voce catalogo', 'Tipo / complessità', 'Quantità', 'Prezzo Excel', 'Prezzo catalogo', 'Differenza unitaria', 'Prezzo in uso', 'Azione', 'Verifica AI attività / catalogo'].map(h => <th key={h} style={{ textAlign: 'left', padding: 8 }}>{h}</th>)}</tr></thead>
+      <tbody>{result.lines.map(({ item, price, original, difference }, index) => {
+        const input = detailReviewInput(item, catalog, interventions, contractId, lot, index);
+        const review = reviews[input.rowId];
+        const stale = review && review.signature !== detailReviewSignature(input);
+        const labels = { coerente: 'Coerente secondo AI', da_verificare: 'Da verificare', non_coerente: 'Possibile incoerenza', error: 'Verifica non disponibile' };
+        return <tr key={item.key ?? index} style={{ borderTop: '1px solid #e2e8f0' }}>
         <td style={{ padding: 8, minWidth: 230 }}><strong>{item.interventionId}</strong><div>{item.detail?.componentApplication}</div><div>{item.detail?.detailDescription || item.reason}</div></td>
         <td className="offer-price-code">{resolveCatalogEntry(item, catalog)?.nome || item.detail?.name || item.id}<div style={{fontSize:11,color:"#52657d"}}>ID Excel {original?.catalogId ?? item.id}</div></td><td>{item.type}<br />{item.complexity}</td><td className="offer-price-number">{item.qty}</td>
         <td className="offer-price-number">{money(original?.unit)}</td><td className="offer-price-number">{money(price)}</td><td className="offer-price-number">{money(difference)}</td><td className="offer-price-number">{money(item.unit)}</td>
         <td><button type="button" disabled={price == null || builtin} onClick={() => onApply(item.key, price)} aria-label={`Applica prezzo catalogo riga ${index + 1}`}>Usa catalogo</button></td>
-      </tr>)}</tbody>
+        <td className="offer-ai-review">{review ? <><strong className={`offer-ai-status ${stale ? 'stale' : review.status}`}>{stale ? 'Da aggiornare: dati modificati dopo la verifica' : labels[review.status]}</strong><p>{review.reason}</p>{review.suggestion && <p><b>Indicazione:</b> {review.suggestion}</p>}{review.evidence && <details><summary>Evidenze utilizzate</summary>{review.evidence}</details>}{review.model && <small>{review.model} · {new Date(review.reviewedAt).toLocaleString('it-IT')}</small>}</> : <span>{reviewBusy ? 'In attesa della verifica AI…' : 'Non verificata: avvia la verifica AI.'}</span>}</td>
+      </tr>; })}</tbody>
     </table></div>
   </section>;
 }

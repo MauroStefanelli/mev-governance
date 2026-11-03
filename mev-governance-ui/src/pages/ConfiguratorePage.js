@@ -4,6 +4,8 @@ import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
 import InitiativeHeading from "../configuratore/InitiativeHeading";
 import { resolveTowPrices } from "../configuratore/towPriceResolution";
 import { activeContractLot } from "../configuratore/activeContractLot";
+import { detailReviewInput, detailReviewSignature, parseDetailReviews } from "../configuratore/offerDetailReview";
+import { reviewOfferDetails } from "../services/mevService";
 import { getConsumoTow } from "../services/mevService";
 import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
@@ -90,6 +92,12 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [towPercentages, setTowPercentages] = useState({});
   const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
+  const [detailReviews, setDetailReviews] = useState({});
+  const [detailReviewBusy, setDetailReviewBusy] = useState(false);
+  const [detailReviewProgress, setDetailReviewProgress] = useState('');
+  const detailReviewJob = useRef(0);
+  useEffect(() => () => { detailReviewJob.current++; }, []);
+  useEffect(() => { detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress(''); }, [ambienteId]);
   const [aiBusy, setAiBusy] = useState(false);
   // Auto-approve AI proposals with high confidence
   const [autoApproveAi, setAutoApproveAi] = useState(false);
@@ -516,6 +524,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         selectedAppIds,
         // Risultato del secondo parere AI (se presente, per non perderlo navigando)
         aiProposals: aiProposals || null,
+        detailReviews,
         suggestions,
       },
     };
@@ -534,6 +543,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   // ── Reset / iniziativa ──
   const resetInitiative = () => {
+    detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false); setDetailReviewProgress('');
     setInitiative({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
     setImportedInterventions([]);
     setItems([]);
@@ -564,8 +574,38 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
 
   // ── Step 1: import Excel ──
+  const runDetailReview = async (reviewItems = items, reviewCatalog = catalog, reviewInterventions = importedInterventions, reviewLot = lot) => {
+    const job = ++detailReviewJob.current;
+    const rows = reviewItems.filter(item => item.imported).map((item, index) => detailReviewInput(item, reviewCatalog, reviewInterventions, selectedContractId, reviewLot, index));
+    if (!rows.length) return;
+    setDetailReviewBusy(true); setDetailReviewProgress(`Verifica AI: 0 / ${rows.length} righe`);
+    // Sequential bounded batches: each detail row has its own stable ID and result.
+    try {
+      for (let offset = 0; offset < rows.length; offset += 5) {
+        if (detailReviewJob.current !== job) return;
+        const batch = rows.slice(offset, offset + 5);
+        let results;
+        try {
+          const response = await reviewOfferDetails({ contractId: selectedContractId, contractName: activeContract?.name || '', lot: reviewLot, rows: batch });
+          results = parseDetailReviews(response, batch);
+        } catch (e) {
+          results = batch.map(input => ({ rowId: input.rowId, signature: detailReviewSignature(input), status: 'error', reason: e.message }));
+          if (detailReviewJob.current === job) {
+            setDetailReviews(previous => ({ ...previous, ...Object.fromEntries(results.map(r => [r.rowId, r])) }));
+            setDetailReviewProgress(`Verifica interrotta: ${e.message}`);
+          }
+          return;
+        }
+        if (detailReviewJob.current !== job) return;
+        setDetailReviews(previous => ({ ...previous, ...Object.fromEntries(results.map(r => [r.rowId, r])) }));
+        setDetailReviewProgress(`Verifica AI: ${Math.min(offset + 5, rows.length)} / ${rows.length} righe`);
+      }
+    } finally { if (detailReviewJob.current === job) setDetailReviewBusy(false); }
+  };
+
   const handleImportExcel = async (file) => {
     if (!file) return;
+    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress('');
     setMappedLoading(true);
     try {
       let parsed = await parseInitiativeWorkbook(file, catalog);
@@ -578,6 +618,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       }
       setImportedInterventions(parsed.interventions);
       setItems(parsed.items);
+      setDetailReviews({});
+      // Start only after successful import; technical review never blocks import.
+      void runDetailReview(parsed.items, importLot?.catalog || catalog, parsed.interventions, parsed.lot || lot);
       setSuggestions([]);
       setSourceWorkbookName(parsed.fileName);
       setInitiative((i) => ({
@@ -1163,6 +1206,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
    const reworkInitiative = (record) => {
+    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress('');
     const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
     // NON cambiare selectedContractId: è usato per caricare gli applicativi (sempre "poste-tet-2025").
     // Il contract_id del record è solo per identificare l'iniziativa nel DB — già gestito da
@@ -1182,6 +1226,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     if (payload.sourceWorkbookName) setSourceWorkbookName(payload.sourceWorkbookName);
     // Ripristina il risultato del secondo parere AI (se presente nel payload)
     setAiProposals(payload.aiProposals || null);
+    setDetailReviews(payload.detailReviews || {});
     // Ripristina app selezionate e techProfile
     if (payload.selectedAppIds?.length) {
       setSelectedAppIds(payload.selectedAppIds);
@@ -1215,6 +1260,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setTow(snapshot.tow || {}); setTowPercentages(snapshot.towPercentages || {});
     setEconomyNotes(snapshot.economicNotes || ''); setSourceWorkbookName(snapshot.sourceWorkbookName || '');
     setAiProposals(snapshot.aiProposals || null);
+    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress(''); setDetailReviews(snapshot.detailReviews || {});
     setSelectedAppIds(snapshot.selectedAppIds || []); setSelectedAppId(snapshot.selectedAppIds?.[0] || '');
     setTechProfile(null);
     return true;
@@ -2324,7 +2370,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       <div hidden={step !== 1}>
         <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
           onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
-          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
+          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
       </div>
       {step === 1 && (
         <div>
@@ -2441,7 +2487,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             })()}
           </div>
 
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           {importedInterventions.length > 0 && (
             <div style={styles.card}>
               <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
@@ -2861,7 +2907,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 3: OFFERTA */}
       {step === 3 && (
         <div>
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

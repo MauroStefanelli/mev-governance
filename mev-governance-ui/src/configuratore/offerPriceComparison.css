@@ -1,6 +1,6 @@
 .offer-price-comparison { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .offer-price-scroll { width: 100%; max-width: 100%; overflow: auto; max-height: 480px; margin-top: 16px; border: 1px solid #dce4ef; border-radius: 8px; }
-.offer-price-table { table-layout: fixed; width: 1535px; min-width: 1535px; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.5; }
+.offer-price-table { table-layout: fixed; width: 2015px; min-width: 2015px; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.5; }
 .offer-price-table th { position: sticky; top: 0; z-index: 1; background: #edf2f8; color: #243247; vertical-align: middle; }
 .offer-price-table th, .offer-price-table td { box-sizing: border-box; padding: 12px; vertical-align: top; border-bottom: 1px solid #dce4ef; overflow-wrap: normal; word-break: normal; }
 .offer-price-table td:first-child { white-space: normal; overflow-wrap: anywhere; }
@@ -11,3 +11,11 @@
 .offer-price-table .offer-price-code { overflow-wrap: anywhere; }
 .offer-price-table button { white-space: nowrap; padding: 8px 10px; min-height: 36px; }
 .offer-price-scroll:focus-visible { outline: 2px solid #1a73e8; outline-offset: 2px; }
+.offer-review-toolbar { margin-top: 12px; padding: 12px; border-radius: 8px; background: #eef4fc; font-size: 12px; }
+.offer-review-toolbar span { margin-left: 12px; }
+.offer-ai-review { white-space: normal; overflow-wrap: anywhere !important; }
+.offer-ai-review p { margin: 8px 0; }
+.offer-ai-status { display: inline-block; border-radius: 6px; padding: 4px 8px; background: #fff4dc; color: #835000; font-size: 11px; }
+.offer-ai-status.coerente { background: #e9f7ee; color: #24613b; }
+.offer-ai-status.non_coerente, .offer-ai-status.error { background: #ffeded; color: #9d3434; }
+.offer-ai-review small { display: block; margin-top: 8px; color: #62738a; }

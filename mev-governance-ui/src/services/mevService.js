@@ -104,6 +104,15 @@ export async function exportOfferWorkbook(template, payload) {
   return response.blob();
 }
 
+export async function reviewOfferDetails(context) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/review-offer-details`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify(context),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message || 'Verifica AI del dettaglio non riuscita');
+  return result;
+}
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
