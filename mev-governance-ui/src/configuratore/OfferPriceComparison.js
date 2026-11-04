@@ -25,14 +25,27 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
     {recovery && <div className="offer-recovery-source" role="status"><strong>{recovery.recoveredPrices} prezzi di base d’asta recuperati dalla documentazione di gara collegata</strong><dl><div><dt>Contratto</dt><dd>{contractName || 'Nome contratto non disponibile'}</dd></div><div><dt>Lotto</dt><dd>{lot}</dd></div><div><dt>Descrizione</dt><dd>{lotDescription || 'Descrizione del lotto non disponibile'}</dd></div></dl><p>I prezzi già presenti nel contratto sono conservati.</p></div>}
     <details className="offer-comparison-help"><summary>Come leggere il confronto</summary><p>Il riferimento della stima è la base d’asta delle Voci Catalogo del contratto selezionato. I prezzi offerti della gara sono separati. I prezzi originali restano conservati. Il confronto riguarda il dettaglio a catalogo (TOW .5), non le altre TOW. Applica un prezzo solo dopo aver verificato il contratto.</p></details>
     {onAssign && !builtin && <details><summary>Associare i codici Excel alle Voci Catalogo del contratto</summary>
-      <p>L’associazione vale per le righe di questa offerta con lo stesso codice originale. I prezzi in uso restano invariati finché non scegli «Usa catalogo».</p>
-      {originalCodes.map(code => <div key={code} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
-        <label>ID Excel {code} <select aria-label={`Voce contratto per ID Excel ${code}`} value={choices[code] || ''} onChange={e => setChoices(prev => ({ ...prev, [code]: e.target.value }))}>
-          <option value="">Seleziona la voce del contratto</option>
-          {catalog.map(c => <option key={c.id} value={c.id}>{c.nome} · {c.id}</option>)}
-        </select></label>
-        <button type="button" disabled={!catalog.some(c => String(c.id) === choices[code])} onClick={() => onAssign(code, choices[code])}>Associa righe ID Excel {code}</button>
-      </div>)}
+      <div className="offer-association-help"><strong>Quando serve?</strong><p>Il codice Excel identifica una voce nel file importato; il contratto può usare un identificativo diverso per la stessa attività. Questa operazione collega le righe Excel alla voce corretta del contratto.</p><ol><li>Leggi nome, ambito e attività riportati nel file, qui sotto.</li><li>Controlla l’associazione attuale. Se è già corretta, non devi fare nulla.</li><li>Se manca o è sbagliata, scegli la voce contrattuale e controllane descrizione e criteri prima di confermare.</li><li>Per aggiornare anche il prezzo, mostra i dettagli e gli importi e premi «Usa catalogo» sulla singola riga.</li></ol><p>L’associazione si applica a <strong>tutte le righe di questa offerta con lo stesso ID Excel</strong>. Non cambia descrizioni, quantità, tipo, complessità o prezzi. La verifica AI potrebbe dover essere aggiornata. Salva la valutazione o una revisione per conservare il collegamento.</p></div>
+      {originalCodes.map(code => {
+        const lines = result.lines.filter(line => String(line.original?.catalogId) === String(code));
+        const names = [...new Set(lines.map(line => line.item.detail?.name).filter(Boolean))];
+        const ambits = [...new Set(lines.map(line => line.item.detail?.ambit).filter(Boolean))];
+        const current = [...new Set(lines.map(line => { const entry = resolveCatalogEntry(line.item, catalog); return entry ? `${entry.nome || entry.id} · ID contratto ${entry.id}` : 'Nessuna voce associata'; }))];
+        const selected = catalog.find(entry => String(entry.id) === choices[code]);
+        return <section key={code} className="offer-association-card" aria-label={`Associazione ID Excel ${code}`}>
+        <header><span className="offer-comparison-eyebrow">Voce nel file Excel</span><h3>ID Excel {code} · {names.join(' / ') || 'Nome voce non presente nel file'}</h3><p>Ambito: {ambits.join(' / ') || 'Non indicato'} · {lines.length} attività coinvolte</p></header>
+        <div className="offer-association-current"><strong>Associazione attuale</strong>{current.map(value => <p key={value}>{value}</p>)}</div>
+        <details><summary>Interventi e attività interessati ({lines.length})</summary><ul>{lines.map(({ item }, index) => <li key={item.key ?? index}><strong>ID Intervento {item.interventionId || 'Non indicato'}</strong><p>{item.detail?.componentApplication || 'Componente non indicato'} · {item.type} · {item.complexity}</p><p>{item.detail?.detailDescription || item.reason || 'Descrizione non disponibile'}</p></li>)}</ul></details>
+        {names.length > 1 && <p className="offer-association-warning">Questo codice Excel è usato con nomi diversi. Verifica tutte le attività prima di applicare un’unica associazione.</p>}
+        <div className="offer-association-choice">
+         <label>ID Excel {code} <select aria-label={`Voce contratto per ID Excel ${code}`} value={choices[code] || ''} onChange={e => setChoices(prev => ({ ...prev, [code]: e.target.value }))}>
+          <option value="">Scegli la voce contrattuale corrispondente all’attività</option>
+          {catalog.map(c => <option key={c.id} value={c.id}>{c.nome} · {c.ambito || 'Ambito non indicato'} · ID {c.id}</option>)}
+         </select></label>
+        {selected && <div className="offer-association-preview"><strong>Voce contrattuale scelta: {selected.nome || selected.id}</strong><p>ID {selected.id} · {selected.ambito || 'Ambito non indicato'}</p><p>{selected.descrizione || 'Descrizione non disponibile nel catalogo: verificare il documento contrattuale.'}</p>{Object.keys(selected.criteri || {}).length > 0 && <dl>{Object.entries(selected.criteri).map(([level, description]) => <div key={level}><dt>{level}</dt><dd>{typeof description === 'string' ? description : JSON.stringify(description)}</dd></div>)}</dl>}</div>}
+        <button type="button" disabled={!selected} onClick={() => onAssign(code, choices[code])}>Conferma associazione · {lines.length} attività · ID Excel {code}</button>
+        </div></section>;
+      })}
     </details>}
     {onReview && <div className="offer-review-toolbar"><button type="button" disabled={reviewBusy} onClick={onReview}>{reviewBusy ? 'Verifica AI in corso…' : 'Verifica / aggiorna coerenza AI delle righe'}</button><span role="status">{reviewProgress}</span><p>Giudizio AI sulla coerenza attività/catalogo, da confermare dall’analista. Non modifica interventi, complessità o prezzi.</p></div>}
     <div className="offer-view-toolbar">

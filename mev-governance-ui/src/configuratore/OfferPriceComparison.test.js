@@ -63,6 +63,8 @@ test('associates legacy Excel codes with a different system catalog identifier e
  fireEvent.click(screen.getByText('Associare i codici Excel alle Voci Catalogo del contratto'));
  fireEvent.change(screen.getByRole('combobox',{name:'Voce contratto per ID Excel 239'}),{target:{value:'driver-api'}});
  expect(onAssign).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:'Associa righe ID Excel 239'}));
+  expect(screen.getByText('Associazione attuale')).toBeInTheDocument();
+  expect(screen.getByText('Voce contrattuale scelta: Servizio API')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Conferma associazione · 1 attività · ID Excel 239'}));
  expect(onAssign).toHaveBeenCalledWith(239,'driver-api');
 });

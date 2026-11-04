@@ -68,3 +68,15 @@
 .offer-recovery-source dt { color: #607b6e; }
 .offer-recovery-source dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
 .offer-recovery-source p { margin: 0; }
+.offer-association-help { background: #f0f5fc; border-radius: 10px; padding: 16px; margin: 12px 0; color: #48617f; font-size: 13px; line-height: 1.7; }
+.offer-association-card { margin: 14px 0; padding: 18px; border: 1px solid #d5e1f0; border-radius: 12px; background: #fff; }
+.offer-association-card h3 { margin: 6px 0; font-size: 16px; color: #284f7e; }
+.offer-association-card p { font-size: 12px; margin: 6px 0; line-height: 1.7; }
+.offer-association-card details { margin: 12px 0; font-size: 12px; }
+.offer-association-card li { border-bottom: 1px solid #e5ecf5; padding: 10px 0; }
+.offer-association-current, .offer-association-preview { padding: 12px; background: #f5f8fc; border-radius: 8px; margin: 10px 0; font-size: 12px; }
+.offer-association-choice label { display: block; font-size: 12px; font-weight: 600; }
+.offer-association-choice select { display: block; width: 100%; box-sizing: border-box; padding: 10px; margin: 8px 0; border: 1px solid #bbcee5; border-radius: 7px; background: #fff; color: #284f7e; }
+.offer-association-preview dl div { margin-top: 8px; }
+.offer-association-preview dd { margin: 4px 0; white-space: pre-wrap; }
+.offer-association-warning { color: #935700; background: #fff5de; padding: 10px; border-radius: 6px; }
