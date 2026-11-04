@@ -70,6 +70,10 @@
 .conversation-composer { margin-top: 14px; background: #f3f7fc; padding: 14px; border-radius: 10px; }
 .conversation-composer textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 12px; font: inherit; resize: vertical; border: 1px solid #b8c8dc; border-radius: 8px; }
 .conversation-composer p { font-size: 12px; color: #60748e; }
+.suggestion-explanation { margin: 0; padding: 10px 12px; border-radius: 7px; background: #f0f5fc; color: #4c688a; font-size: 12px; line-height: 1.7; }
+.suggestion-technical-reference { font-size: 11px; color: #6d8199; }
+.suggestion-technical-reference summary { cursor: pointer; }
+.suggestion-technical-reference code { overflow-wrap: anywhere; }
 .tow-workbench > .tow-initiative-library { padding: 20px !important; background: linear-gradient(125deg,#fff 40%,#f1f6fe) !important; border: 1px solid #d9e4f2; box-shadow: 0 5px 20px #24466e08; border-radius: 16px !important; }
 .initiative-library-trigger { display: flex; align-items: center; gap: 14px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; color: #234c7c; }
 .initiative-library-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(140deg,#dceaff,#edf4ff); color: #356caf; flex-shrink: 0; }

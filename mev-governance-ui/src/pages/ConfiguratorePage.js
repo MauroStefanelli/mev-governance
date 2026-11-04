@@ -2663,7 +2663,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
               <div key={pi} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "16px", flexWrap: "wrap", background: "#fff", border: "1px solid #ddd8fe", borderRadius: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
-                    ID {cc.id} · {esc(cc.ambito)}
+                    Voce di catalogo proposta · Ambito: {cc.ambito || 'Non indicato'}
                     {p.interventionId && p.interventionId.trim() && (
                       <span style={{ marginLeft: 8, background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>
                         ID_INTERVENTO {p.interventionId}
@@ -2675,7 +2675,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                       </span>
                     )}
                   </div>
-                  <strong style={{ fontSize: 13, display: "block", marginBottom: 3 }}>{esc(cc.nome)}</strong>
+                  <strong style={{ fontSize: 13, display: "block", marginBottom: 3 }}>{cc.nome || 'Voce senza nome'}</strong>
+                  <details className="suggestion-technical-reference"><summary>Riferimento tecnico della voce</summary><p>Codice interno voce: <code>{cc.id}</code>. Identifica questa voce nel catalogo del contratto selezionato; non è l’ID intervento né l’ID contratto. Non richiede compilazione.</p></details>
                   <div style={{ fontSize: 11, color: "#6b7280" }}>
                     {p.type || "MODIFICA"} · {p.complexity || "Medio"} · Q.tà {p.quantity || 1}
                   </div>
@@ -2765,7 +2766,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                   <input type="checkbox" style={{ marginTop: 3, flex: "0 0 auto" }} checked={s.selected} onChange={(e) => setSuggestions((prev) => prev.map((q, j) => (j === s.__gi ? { ...q, selected: e.target.checked } : q)))} />
                    <div style={{ flex: 1 }}>
                      <div style={{ color: "#667482", fontSize: 11, marginBottom: 2 }}>
-                       ID {cc.id} · {esc(cc.ambito)}
+                        Voce di catalogo proposta · Ambito: {cc.ambito || 'Non indicato'}
                        {s.additionalInfo === "Proposta AI" && (
                          <span style={{ marginLeft: 8, background: "#ede9fe", color: "#6d28d9", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>✦ AI</span>
                        )}
@@ -2782,9 +2783,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                        </p>
                      )}
                    </div>
-                </label>
+                 </label>
+                 <p className="suggestion-explanation">Questa voce del catalogo è una possibile integrazione per l’intervento <strong>{s.interventionId || gid}</strong>. Controlla attività, motivazione, tipo, complessità e quantità; selezionala solo se necessaria e non già coperta dalle righe esistenti. Il suggerimento non è un’attività approvata.</p>
+                 <details className="suggestion-technical-reference"><summary>Riferimento tecnico della voce</summary><p>Codice interno voce: <code>{cc.id}</code>. Il prefisso driver- indica un identificativo generato dal sistema per la voce di catalogo. Non identifica il contratto né l’intervento e non va inserito manualmente.</p></details>
 
-                {/* Tabella prezzi S/M/C */}
+                 {/* Tabella prezzi S/M/C */}
                 <div style={{ overflowX: "auto" }}>
                   <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, fontSize: 13 }}>
                     <thead>
@@ -2878,7 +2881,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                        padding: "8px 12px", cursor: "pointer", gap: 8, listStyle: "none",
                        background: alreadyAdded ? "#f0f7ff" : "#fff" }}>
                        <div style={{ flex: 1, minWidth: 0 }}>
-                         <small style={{ color: "#667482" }}>ID {cc.id} · {esc(cc.ambito)}</small>
+                         <small style={{ color: "#667482" }}>Voce di catalogo · Ambito: {cc.ambito || 'Non indicato'}</small>
                          <div style={{ fontWeight: 600, fontSize: 13 }}>{esc(cc.nome)}</div>
                          <div style={{ color: "#555", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                            {esc((cc.descrizione || "").slice(0, 100))}{cc.descrizione?.length > 100 ? "…" : ""}
