@@ -1,5 +1,5 @@
 // Increment this value when publishing the next DEV release.
-export const DEV_RELEASE = 'DEV_REL_025';
+export const DEV_RELEASE = 'DEV_REL_026';
 
 export function resolveRelease(runtime, build) {
   // Render does not expand {{SHORT_SHA}}. Never display unresolved placeholders.

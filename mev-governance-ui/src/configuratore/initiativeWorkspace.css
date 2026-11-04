@@ -90,6 +90,18 @@
 .initiative-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .initiative-revision-pill { border-radius: 12px; padding: 3px 8px; background: #eef7f2; color: #3b7558 !important; font-size: 10px !important; }
 .initiative-saved-offers { max-height: 460px; overflow: auto; display: grid; gap: 8px; }
+.imported-intervention-group { margin: 12px 0; border: 1px solid #d8e4f2; border-radius: 12px; overflow: hidden; background: #fff; }
+.imported-intervention-group > summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 18px; background: #eff4fc; }
+.imported-intervention-group > summary:hover { background: #e6effb; }
+.imported-intervention-group[open] > summary { border-bottom: 1px solid #d8e4f2; }
+.imported-intervention-identity { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.imported-intervention-identity > span { color: #3569a7; font-size: 11px; font-weight: 700; }
+.imported-intervention-identity > strong { color: #274363; font-size: 14px; line-height: 1.6; }
+.imported-intervention-identity p { color: #60758d; font-size: 12px; margin: 0; }
+.imported-intervention-total { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; text-align: right; }
+.imported-intervention-total strong { color: #245895; font-size: 18px; font-variant-numeric: tabular-nums; }
+.imported-intervention-total small { color: #657d99; font-size: 11px; }
+@media(max-width:600px) { .imported-intervention-group > summary { align-items: flex-start; flex-direction: column; } .imported-intervention-total { text-align: left; } }
 .tow-initiative-library .tow-archive-row { background: #fff !important; border-color: #dce5ef !important; padding: 16px 18px !important; }
 .tow-initiative-library .tow-archive-row[aria-pressed="true"] { background: #eff5ff !important; border-color: #85abe0 !important; box-shadow: inset 3px 0 #3c76c4; }
 @media (max-width: 600px) { .initiative-library-trigger { gap: 9px; } .initiative-library-label > small { max-width: 24ch; } .initiative-library-icon { width: 40px; height: 44px; } .tow-workbench > .tow-initiative-library { padding: 14px !important; } }

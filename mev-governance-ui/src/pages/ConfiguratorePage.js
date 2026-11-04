@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import ImportedInterventionGroup, { importedMappingValues } from "../configuratore/ImportedInterventionGroup";
 import { saveImportedRevision } from "../configuratore/importRevision";
 import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
 import InitiativeHeading from "../configuratore/InitiativeHeading";
@@ -2504,12 +2505,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                 <summary style={{ cursor: "pointer", margin: "8px 0", fontWeight: 600 }}>Mostra dettaglio importato</summary>
                 <div style={{ overflowX: "auto", marginTop: 8 }}>
                   {importedInterventions.map((x, xi) => (
-                    <div key={x.id} style={{ marginBottom: 16, border: "1px solid #dde1e6", borderRadius: 8, overflow: "hidden" }}>
-                      <div style={{ background: "#f8f9fa", padding: "8px 12px", fontWeight: 700, fontSize: 13, borderBottom: "1px solid #dde1e6" }}>
-                        <span style={{ color: "#1a73e8" }}>ID_INTERVENTO {x.id}</span>
-                        {x.titolo ? <span style={{ marginLeft: 8, color: "#222" }}>{esc(x.titolo)}</span> : null}
-                        {x.descrizione ? <span style={{ marginLeft: 8, color: "#666", fontWeight: 400, fontSize: 12 }}>{esc(x.descrizione)}</span> : null}
-                      </div>
+                    <ImportedInterventionGroup key={x.id} intervention={x} items={items}>
                       {x.mappings.length > 0 ? (
                         <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, fontSize: 13 }}>
                           <thead>
@@ -2526,16 +2522,16 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                             {x.mappings.map((m, mi) => {
                               const cc = catalog.find(c => c.id === m.catalogId || c.nome === m.name);
                               const validC = cc ? validComplexities(cc, m.type) : ["Semplice", "Medio", "Complesso"];
-                              const unitPrice = m.unit ?? (m.qty ? (m.total || 0) / m.qty : 0);
+                              const currentValues = importedMappingValues(m, items);
                               const updMapping = (patch) => {
-                                const changed = { ...m, ...patch };
+                                const changed = { ...m, qty: currentValues.quantity, unit: currentValues.price, ...patch };
                                 if (patch.type || patch.complexity) changed.unit = catalogUnitPrice({ id: m.catalogId, ...changed }, catalog);
                                 const row = items.find(it => m.sourceRowId ? it.sourceRowId === m.sourceRowId : it.detail === m);
                                 if (row) updateItem(row.key, { type: changed.type, complexity: changed.complexity, qty: changed.qty, unit: changed.unit });
                                 setImportedInterventions(prev => prev.map((iv, ivi) => ivi !== xi ? iv : { ...iv, mappings: iv.mappings.map((mm, mmi) => mmi !== mi ? mm : changed) }));
                               };
-                              const qty = m.qty ?? 1;
-                              const unit = m.unit ?? unitPrice;
+                              const qty = currentValues.quantity;
+                              const unit = currentValues.price ?? 0;
                               return (
                                 <tr key={mi} style={{ background: mi % 2 ? "#f7f9fb" : "#fff", borderBottom: "1px solid #eef2f5" }}>
                                   <td style={{ padding: "10px 12px" }}>
@@ -2565,7 +2561,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                                       style={{ ...styles.input, width: 90, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
                                   </td>
                                   <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                    {euro.format(qty * unit)}
+                                    {currentValues.total == null ? 'Non disponibile' : euro.format(currentValues.total)}
                                   </td>
                                 </tr>
                               );
@@ -2575,7 +2571,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                       ) : (
                         <div style={{ padding: "8px 12px", color: "#667482", fontSize: 12 }}>Nessuna valorizzazione di catalogo.</div>
                       )}
-                    </div>
+                    </ImportedInterventionGroup>
                   ))}
                 </div>
               </details>
