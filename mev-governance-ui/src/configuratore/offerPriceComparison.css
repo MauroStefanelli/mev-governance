@@ -80,3 +80,4 @@
 .offer-association-preview dl div { margin-top: 8px; }
 .offer-association-preview dd { margin: 4px 0; white-space: pre-wrap; }
 .offer-association-warning { color: #935700; background: #fff5de; padding: 10px; border-radius: 6px; }
+.offer-association-purpose { background: #edf4ff; border-left: 3px solid #7da5d8; padding: 12px; border-radius: 7px; color: #395c85; }
