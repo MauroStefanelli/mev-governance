@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import PageManual from "./components/help/PageManual";
 import { resolveRelease } from "./release";
 import MevPage from "./pages/MevPage";
 import MevCapPage from "./pages/MevCapPage";
@@ -621,6 +622,7 @@ function App() {
 
           {/* Destra: utente + profilo */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {page !== 'configuratore' && <PageManual key={page} page={page} />}
             {lastAlign && (
               <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, display: "none" /* nascosto su mobile */ }}>
                 {new Date(lastAlign).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}

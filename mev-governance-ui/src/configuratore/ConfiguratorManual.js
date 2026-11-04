@@ -60,7 +60,7 @@ const chapters = [
   ], note: 'L’export non modifica l’originale scelto. Sono disponibili anche le esportazioni JSON, CSV e i documenti Markdown previsti dal configuratore.' },
 ];
 
-export default function ConfiguratorManual() {
+export function UserManual({ chapters, title, subtitle, triggerLabel = 'Manuale d’uso', triggerHint = 'Guida alla sezione', compact = false }) {
   const [open, setOpen] = useState(false);
   const [chapter, setChapter] = useState(0);
   const dialog = useRef(null);
@@ -76,15 +76,19 @@ export default function ConfiguratorManual() {
   }, [open]);
   const current = chapters[chapter];
   return <>
-    <button type="button" className="tow-manual-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog">
+    <button type="button" className={`tow-manual-trigger${compact ? ' tow-manual-trigger-compact' : ''}`} onClick={() => setOpen(true)} aria-haspopup="dialog">
       <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1zM12 5v15"/></svg>
-      <span>Manuale d’uso<small>Guida al configuratore</small></span>
+      <span>{triggerLabel}{!compact && <small>{triggerHint}</small>}</span>
     </button>
     {open && createPortal(<dialog ref={dialog} className="tow-manual" aria-labelledby={titleId} onCancel={() => setOpen(false)} onClose={() => setOpen(false)}>
-      <header className="tow-manual-header"><div><span>GUIDA OPERATIVA</span><h2 id={titleId}>Configuratore Offerta TOW</h2><p>Dall’iniziativa alla proposta tecnica ed economica.</p></div><button type="button" autoFocus aria-label="Chiudi manuale" onClick={() => setOpen(false)}>✕</button></header>
+      <header className="tow-manual-header"><div><span>GUIDA OPERATIVA</span><h2 id={titleId}>{title}</h2><p>{subtitle}</p></div><button type="button" autoFocus aria-label="Chiudi manuale" onClick={() => setOpen(false)}>✕</button></header>
       <div className="tow-manual-layout"><nav aria-label="Indice del manuale">{chapters.map((entry, index) => <button type="button" key={entry.title} aria-current={chapter === index ? 'page' : undefined} onClick={() => { setChapter(index); content.current?.scrollTo({ top: 0 }); }}><span>{String(index + 1).padStart(2, '0')}</span>{entry.title}</button>)}</nav>
         <article ref={content} className="tow-manual-content"><span className="tow-manual-section-number">Capitolo {chapter + 1} di {chapters.length}</span><h3>{current.title}</h3><p className="tow-manual-subtitle">{current.subtitle}</p><ol>{current.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>{current.note && <aside><strong>Da ricordare</strong><p>{current.note}</p></aside>}<footer><button type="button" disabled={chapter === 0} onClick={() => { setChapter(chapter - 1); content.current?.scrollTo({ top: 0 }); }}>← Precedente</button><button type="button" disabled={chapter === chapters.length - 1} onClick={() => { setChapter(chapter + 1); content.current?.scrollTo({ top: 0 }); }}>Successivo →</button></footer></article>
       </div>
     </dialog>, document.body)}
   </>;
+}
+
+export default function ConfiguratorManual() {
+  return <UserManual chapters={chapters} title="Configuratore Offerta TOW" subtitle="Dall’iniziativa alla proposta tecnica ed economica." triggerHint="Guida al configuratore" />;
 }

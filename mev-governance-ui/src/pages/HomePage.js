@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PageManual from "../components/help/PageManual";
 
 // Nomi femminili italiani comuni per determinare il genere dal nome
 const NOMI_FEMMINILI = new Set([
@@ -469,6 +470,7 @@ export default function HomePage({
           <div style={{ fontSize: "clamp(26px,3.5vw,38px)", fontWeight: 800, letterSpacing: "-1px", lineHeight: 1.15, color: T.titleColor }}>
             {getGreeting(fullName, username)}, {fullName?.split(" ")[0] || username}
           </div>
+          <PageManual page="home" homePages={visibleCards.map(card => card.id)} />
           {lastAlign && (
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <span style={{ fontSize: 12, color: T.textFaint, fontWeight: 500 }}>Ultimo aggiornamento dati</span>
