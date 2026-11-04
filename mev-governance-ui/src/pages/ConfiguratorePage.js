@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import { saveImportedRevision } from "../configuratore/importRevision";
 import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
 import InitiativeHeading from "../configuratore/InitiativeHeading";
 import { resolveTowPrices } from "../configuratore/towPriceResolution";
@@ -85,6 +86,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [importedInterventions, setImportedInterventions] = useState([]);
   const [items, setItems] = useState([]);
   const [workspaceContext, setWorkspaceContext] = useState(null);
+  const [workspaceReload, setWorkspaceReload] = useState(0);
+  const [importHistoryError, setImportHistoryError] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [contingency, setContingency] = useState(0);
@@ -623,14 +626,21 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       void runDetailReview(parsed.items, importLot?.catalog || catalog, parsed.interventions, parsed.lot || lot);
       setSuggestions([]);
       setSourceWorkbookName(parsed.fileName);
-      setInitiative((i) => ({
-        ...i,
-        code: parsed.code || i.code,
-        title: parsed.title || i.title,
-        system: parsed.systems || i.system,
-        requirements: parsed.requirements || i.requirements,
-        description: parsed.description || i.description,
-      }));
+      const importedInitiative = { ...initiative, code: parsed.code || initiative.code,
+        title: parsed.title || initiative.title, system: parsed.systems || initiative.system,
+        requirements: parsed.requirements || initiative.requirements, description: parsed.description || initiative.description };
+      setInitiative(importedInitiative);
+      setImportHistoryError('');
+      try {
+        await saveImportedRevision(importedInitiative, { initiative: importedInitiative, items: parsed.items,
+          importedInterventions: parsed.interventions, suggestions: [], detailReviews: {},
+          sourceWorkbookName: parsed.fileName, catalogSource: { contractId: selectedContractId, lot: parsed.lot || lot, towPriceSourceId },
+          discount, contingency, tow, towPercentages }, parsed.fileName);
+        setWorkspaceReload(value => value + 1);
+        refreshWorkspaceArchive();
+      } catch (e) {
+        setImportHistoryError(`Excel importato, ma revisione non salvata: ${e.message} I dati importati restano nella pagina. Salva una revisione dal workspace dopo aver verificato lo storico.`);
+      }
       toast(`${parsed.interventions.length} interventi e ${parsed.items.length} dettagli importati; verifico possibili integrazioni`);
       await runGapAnalysis(parsed.interventions, parsed.items);
     } catch (err) {
@@ -2367,8 +2377,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
 
         </div>
       )}
-      <div hidden={step !== 1}>
-        <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
+      <div>
+        {importHistoryError && <p role="alert">{importHistoryError}</p>}
+        <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}:${workspaceReload}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
           onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
           estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
       </div>
