@@ -42,10 +42,19 @@ public static class OfferWorkbookExporter
         if (summary.Cell("A4").GetString() != "ID_INTERVENTO" || detail.Cell("A1").GetString() != "ID Intervento"
             || detail.Cell("M1").GetString() != "Prezzo Totale")
             throw new ArgumentException("Template non riconosciuto: utilizzare il modello Tabella Offerta con intestazioni originali.");
-        var totals = summary.Column(8).CellsUsed().FirstOrDefault(c => c.GetString() == "TOTALE TOW")?.Address.RowNumber ?? 0;
-        var priceRow = summary.Column(2).CellsUsed().FirstOrDefault(c => c.GetString().Replace(" ", "") == $"TOW0{request.Lot}.1")?.Address.RowNumber ?? 0;
-        if (totals <= 6 || priceRow <= totals + 2 || detail.Tables.Count() != 1)
-            throw new ArgumentException("Struttura riepilogo/listino non riconosciuta o lotto del template diverso dalla stima.");
+        static string Normalized(string text) => System.Text.RegularExpressions.Regex.Replace(text, @"\s+", "").ToUpperInvariant();
+        var economicRows = summary.Column(8).CellsUsed().Where(c => Normalized(c.GetString()) == "IMPORTOECONOMICO").ToList();
+        // Some official examples omit the text TOTALE TOW but retain its row
+        // immediately before Importo economico. Locate the block structurally.
+        if (economicRows.Count != 1) throw new ArgumentException("Nel riepilogo deve essere presente una sola riga 'Importo economico' nella colonna H.");
+        var totals = economicRows[0].Address.RowNumber - 1;
+        if (totals <= 6 || Normalized(summary.Cell(totals + 2, 8).GetString()) != "VALOREINIZIATIVA")
+            throw new ArgumentException("Blocco totali non riconosciuto: verificare le righe precedenti e successive a 'Importo economico'.");
+        var priceRows = Enumerable.Range(1, 4).Select(n => summary.Column(2).CellsUsed()
+            .Where(c => Normalized(c.GetString()) == $"TOW0{request.Lot}.{n}").Select(c => c.Address.RowNumber).ToList()).ToList();
+        if (priceRows.Any(rows => rows.Count != 1) || priceRows.Any(rows => rows[0] <= totals + 2))
+            throw new ArgumentException($"Listino del modello non riconosciuto: servono TOW0{request.Lot}.1–.4 nella colonna B, sotto il riepilogo. Verificare il lotto del file.");
+        if (detail.Tables.Count() != 1) throw new ArgumentException("DettaglioInterventi deve contenere una sola tabella Excel strutturata.");
         var table = detail.Tables.Single();
         if (table.RangeAddress.FirstAddress.RowNumber != 1 || table.ColumnCount() != 13 || !table.ShowTotalsRow)
             throw new ArgumentException("La tabella DettaglioInterventi deve avere 13 colonne e riga totali.");
@@ -56,7 +65,8 @@ public static class OfferWorkbookExporter
         if (delta > 0) summary.Row(totals - 1).InsertRowsBelow(delta);
         if (delta < 0) summary.Rows(6 + request.Interventions.Count, totals - 1).Delete();
         totals = 6 + request.Interventions.Count;
-        priceRow += delta;
+        var shiftedPriceRows = priceRows.Select(rows => rows[0] + delta).ToArray();
+        summary.Cell(totals, 8).Value = "TOTALE TOW";
         summary.Cell("A2").Value = $"Interventi Iniziativa\nCodice: {request.Code}\nTitolo: {request.Title}";
         // Clear all example detail data, including rows outside the resized table.
         detail.Range(2, 1, Math.Max(table.RangeAddress.LastAddress.RowNumber, request.Details.Count + 2), 13).Clear(XLClearOptions.Contents);
@@ -88,10 +98,10 @@ public static class OfferWorkbookExporter
         {
             var letter = XLHelper.GetColumnLetterFromNumber(col);
             summary.Cell(totals, col).FormulaA1 = $"SUM({letter}6:{letter}{totals - 1})";
-            summary.Cell(totals + 1, col).FormulaA1 = col == 13 ? $"M{totals}" : $"{letter}{totals}*D{priceRow + col - 9}";
+            summary.Cell(totals + 1, col).FormulaA1 = col == 13 ? $"M{totals}" : $"{letter}{totals}*D{shiftedPriceRows[col - 9]}";
         }
         summary.Cell(totals + 2, 10).FormulaA1 = $"SUM(I{totals + 1}:M{totals + 1})";
-        for (var n = 1; n <= 4; n++) summary.Cell(priceRow + n - 1, 4).Value = request.TowPrices[$"TOW0{request.Lot}.{n}"];
+        for (var n = 1; n <= 4; n++) summary.Cell(shiftedPriceRows[n - 1], 4).Value = request.TowPrices[$"TOW0{request.Lot}.{n}"];
         // Never retain initiative-specific exclusions from the example.
         var exclusion = summary.Column(1).CellsUsed().FirstOrDefault(c => c.GetString() == "ESCLUSIONI");
         if (exclusion != null) summary.Range(exclusion.Address.RowNumber + 1, 2, summary.LastRowUsed()!.RowNumber(), 4).Clear(XLClearOptions.Contents);

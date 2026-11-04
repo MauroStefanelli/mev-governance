@@ -10,7 +10,9 @@ public static class OfferWorkbookRegression
         {
             var summary = workbook.AddWorksheet("EXAMPLE"); summary.Cell("A4").Value = "ID_INTERVENTO";
             summary.Cell("A6").Value = "OLD"; summary.Cell("H7").Value = "TOTALE TOW";
-            summary.Range("J9:M9").Merge(); summary.Cell("B18").Value = "TOW02.1";
+            summary.Cell("H8").Value = "Importo economico"; summary.Cell("H9").Value = "Valore iniziativa";
+            summary.Range("J9:M9").Merge();
+            for (var n = 1; n <= 4; n++) summary.Cell(17 + n, 2).Value = $"TOW02.{n}";
             summary.Cell("A27").Value = "ESCLUSIONI"; summary.Cell("B28").Value = "OLD EXCLUSION";
             var detail = workbook.AddWorksheet("DettaglioInterventi");
             var heads = new[] { "ID Intervento", "Componente-applicativo", "Tecnologia", "Unità", "Descrizione Intervento", "ID di catalogo", "Ambito driver", "Nome Driver", "Tipo Intervento", "Complessità", "Quantità", "Prezzo Unitario", "Prezzo Totale" };
