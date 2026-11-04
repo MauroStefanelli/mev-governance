@@ -2006,15 +2006,13 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: showArchive && archiveRecords.length > 0 ? 10 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+              className="initiative-library-trigger"
               aria-expanded={showArchive}
               onClick={() => setShowArchive(v => !v)}>
-              <span style={{ fontSize: 13, color: showArchive ? "#1a73e8" : "#102a47", fontWeight: 700 }}>
-                {showArchive ? "▾" : "▸"} Archivio iniziative
-              </span>
-              <span style={{ fontSize: 12, color: "#667482" }}>
-                 {archiveRecords.length + workspaceRecords.length} schede salvate
-              </span>
+              <span className="initiative-library-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 7h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2"/></svg></span>
+              <span className="initiative-library-label"><span className="workspace-eyebrow">Il tuo spazio di lavoro</span><strong>Archivio iniziative</strong><small>{showArchive ? 'Seleziona una scheda per riprendere il lavoro' : 'Analisi, offerte e revisioni del team'}</small></span>
+              <span className="initiative-library-count">{archiveRecords.length + workspaceRecords.length}<small>schede</small></span>
+              <svg className={`initiative-library-chevron${showArchive ? ' is-open' : ''}`} aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             {editingRecordKey && (
               <span style={{ fontSize: 11, background: "#fff8e1", color: "#92600a", border: "1px solid #f6c90e", borderRadius: 4, padding: "2px 8px", fontWeight: 700 }}>
@@ -2041,15 +2039,15 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </div>
         </div>
         {showArchive && <div className="workspace-library">
-          <h4>Analisi condivise e revisioni ({workspaceRecords.length})</h4>
+          <h4 className="initiative-library-section-title">Analisi condivise e revisioni <span>{workspaceRecords.length}</span></h4>
           {!workspaceRecords.length && <p>Nessuna analisi condivisa salvata in questo ambiente.</p>}
           {workspaceRecords.map(r => <button type="button" className="workspace-library-row" key={r.id} onClick={() => openWorkspace(r)}>
-            <strong>{r.goto} · {JSON.parse(r.payload).title}</strong>
-            <span>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')}</span>
+            <span className="initiative-card-code">{r.goto}</span><strong className="initiative-card-title">{JSON.parse(r.payload).title}</strong>
+            <span className="initiative-card-meta"><span className="initiative-revision-pill">Revisione {r.version}</span>{r.author} · {new Date(r.createdAt).toLocaleString('it-IT')}</span>
           </button>)}
         </div>}
         {showArchive && archiveRecords.length > 0 && (
-          <div style={{ display: "grid", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+          <div className="initiative-saved-offers"><h4 className="initiative-library-section-title">Offerte salvate <span>{archiveRecords.length}</span></h4>
             {archiveRecords.map((rec) => {
               const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
               const ini = payload.initiative || {};
@@ -2066,9 +2064,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                   border: isCurrentlyEditing ? "1.5px solid #f6c90e" : "1px solid #e8ecf0",
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#102a47", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {isCurrentlyEditing && <span style={{ color: "#92600a", marginRight: 6 }}>✏</span>}
-                      {esc(ini.code || "—")} · {esc(ini.title || rec.title || "Senza titolo")}
+                      <div className="initiative-card-title">
+                       <span className="initiative-card-code">{ini.code || 'Senza GOTO'}</span>
+                       {ini.title || rec.title || "Senza titolo"}
                     </div>
                     <div style={{ fontSize: 11, color: "#667482", marginTop: 1 }}>
                       {esc(rec.contract_id || payload.contractId || "")}
