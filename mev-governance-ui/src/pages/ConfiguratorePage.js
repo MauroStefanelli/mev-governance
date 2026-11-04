@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import ConfiguratorManual from "../configuratore/ConfiguratorManual";
 import ImportedInterventionGroup, { importedMappingValues } from "../configuratore/ImportedInterventionGroup";
 import { saveImportedRevision } from "../configuratore/importRevision";
 import OfferWorkbookExport from "../configuratore/OfferWorkbookExport";
@@ -1754,9 +1755,12 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
   return (
     <div className="tow-workbench" style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
       <InitiativeHeading initiative={initiative} contractId={initiativeContractId} lot={lot} catalogCount={catalog.length}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <ConfiguratorManual />
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}
         </button>
+        </div>
       </InitiativeHeading>
 
       <details className="tow-resources">
