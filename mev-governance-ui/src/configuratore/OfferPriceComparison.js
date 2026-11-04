@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { reconcileCatalog, resolveCatalogEntry } from './catalogReconciliation';
 import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
 const money = value => value == null ? 'Non disponibile' : new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
-export default function CatalogReconciliation({ items, catalog, contractName, lot, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, reviewProgress, onReview }) {
+export default function CatalogReconciliation({ items, catalog, contractName, lot, lotDescription, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, reviewProgress, onReview }) {
   const [choices, setChoices] = useState({});
   const [view, setView] = useState('interventions');
   const [showEconomics, setShowEconomics] = useState(false);
@@ -22,7 +22,7 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
     <header className="offer-comparison-heading"><div><span className="offer-comparison-eyebrow">Validazione tecnica ed economica</span><h2>Confronto Excel e Voci Catalogo</h2><p>{contractName || 'Contratto non selezionato'} · Lotto {lot}{builtin ? ' · Catalogo predefinito: verificare il contratto di sistema' : ''}</p></div><span className="offer-comparison-count">{result.lines.length} righe importate</span></header>
     <div className="offer-comparison-totals"><div><span>Totale originale Excel</span><strong>{money(result.originalTotal)}</strong></div><div><span>Totale base d’asta catalogo · quantità correnti</span><strong>{money(result.catalogTotal)}</strong></div><p>Leggi prima la verifica AI di ciascuna attività, poi confronta gli importi e scegli se applicare il prezzo contrattuale.</p></div>
     {!!result.missing && <p role="alert">{result.missing} righe senza prezzo di catalogo valido: il confronto complessivo non è disponibile. Le righe sono conservate.</p>}
-    {recovery && <p role="status">{recovery.recoveredPrices} prezzi di base d’asta recuperati dal catalogo della gara collegata {recovery.garaId}. I prezzi già presenti nel contratto sono conservati.</p>}
+    {recovery && <div className="offer-recovery-source" role="status"><strong>{recovery.recoveredPrices} prezzi di base d’asta recuperati dalla documentazione di gara collegata</strong><dl><div><dt>Contratto</dt><dd>{contractName || 'Nome contratto non disponibile'}</dd></div><div><dt>Lotto</dt><dd>{lot}</dd></div><div><dt>Descrizione</dt><dd>{lotDescription || 'Descrizione del lotto non disponibile'}</dd></div></dl><p>I prezzi già presenti nel contratto sono conservati.</p></div>}
     <details className="offer-comparison-help"><summary>Come leggere il confronto</summary><p>Il riferimento della stima è la base d’asta delle Voci Catalogo del contratto selezionato. I prezzi offerti della gara sono separati. I prezzi originali restano conservati. Il confronto riguarda il dettaglio a catalogo (TOW .5), non le altre TOW. Applica un prezzo solo dopo aver verificato il contratto.</p></details>
     {onAssign && !builtin && <details><summary>Associare i codici Excel alle Voci Catalogo del contratto</summary>
       <p>L’associazione vale per le righe di questa offerta con lo stesso codice originale. I prezzi in uso restano invariati finché non scegli «Usa catalogo».</p>

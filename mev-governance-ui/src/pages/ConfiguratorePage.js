@@ -2487,7 +2487,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             })()}
           </div>
 
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           {importedInterventions.length > 0 && (
             <div style={styles.card}>
               <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
@@ -2907,7 +2907,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 3: OFFERTA */}
       {step === 3 && (
         <div>
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

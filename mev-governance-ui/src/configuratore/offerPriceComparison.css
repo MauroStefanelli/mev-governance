@@ -62,3 +62,9 @@
 .offer-price-table.offer-price-table-compact { width: 100%; min-width: 1000px; }
 .offer-row-identity { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 11px; color: #526b89; }
 .offer-price-comparison :focus-visible { outline: 3px solid #84ade8; outline-offset: 3px; }
+.offer-recovery-source { padding: 14px 16px; margin: 12px 0; background: #edf7f2; border: 1px solid #cce4d8; border-radius: 10px; color: #305c49; font-size: 12px; }
+.offer-recovery-source dl { display: grid; gap: 8px; margin: 12px 0; }
+.offer-recovery-source dl > div { display: grid; grid-template-columns: 85px minmax(0,1fr); gap: 10px; }
+.offer-recovery-source dt { color: #607b6e; }
+.offer-recovery-source dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+.offer-recovery-source p { margin: 0; }
