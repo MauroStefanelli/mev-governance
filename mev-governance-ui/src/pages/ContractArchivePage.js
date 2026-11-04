@@ -12,7 +12,7 @@ import {
 } from '../services/mevService';
 import { CONTRACT_SUMMARIES } from '../configuratore/contractSummaries';
 
-const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
+import { euro } from '../utils';
 
 // ── Stili allineati a ConfiguratorePage ───────────────────────────────────
 const S = {

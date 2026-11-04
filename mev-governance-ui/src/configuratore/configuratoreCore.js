@@ -8,12 +8,13 @@ import { catalogUnitPrice, resolveCatalogEntry } from "./catalogReconciliation";
 // ============================================================
 
 import JSZip from "jszip";
+import { euro } from '../utils';
 import { APP_DATA } from "./appData";
 import { DEFAULT_APPLICATIONS } from "./applications";
 
 export { APP_DATA, DEFAULT_APPLICATIONS };
 
-export const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+export { euro } from '../utils';
 
 export const esc = (s) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");

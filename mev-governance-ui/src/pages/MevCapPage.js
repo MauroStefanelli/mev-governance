@@ -595,7 +595,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
   const formatDisplay = (val) => {
     const n = parseFloat(val);
     if (isNaN(n) || val === "" || val == null) return "";
-    return n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return fmtItIT(n, 2);
   };
 
   const handleFocus = (nome) => {
@@ -637,7 +637,7 @@ function SocietàImportiInput({ societàList, importiValue, onChange, color = "#
         </span>
         {totalImporti > 0 && (
           <span style={{ fontSize: "10px", fontWeight: 700, color: labelColor }}>
-            Tot: {totalImporti.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            Tot: {fmtItIT(totalImporti, 2)}
           </span>
         )}
       </div>

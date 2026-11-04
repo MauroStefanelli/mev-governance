@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { fmtItIT } from '../utils';
 import * as XLSX from "xlsx";
 import { getConsumoTow, getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord, recalcConsumoTow } from "../services/mevService";
 import {
@@ -786,7 +787,7 @@ function ConsumoTowSection({ towRows, ambienteId }) {
             const towRows = filtered.filter(r => r.towContratto === selectedTipo);
             if (towRows.length === 0) return null;
 
-            const fmtNum = n => (n ?? 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const fmtNum = n => fmtItIT(n ?? 0, 2);
             const safeDiv = (a, b) => (b && b !== 0 ? a / b : null);
             // QTA contrattuale fissa = ValoreTotale / ValoreUnitario (non il campo TowApprovati che è dinamico)
             const getQta = r => !r.isCatalogo && r.valoreUnitario > 0 ? r.valoreTotale / r.valoreUnitario : null;

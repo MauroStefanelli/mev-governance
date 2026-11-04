@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { fmtItIT } from '../utils';
 import * as XLSX from "xlsx";
 import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFiglio, deleteConsumoTowContratto,
   getTowImpatto, setTowImpatto as saveTowImpattoToDb, getMevList,
@@ -306,7 +307,7 @@ const saveTowImpatto = (map) => {
 const formatEuro = (v) => {
   const n = Number(v);
   if (isNaN(n)) return "—";
-  return new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true }).format(n) + " €";
+  return fmtItIT(n, 2) + " €";
 };
 
 const formatQta = (v) => {
@@ -349,11 +350,7 @@ const formatForInput = (v, group) => {
   const n = Number(v);
   if (isNaN(n) || v === "" || v === null || v === undefined) return "0";
   if (group === "euro") {
-    return new Intl.NumberFormat("it-IT", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-      useGrouping: true,
-    }).format(n);
+    return fmtItIT(n, 2);
   }
   // qta: fino a 3 decimali, senza simbolo €
   return new Intl.NumberFormat("it-IT", {

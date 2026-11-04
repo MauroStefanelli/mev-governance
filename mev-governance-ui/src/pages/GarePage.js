@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { fmtItIT } from '../utils';
 import OffertaCatalogo, { aggiornaCatalogoModifica } from "../components/gare/OffertaCatalogo";
 import LottoFilePicker from "../components/gare/LottoFilePicker";
 import LottiOverview from "../components/gare/LottiOverview";
@@ -581,7 +582,7 @@ function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara, lottoSelezio
         <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>Offerta Economica</div>
         {importoBase && (
           <span style={{ background: sopraSoglia ? "rgba(220,38,38,0.85)" : "rgba(255,255,255,0.2)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>
-            Base gara: € {Number(importoBase).toLocaleString("it-IT", { minimumFractionDigits: 2 })}
+            Base gara: € {fmtItIT(importoBase, 2)}
             {sopraSoglia && " ⚠ SUPERA LA SOGLIA"}
           </span>
         )}
@@ -633,7 +634,7 @@ function TabOffertaEconomica({ offertaLotti, lotti, onUpdate, gara, lottoSelezio
               <tr style={{ background: "#f0fdf4", borderTop: "2px solid #86efac" }}>
                 <td colSpan={4} style={{ padding: "8px 12px", fontWeight: 700, color: "#166534", fontSize: 12 }}>Totale offerta</td>
                 <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, fontSize: 14, color: sopraSoglia ? "#dc2626" : "#166534" }}>
-                  € {totaleOfferto.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  € {fmtItIT(totaleOfferto, 2)}
                   {sopraSoglia && <span style={{ fontSize: 10, marginLeft: 4 }}>⚠</span>}
                 </td>
                 <td />
@@ -1212,7 +1213,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                                 <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}><span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 6px", fontWeight: 700, fontSize: 11 }}>{t.id}</span></td>
                                                 <td style={{ padding: "7px 10px", color: "#111827", fontWeight: 500 }}>{t.acatalogo ? <span style={{ color: "#1d4ed8", fontWeight: 700, fontSize: 11 }}>A catalogo</span> : (t.descrizione || "—")}</td>
                                                 <td style={{ padding: "7px 10px", textAlign: "right" }}>{peso != null ? <span style={{ background: AMBER_LIGHT, color: AMBER_DARK, border: "1px solid " + AMBER_BORDER, borderRadius: 5, padding: "2px 6px", fontWeight: 700, fontSize: 11 }}>{peso.toLocaleString("it-IT", { minimumFractionDigits: 2 })}%</span> : <span style={{ color: "#d1d5db" }}>—</span>}</td>
-                                                <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600, color: imp != null ? "#111827" : "#d1d5db" }}>{imp != null ? "€ " + imp.toLocaleString("it-IT", { minimumFractionDigits: 2 }) : "—"}</td>
+                                                <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600, color: imp != null ? "#111827" : "#d1d5db" }}>{imp != null ? "€ " + fmtItIT(imp, 2) : "—"}</td>
                                               </tr>
                                             );
                                           })}
@@ -1333,7 +1334,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                               {t._importo != null
                                                 ? <span style={{ color: t._isResiduo ? "#1d4ed8" : "#111827" }}>
                                                     {t._isResiduo && <span title="Calcolato come residuo della base d'asta" style={{ fontSize: 10, marginRight: 4, color: "#93c5fd" }}>≈</span>}
-                                                    € {t._importo.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    € {fmtItIT(t._importo, 2)}
                                                   </span>
                                                 : (t.acatalogo
                                                     ? <span style={{ color: "#93c5fd", fontSize: 11 }}>A catalogo</span>
@@ -1348,7 +1349,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                         <tr style={{ background: AMBER_BG, borderTop: "2px solid " + AMBER_BORDER }}>
                                           <td colSpan={4} style={{ padding: "8px 12px", fontWeight: 700, color: AMBER_DARK, fontSize: 12 }}>Totale TOW calcolato</td>
                                           <td style={{ padding: "8px 12px", fontWeight: 800, color: AMBER_DARK, textAlign: "right", fontSize: 13 }}>
-                                            € {towCalc.filter(t => t._importo != null).reduce((s, t) => s + t._importo, 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            € {fmtItIT(towCalc.filter(t => t._importo != null).reduce((s, t) => s + t._importo, 0), 2)}
                                           </td>
                                         </tr>
                                       </tfoot>
@@ -1410,7 +1411,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                                       </thead>
                                       <tbody>
                                         {catalogo.map((c, i) => {
-                                          const fmt = v => v != null && v > 0 ? Number(v).toLocaleString("it-IT", { minimumFractionDigits: 2 }) : <span style={{ color: "#d1d5db" }}>—</span>;
+                                          const fmt = v => v != null && v > 0 ? fmtItIT(v, 2) : <span style={{ color: "#d1d5db" }}>—</span>;
                                           return (
                                             <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#f8faff" }}>
                                               <td style={{ padding: "7px 10px", whiteSpace: "nowrap", borderRight: "1px solid #f0f0f0" }}>
@@ -1552,8 +1553,8 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                               <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{r.voce}</div>
                             </div>
                             <span style={{ fontSize: 12, color: "#6b7280", minWidth: 50, textAlign: "right" }}>{r.gg != null ? r.gg + " gg" : "-"}</span>
-                            <span style={{ fontSize: 12, color: "#6b7280", minWidth: 80, textAlign: "right" }}>{r.tariffa ? "€ " + r.tariffa.toLocaleString("it-IT") : "-"}</span>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "#111827", minWidth: 90, textAlign: "right" }}>{"€ " + (r.importo || 0).toLocaleString("it-IT")}</span>
+                            <span style={{ fontSize: 12, color: "#6b7280", minWidth: 80, textAlign: "right" }}>{r.tariffa ? "€ " + fmtItIT(r.tariffa, 2) : "-"}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "#111827", minWidth: 90, textAlign: "right" }}>{"€ " + fmtItIT(r.importo || 0, 2)}</span>
                             {r.dettagli && (
                               <button onClick={() => toggleDettagli(key)} style={{ background: open ? AMBER_LIGHT : "#f1f5f9", color: open ? AMBER_DARK : "#475569", border: "1px solid " + (open ? AMBER_BORDER : "#e2e8f0"), borderRadius: 7, padding: "4px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                                 {open ? "Chiudi" : "Dettagli"}
@@ -1593,7 +1594,7 @@ export function DettaglioGara({ gara, onBack, onUpdate, onDelete }) {
                     {/* Totale */}
                     <div style={{ background: AMBER_LIGHT, border: "1px solid " + AMBER_BORDER, borderRadius: 10, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16 }}>
                       <span style={{ fontSize: 14, fontWeight: 800, color: AMBER_DARK }}>TOTALE</span>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: AMBER_DARK }}>{"€ " + totEco.toLocaleString("it-IT")}</span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: AMBER_DARK }}>{"€ " + fmtItIT(totEco, 2)}</span>
                     </div>
                   </div>
                 )}

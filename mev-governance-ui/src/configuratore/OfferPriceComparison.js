@@ -2,7 +2,8 @@ import "./offerPriceComparison.css";
 import React, { useState } from 'react';
 import { reconcileCatalog, resolveCatalogEntry } from './catalogReconciliation';
 import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
-const money = value => value == null ? 'Non disponibile' : new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
+import { euro } from '../utils';
+const money = value => value == null ? 'Non disponibile' : euro.format(value);
 export default function CatalogReconciliation({ items, catalog, contractName, lot, lotDescription, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, reviewProgress, onReview }) {
   const [choices, setChoices] = useState({});
   const [view, setView] = useState('interventions');

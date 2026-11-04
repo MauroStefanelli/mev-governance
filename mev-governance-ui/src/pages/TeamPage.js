@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { fmtItIT } from '../utils';
 import * as XLSX from "xlsx";
 import { getTeam, createTeamMember, updateTeamMember, deleteTeamMember, importTeam } from "../services/mevService";
 
@@ -6,7 +7,7 @@ import { getTeam, createTeamMember, updateTeamMember, deleteTeamMember, importTe
 const fmtEuro = (v) => {
   const n = Number(v);
   if (v === null || v === undefined || v === "") return "—";
-  return `€ ${n.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `€ ${fmtItIT(n, 2)}`;
 };
 const fmtDate = (v) => {
   if (!v) return "";

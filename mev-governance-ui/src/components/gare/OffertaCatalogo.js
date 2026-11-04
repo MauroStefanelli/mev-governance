@@ -1,8 +1,9 @@
 import React from "react";
+import { euro as euroFormatter } from '../../utils';
 import { numeroLotto } from "./lottoAmounts";
 
 export const FASCE = ["Semplice", "Medio", "Complesso"];
-export const euro = value => value == null ? "—" : Number(value).toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+export const euro = value => value == null ? "—" : euroFormatter.format(value);
 const cell = { padding: "10px 8px", border: "1px solid #cbd5e1", verticalAlign: "top" };
 const head = { ...cell, background: "#102a43", color: "white", textAlign: "center", whiteSpace: "nowrap" };
 

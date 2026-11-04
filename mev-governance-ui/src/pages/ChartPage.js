@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { euro } from '../utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -32,7 +33,6 @@ const STATI_ESCLUSI = new Set(["eliminato", "sospeso"]);
 // Stati mostrati di default
 const DEFAULT_VISIBLE = ["approvato", "in approvazione", "in analisi / stima", "in analisi"];
 
-const euro = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
 const compact = new Intl.NumberFormat("it-IT", { notation: "compact", maximumFractionDigits: 1 });
 const count = new Intl.NumberFormat("it-IT");
 const collator = new Intl.Collator("it", { numeric: true, sensitivity: "base" });

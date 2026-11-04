@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { euro } from '../utils';
 import * as XLSX from "xlsx";
 import "./reportAvanzamenti.css";
 import { getMevList, getReleaseSchedules, upsertReleaseSchedule, deleteReleaseSchedule, renameReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
@@ -21,7 +22,6 @@ const C = {
   head:     "#172554",
 };
 
-const euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // fmtDate was declared but unused; remove to avoid lint warning
 
 // ── Stato colori ─────────────────────────────────────────────────────────────

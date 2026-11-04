@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { euro } from '../utils';
 import { resolveCatalogEntry, catalogUnitPrice } from './catalogReconciliation';
 import { exportOfferWorkbook } from '../services/mevService';
 
@@ -60,7 +61,7 @@ export default function OfferWorkbookExport({ initiative, items, interventions, 
     <label>Modello Excel originale<input type="file" accept=".xlsx" onChange={e => setTemplate(e.target.files?.[0] || null)} /></label>
     <p>TOW .1, .3 e .4 sono calcolate dal valore di catalogo di ogni intervento, con moltiplicatore e percentuali della stima contrattuale. Le quantità equivalenti derivano dall’importo diviso per il prezzo unitario. TOW .2 usa la quantità già inserita in Offerta, ripartita in proporzione al valore di catalogo.</p>
     <div>{[1, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>TOW 0{lot}.{n}: {percentages?.[n] ?? 'non configurata'}%</span>)}</div>
-    <div>{[1, 2, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>Prezzo TOW 0{lot}.{n}: {prices[`TOW0${lot}.${n}`] > 0 ? new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(prices[`TOW0${lot}.${n}`]) : 'non disponibile'}</span>)}</div>
+    <div>{[1, 2, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>Prezzo TOW 0{lot}.{n}: {prices[`TOW0${lot}.${n}`] > 0 ? euro.format(prices[`TOW0${lot}.${n}`]) : 'non disponibile'}</span>)}</div>
     {priceError && <p role="alert">{priceError}</p>}
     {[1, 3, 4].some(n => !(prices[`TOW0${lot}.${n}`] > 0)) && <p>Le percentuali di impatto non sono prezzi unitari. Verifica il listino TOW del lotto in Archivio Contrattuale e il Tipo contratto nei dati iniziativa. Il listino dell’esempio Excel non viene utilizzato.</p>}
     {rows.map(i => <p key={i.id}><strong>{i.id}</strong> · {i.titolo}</p>)}
