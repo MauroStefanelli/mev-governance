@@ -46,3 +46,19 @@
 .offer-ai-empty p { font-size: 12px; }
 .offer-type { font-size: 10px; font-weight: 700; color: #58708e; }
 .offer-complexity { margin-top: 6px; font-size: 13px; font-weight: 600; }
+.offer-view-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.offer-view-switch { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #edf2f9; }
+.offer-view-switch button { border: 0; border-radius: 8px; padding: 10px 16px; background: transparent; color: #527091; font-weight: 650; cursor: pointer; }
+.offer-view-switch button[aria-pressed="true"] { background: #fff; color: #245c9e; box-shadow: 0 2px 7px #25466b16; }
+.offer-economics-toggle { display: inline-flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 12px; border: 1px solid #c8d9ef; background: linear-gradient(135deg,#f7faff,#e8f1ff); color: #295c9b; font-size: 12px; font-weight: 700; box-shadow: 0 3px 8px #25466b0b; cursor: pointer; transition: box-shadow .15s, transform .15s; }
+.offer-economics-toggle:hover { box-shadow: 0 5px 12px #25466b24; transform: translateY(-1px); }
+.offer-economics-toggle.is-active { background: #285c9e; color: white; border-color: #285c9e; }
+.offer-group-directory > summary, .offer-activity-group > summary { cursor: pointer; border-radius: 10px; padding: 14px 16px; background: #f1f5fb; color: #264b77; font-size: 14px; }
+.offer-group-directory > summary { font-weight: 700; background: #e7effb; }
+.offer-group-directory summary span { font-size: 11px; font-weight: 400; color: #627a96; margin-left: 12px; }
+.offer-activity-group { margin: 10px 0; border: 1px solid #dbe5f1; border-radius: 10px; overflow: hidden; }
+.offer-activity-group[open] > summary { border-bottom: 1px solid #dbe5f1; }
+.offer-activity-group .offer-price-scroll { margin-top: 0; border: 0; border-radius: 0; max-height: 650px; }
+.offer-price-table.offer-price-table-compact { width: 100%; min-width: 1000px; }
+.offer-row-identity { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 11px; color: #526b89; }
+.offer-price-comparison :focus-visible { outline: 3px solid #84ade8; outline-offset: 3px; }

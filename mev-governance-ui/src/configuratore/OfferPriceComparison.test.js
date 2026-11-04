@@ -5,9 +5,15 @@ import OfferPriceComparison from './OfferPriceComparison';
 import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
 const item = { key:'row-1', id:239, imported:true, interventionId:'INT-1', type:'MODIFICA', complexity:'Medio',qty:1,unit:360,original:{unit:360,total:360} };
 const catalog = [{id:239,prezzi:{MODIFICA:{Medio:400}}}];
+const expandInterventions = () => {
+  fireEvent.click(screen.getByText('Interventi', { selector: 'summary' }));
+  fireEvent.click(screen.getByText('INT-1', { selector: 'summary strong' }));
+};
 test('shows original and contract prices and only applies a price on explicit click', () => {
   const onApply = jest.fn();
   render(<OfferPriceComparison items={[item]} catalog={catalog} contractName="Sistema" lot="2" onApply={onApply} />);
+  expandInterventions();
+  fireEvent.click(screen.getByRole('button', { name: /Mostra dettagli e importi/ }));
   expect(screen.getAllByText('360,00 €').length).toBeGreaterThan(0);
   expect(screen.getByText('40,00 €')).toBeInTheDocument();
   expect(onApply).not.toHaveBeenCalled();
@@ -18,6 +24,7 @@ test('shows per-row AI rationale and marks it stale after changing complexity', 
   const signature = detailReviewSignature(detailReviewInput(item, catalog, [], 'system', '2', 0));
   const reviews = { 'row-1': { signature, status: 'da_verificare', reason: 'Manca il criterio di complessità', suggestion: 'Verificare il requisito' } };
   const view = render(<OfferPriceComparison items={[item]} catalog={catalog} contractId="system" lot="2" reviews={reviews} onApply={jest.fn()} />);
+  expandInterventions();
   expect(screen.getByRole('columnheader', { name: 'Verifica AI attività / catalogo' })).toBeInTheDocument();
   expect(screen.getByText('Manca il criterio di complessità')).toBeInTheDocument();
   view.rerender(<OfferPriceComparison items={[{ ...item, complexity: 'Complesso' }]} catalog={catalog} contractId="system" lot="2" reviews={reviews} onApply={jest.fn()} />);
@@ -26,9 +33,29 @@ test('shows per-row AI rationale and marks it stale after changing complexity', 
 test('keeps missing and builtin catalog prices explicit and disables application', () => {
   const view=render(<OfferPriceComparison items={[item]} catalog={[]} lot="2" onApply={jest.fn()} />);
   expect(screen.getByRole('alert')).toHaveTextContent('1 righe senza prezzo');
-  expect(screen.getByRole('button')).toBeDisabled();
+   expandInterventions();
+   expect(screen.getByRole('button', { name: 'Applica prezzo catalogo riga 1' })).toBeDisabled();
   view.rerender(<OfferPriceComparison items={[item]} catalog={catalog} lot="2" builtin onApply={jest.fn()} />);
-  expect(screen.getByRole('button')).toBeDisabled();
+   expect(screen.getByRole('button', { name: 'Applica prezzo catalogo riga 1' })).toBeDisabled();
+});
+test('groups activities by intervention or catalog and toggles economic columns without changing data', () => {
+  const onApply = jest.fn();
+  render(<OfferPriceComparison items={[item, { ...item, key: 'row-2', interventionId: 'INT-2' }]} catalog={[{ ...catalog[0], nome: 'API' }]} lot="2" onApply={onApply} />);
+  expandInterventions();
+  expect(screen.queryByRole('columnheader', { name: 'Prezzo Excel' })).not.toBeInTheDocument();
+  expect(screen.getByText('ID Intervento INT-1')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Voce catalogo' }));
+  fireEvent.click(screen.getByText('Voci catalogo', { selector: 'summary' }));
+  fireEvent.click(screen.getByText('API', { selector: 'summary strong' }));
+  expect(screen.getByText('ID Intervento INT-1')).toBeVisible();
+  expect(screen.getByText('ID Intervento INT-2')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: /Mostra dettagli e importi/ }));
+  expect(screen.getByRole('columnheader', { name: 'Prezzo Excel' })).toBeVisible();
+  const headers = screen.getAllByRole('columnheader');
+  expect(headers.slice(0, 3).map(h => h.textContent)).toEqual(['Intervento / attività', 'Voce catalogo', 'Verifica AI attività / catalogo']);
+  fireEvent.click(screen.getByRole('button', { name: /Nascondi dettagli e importi/ }));
+  expect(screen.queryByRole('columnheader', { name: 'Prezzo Excel' })).not.toBeInTheDocument();
+  expect(onApply).not.toHaveBeenCalled();
 });
 test('associates legacy Excel codes with a different system catalog identifier explicitly', () => {
  const onAssign=jest.fn();
