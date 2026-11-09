@@ -1,5 +1,7 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import DevelopmentActivities from "../configuratore/ActivityDevelopmentPanel";
+import { importedGapSuggestions, developmentActivities, developmentMarkdown } from "../configuratore/developmentActivityModel";
 import ConfiguratorManual from "../configuratore/ConfiguratorManual";
 import ImportedInterventionGroup, { importedMappingValues } from "../configuratore/ImportedInterventionGroup";
 import { saveImportedRevision } from "../configuratore/importRevision";
@@ -98,6 +100,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
   const [detailReviews, setDetailReviews] = useState({});
+  const [developmentPlans, setDevelopmentPlans] = useState({});
   const [detailReviewBusy, setDetailReviewBusy] = useState(false);
   const [detailReviewProgress, setDetailReviewProgress] = useState('');
   const detailReviewJob = useRef(0);
@@ -530,6 +533,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         // Risultato del secondo parere AI (se presente, per non perderlo navigando)
         aiProposals: aiProposals || null,
         detailReviews,
+        developmentPlans,
         suggestions,
       },
     };
@@ -548,6 +552,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   // ── Reset / iniziativa ──
   const resetInitiative = () => {
+    setDevelopmentPlans({});
     detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false); setDetailReviewProgress('');
     setInitiative({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
     setImportedInterventions([]);
@@ -623,6 +628,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       }
       setImportedInterventions(parsed.interventions);
       setItems(parsed.items);
+      setDevelopmentPlans({});
       setDetailReviews({});
       // Start only after successful import; technical review never blocks import.
       void runDetailReview(parsed.items, importLot?.catalog || catalog, parsed.interventions, parsed.lot || lot);
@@ -635,7 +641,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       setImportHistoryError('');
       try {
         await saveImportedRevision(importedInitiative, { initiative: importedInitiative, items: parsed.items,
-          importedInterventions: parsed.interventions, suggestions: [], detailReviews: {},
+          importedInterventions: parsed.interventions, suggestions: [], detailReviews: {}, developmentPlans: {},
           sourceWorkbookName: parsed.fileName, catalogSource: { contractId: selectedContractId, lot: parsed.lot || lot, towPriceSourceId },
           discount, contingency, tow, towPercentages }, parsed.fileName);
         setWorkspaceReload(value => value + 1);
@@ -644,7 +650,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         setImportHistoryError(`Excel importato, ma revisione non salvata: ${e.message} I dati importati restano nella pagina. Salva una revisione dal workspace dopo aver verificato lo storico.`);
       }
       toast(`${parsed.interventions.length} interventi e ${parsed.items.length} dettagli importati; verifico possibili integrazioni`);
-      await runGapAnalysis(parsed.interventions, parsed.items);
+      runGapAnalysis(parsed.interventions, importLot?.catalog || catalog);
     } catch (err) {
       toast("Importazione non riuscita: " + err.message);
     } finally {
@@ -653,50 +659,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
 
   // ── Step 2: gap analysis (port da analyzeImportedGaps) ──
-  const runGapAnalysis = async (interventions, _already = items) => {
-    const suggestions = [];
-    for (const intervention of interventions) {
-      const history = await loadInitiativeHistory();
-      const historicalCounts = new Map();
-      history.forEach((rec) => {
-        const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
-        const sys = payload.initiative?.system || rec.payload?.system || "";
-        if (appNorm(sys) && appNorm(intervention.sistema) && appNorm(intervention.sistema).includes(appNorm(sys))) {
-          (payload.items || []).forEach((x) => historicalCounts.set(x.id, (historicalCounts.get(x.id) || 0) + 1));
-        }
-      });
-      const detailText = (intervention.mappings || []).flatMap((m) => [m.name, m.componentApplication, m.technology, m.unitName, m.detailDescription, m.ambit]).join(" ");
-      const profileCatalogIds = [];
-      const apps = applicationContextFor(intervention.sistema, DEFAULT_APPLICATIONS[lot]);
-      apps.forEach((a) => {
-        const techs = [...(a.languages || []), ...(a.databases || []), ...(a.extraTechnologies || [])];
-        catalog.forEach((c) => {
-          if (techs.some((t) => appNorm(t) && (appNorm(c.nome) + appNorm(c.descrizione)).includes(appNorm(t)))) profileCatalogIds.push(c.id);
-        });
-      });
-      const appText = applicationsText(apps);
-      const { scores } = scoreIntervention({ intervention, detailText: detailText + " " + initiativeScopeText(initiative), catalog, applicationContextText: appText, historicalCounts, profileCatalogIds });
-      [...scores]
-        .map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score }))
-        .filter((x) => x.c && !new Set((intervention.mappings || []).map((m) => m.catalogId)).has(x.c.id) && x.score >= 2)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
-        .forEach(({ c, score }) => {
-          const source = [intervention.titolo, intervention.descrizione, intervention.attivita, detailText, appText].join(" ").toLowerCase();
-          suggestions.push({
-            id: c.id,
-            selected: false,
-            type: source.match(/modific|adegua|evoluz|rientro/) ? "MODIFICA" : "REALIZZAZIONE",
-            complexity: "Medio",
-            qty: 1,
-            score,
-            reason: `Possibile voce aggiuntiva per ${intervention.id}: ${reasonFor(c, source)}`,
-            interventionId: intervention.id,
-            interventionTitle: intervention.titolo,
-          });
-        });
-    }
-    setSuggestions(suggestions);
+  const runGapAnalysis = (interventions, selectedCatalog = catalog) => {
+    setSuggestions(importedGapSuggestions(interventions, selectedCatalog));
   };
 
   const safeParse = (s) => {
@@ -715,7 +679,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     // Se ci sono interventi importati dal workbook, usa runGapAnalysis
     // per ottenere il raggruppamento per ID_INTERVENTO (come in "Mostra dettaglio importato")
     if (importedInterventions.length > 0) {
-      await runGapAnalysis(importedInterventions, items);
+      runGapAnalysis(importedInterventions);
       setStep(2);
       return;
     }
@@ -1239,6 +1203,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     // Ripristina il risultato del secondo parere AI (se presente nel payload)
     setAiProposals(payload.aiProposals || null);
     setDetailReviews(payload.detailReviews || {});
+    setDevelopmentPlans(payload.developmentPlans || {});
     // Ripristina app selezionate e techProfile
     if (payload.selectedAppIds?.length) {
       setSelectedAppIds(payload.selectedAppIds);
@@ -1264,6 +1229,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     }
     if (source) { setSelectedContractId(source.contractId); setLot(String(source.lot)); }
     setTowPriceSourceId(source?.towPriceSourceId || '');
+    setDevelopmentPlans(snapshot.developmentPlans || {});
     setInitiative({ ...(snapshot.initiative || {}), code, title: state.title || '', system: state.system || '' });
     setItems(snapshot.items || []);
     setImportedInterventions(snapshot.importedInterventions || []);
@@ -1572,7 +1538,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         ? ((allPaths[0] || "").split("/")[0] || "repository")
         : (techProfile?.name || initiative.system || "repository");
       const request = {
-        formatVersion: 3,
+        formatVersion: 4,
+        developmentActivities: developmentActivities(items).map(a => ({ key: a.key, interventionId: a.item.interventionId,
+          description: a.item.detail?.detailDescription || a.item.reason, plan: developmentPlans[a.key] || {} })),
         generatedAt: new Date().toISOString(),
         source: "Configuratore MEV v1",
         targetTool: codeChangeTool,
@@ -1619,6 +1587,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         techProfile: techProfile || null,
       }));
       zip.file("elenco_file_repository.txt", allPaths.join("\n"));
+      const activityList = developmentActivities(items);
+      zip.file("schede_sviluppo.json", JSON.stringify({ goto: initiative.code, activities: activityList.map(a => ({ key: a.key, interventionId: a.item.interventionId, description: a.item.detail?.detailDescription || a.item.reason, plan: developmentPlans[a.key] || {} })) }, null, 2));
+      zip.file("SCHEDE_SVILUPPO.md", developmentMarkdown(activityList, developmentPlans, applicationContextFor(initiative.system, applications, lot)));
       zip.file("VERIFICA_SELEZIONE.txt", [
         `Codice iniziativa: ${initiative.code || ""}`,
         `Titolo: ${initiative.title || ""}`,
@@ -2384,7 +2355,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         {importHistoryError && <p role="alert">{importHistoryError}</p>}
         <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}:${workspaceReload}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
           onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
-          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
+          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, developmentPlans, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
       </div>
       {step === 1 && (
         <div>
@@ -3141,6 +3112,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
 
       {/* STEP 4: REVISIONE */}
       {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} priceError={towPriceResolution.error} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} />}
+      {step === 4 && <DevelopmentActivities items={items} plans={developmentPlans} onChange={setDevelopmentPlans} applications={applicationContextFor(initiative.system, applications, lot)} onSelectFiles={selectImplementationRepository} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />
