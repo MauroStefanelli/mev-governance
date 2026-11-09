@@ -130,6 +130,13 @@ export async function prepareActivityDevelopment(context) {
   return result;
 }
 
+export async function generateActivityCode(context) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/activity-code`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(context) });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(response.status === 404 ? 'Aggiorna il backend DEV: generazione codice non ancora disponibile sul servizio.' : result.message || `Generazione codice fallita (HTTP ${response.status}).`);
+  return result;
+}
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",

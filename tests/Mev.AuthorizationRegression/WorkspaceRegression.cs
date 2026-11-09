@@ -10,6 +10,12 @@ public static class WorkspaceRegression
 {
     public static async Task Run(AppDbContext db, Action<bool, string> check)
     {
+        foreach (var badPath in new[] { "../outside.java", "/etc/file", "src/../a", "C:/a", ".git/config", ".env", "a\\b" })
+            check(!MevGovernanceBackend.Services.CodeArtifactValidation.SafePath(badPath), "Code artifact rejects unsafe path " + badPath);
+        var filesResponse = System.Text.Json.Nodes.JsonNode.Parse("{\"files\":[{\"path\":\"src/A.java\",\"action\":\"update\",\"baseSha256\":\"abc\",\"content\":\"class A {}\"}]}")!.AsObject();
+        check(MevGovernanceBackend.Services.CodeArtifactValidation.Validate(filesResponse, new Dictionary<string,string> { ["src/A.java"] = "abc" }).Count == 1, "Code artifacts accept exact original hash");
+        try { MevGovernanceBackend.Services.CodeArtifactValidation.Validate(filesResponse, new Dictionary<string,string> { ["src/A.java"] = "different" }); check(false, "Hash mismatch must fail"); }
+        catch (ArgumentException) { check(true, "Code artifacts reject mismatched originals"); }
         var activityResponse = System.Text.Json.Nodes.JsonNode.Parse("{\"result\":{\"soluzione\":\"Verificare endpoint OSB\",\"acceptanceCriteria\":[\"Payload valido\",\"Errore gestito\"]}}")!.AsObject();
         var activityPlan = MevGovernanceBackend.Services.ActivityDevelopmentResponse.Normalize(activityResponse);
         check(activityPlan?["solution"]?.ToString() == "Verificare endpoint OSB", "Activity AI accepts nested solution aliases");

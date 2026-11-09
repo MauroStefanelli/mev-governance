@@ -84,6 +84,8 @@
 .project-preparation input,.project-preparation select,.project-preparation textarea { display: block; width: 100%; box-sizing: border-box; padding: 10px; margin-top: 6px; border: 1px solid #bfd0e6; border-radius: 8px; font: inherit; background: #fbfcfe; }
 .project-preparation fieldset { border: 1px solid #dbe5f2; border-radius: 10px; padding: 14px; margin: 14px 0; }
 .project-preparation legend { font-size: 13px; font-weight: 650; color: #355e8f; }
+.activity-code-generator .workspace-fields textarea,.activity-code-generator select { display: block; width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #b9cce4; border-radius: 8px; font: inherit; margin-top: 6px; }
+.generated-code-preview { white-space: pre-wrap; overflow-wrap: anywhere; background: #152c47; color: #e3edfa; padding: 16px; border-radius: 8px; max-height: 500px; overflow: auto; font-size: 12px; line-height: 1.7; }
 .tow-workbench > .tow-initiative-library { padding: 20px !important; background: linear-gradient(125deg,#fff 40%,#f1f6fe) !important; border: 1px solid #d9e4f2; box-shadow: 0 5px 20px #24466e08; border-radius: 16px !important; }
 .initiative-library-trigger { display: flex; align-items: center; gap: 14px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; color: #234c7c; }
 .initiative-library-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(140deg,#dceaff,#edf4ff); color: #356caf; flex-shrink: 0; }

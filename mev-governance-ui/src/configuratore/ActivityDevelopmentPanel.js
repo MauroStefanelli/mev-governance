@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { developmentActivities } from './developmentActivityModel';
 import { activitySourceContext } from './activitySourceContext';
 import { prepareActivityDevelopment } from '../services/mevService';
+import ActivityCodeGenerator from './ActivityCodeGenerator';
 
 export default function DevelopmentActivities({ items, plans, onChange, applications, onSelectFiles, sourceFiles = [] }) {
   const [filter, setFilter] = useState('Tutte');
@@ -40,7 +41,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
       <button type="button" onClick={onSelectFiles}>Seleziona cartella sorgenti per questa sessione</button>
     </div>
     <label>Stato attività<select value={filter} onChange={e => setFilter(e.target.value)}><option>Tutte</option>{states.map(state => <option key={state}>{state}</option>)}</select></label>
-    <p>{sourceFiles.length} file selezionati nella sessione. La preparazione AI analizza un campione e non genera ancora patch.</p>
+    <p>{sourceFiles.length} file selezionati nella sessione. “Prepara scheda con AI” usa estratti; “Generazione codice / workflow” produce file completi per il target scelto e richiede gli originali completi per modificarli.</p>
     {error && <p role="alert">{error}</p>}
     {activities.filter(a => filter === 'Tutte' || (plans[a.key]?.status || 'Da analizzare') === filter).map(({ key, item, number }) => {
       const plan = plans[key] || {};
@@ -63,6 +64,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
         <div className="workspace-fields">{[['files', 'File coinvolti (uno per riga, percorso relativo)'], ['solution', 'Soluzione tecnica'], ['acceptance', 'Criteri di accettazione'], ['verification', 'Evidenze di verifica (test, comando, esito, commit)']].map(([field, label]) => <label key={field}>{label}<textarea rows={4} value={plan[field] || ''} onChange={e => update(key, { [field]: e.target.value })} /></label>)}</div>
         <label>Stato di verifica<select aria-label={`Stato attività ${number}`} value={plan.status || 'Da analizzare'} onChange={e => update(key, { status: e.target.value })}>{states.map(state => <option key={state} disabled={(state === 'Verificata' && !plan.verification?.trim()) || (state === 'Pronta per sviluppo' && (!plan.files?.trim() || !plan.solution?.trim() || !plan.acceptance?.trim()))}>{state}</option>)}</select></label>
         <p>“Verificata” è una dichiarazione dell’analista accompagnata da evidenze; il configuratore non esegue compilazioni o test del repository.</p>
+        <ActivityCodeGenerator item={item} plan={plan} update={patch => update(key, patch)} applications={applications} sourceFiles={sourceFiles} />
       </details>;
     })}
   </section>;
