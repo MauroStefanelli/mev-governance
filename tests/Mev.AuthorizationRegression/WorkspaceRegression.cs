@@ -10,6 +10,11 @@ public static class WorkspaceRegression
 {
     public static async Task Run(AppDbContext db, Action<bool, string> check)
     {
+        var activityResponse = System.Text.Json.Nodes.JsonNode.Parse("{\"result\":{\"soluzione\":\"Verificare endpoint OSB\",\"acceptanceCriteria\":[\"Payload valido\",\"Errore gestito\"]}}")!.AsObject();
+        var activityPlan = MevGovernanceBackend.Services.ActivityDevelopmentResponse.Normalize(activityResponse);
+        check(activityPlan?["solution"]?.ToString() == "Verificare endpoint OSB", "Activity AI accepts nested solution aliases");
+        check(activityPlan?["acceptance"]?.ToString() == "Payload valido\nErrore gestito", "Activity AI normalizes string-array criteria");
+        check(MevGovernanceBackend.Services.ActivityDevelopmentResponse.Normalize(new System.Text.Json.Nodes.JsonObject { ["solution"] = "Ipotesi" }) == null, "Activity AI never fabricates missing acceptance criteria");
         var rowResponse = System.Text.Json.Nodes.JsonNode.Parse("{\"rowId\":\"d1\",\"status\":\"da_verificare\",\"reason\":\"Mancano criteri\"}")!.AsObject();
         check(MevGovernanceBackend.Services.OfferReviewResponse.ValidRow(MevGovernanceBackend.Services.OfferReviewResponse.Normalize(rowResponse), "d1") != null, "AI accepts single-row JSON response");
         var wrapped = new System.Text.Json.Nodes.JsonObject { ["analysis"] = new System.Text.Json.Nodes.JsonObject { ["reviews"] = new System.Text.Json.Nodes.JsonArray(rowResponse.DeepClone()) } };
