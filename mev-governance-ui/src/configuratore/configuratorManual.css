@@ -26,6 +26,10 @@
 .tow-manual-content li::marker { color: #447cba; font-weight: 700; }
 .tow-manual-content aside { padding: 14px 18px; background: #edf4ff; border-left: 3px solid #719bcf; border-radius: 8px; font-size: 12px; }
 .tow-manual-content aside p { margin: 4px 0; }
+.tow-manual-highlights { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; margin: 18px 0 24px; }
+.tow-manual-highlights section { padding: 16px; border: 1px solid #d5e2f2; border-radius: 12px; background: linear-gradient(140deg,#f6faff,#edf3fc); font-size: 12px; line-height: 1.7; }
+.tow-manual-highlights strong { color: #2c629e; font-size: 13px; }
+.tow-manual-highlights p { margin: 8px 0 0; }
 .tow-manual-content footer { display: flex; justify-content: space-between; gap: 12px; padding-top: 24px; }
 .tow-manual-content footer button { padding: 9px 14px; border: 1px solid #c8d9ed; border-radius: 8px; background: #fff; color: #37689e; cursor: pointer; }
 .tow-manual-content footer button:disabled { opacity: .4; cursor: default; }
