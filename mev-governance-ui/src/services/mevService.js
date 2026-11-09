@@ -118,7 +118,15 @@ export async function prepareActivityDevelopment(context) {
     method: 'POST', headers: authHeaders(), body: JSON.stringify(context),
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.message || 'Preparazione scheda non riuscita');
+  if (!response.ok) {
+    const messages = {
+      404: 'Il backend non espone ancora la preparazione scheda AI. Aggiorna su Render il backend DEV al commit d1902b2 o successivo, poi riprova. La scheda corrente è conservata.',
+      401: 'Sessione non autorizzata: accedi nuovamente prima di preparare la scheda.',
+      403: 'Il ruolo corrente non è autorizzato a preparare la scheda AI.',
+      413: 'Gli estratti sorgente superano il limite della richiesta. Riduci i file selezionati.',
+    };
+    throw new Error(messages[response.status] || result.message || `Preparazione scheda non riuscita (HTTP ${response.status}).`);
+  }
   return result;
 }
 
