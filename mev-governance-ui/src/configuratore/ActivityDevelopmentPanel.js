@@ -8,7 +8,8 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
   const [filter, setFilter] = useState('Tutte');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [proposals, setProposals] = useState({});
+  // Proposals are persisted with the plan even before applying their fields.
+  const proposals = Object.fromEntries(Object.entries(plans).filter(([, plan]) => plan.aiProposal || plan.aiDraft).map(([key, plan]) => [key, plan.aiProposal || plan.aiDraft]));
   const prepare = async (key, item) => {
     setBusy(key); setError('');
     try {
@@ -21,7 +22,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
         const file = source.files.find(f => f.path === entry.path);
         return file && Number.isInteger(entry.startLine) && Number.isInteger(entry.endLine) && entry.startLine >= file.startLine && entry.endLine <= file.endLine && entry.endLine >= entry.startLine;
       }).map(entry => ({ ...entry, sha256: source.files.find(f => f.path === entry.path).sha256 }));
-      setProposals(previous => ({ ...previous, [key]: { ...result, evidence, coverage: source.coverage, excerpts: source.files } }));
+      onChange(previous => ({ ...previous, [key]: { ...previous[key], aiProposal: { ...result, evidence, coverage: source.coverage, excerpts: source.files } } }));
     } catch (e) { setError(e.message); } finally { setBusy(''); }
   };
   const activities = developmentActivities(items);
@@ -34,10 +35,10 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
   });
   return <section className="initiative-workspace" aria-label="Schede di sviluppo per attività">
     <header className="workspace-heading"><div><span className="workspace-eyebrow">Consegna · Visual Studio Code</span><h3>Schede di sviluppo · {activities.length} attività</h3></div><span className="workspace-version">{activities.filter(a => plans[a.key]?.status === 'Verificata').length} verificate</span></header>
-    <p>Una scheda per ogni riga di dettaglio, anche quando più attività usano la stessa voce di catalogo. Salvare una valutazione o una revisione conserva le schede.</p>
+    <p>Una scheda per ogni riga di dettaglio. “Prepara scheda con AI” aggiunge la proposta ai dati da salvare; “Inserisci bozza” ne copia i contenuti nei campi modificabili. Salva una valutazione o una revisione per conservare entrambi.</p>
     <div className="development-repositories"><strong>Applicativi collegati al sistema dell’iniziativa</strong>
       {applications.length ? applications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b> · <code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>) : <p>Nessun applicativo corrispondente trovato: verificare Sistema e Applicativi e tecnologie.</p>}
-      <p>Un percorso configurato è un riferimento: il browser non può leggere automaticamente cartelle locali. Seleziona i file per renderli disponibili alla sessione; i nomi elencati non attestano che ogni file sia stato analizzato.</p>
+      <p>Il percorso configurato non conserva il permesso del browser di leggere i file locali. Riseleziona la cartella solo per nuove analisi o modifiche ai sorgenti. Proposte AI, estratti già usati e schede salvate restano consultabili senza riselezionarla.</p>
       <button type="button" onClick={onSelectFiles}>Seleziona cartella sorgenti per questa sessione</button>
     </div>
     <label>Stato attività<select value={filter} onChange={e => setFilter(e.target.value)}><option>Tutte</option>{states.map(state => <option key={state}>{state}</option>)}</select></label>
@@ -49,7 +50,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
         <summary><span className="workspace-version">Attività {number}</span><strong>{item.interventionId} · {item.detail?.componentApplication || item.detail?.name || item.id}</strong><span>{plan.status || 'Da analizzare'}</span></summary>
         <p className="development-requirement">{item.detail?.detailDescription || item.reason}</p>
         <button type="button" disabled={!!busy || !sourceFiles.length} onClick={() => prepare(key, item)}>{busy === key ? 'Analisi degli estratti…' : 'Prepara scheda con AI'}</button>
-        {proposals[key] && <div className="development-ai-proposal"><strong>Proposta AI · da controllare</strong><p>{proposals[key].coverage.notice}</p>
+        {proposals[key] && <div className="development-ai-proposal"><strong>Proposta AI · da controllare</strong><p>Proposta disponibile nella scheda: salva una valutazione o una revisione prima di ricaricare.</p><p>{proposals[key].coverage.notice}</p>
           <h4>Soluzione</h4><p style={{ whiteSpace: 'pre-wrap' }}>{proposals[key].analysis.solution}</p><h4>Criteri di accettazione</h4><p style={{ whiteSpace: 'pre-wrap' }}>{proposals[key].analysis.acceptance}</p>
           <h4>File e righe citati negli estratti</h4>{!proposals[key].evidence.length && <p>Nessuna citazione valida ai file ricevuti. Non considerare i file ipotizzati come verificati.</p>}
           {proposals[key].evidence.map((entry, index) => <p key={index}><code>{entry.path}:{entry.startLine}–{entry.endLine}</code> · {typeof entry.reason === 'string' ? entry.reason : ''}</p>)}

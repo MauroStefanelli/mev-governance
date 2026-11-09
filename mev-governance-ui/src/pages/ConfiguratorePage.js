@@ -1,5 +1,6 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
+import { saveAndClose } from "../configuratore/saveAndClose";
 import DevelopmentActivities from "../configuratore/ActivityDevelopmentPanel";
 import ProjectPreparationPanel from "../configuratore/ProjectPreparationPanel";
 import { newProjectPreparation } from "../configuratore/projectPackage";
@@ -545,7 +546,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       await upsertConfiguratoreRecord(body);
       const isUpdate = !!editingRecordKey;
       if (showMessage) toast(isUpdate ? "Valutazione aggiornata con successo" : "Valutazione salvata e resa disponibile alle stime future");
-      setEditingRecordKey(null); // reset dopo salvataggio
+      setEditingRecordKey(recordKey); // keep updating the exact reopened archive record
       loadArchive();
       return true;
     } catch (error) {
@@ -2083,11 +2084,12 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
          <button
            style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
            onClick={async () => {
-             await persistInitiativeEvaluation(true);
-             resetInitiative();
-             setEditingRecordKey(null);
-             setStep(1);
-             window.scrollTo({ top: 0, behavior: "smooth" });
+              await saveAndClose(() => persistInitiativeEvaluation(true), () => {
+                resetInitiative();
+                setEditingRecordKey(null);
+                setStep(1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              });
            }}>
            Salva e Chiudi
          </button>
