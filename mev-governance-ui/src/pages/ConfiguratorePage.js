@@ -1,6 +1,7 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import { saveAndClose } from "../configuratore/saveAndClose";
+import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
 import DevelopmentActivities from "../configuratore/ActivityDevelopmentPanel";
 import ProjectPreparationPanel from "../configuratore/ProjectPreparationPanel";
 import { newProjectPreparation } from "../configuratore/projectPackage";
@@ -543,11 +544,13 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       },
     };
     try {
-      await upsertConfiguratoreRecord(body);
+      await saveInitiativeSnapshot(body, workspaceContext, upsertConfiguratoreRecord);
       const isUpdate = !!editingRecordKey;
       if (showMessage) toast(isUpdate ? "Valutazione aggiornata con successo" : "Valutazione salvata e resa disponibile alle stime future");
       setEditingRecordKey(recordKey); // keep updating the exact reopened archive record
       loadArchive();
+      refreshWorkspaceArchive();
+      setWorkspaceReload(value => value + 1);
       return true;
     } catch (error) {
       toast("Salvataggio non riuscito: " + error.message);
