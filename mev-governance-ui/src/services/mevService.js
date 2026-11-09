@@ -113,6 +113,15 @@ export async function reviewOfferDetails(context) {
   return result;
 }
 
+export async function prepareActivityDevelopment(context) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/activity-development`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify(context),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message || 'Preparazione scheda non riuscita');
+  return result;
+}
+
 export const login = async (username, password) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
