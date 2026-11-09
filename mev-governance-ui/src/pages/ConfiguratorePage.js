@@ -1,6 +1,8 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import DevelopmentActivities from "../configuratore/ActivityDevelopmentPanel";
+import ProjectPreparationPanel from "../configuratore/ProjectPreparationPanel";
+import { newProjectPreparation } from "../configuratore/projectPackage";
 import { importedGapSuggestions, developmentActivities, developmentMarkdown } from "../configuratore/developmentActivityModel";
 import ConfiguratorManual from "../configuratore/ConfiguratorManual";
 import ImportedInterventionGroup, { importedMappingValues } from "../configuratore/ImportedInterventionGroup";
@@ -101,6 +103,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [aiProposals, setAiProposals] = useState(null);
   const [detailReviews, setDetailReviews] = useState({});
   const [developmentPlans, setDevelopmentPlans] = useState({});
+  const [projectPreparation, setProjectPreparation] = useState(newProjectPreparation);
   const [detailReviewBusy, setDetailReviewBusy] = useState(false);
   const [detailReviewProgress, setDetailReviewProgress] = useState('');
   const detailReviewJob = useRef(0);
@@ -534,6 +537,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         aiProposals: aiProposals || null,
         detailReviews,
         developmentPlans,
+        projectPreparation,
         suggestions,
       },
     };
@@ -553,6 +557,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   // ── Reset / iniziativa ──
   const resetInitiative = () => {
     setDevelopmentPlans({});
+    setProjectPreparation(newProjectPreparation());
     detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false); setDetailReviewProgress('');
     setInitiative({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
     setImportedInterventions([]);
@@ -629,6 +634,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       setImportedInterventions(parsed.interventions);
       setItems(parsed.items);
       setDevelopmentPlans({});
+      setProjectPreparation(newProjectPreparation());
       setDetailReviews({});
       // Start only after successful import; technical review never blocks import.
       void runDetailReview(parsed.items, importLot?.catalog || catalog, parsed.interventions, parsed.lot || lot);
@@ -1204,6 +1210,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setAiProposals(payload.aiProposals || null);
     setDetailReviews(payload.detailReviews || {});
     setDevelopmentPlans(payload.developmentPlans || {});
+    setProjectPreparation(payload.projectPreparation || newProjectPreparation());
     // Ripristina app selezionate e techProfile
     if (payload.selectedAppIds?.length) {
       setSelectedAppIds(payload.selectedAppIds);
@@ -1230,6 +1237,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     if (source) { setSelectedContractId(source.contractId); setLot(String(source.lot)); }
     setTowPriceSourceId(source?.towPriceSourceId || '');
     setDevelopmentPlans(snapshot.developmentPlans || {});
+    setProjectPreparation(snapshot.projectPreparation || newProjectPreparation());
     setInitiative({ ...(snapshot.initiative || {}), code, title: state.title || '', system: state.system || '' });
     setItems(snapshot.items || []);
     setImportedInterventions(snapshot.importedInterventions || []);
@@ -2355,7 +2363,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         {importHistoryError && <p role="alert">{importHistoryError}</p>}
         <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}:${workspaceReload}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
           onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
-          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, developmentPlans, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
+          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, developmentPlans, projectPreparation, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
       </div>
       {step === 1 && (
         <div>
@@ -3113,6 +3121,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 4: REVISIONE */}
       {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} priceError={towPriceResolution.error} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} />}
       {step === 4 && <DevelopmentActivities key={`${ambienteId}:${initiative.code}`} items={items} plans={developmentPlans} onChange={setDevelopmentPlans} applications={applicationContextFor(initiative.system, applications, lot)} onSelectFiles={selectImplementationRepository} sourceFiles={implementationFiles} />}
+      {step === 4 && <ProjectPreparationPanel key={`${ambienteId}:${initiative.code}:project`} initiative={initiative} preparation={projectPreparation} onChange={setProjectPreparation} items={items} plans={developmentPlans} applications={applicationContextFor(initiative.system, applications, lot)} workspaceContext={workspaceContext} branch={implementationBranch} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />

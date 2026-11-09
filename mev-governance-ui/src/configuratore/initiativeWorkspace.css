@@ -81,6 +81,9 @@
 .development-activity .workspace-fields textarea { display: block; box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #c2d2e6; border-radius: 8px; font: inherit; }
 .development-requirement { white-space: pre-wrap; background: #fafbfd; padding: 12px; border-left: 3px solid #8caed7; line-height: 1.7; }
 .development-ai-proposal { padding: 16px; background: #f2f1fc; border: 1px solid #d4d0ed; border-radius: 10px; margin: 12px 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.project-preparation input,.project-preparation select,.project-preparation textarea { display: block; width: 100%; box-sizing: border-box; padding: 10px; margin-top: 6px; border: 1px solid #bfd0e6; border-radius: 8px; font: inherit; background: #fbfcfe; }
+.project-preparation fieldset { border: 1px solid #dbe5f2; border-radius: 10px; padding: 14px; margin: 14px 0; }
+.project-preparation legend { font-size: 13px; font-weight: 650; color: #355e8f; }
 .tow-workbench > .tow-initiative-library { padding: 20px !important; background: linear-gradient(125deg,#fff 40%,#f1f6fe) !important; border: 1px solid #d9e4f2; box-shadow: 0 5px 20px #24466e08; border-radius: 16px !important; }
 .initiative-library-trigger { display: flex; align-items: center; gap: 14px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; color: #234c7c; }
 .initiative-library-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(140deg,#dceaff,#edf4ff); color: #356caf; flex-shrink: 0; }
