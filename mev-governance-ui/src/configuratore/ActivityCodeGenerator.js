@@ -17,7 +17,7 @@ export async function codeOriginals(files, paths) {
   return originals;
 }
 
-export default function ActivityCodeGenerator({ item, plan, update, applications, sourceFiles }) {
+export default function ActivityCodeGenerator({ item, plan, update, applications, sourceFiles, knowledge = [] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null);
@@ -29,7 +29,8 @@ export default function ActivityCodeGenerator({ item, plan, update, applications
     try {
       const originals = await codeOriginals(sourceFiles, target.originalPaths || '');
       const result = await generateActivityCode({ target: { application: target.application || '', component: target.component || '', stack: target.stack || '', database: target.database || 'Non applicabile', instructions: target.instructions || '' },
-        activity: item.detail?.detailDescription || item.reason || '', solution: plan.solution || '', acceptance: plan.acceptance || '', originals });
+        activity: item.detail?.detailDescription || item.reason || '', solution: plan.solution || '', acceptance: plan.acceptance || '', originals,
+        confirmedRationale: knowledge.map(entry => ({ kind: entry.kind, text: entry.text, interventionId: entry.interventionId || null })) });
       setPreview({ ...result, originals });
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };

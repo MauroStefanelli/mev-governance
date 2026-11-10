@@ -1,4 +1,4 @@
-import { getConfiguratoreRecords, upsertConfiguratoreRecord, getSharedApplications } from '../services/mevService';
+import { getConfiguratoreRecords, upsertConfiguratoreRecord, getSharedApplications, rationaleRequest } from '../services/mevService';
 import { verifiedPlanSnapshot } from './saveInitiativeSnapshot';
 import { newProjectPreparation } from './projectPackage';
 import { applicationsFor, applicationContextFor, applicationIdentity } from './configuratoreCore';
@@ -111,4 +111,12 @@ export function applicationDiagnosis(system, applications, scope) {
   const where = `contratto «${scope.contractId}», lotto «${scope.lot}»`;
   if (!applications.length) return `Nel ${where} non risulta nessun applicativo configurato.`;
   return `Nel ${where} ci sono ${applications.length} applicativi (${applications.slice(0, 6).map(app => app.name).join(', ')}${applications.length > 6 ? '…' : ''}) ma nessuno corrisponde al sistema «${system || '—'}». Aggiungi il nome «${system || ''}» come alias dell’applicativo corretto, oppure crealo.`;
+}
+
+// Confirmed rationale and constraints of the initiative. Never blocks Sviluppo: if unavailable it says so.
+export async function loadConfirmedKnowledge(code) {
+  const value = String(code || '').trim();
+  if (!value) return { entries: [], error: '' };
+  try { return { entries: await rationaleRequest(`confirmed?goto=${encodeURIComponent(value)}`), error: '' }; }
+  catch (e) { return { entries: [], error: e.message }; }
 }

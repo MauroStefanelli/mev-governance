@@ -36,6 +36,8 @@ public class AppDbContext : DbContext
     public DbSet<InitiativeConversation> InitiativeConversations => Set<InitiativeConversation>();
     public DbSet<DevelopmentPresence> DevelopmentPresences => Set<DevelopmentPresence>();
     public DbSet<DevelopmentMessage> DevelopmentMessages => Set<DevelopmentMessage>();
+    public DbSet<RationaleMessage> RationaleMessages => Set<RationaleMessage>();
+    public DbSet<RationaleEntry> RationaleEntries => Set<RationaleEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

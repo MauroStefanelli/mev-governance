@@ -151,3 +151,11 @@
 .dev-chat-empty { margin: auto; color: var(--muted); font-size: 13px; text-align: center; } .dev-chat-more { align-self: center; }
 .dev-chat-form { display: flex; gap: 10px; align-items: flex-end; } .dev-chat-form textarea { flex: 1; resize: vertical; min-height: 44px; max-height: 140px; padding: 9px 12px; border: 1px solid #bacbdf; border-radius: 9px; font: inherit; font-size: 13.5px; }
 @media (max-width: 760px) { .dev-chat-msg { max-width: 92%; } .dev-chat-form { flex-direction: column; align-items: stretch; } .dev-head { position: static; } }
+
+/* Confirmed rationale in Sviluppo */
+.dev-knowledge { background: #fbfcff; border: 1px solid #d9e3ef; border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; display: flex; flex-direction: column; gap: 8px; } .dev-knowledge-head { display: flex; flex-direction: column; gap: 2px; }
+.dev-knowledge-counts { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; } .dev-knowledge-counts li { font-size: 12px; background: #f2f6fb; border: 1px solid #d9e3ef; border-radius: 20px; padding: 3px 12px; color: #3d5878; } .dev-knowledge-counts b { color: #1f5fbf; margin-right: 6px; }
+.dev-knowledge-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; } .dev-knowledge-list li, .dev-know li { font-size: 13px; line-height: 1.5; padding: 7px 11px; background: #fff; border: 1px solid #d9e3ef; border-left: 4px solid #8caed7; border-radius: 8px; overflow-wrap: anywhere; }
+.dev-knowledge-list li.dev-know-vincolo, .dev-know-vincolo-row { border-left-color: #c9822b; } .dev-knowledge-list li.dev-know-decisione { border-left-color: #1f8f5a; }
+.dev-know-kind { display: inline-block; margin-right: 8px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .7px; color: #3d5878; } .dev-know-kind.dev-know-vincolo, .dev-know-vincolo .dev-know-kind { color: #8a5200; } .dev-know-kind.dev-know-decisione, .dev-know-decisione .dev-know-kind { color: #14704a; }
+.dev-know { background: #fffaf0; border: 1px solid #f0dcb0; border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; } .dev-know ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }

@@ -66,6 +66,21 @@ const fetchWithRefresh = async (url, options = {}) => {
   return res;
 };
 
+// Rationale chat and confirmed knowledge of an initiative (scoped by the server to the active environment).
+export async function rationaleRequest(path, body) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/rationale${path ? `/${path}` : ''}`, {
+    method: body ? 'POST' : 'GET', headers: authHeaders(),
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const details = response.ok ? null : await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(details.message || (response.status === 404 ? 'Il backend non espone ancora i razionali: aggiorna il backend DEV.' : `Razionali: errore ${response.status}`));
+    error.status = response.status; error.saved = details.message_saved || null;
+    throw error;
+  }
+  return response.json();
+}
+
 // Presence, last worker and chat of the Sviluppo application (always scoped by the server to the active environment).
 export async function developmentRequest(path, body) {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/development/${path}`, {

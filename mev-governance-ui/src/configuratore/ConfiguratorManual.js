@@ -8,6 +8,14 @@ const chapters = [
     'Controlla contratto e lotto in “Risorse e configurazione”. Il GOTO e il titolo rimangono visibili nell’intestazione fissa durante il lavoro.',
     'Importa la Tabella di Offerta esistente oppure prepara l’analisi nel workspace. Prosegui attraverso Iniziativa → Interventi → Offerta → Revisione.',
   ], note: 'Il GOTO collega storico, allegati e conversazione nell’ambiente attivo. Per mantenere separati lavori distinti usa GOTO distinti.' },
+  { title: 'Razionali e vincoli con l’AI', subtitle: 'Spiegare perché servono gli interventi', steps: [
+    'Nel passo Iniziativa, sotto «Dati iniziativa», trovi «Razionali e vincoli con l’AI». Serve il codice GOTO o il titolo. Scrivi all’AI perché servono gli interventi, quali vincoli tecnici o di processo valgono, cosa è già stato deciso. Invio per inviare, Maiusc+Invio per andare a capo.',
+    'L’AI risponde e può proporre voci di tre tipi: razionale (perché serve), vincolo (cosa limita) e decisione (cosa è stato scelto). Le voci proposte compaiono in «Da confermare»: puoi correggerne il testo, poi «Conferma» o «Scarta». L’AI non conferma mai da sola.',
+    'Solo le voci confermate sono conoscenza: vengono date al parere AI sull’offerta, alla verifica AI di ogni riga, alle proposte di scheda, alla generazione dei file e agli ZIP di Sviluppo. Le proposte, le scartate e le revocate non vengono mai usate. Una voce collegata a un intervento vale per quell’intervento; una non collegata vale per l’intera iniziativa.',
+    '«Aggiungi una voce a mano» crea subito una voce confermata, perché la decide una persona. «Revoca» toglie una voce confermata dall’uso futuro (chiede conferma); la voce resta nello storico.',
+    '«Da altre iniziative» mostra le voci confermate in altre iniziative dello stesso ambiente e dello stesso sistema. «Riprendi in questa iniziativa» le copia come proposte, ricordando l’origine: devi confermarle tu, perché possono non valere qui. Così un nuovo intervento sullo stesso sistema parte dalle logiche già stabilite.',
+    'La conversazione è unica per iniziativa e ambiente, conservata nel tempo e visibile ai colleghi che lavorano sull’iniziativa. I messaggi più vecchi si caricano con «Mostra messaggi precedenti». Se l’AI non risponde, il tuo messaggio resta salvato.',
+  ], note: 'Le risposte dell’AI sono proposte da verificare, non fatti. Non scrivere password, chiavi o dati riservati: la cronologia è visibile ai colleghi dello stesso ambiente. Non cambiano prezzi né stime: orientano l’analisi e lo sviluppo.' },
   { title: 'Archivio e creazione', subtitle: 'Ritrovare e riprendere il lavoro', steps: [
     'Apri “Archivio iniziative”: le analisi condivise e le offerte salvate sono presentate in sezioni distinte. Clicca una scheda per aprirla.',
     'Una revisione condivisa conserva analisi e snapshot economico. La riapertura recupera i dati disponibili; un catalogo non più disponibile impedisce il ripristino dello snapshot.',

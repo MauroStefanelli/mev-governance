@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PROJECT_DECISIONS, decisionComplete, buildProjectPackage } from './projectPackage';
 
-export default function ProjectPreparation({ initiative, preparation, onChange, items, plans, applications, workspaceContext, branch }) {
+export default function ProjectPreparation({ initiative, preparation, onChange, items, plans, applications, workspaceContext, branch, knowledge = [] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -10,7 +10,7 @@ export default function ProjectPreparation({ initiative, preparation, onChange, 
   const download = async () => {
     setBusy(true); setError(''); setNotice('');
     try {
-      const result = await buildProjectPackage({ initiative, preparation, items, plans, applications, workspaceContext, branch });
+      const result = await buildProjectPackage({ initiative, preparation, items, plans, applications, workspaceContext, branch, knowledge });
       const blob = await result.zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = result.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       setNotice(`Pacchetto preparato: ${result.manifest.activities.length} attività, ${result.manifest.openDecisions.length} decisioni aperte. Salva una revisione per conservare la configurazione nell’app.`);

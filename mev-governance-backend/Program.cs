@@ -236,6 +236,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
+builder.Services.AddScoped<MevGovernanceBackend.Services.IRationaleAssistant, MevGovernanceBackend.Services.AiRationaleAssistant>();
 builder.Services.AddHttpClient("ConfiguratoreAi", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(360);
@@ -628,6 +629,44 @@ using (var scope = app.Services.CreateScope())
             );
             CREATE INDEX IF NOT EXISTS ""IX_DevelopmentMessages_AmbienteId_Goto_Id""
                 ON ""{sch}"".""DevelopmentMessages"" (""AmbienteId"", ""Goto"", ""Id"");");
+
+        // Rationale chat and knowledge base of the Configuratore (reused by the offer, Sviluppo and new initiatives).
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""RationaleMessages"" (
+                ""Id"" BIGSERIAL PRIMARY KEY,
+                ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" VARCHAR(120) NOT NULL,
+                ""Role"" VARCHAR(16) NOT NULL,
+                ""Author"" VARCHAR(120) NOT NULL,
+                ""AuthorFullName"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                ""Text"" TEXT NOT NULL,
+                ""Model"" TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_RationaleMessages_AmbienteId_Goto_Id""
+                ON ""{sch}"".""RationaleMessages"" (""AmbienteId"", ""Goto"", ""Id"");
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""RationaleEntries"" (
+                ""Id"" BIGSERIAL PRIMARY KEY,
+                ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" VARCHAR(120) NOT NULL,
+                ""GotoLabel"" TEXT NOT NULL DEFAULT '',
+                ""SystemKey"" TEXT NOT NULL DEFAULT '',
+                ""Kind"" VARCHAR(16) NOT NULL,
+                ""Text"" TEXT NOT NULL,
+                ""InterventionId"" TEXT NULL,
+                ""Status"" VARCHAR(16) NOT NULL,
+                ""ByAi"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""SourceMessageId"" BIGINT NULL,
+                ""SourceEntryId"" BIGINT NULL,
+                ""CreatedBy"" VARCHAR(120) NOT NULL,
+                ""CreatedByFullName"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                ""DecidedBy"" VARCHAR(120) NULL,
+                ""DecidedByFullName"" TEXT NULL,
+                ""DecidedAt"" TIMESTAMPTZ NULL
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_RationaleEntries_AmbienteId_Goto""
+                ON ""{sch}"".""RationaleEntries"" (""AmbienteId"", ""Goto"");");
 
         // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
         try

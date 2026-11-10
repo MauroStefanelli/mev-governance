@@ -75,6 +75,12 @@ export const PAGE_MANUALS = {
       'Cerca l’iniziativa per GOTO, titolo o sistema e aprila: nell’elenco vedi per ciascuna quante schede sono definite e verificate. Il GOTO e il titolo restano visibili nell’intestazione fissa.',
       'Offerta, importi e catalogo restano nel Configuratore: qui lavori su schede, progetto e consegna. Per cambiare l’offerta torna al Configuratore.',
     ], 'Se le schede erano state salvate nel Configuratore prima di questa applicazione, vengono caricate come punto di partenza: premi “Salva sviluppo” per renderle definitive.'),
+    chapter('Razionali e vincoli dell’iniziativa', 'La conoscenza confermata nel Configuratore', [
+      'Nella fase Fonti trovi «Razionali e vincoli confermati»: le voci che il team ha confermato nel Configuratore (passo Iniziativa) per questa iniziativa, divise in razionali, vincoli e decisioni. Qui si consultano; per modificarle torna al Configuratore.',
+      'Guidano il lavoro: sono incluse nelle richieste di «Prepara scheda con AI» e di «Genera codice», sono mostrate dentro ogni attività a cui si applicano (una voce collegata a un intervento vale per le sue attività, una generale per tutte) e finiscono negli ZIP in RAZIONALI_E_VINCOLI.md, nella richiesta JSON e nel progetto di avvio.',
+      'Solo le voci confermate vengono usate. Se un vincolo rende impossibile una richiesta, la generazione dei file lo segnala come blocco. Se il servizio dei razionali non è disponibile, Sviluppo continua a funzionare e lo dice.',
+      'I razionali si leggono quando apri l’iniziativa: se un collega ne conferma di nuovi mentre lavori, richiudi e riapri l’iniziativa per includerli.',
+    ], 'Le voci non sostituiscono le verifiche: restano indicazioni del team, non prove che il codice le rispetti.'),
     chapter('Colleghi collegati e chat', 'Sapere chi sta lavorando e parlarsi', [
       'Nell’elenco delle iniziative ogni riga mostra chi ha salvato per ultimo lo sviluppo e quando, e chi è collegato in questo momento. Conta come «ultimo lavoro» solo un salvataggio confermato dal server: aprire l’iniziativa non basta.',
       'Aprendo un’iniziativa compare il riquadro di collaborazione: i colleghi collegati, un avviso in giallo se qualcuno sta lavorando sulla stessa iniziativa e la chat. Quando un collega si collega mentre sei dentro, ricevi una notifica.',

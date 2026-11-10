@@ -3,10 +3,11 @@ import { developmentActivities } from './developmentActivityModel';
 import { activitySourceContext, createSourceCache } from './activitySourceContext';
 import { prepareActivityDevelopment } from '../services/mevService';
 import ActivityCodeGenerator from './ActivityCodeGenerator';
+import { knowledgeForAi, entriesForIntervention } from './rationaleKnowledge';
 import { planInsertion, applyInsertion, undoInsertion, draftPatch } from './draftInsertion';
 import { ACTIVITY_STATES, stateAllowed, isDefined, hasProposal, hasCode, isVerified, activityNextStep } from './developmentJourney';
 
-export default function DevelopmentActivities({ items, plans, onChange, applications, onSelectFiles, sourceFiles = [], embedded = false }) {
+export default function DevelopmentActivities({ items, plans, onChange, applications, onSelectFiles, sourceFiles = [], embedded = false, knowledge = [] }) {
   const [filter, setFilter] = useState('Tutte');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +24,8 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
     const description = item.detail?.detailDescription || item.reason || '';
     const source = await activitySourceContext(sourceFiles, description, cache);
     if (!source.files.length) throw new Error('Nessun file sorgente leggibile: seleziona la cartella dei sorgenti per questa sessione.');
-    const result = await prepareActivityDevelopment({ activity: { interventionId: item.interventionId, description, technology: item.detail?.technology }, source });
+    const result = await prepareActivityDevelopment({ activity: { interventionId: item.interventionId, description, technology: item.detail?.technology }, source,
+      confirmedRationale: knowledgeForAi(entriesForIntervention(knowledge, item.interventionId)) });
     if (typeof result.analysis?.solution !== 'string' || typeof result.analysis?.acceptance !== 'string') throw new Error('Risposta AI incompleta: la scheda corrente non è stata modificata.');
     const evidence = (Array.isArray(result.analysis.evidence) ? result.analysis.evidence : []).filter(entry => {
       const file = source.files.find(f => f.path === entry.path);
@@ -155,6 +157,9 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
         <div className="dev-activity-body">
           <ol className="dev-mini-journey" aria-label="Sequenza dell’attività">{stepsFor(plan).map(([label, done]) => <li key={label} className={done ? 'is-done' : ''}>{label}</li>)}</ol>
           <p className="dev-next"><b>Prossimo passo.</b> {next.text}</p>
+          {entriesForIntervention(knowledge, item.interventionId).length > 0 && <div className="dev-know" aria-label="Razionali e vincoli confermati per questa attività">
+            <b>Razionali e vincoli confermati</b>
+            <ul>{entriesForIntervention(knowledge, item.interventionId).map(entry => <li key={entry.id}><span className={`dev-know-kind dev-know-${entry.kind}`}>{entry.kind}</span>{entry.text}</li>)}</ul></div>}
           <h4>Requisito</h4>
           <p className="development-requirement">{item.detail?.detailDescription || item.reason}</p>
           <div className="dev-ai-row">
@@ -176,7 +181,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
         <div className="workspace-fields">{[['files', 'File coinvolti (uno per riga, percorso relativo)'], ['solution', 'Soluzione tecnica'], ['acceptance', 'Criteri di accettazione'], ['verification', 'Evidenze di verifica (test, comando, esito, commit)']].map(([field, label]) => <label key={field}>{label}<textarea rows={4} value={plan[field] || ''} onChange={e => update(key, { [field]: e.target.value })} /></label>)}</div>
         <label className="dev-status-field">Stato di verifica<select aria-label={`Stato attività ${number}`} value={status} onChange={e => update(key, { status: e.target.value })}>{states.map(state => <option key={state} disabled={!stateAllowed(state, plan)}>{state}</option>)}</select></label>
         <p className="dev-hint">“Pronta per sviluppo” richiede file, soluzione e criteri. “Verificata” è una dichiarazione dell’analista accompagnata da evidenze: l’app non esegue compilazioni o test del repository.</p>
-        <ActivityCodeGenerator item={item} plan={plan} update={patch => update(key, patch)} applications={applications} sourceFiles={sourceFiles} />
+        <ActivityCodeGenerator item={item} plan={plan} update={patch => update(key, patch)} applications={applications} sourceFiles={sourceFiles} knowledge={entriesForIntervention(knowledge, item.interventionId)} />
         </div>
       </details>;
     })}

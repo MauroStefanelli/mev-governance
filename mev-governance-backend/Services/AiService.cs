@@ -542,6 +542,7 @@ public class AiService
         "Se nel contesto è presente il campo 'sourceCode' con snippet di codice sorgente, usali per verificare " +
         "la coerenza tecnica delle proposte: verifica se le dipendenze tecnologiche, i pattern architetturali e " +
         "la complessità del codice confermano o contraddicono le stime proposte; segnala eventuali discrepanze nei warnings. " +
+        "Se il contesto include 'confirmedRationale', sono razionali, vincoli e decisioni confermati dagli utenti: rispettali, non proporre interventi che li contraddicono e citali nel rationale quando giustificano una proposta. " +
         "Proponi interventi necessari e sufficienti, senza inventare voci. " +
         "Per ogni proposta, compila 'interventionId' con l'ID_INTERVENTO di riferimento dal campo 'excelInterventions' " +
         "(es. \"regexp-001\") se la proposta è specifica per quell'intervento; lascia vuoto (\"\") se è generica. " +
@@ -552,6 +553,7 @@ public class AiService
     private const string DevelopmentInstructions =
         "Sei un responsabile tecnico software. Verifica un piano di sviluppo già stimato. " +
         "Raggruppa il lavoro per ID_INTERVENTO e, dentro ciascuno, valuta tutti gli ID Catalogo associati. " +
+        "Se il contesto include 'confirmedRationale', rispetta razionali, vincoli e decisioni confermati dagli utenti e riportali nei rischi o nei test quando pertinenti. " +
         "Per ogni coppia spiega perché è necessaria, attività tecniche, file candidati, rischi e test. " +
         "Non aggiungere ID Catalogo non presenti. " +
         "Restituisci esclusivamente JSON valido senza Markdown: {\"summary\":\"...\",\"recommendations\":[{\"interventionId\":\"...\",\"catalogId\":\"...\",\"reason\":\"...\",\"activities\":[\"...\"],\"files\":[\"...\"],\"risks\":[\"...\"],\"tests\":[\"...\"]}],\"warnings\":[\"...\"]}.";

@@ -46,6 +46,7 @@ public class ActivityCodeController : ControllerBase
                 "Se mancano decisioni indispensabili restituisci {\"files\":[],\"blockers\":[\"decisione mancante\"]}. " +
                 "Altrimenti rispondi JSON {\"files\":[{\"path\":\"percorso/relativo\",\"action\":\"create|update\",\"baseSha256\":\"hash esatto originale per update\",\"content\":\"contenuto completo del file, senza fence o ellissi\"}],\"summary\":\"descrizione\",\"testInstructions\":\"comandi/test suggeriti NON eseguiti\",\"blockers\":[]}. " +
                 "Non modificare file non forniti integralmente. Nessuna cancellazione. Includi test pertinenti. Per SQL indica dialetto e non mescolare database diversi. " +
+                "Se la richiesta include 'confirmedRationale', sono vincoli e decisioni confermati dagli utenti: rispettali nel codice e, se uno rende impossibile la richiesta, restituisci blockers. " +
                 "Mantieni il risultato piccolo (1–4 file) per non troncare il JSON; niente scaffolding vuoto. Non inserire credenziali.",
                 JsonSerializer.Serialize(new { request, originalHashes = hashes }), user.AiApiKey, user.AiEndpoint, user.AiModel, user.AiStyle, user.AiAuthMode);
             if (response.Analysis["files"] is JsonArray { Count: 0 })
@@ -60,4 +61,5 @@ public class ActivityCodeController : ControllerBase
 }
 public record CodeTarget(string Application, string Component, string Stack, string Database, string Instructions);
 public record CodeOriginal(string Path, string Content);
-public record CodeGenerationRequest(CodeTarget Target, string Activity, string Solution, string Acceptance, List<CodeOriginal> Originals);
+public record CodeGenerationRequest(CodeTarget Target, string Activity, string Solution, string Acceptance, List<CodeOriginal> Originals, List<ConfirmedRationale>? ConfirmedRationale = null);
+public record ConfirmedRationale(string Kind, string Text, string? InterventionId);

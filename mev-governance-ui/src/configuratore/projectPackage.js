@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { developmentActivities, developmentMarkdown } from './developmentActivityModel';
+import { knowledgeMarkdown, knowledgeForAi } from './rationaleKnowledge';
 
 export const PROJECT_DECISIONS = [
   ['runtime', 'Tecnologia e runtime', 'Stack, versioni e hosting da concordare.'],
@@ -17,7 +18,7 @@ export const newProjectPreparation = () => ({ name: '', kind: 'Da definire', obj
 export const decisionComplete = d => !!(d?.choice?.trim() && d?.source?.trim() && d?.owner?.trim());
 const slug = value => String(value || 'iniziativa').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'iniziativa';
 
-export async function buildProjectPackage({ initiative, preparation, items, plans, applications, workspaceContext, branch }) {
+export async function buildProjectPackage({ initiative, preparation, items, plans, applications, workspaceContext, branch, knowledge = [] }) {
   if (!initiative.code?.trim() || !initiative.title?.trim()) throw new Error('Compila GOTO e titolo prima di generare il progetto.');
   if (!preparation.name?.trim() || !preparation.objective?.trim()) throw new Error('Inserisci nome del progetto e obiettivo tecnico.');
   const activities = developmentActivities(items);
@@ -35,6 +36,8 @@ export async function buildProjectPackage({ initiative, preparation, items, plan
   zip.file('docs/DECISIONI.md', '# Decisioni tecniche\n\nDocumentata non significa approvata automaticamente.\n\n' + PROJECT_DECISIONS.map(([id, label, hint]) => { const d = preparation.decisions?.[id] || {}; return `## ${id} — ${label}\n${hint}\nStato: ${decisionComplete(d) ? 'DOCUMENTATA — da validare con il team' : 'APERTA'}\nScelta: ${d.choice || 'Da definire'}\nFonte/versione: ${d.source || 'Da indicare'}\nReferente: ${d.owner || 'Da indicare'}\n`; }).join('\n'));
   zip.file('docs/ARCHITETTURA.md', `# Architettura candidata\n\n${preparation.objective}\n\n## Applicativi e riferimenti\n${manifest.applications.map(a => `- ${a.name}: ${a.repositoryReference || 'Da configurare'}`).join('\n')}\n\nI riferimenti non attestano la lettura dei sorgenti. Verificare le evidenze delle schede sul repository reale.\n\n## Analisi e fonti\n${JSON.stringify(manifest.analysis, null, 2)}\n`);
   zip.file('SCHEDE_SVILUPPO.md', developmentMarkdown(activities, plans, applications));
+  const rationale = knowledgeMarkdown(knowledge);
+  if (rationale) { zip.file('docs/RAZIONALI_E_VINCOLI.md', rationale); manifest.confirmedRationale = knowledgeForAi(knowledge); zip.file('progetto.json', JSON.stringify(manifest, null, 2)); }
   zip.file('contracts/README.md', '# Contratti da concordare\nInserire ICD/schema/versione e request/response anonimizzate approvate. Nessun contratto operativo è dedotto automaticamente dall’Excel.\n');
   zip.file('fixtures/README.md', '# Dati di prova\nPreparare casi sintetici concordati: positivo, input invalido, valori limite, duplicati ed errori. Nessun fixture di produzione o payload inventato è incluso.\n');
   zip.file('src/README.md', '# Implementazione da realizzare\nCreare il codice dopo la validazione di schede, stack e decisioni. Nessuna modifica al repository è eseguita dal pacchetto.\n');

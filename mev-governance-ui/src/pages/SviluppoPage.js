@@ -5,11 +5,12 @@ import JourneyBar from '../configuratore/JourneyBar';
 import CollaborationPanel from '../configuratore/CollaborationPanel';
 import { indexSummaries, initiativeKey, activityLine, displayName } from '../configuratore/developmentCollaboration';
 import { developmentActivities } from '../configuratore/developmentActivityModel';
-import { DEVELOPMENT_ENTITY, parseRecordPayload, loadDevelopmentState, saveDevelopmentState, loadApplicationsFor, catalogFor, applicationsForInitiative, applicationScope, applicationDiagnosis,
+import { DEVELOPMENT_ENTITY, parseRecordPayload, loadDevelopmentState, saveDevelopmentState, loadApplicationsFor, loadConfirmedKnowledge, catalogFor, applicationsForInitiative, applicationScope, applicationDiagnosis,
   activitySignature, activityChanges, DEFAULT_DELIVERY } from '../configuratore/developmentRecord';
 import { computeJourney, developmentSummary, hasCode } from '../configuratore/developmentJourney';
 import { approvedInterventions, buildCodeChangeRequest, implementationMarkdown, developmentDocumentMarkdown, downloadBlob, repositorySummary } from '../configuratore/developmentPackages';
 import { saveAndClose } from '../configuratore/saveAndClose';
+import { KINDS, KIND_ORDER, countByKind, confirmedEntries } from '../configuratore/rationaleKnowledge';
 import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi, developmentRequest } from '../services/mevService';
 import { APP_DATA, appNorm, sourceFileAllowed, ignoredSourcePath } from '../configuratore/configuratoreCore';
 import '../configuratore/initiativeWorkspace.css';
@@ -38,6 +39,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
   const [preparation, setPreparation] = useState({});
   const [delivery, setDelivery] = useState(DEFAULT_DELIVERY);
   const [applications, setApplications] = useState([]);
+  const [knowledge, setKnowledge] = useState({ entries: [], error: '' });
   const [files, setFiles] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState('');
@@ -78,9 +80,10 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     try {
       const state = await loadDevelopmentState(record);
       const apps = await loadApplicationsFor(state.evaluation, { contractId: state.contractId, lot: state.lot });
+      const known = await loadConfirmedKnowledge(state.evaluation.initiative?.code || state.evaluation.initiative?.title);
       if (token !== opening.current) return;
       setLoaded(state); setPlans(state.plans); setPreparation(state.preparation); setDelivery(state.delivery);
-      setApplications(apps); setFiles([]); setDirty(false); setPhase(state.source === 'new' ? 'fonti' : 'schede');
+      setApplications(apps); setKnowledge(known); setFiles([]); setDirty(false); setPhase(state.source === 'new' ? 'fonti' : 'schede');
       if (state.source === 'legacy') setMessage('Le schede erano salvate nella valutazione del Configuratore. Sono state caricate qui come punto di partenza: salvale in Sviluppo per renderle definitive.');
     } catch (e) { if (token === opening.current) setError(e.message); } finally { if (token === opening.current) setBusy(''); }
   };
@@ -114,12 +117,12 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
   const run = (name, action) => async () => { setBusy(name); setError(''); setMessage(''); try { await action(); } catch (e) { setError(e.message); } finally { setBusy(''); } };
   const contractName = contracts.find(c => c.contractId === loaded?.evaluation.catalogSource?.contractId)?.name;
   const exportZip = run('zip', async () => {
-    const result = buildCodeChangeRequest({ loaded, plans, delivery, applications, approved, files, techProfile, contractName });
+    const result = buildCodeChangeRequest({ loaded, plans, delivery, applications, approved, files, techProfile, contractName, knowledge: knowledge.entries });
     downloadBlob(result.name, await result.zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } }));
     setMessage('Richiesta di modifica codice generata. Lo ZIP riporta le schede mostrate in questa pagina, anche se non ancora salvate.');
   });
   const exportMarkdown = run('md', async () => {
-    downloadBlob(`piano_sviluppo_${appNorm(loaded.evaluation.initiative?.code || 'iniziativa')}.md`, new Blob([implementationMarkdown({ loaded, delivery, approved, techProfile })], { type: 'text/markdown;charset=utf-8' }));
+    downloadBlob(`piano_sviluppo_${appNorm(loaded.evaluation.initiative?.code || 'iniziativa')}.md`, new Blob([implementationMarkdown({ loaded, delivery, approved, techProfile, knowledge: knowledge.entries })], { type: 'text/markdown;charset=utf-8' }));
   });
   const generateDocument = run('ai', async () => {
     const repo = repositorySummary(files, techProfile, loaded.evaluation.initiative?.system);
@@ -176,6 +179,15 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
   const body = {
     fonti: <section className="dev-card dev-phase-card" aria-label="Fonti del codice">
       <h3>Fonti del codice</h3>
+      <div className="dev-knowledge" aria-label="Razionali e vincoli dell’iniziativa">
+        <div className="dev-knowledge-head"><b>Razionali e vincoli confermati</b>
+          <span className="dev-hint">Definiti nel Configuratore → Iniziativa. Guidano le proposte AI, la generazione dei file e i pacchetti.</span></div>
+        {knowledge.error && <p className="dev-warn">Razionali non disponibili: {knowledge.error}</p>}
+        {!knowledge.error && !confirmedEntries(knowledge.entries).length && <p className="dev-hint">Nessun razionale confermato. Nel Configuratore, passo Iniziativa, spiega all’AI perché servono gli interventi e conferma le voci proposte: qui le ritroverai.</p>}
+        {confirmedEntries(knowledge.entries).length > 0 && <>
+          <ul className="dev-knowledge-counts">{KIND_ORDER.map(kind => <li key={kind}><b>{countByKind(knowledge.entries)[kind]}</b>{KINDS[kind].plural}</li>)}</ul>
+          <ul className="dev-knowledge-list">{confirmedEntries(knowledge.entries).map(entry => <li key={entry.id} className={`dev-know-${entry.kind}`}><span className="dev-know-kind">{entry.kind}{entry.interventionId ? ` · ${entry.interventionId}` : ''}</span>{entry.text}</li>)}</ul></>}
+      </div>
       <div className="dev-source-grid">
         <div className="dev-source"><span className="dev-source-label">Applicativi associati al sistema «{heading.system || '—'}»</span>
           {linkedApplications.length ? linkedApplications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b><code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>)
@@ -186,8 +198,8 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
           <small>Il browser non conserva il permesso di leggere la cartella: va riselezionata dopo un ricaricamento, solo per nuove analisi.</small></div>
       </div>
     </section>,
-    schede: <DevelopmentActivities key={`${loaded.key}:activities`} embedded items={loaded.evaluation.items || []} plans={plans} onChange={editPlans} applications={linkedApplications} onSelectFiles={selectFolder} sourceFiles={files} />,
-    progetto: <ProjectPreparationPanel key={`${loaded.key}:project`} initiative={heading} preparation={preparation} onChange={editPreparation} items={loaded.evaluation.items || []} plans={plans} applications={linkedApplications} workspaceContext={null} branch={delivery.branch} />,
+    schede: <DevelopmentActivities key={`${loaded.key}:activities`} embedded items={loaded.evaluation.items || []} plans={plans} onChange={editPlans} applications={linkedApplications} onSelectFiles={selectFolder} sourceFiles={files} knowledge={knowledge.entries} />,
+    progetto: <ProjectPreparationPanel key={`${loaded.key}:project`} initiative={heading} preparation={preparation} onChange={editPreparation} items={loaded.evaluation.items || []} plans={plans} applications={linkedApplications} workspaceContext={null} branch={delivery.branch} knowledge={knowledge.entries} />,
     codice: <section className="dev-card dev-phase-card" aria-label="Generazione di file">
       <h3>Generazione di codice e workflow</h3>
       <p>La generazione si fa dentro ogni scheda, nella sezione «Generazione codice / workflow». Qui vedi dove sei arrivato.</p>

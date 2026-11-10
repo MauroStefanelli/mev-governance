@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { developmentActivities, developmentMarkdown } from './developmentActivityModel';
+import { knowledgeMarkdown, knowledgeForAi } from './rationaleKnowledge';
 import { appNorm, codeChangePrompt, implementationDocument, sourceFileAllowed, ignoredSourcePath, evaluationSystems, evaluationApplicationCodes, applicationContextFor } from './configuratoreCore';
 
 export const downloadBlob = (name, blob) => {
@@ -33,13 +34,13 @@ export function repositorySummary(files, techProfile, fallbackName) {
   return { folderName, allPaths, sourcePaths, hasFiles };
 }
 
-export function implementationMarkdown({ loaded, delivery, approved, techProfile }) {
-  return implementationDocument({ record: { payload: loaded.evaluation, lot_id: loaded.lot, contract_id: loaded.contractId, title: loaded.evaluation.initiative?.title },
+export function implementationMarkdown({ loaded, delivery, approved, techProfile, knowledge = [] }) {
+  return knowledgeMarkdown(knowledge) + implementationDocument({ record: { payload: loaded.evaluation, lot_id: loaded.lot, contract_id: loaded.contractId, title: loaded.evaluation.initiative?.title },
     proposals: approved, branch: delivery.branch, approvalNotes: delivery.notes, tests: delivery.tests,
     excelInterventions: excelInterventions(loaded.evaluation.importedInterventions), techProfile: techProfile || null });
 }
 
-export function buildCodeChangeRequest({ loaded, plans, delivery, applications, approved, files, techProfile, contractName }) {
+export function buildCodeChangeRequest({ loaded, plans, delivery, applications, approved, files, techProfile, contractName, knowledge = [] }) {
   const evaluation = loaded.evaluation; const initiative = evaluation.initiative || {};
   if (!approved.length) throw new Error('Nessun intervento approvato: apri il Configuratore e approva almeno un intervento.');
   if (!files.length && !techProfile) throw new Error('Seleziona la cartella dei sorgenti oppure scegli un applicativo con profilo tecnico.');
@@ -51,13 +52,15 @@ export function buildCodeChangeRequest({ loaded, plans, delivery, applications, 
   const request = { formatVersion: 4, developmentActivities: planRows(items, plans), generatedAt: new Date().toISOString(), source: 'Sviluppo MEV Governance',
     targetTool: delivery.tool, contractId: loaded.contractId, contractName: contractName || loaded.contractId, lot: String(loaded.lot), initiative, systems, applicationCodes,
     requirements: initiative.requirements || '', description: initiative.description || '', approvalNotes: delivery.notes, branch: delivery.branch,
-    approvedInterventions: approved, excelInterventions: excelInterventions(evaluation.importedInterventions), techProfile: techProfile || null,
+    approvedInterventions: approved, excelInterventions: excelInterventions(evaluation.importedInterventions), techProfile: techProfile || null, confirmedRationale: knowledgeForAi(knowledge),
     repository: { folderName: repo.folderName, totalFiles: repo.allPaths.length, sourceFiles: repo.sourcePaths.length, filePaths: repo.allPaths, sourceFilePaths: repo.sourcePaths } };
   const zip = new JSZip();
   const activityList = developmentActivities(items);
   zip.file('README_MODIFICA_CODICE.md', codeChangePrompt(request));
   zip.file('richiesta_modifica_codice.json', JSON.stringify(request, null, 2));
-  zip.file('piano_sviluppo.md', implementationMarkdown({ loaded, delivery, approved, techProfile }));
+  zip.file('piano_sviluppo.md', implementationMarkdown({ loaded, delivery, approved, techProfile, knowledge }));
+  const rationale = knowledgeMarkdown(knowledge);
+  if (rationale) zip.file('RAZIONALI_E_VINCOLI.md', rationale);
   zip.file('elenco_file_repository.txt', repo.allPaths.join('\n'));
   zip.file('schede_sviluppo.json', JSON.stringify({ goto: initiative.code, activities: planRows(items, plans) }, null, 2));
   zip.file('SCHEDE_SVILUPPO.md', developmentMarkdown(activityList, plans, context));
