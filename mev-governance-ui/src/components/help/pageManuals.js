@@ -63,6 +63,43 @@ export const PAGE_MANUALS = {
     chapter('Impostazioni applicazione', 'Parametri operativi dell’app', ['Apri la scheda Impostazioni Applicazione per consultare i parametri disponibili.', 'Verifica il significato dei campi e salva solo modifiche concordate con chi gestisce l’ambiente.', 'Le impostazioni di applicazione sono diverse dalla configurazione della connessione database.']),
     chapter('Configurazione', 'Verificare la destinazione dei dati', ['Controlla l’ambiente prima di consultare o aggiornare la configurazione.', 'Usa solo i campi e i comandi presenti nella pagina e attendi la conferma di verifica o salvataggio.', 'Non condividere password o stringhe di connessione nei documenti operativi o nei messaggi di assistenza.'], accessNote),
   ] },
+  sviluppo: { title: 'Sviluppo iniziative', summary: 'Trasforma una valutazione del Configuratore in schede per attività, progetto di avvio, file generati e richiesta di modifica codice.', chapters: [
+    chapter('Parti da qui', 'Dalla valutazione salvata allo sviluppo', [
+      'Salva prima la valutazione nel Configuratore (Revisione → “Salva valutazione”, oppure “Salva e vai a Sviluppo →”). Lo Sviluppo mostra solo le iniziative già valutate nell’ambiente attivo.',
+      'Cerca l’iniziativa per GOTO, titolo o sistema e aprila. Il GOTO e il titolo restano visibili nell’intestazione fissa.',
+      'Offerta, importi e catalogo restano nel Configuratore: qui lavori su schede, progetto e consegna. Per cambiare l’offerta torna al Configuratore.',
+    ], 'Se le schede erano state salvate nel Configuratore prima di questa applicazione, vengono caricate come punto di partenza: premi “Salva sviluppo” per renderle definitive.'),
+    chapter('Salvataggio e collaborazione', 'Conservare il lavoro senza sovrascrivere i colleghi', [
+      '“Salva sviluppo” scrive schede, proposte AI, progetto e dati di consegna in un archivio dedicato e mostra la conferma solo dopo il riscontro del server. “Salva e chiudi” chiude solo se il salvataggio riesce.',
+      'Se un collega ha salvato lo sviluppo della stessa iniziativa dopo la tua apertura, ricevi un conflitto e la pagina resta aperta con le tue modifiche. Non ricaricare: copia ciò che serve, riapri l’iniziativa e riconcilia.',
+      'Se l’offerta viene rivista nel Configuratore, le schede restano legate alla riga originale. Se descrizione o numero di attività cambiano, lo Sviluppo lo segnala: controlla le schede delle righe modificate.',
+    ], 'Salvare lo sviluppo non modifica la valutazione dell’offerta e salvare l’offerta non modifica lo sviluppo.'),
+    chapter('Schede per attività e AI', 'Una scheda per ogni riga importata', [
+      'Ogni riga di dettaglio ha una scheda: ad esempio un intervento con 29 righe produce 29 schede distinte. Controlla l’applicativo associato e il percorso sorgenti configurato.',
+      'Premi “Seleziona cartella sorgenti per questa sessione” e scegli la cartella del repository. Il browser non conserva il permesso: va riselezionata dopo un ricaricamento, solo per nuove analisi o generazioni. Proposte e schede salvate si consultano senza cartella.',
+      'Inizia da una sola attività con “Prepara scheda con AI”: usa la descrizione e un campione di sorgenti (fino a 60 file letti e otto estratti inviati). Non è una scansione completa e non esegue compilazioni o test. Configura prima il servizio AI personale dal Profilo.',
+      'Leggi soluzione, criteri, file e righe citati. I riferimenti sono controllati rispetto agli estratti inviati: confermano dove si trovano nel campione, non la correttezza della soluzione. Un file ipotizzato non è un file letto.',
+      '“Inserisci bozza nella scheda” sostituisce file, soluzione e criteri correnti dopo conferma; non salva e non approva. Completa i dettagli, poi salva lo sviluppo: la proposta AI viene conservata anche se non la inserisci.',
+      'Compila file coinvolti, soluzione e criteri prima di “Pronta per sviluppo”. Imposta “Verificata” solo con evidenze di test o verifica: l’app non esegue quei test.',
+    ], 'Un errore 404 nella preparazione indica che il backend non espone ancora l’endpoint AI: non dipende dall’Excel.'),
+    chapter('Progetto di avvio', 'Struttura e decisioni da concordare', [
+      'In “Prepara progetto · Visual Studio Code” inserisci nome, tipo e obiettivo. Compila le decisioni su runtime, interfacce, mapping, errori, duplicati, accessi e test con scelta, fonte e referente. Le voci mancanti restano aperte: non scegliere una tecnologia senza conferma.',
+      '“Genera progetto di avvio ZIP” produce README, workspace VS Code, schede attività, architettura, registro decisioni e piano test, con cartelle src, contracts e fixtures da completare. Il piano test è una checklist non eseguita.',
+      'Lo ZIP non contiene i sorgenti locali né un workflow distribuibile. Salva lo sviluppo per conservare la configurazione.',
+    ]),
+    chapter('Generazione di file reali', 'Codice o workflow per un applicativo', [
+      'Nella scheda attività apri “Generazione codice / workflow · target applicativo”. Scegli l’applicativo, indica modulo, stack/runtime e DB/versione (o Non applicabile), quindi contratti e convenzioni. Un solo target alla volta.',
+      'Per modificare file esistenti elenca i percorsi relativi degli originali completi presenti nella cartella selezionata (massimo otto); lascia vuoto per soli file nuovi. La scheda deve avere soluzione e criteri.',
+      'Consulta ogni file e il relativo originale, poi “Conserva artefatti nella scheda” e scarica lo ZIP sorgenti (proposed/, original/, manifest e test suggeriti). Una nuova generazione sostituisce gli artefatti solo dopo conferma.',
+      'Confronta i file con il checkout effettivo prima di applicarli. L’AI può segnalare decisioni mancanti senza generare file.',
+    ], 'Generato non significa compilato, distribuibile o collaudato. L’app non scrive nel repository, non esegue SQL, build o deploy.'),
+    chapter('Consegna e verifica', 'Dalla richiesta al codice verificato', [
+      'In “Richiesta di modifica codice” scegli lo strumento (Visual Studio Code, Codex o altro), il branch, le note di approvazione e i test attesi. Collega la cartella sorgenti oppure usa il profilo tecnico di un applicativo.',
+      '“Genera ZIP richiesta modifica codice” include README_MODIFICA_CODICE.md, richiesta_modifica_codice.json, piano_sviluppo.md, SCHEDE_SVILUPPO.md, schede_sviluppo.json ed elenco_file_repository.txt. Lo ZIP riporta le schede mostrate nella pagina, anche non ancora salvate. “Esporta piano di sviluppo (MD)” e “Genera documento sviluppo (AI)” producono documenti Markdown.',
+      'Apri il progetto reale in Visual Studio Code sul branch concordato e lavora su un’attività alla volta, verificando i file citati sul checkout effettivo. Visual Studio Code è un editor: la modifica la scrive lo sviluppatore o un assistente con accesso ai sorgenti.',
+      'Esegui build e test del modulo con gli strumenti del progetto (per NPSO WLS, OSB, BPEL e microservizi possono differire). Riporta comandi, esiti e commit nella scheda, imposta “Verificata” solo con evidenze e salva lo sviluppo.',
+    ], 'Il worker automatico di compilazione e test non è ancora disponibile: la prontezza al rilascio si dimostra con le verifiche del repository e dell’ambiente destinatario.'),
+  ] },
   configuratore: { title: 'Configuratore Offerta TOW', summary: 'Trasforma requisiti, analisi e interventi in una proposta tecnica ed economica con storico e supporto AI.' },
 };
 

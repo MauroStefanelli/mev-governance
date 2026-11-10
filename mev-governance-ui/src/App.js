@@ -13,6 +13,7 @@ import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
+import SviluppoPage from "./pages/SviluppoPage";
 import GarePage from "./pages/GarePage";
 import ReportAvanzamentiPage from "./pages/ReportAvanzamentiPage";
 import TeamPage from "./pages/TeamPage";
@@ -951,7 +952,8 @@ function App() {
         {page === "tools"             && canViewApp("tools")             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && canViewApp("consumotow")        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
-        {page === "configuratore"     && canViewApp("configuratore")     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} />}
+        {page === "configuratore"     && canViewApp("configuratore")     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} onNavigate={setPage} />}
+        {page === "sviluppo"          && canViewApp("sviluppo")          && hasRole("SuperAdmin", "Developer") && <SviluppoPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} />}
         {page === "gara"              && canViewApp("gara")              && hasRole("Bid Manager", "SuperAdmin") && <GarePage onUnauthorized={handleUnauthorized} />}
         {/* Accesso negato */}
         {page !== "home" && !["admin","dbconfig","superadmin"].includes(page) && !canViewApp(page) && (

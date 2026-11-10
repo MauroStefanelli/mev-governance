@@ -26,6 +26,7 @@ public class AppRolePermissionsController : BaseController
         new("tools",             "Tools"),
         new("gara",              "Gare"),
         new("configuratore",     "Configuratore"),
+        new("sviluppo",          "Sviluppo iniziative"),
         new("team",              "Gestione Team"),
     ];
 

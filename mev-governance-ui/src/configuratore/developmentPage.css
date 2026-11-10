@@ -1,0 +1,5 @@
+.development-app .development-search { display: block; width: 100%; max-width: 480px; box-sizing: border-box; margin: 6px 0 12px; padding: 9px 12px; border: 1px solid #bacbdf; border-radius: 7px; font: inherit; }
+.development-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.development-alert { background: #fff3ef; color: #9c361b; padding: 12px; border-radius: 8px; margin: 0; }
+.development-status { background: #edf5ff; color: #1e416b; padding: 12px; border-radius: 8px; margin: 0; }
+.development-dirty { background: #fff8e1; color: #92600a; padding: 10px 12px; border-radius: 8px; }

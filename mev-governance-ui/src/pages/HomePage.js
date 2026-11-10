@@ -191,6 +191,20 @@ const PAGE_DEFS = [
     ),
   },
   {
+    id: "sviluppo",
+    label: "Sviluppo iniziative",
+    description: "Schede per attività, proposte AI, progetto di avvio e richiesta di modifica codice.",
+    accent: "#10b981",
+    accentDark: "#059669",
+    roles: ["SuperAdmin","Developer"],
+    clientPage: null,
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><line x1="14" y1="4" x2="10" y2="20"/>
+      </svg>
+    ),
+  },
+  {
     id: "gara",
     label: "Risposte di Gara",
     description: "Analisi documenti di gara con AI: deliverable, proposta tecnico-economica e piano di risposta.",

@@ -2,10 +2,8 @@ import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import { saveAndClose } from "../configuratore/saveAndClose";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
-import DevelopmentActivities from "../configuratore/ActivityDevelopmentPanel";
-import ProjectPreparationPanel from "../configuratore/ProjectPreparationPanel";
 import { newProjectPreparation } from "../configuratore/projectPackage";
-import { importedGapSuggestions, developmentActivities, developmentMarkdown } from "../configuratore/developmentActivityModel";
+import { importedGapSuggestions } from "../configuratore/developmentActivityModel";
 import ConfiguratorManual from "../configuratore/ConfiguratorManual";
 import ImportedInterventionGroup, { importedMappingValues } from "../configuratore/ImportedInterventionGroup";
 import { saveImportedRevision } from "../configuratore/importRevision";
@@ -29,13 +27,11 @@ import {
   upsertConfiguratoreRecord,
   deleteConfiguratoreRecord,
   analyzeInitiativeWithAi,
-  analyzeDevelopmentWithAi,
   getReleaseSchedules,
   getTowImpatto,
   getSharedApplications,
   putSharedApplications,
 } from "../services/mevService";
-import JSZip from "jszip";
 import {
   euro,
   esc,
@@ -53,12 +49,6 @@ import {
   suggestionRules,
   APP_DATA,
   DEFAULT_APPLICATIONS,
-  codeChangePrompt,
-  implementationDocument,
-  sourceFileAllowed,
-  ignoredSourcePath,
-  evaluationSystems,
-  evaluationApplicationCodes,
   applicationsFor,
   saveApplications,
   applicationIdentity,
@@ -67,7 +57,7 @@ import {
 
 const STEPS = ["Iniziativa", "Interventi", "Offerta", "Revisione"];
 
-export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
+export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceContratto, role, roles, onNavigate }) {
   const [contracts, setContracts] = useState([]);
   const [towPriceSourceId, setTowPriceSourceId] = useState('');
   useEffect(() => { setTowPriceSourceId(''); }, [ambienteId]);
@@ -149,11 +139,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   void techProfileBusy;
   const [selectedAppId, setSelectedAppId] = useState("");
   const [selectedAppIds, setSelectedAppIds] = useState([]);
-  const [codeChangeTool, setCodeChangeTool] = useState("vscode");
-  const [implementationBranch, setImplementationBranch] = useState("");
-  const [implementationApprovalNotes, setImplementationApprovalNotes] = useState("");
-  const [implementationTests, setImplementationTests] = useState("");
-  const [devBusy, setDevBusy] = useState(false);
 
   // Snippet viewer modal for AI proposals
   const [snippetModal, setSnippetModal] = useState({ open: false, title: "", content: "" });
@@ -584,9 +569,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setSelectedAppId("");
     setSelectedAppIds([]);
     setAnalyzeBusy(false);
-    setImplementationBranch("");
-    setImplementationApprovalNotes("");
-    setImplementationTests("");
     // Applicativi
     setApplicationDraft(null);
     setStep(1);
@@ -988,71 +970,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     try { persistInitiativeEvaluation(false); } catch {}
   };
 
-  // Generate aggregated development document via AI
-  const generateDevelopmentDocument = async () => {
-    setDevBusy(true);
-    try {
-      const payload = {
-        contractId: initiativeContractId,
-        lot,
-        initiative,
-        approved: approvedInterventionsFor(),
-        techProfile,
-        implementationFiles: implementationFiles.length ? implementationFiles.map(f => f.webkitRelativePath || f.name) : (techProfile?.filePaths || []),
-      };
-      const result = await analyzeDevelopmentWithAi(payload);
-      // Prefer structured analysis -> render to Markdown; otherwise fallback to any provided document/markdown field or raw JSON
-      let doc = "";
-      if (result && result.analysis) {
-        const a = result.analysis;
-        // If Recommendations present, format them
-        if (Array.isArray(a.recommendations) && a.recommendations.length > 0) {
-          doc += `# Documento di sviluppo - Iniziativa ${appNorm(initiative.code || initiative.title)}\n\n`;
-          if (a.summary) doc += `## Riepilogo\n${a.summary}\n\n`;
-          doc += `## Raccomandazioni\n`;
-          a.recommendations.forEach((r, idx) => {
-            doc += `\n### ${idx + 1}. Intervention ${r.interventionId || ""} · Catalog ${r.catalogId || ""}\n`;
-            if (r.reason) doc += `**Perché**: ${r.reason}\n\n`;
-            if (Array.isArray(r.activities) && r.activities.length) {
-              doc += `**Attività**:\n`;
-              r.activities.forEach(act => { doc += `- ${act}\n`; });
-              doc += `\n`;
-            }
-            if (Array.isArray(r.files) && r.files.length) {
-              doc += `**File candidati**:\n`;
-              r.files.forEach(f => { doc += `- ${f}\n`; });
-              doc += `\n`;
-            }
-            if (Array.isArray(r.risks) && r.risks.length) {
-              doc += `**Rischi**:\n`;
-              r.risks.forEach(rk => { doc += `- ${rk}\n`; });
-              doc += `\n`;
-            }
-            if (Array.isArray(r.tests) && r.tests.length) {
-              doc += `**Test consigliati**:\n`;
-              r.tests.forEach(t => { doc += `- ${t}\n`; });
-              doc += `\n`;
-            }
-          });
-          if (Array.isArray(a.warnings) && a.warnings.length) {
-            doc += `\n## Avvertenze\n`;
-            a.warnings.forEach(w => { doc += `- ${w}\n`; });
-          }
-        } else {
-          // No recommendations: include summary and raw analysis
-          doc = (a.summary ? `# Riepilogo\n${a.summary}\n\n` : "") + `\n\n` + `\n\nJSON analysis:\n` + JSON.stringify(a, null, 2);
-        }
-      } else {
-        doc = result.document || result.markdown || JSON.stringify(result, null, 2);
-      }
-      downloadBlob(`sviluppo_iniziativa_${appNorm(initiative.code || initiative.title)}.md`, new Blob([doc], { type: 'text/markdown;charset=utf-8' }));
-      toast('Documento di sviluppo generato (scaricato).');
-    } catch (e) {
-      toast('Generazione documento non riuscita: ' + (e.message || e));
-    } finally {
-      setDevBusy(false);
-    }
-  };
   // kept for UI action wiring; mark as used to silence linter
   void applyAiProposals;
 
@@ -1489,158 +1406,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
   };
   // referenced by UI flows / future wiring
   void selectSourceFolder;
-
-  // ── Sviluppo: repository + ZIP richiesta codice (port da generateCodeChangeRequest r.244) ──
-  const selectImplementationRepository = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    input.setAttribute("webkitdirectory", "");
-    input.setAttribute("directory", "");
-    input.onchange = () => {
-      if (!input.files.length) return;
-      setImplementationFiles([...input.files]);
-      toast("Repository collegato: " + input.files.length + " file selezionati");
-    };
-    input.click();
-  };
-  // referenced by UI flows / future wiring
-  void selectImplementationRepository;
-
-  const approvedInterventionsFor = () =>
-    [...suggestions.filter((s) => s.selected && s.approved !== false), ...items.filter((it) => it.selected || it.imported)].map((x, i) => ({
-      key: x.key || "s" + i,
-      id: x.id,
-      name: catalog.find((c) => c.id === x.id)?.nome || x.name || x.id,
-      type: x.type,
-      complexity: x.complexity,
-      quantity: x.qty,
-      reason: x.reason || "",
-      additionalInfo: x.additionalInfo || "",
-      interventionId: x.interventionId || "",
-    }));
-
-  const generateCodeChangeRequest = async () => {
-    const r = activeContract;
-    const payload = {};
-    const selected = approvedInterventionsFor();
-    if (!r || !selected.length) {
-      toast("Approva prima almeno un intervento");
-      return;
-    }
-    if (!implementationFiles.length && !techProfile) {
-      toast("Seleziona prima un applicativo in 'Applicativi e tecnologie'");
-      return;
-    }
-    setDevBusy(true);
-    try {
-      const systems = evaluationSystems({ initiative, systems: [initiative.system], importedInterventions });
-      const applicationCodes = evaluationApplicationCodes({ applicationContext: applicationContextFor(initiative.system, DEFAULT_APPLICATIONS[lot]) });
-      // Se ci sono file fisici li uso, altrimenti uso i dati del profilo tecnico
-      const hasFiles = implementationFiles.length > 0;
-      const allPaths = hasFiles
-        ? [...implementationFiles].map((f) => f.webkitRelativePath || f.name)
-        : (techProfile?.filePaths || []);
-      const sourcePaths = hasFiles
-        ? [...implementationFiles]
-            .filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name))
-            .map((f) => f.webkitRelativePath || f.name)
-        : (techProfile?.filePaths || []).filter((p) => sourceFileAllowed(p) && !ignoredSourcePath(p));
-      const folderName = hasFiles
-        ? ((allPaths[0] || "").split("/")[0] || "repository")
-        : (techProfile?.name || initiative.system || "repository");
-      const request = {
-        formatVersion: 4,
-        developmentActivities: developmentActivities(items).map(a => ({ key: a.key, interventionId: a.item.interventionId,
-          description: a.item.detail?.detailDescription || a.item.reason, plan: developmentPlans[a.key] || {} })),
-        generatedAt: new Date().toISOString(),
-        source: "Configuratore MEV v1",
-        targetTool: codeChangeTool,
-        contractId: initiativeContractId,
-        contractName: r.name || initiativeContractId,
-        lot: String(lot),
-        initiative,
-        systems,
-        applicationCodes,
-        requirements: initiative.requirements || "",
-        description: initiative.description || "",
-        approvalNotes: implementationApprovalNotes,
-        branch: implementationBranch,
-        approvedInterventions: selected,
-        excelInterventions: importedInterventions.map((x) => ({
-          id:          x.id,
-          title:       x.titolo || x.title || "",
-          sistema:     x.sistema || "",
-          componente:  x.componente || "",
-          description: x.descrizione || x.description || "",
-          activity:    x.attivita || x.activity || "",
-          tow5:        x.tow5 || 0,
-        })),
-        techProfile: techProfile || null,
-        repository: { folderName, totalFiles: allPaths.length, sourceFiles: sourcePaths.length, filePaths: allPaths, sourceFilePaths: sourcePaths },
-      };
-      const zip = new JSZip();
-      zip.file("README_MODIFICA_CODICE.md", codeChangePrompt(request));
-      zip.file("richiesta_modifica_codice.json", JSON.stringify(request, null, 2));
-      zip.file("piano_sviluppo.md", implementationDocument({
-        record: { payload, lot_id: lot, contract_id: selectedContractId, title: initiative.title },
-        proposals: selected,
-        branch: implementationBranch,
-        approvalNotes: implementationApprovalNotes,
-        tests: implementationTests,
-        excelInterventions: importedInterventions.map((x) => ({
-          id:          x.id,
-          title:       x.titolo || x.title || "",
-          sistema:     x.sistema || "",
-          componente:  x.componente || "",
-          description: x.descrizione || x.description || "",
-          activity:    x.attivita || x.activity || "",
-        })),
-        techProfile: techProfile || null,
-      }));
-      zip.file("elenco_file_repository.txt", allPaths.join("\n"));
-      const activityList = developmentActivities(items);
-      zip.file("schede_sviluppo.json", JSON.stringify({ goto: initiative.code, activities: activityList.map(a => ({ key: a.key, interventionId: a.item.interventionId, description: a.item.detail?.detailDescription || a.item.reason, plan: developmentPlans[a.key] || {} })) }, null, 2));
-      zip.file("SCHEDE_SVILUPPO.md", developmentMarkdown(activityList, developmentPlans, applicationContextFor(initiative.system, applications, lot)));
-      zip.file("VERIFICA_SELEZIONE.txt", [
-        `Codice iniziativa: ${initiative.code || ""}`,
-        `Titolo: ${initiative.title || ""}`,
-        `Sistema/applicazione: ${systems.join(", ")}`,
-        `Applicativi AP: ${applicationCodes.join(", ")}`,
-        `Repository selezionato: ${folderName}`,
-        `Interventi approvati: ${selected.length}`,
-      ].join("\n"));
-      const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
-      const code = String(initiative.code || "iniziativa").replace(/[^a-z0-9_-]+/gi, "_");
-      downloadBlob(`Richiesta_Modifica_Codice_${code}.zip`, blob);
-      toast("Richiesta di modifica codice generata");
-    } catch (error) {
-      toast("Generazione non riuscita: " + error.message);
-    } finally {
-      setDevBusy(false);
-    }
-  };
-
-  const exportImplementation = () => {
-    const code = initiative.code || "iniziativa";
-    const doc = implementationDocument({
-      record: { payload: {}, lot_id: lot, contract_id: selectedContractId, title: initiative.title },
-      proposals: approvedInterventionsFor(),
-      branch: implementationBranch,
-      approvalNotes: implementationApprovalNotes,
-      tests: implementationTests,
-      excelInterventions: importedInterventions.map((x) => ({
-        id:          x.id,
-        title:       x.titolo || x.title || "",
-        sistema:     x.sistema || "",
-        componente:  x.componente || "",
-        description: x.descrizione || x.description || "",
-        activity:    x.attivita || x.activity || "",
-      })),
-      techProfile: techProfile || null,
-    });
-    downloadBlob(`piano_sviluppo_${code}.md`, new Blob([doc], { type: "text/markdown;charset=utf-8" }));
-  };
 
   // ── Export ──
   const exportSnapshotJson = () => {
@@ -3125,8 +2890,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
 
       {/* STEP 4: REVISIONE */}
       {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} priceError={towPriceResolution.error} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} />}
-      {step === 4 && <DevelopmentActivities key={`${ambienteId}:${initiative.code}`} items={items} plans={developmentPlans} onChange={setDevelopmentPlans} applications={applications} onSelectFiles={selectImplementationRepository} sourceFiles={implementationFiles} />}
-      {step === 4 && <ProjectPreparationPanel key={`${ambienteId}:${initiative.code}:project`} initiative={initiative} preparation={projectPreparation} onChange={setProjectPreparation} items={items} plans={developmentPlans} applications={applicationContextFor(initiative.system, applications, lot)} workspaceContext={workspaceContext} branch={implementationBranch} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />
@@ -3216,31 +2979,15 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             <button style={btnStyles.secondary} onClick={exportSnapshotJson}>Esporta JSON</button>
             <button style={btnStyles.secondary} onClick={exportCsv}>Esporta CSV</button>
             <button style={btnStyles.secondary} onClick={() => window.print()}>Stampa</button>
+            {onNavigate && <button style={btnStyles.secondary} title="Salva la valutazione e passa all'applicazione Sviluppo iniziative"
+              onClick={async () => { if (await persistInitiativeEvaluation(false)) onNavigate("sviluppo"); }}>Salva e vai a Sviluppo →</button>}
           </div>
+          {onNavigate && <p style={styles.hint}>Schede per attività, proposte AI, progetto di avvio e richiesta di modifica codice si gestiscono ora nell&apos;applicazione <strong>Sviluppo iniziative</strong>, dalla Home. La valutazione deve essere salvata prima.</p>}
         </div>
       )}
 
       </main>
-      {/* SVILUPPO INIZIATIVA */}
-      <details style={{ ...styles.card, marginTop: 28, background: "#edf1f6" }}>
-        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#102a47" }}>Sviluppo iniziativa</summary>
-        <h3 style={{ margin: 0 }}>Richiesta di modifica codice</h3>
-        <p style={styles.hint}>Autorizza gli interventi nello step Offerta/Revisione, collega il repository e genera il pacchetto di richiesta codice (ZIP) per lo strumento di sviluppo scelto.</p>
-        <div style={{ ...styles.grid2, marginTop: 10 }}>
-          <label style={styles.label}>
-            Strumento previsto
-            <select style={styles.input} value={codeChangeTool} onChange={(e) => setCodeChangeTool(e.target.value)}>
-              <option value="vscode">Visual Studio Code</option>
-              <option value="codex">Codex</option>
-              <option value="other">Altro</option>
-            </select>
-          </label>
-          <label style={styles.label}>
-            Branch suggerito
-            <input style={styles.input} value={implementationBranch} onChange={(e) => setImplementationBranch(e.target.value)} placeholder="feature/<codice>" />
-          </label>
-        </div>
-        {/* Snippet modal */}
+      {/* Anteprima snippet delle proposte AI */}
         {snippetModal.open && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSnippetModal({ open: false, title: '', content: '' })}>
             <div style={{ width: 'min(900px, 94vw)', maxHeight: '85vh', overflow: 'auto', background: '#fff', borderRadius: 12 }} onClick={(e) => e.stopPropagation()}>
@@ -3252,37 +2999,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             </div>
           </div>
         )}
-        <label style={styles.label}>
-          Note di approvazione
-          <textarea style={styles.textarea} rows={2} value={implementationApprovalNotes} onChange={(e) => setImplementationApprovalNotes(e.target.value)} placeholder="Criteri di autorizzazione, vincoli, razionale…" />
-        </label>
-        <label style={styles.label}>
-          Compilazione e test
-          <textarea style={styles.textarea} rows={2} value={implementationTests} onChange={(e) => setImplementationTests(e.target.value)} placeholder="Comandi di build/test da eseguire (es. npm run build, dotnet test)…" />
-        </label>
-        {implementationFiles.length > 0 ? (
-          <p style={styles.hint}>
-            {implementationFiles.filter((f) => sourceFileAllowed(f.name) && !ignoredSourcePath(f.webkitRelativePath || f.name)).length} file sorgente presi in considerazione · quelli ignorati (node_modules, dist, build, vendor, bin/obj, minificati, lock) non vengono elencati.
-          </p>
-        ) : techProfile ? (
-          <p style={styles.hint}>
-            Repository: <strong>{techProfile.name || initiative.system}</strong> — profilo tecnico caricato dall&apos;applicativo selezionato ({techProfile.totalFiles || 0} file totali, {techProfile.readFiles || 0} analizzati).
-          </p>
-        ) : (
-          <p style={{ ...styles.hint, color: "#b00020" }}>
-            Nessun applicativo selezionato — torna al passo 1 e seleziona un applicativo da &quot;Applicativi e tecnologie&quot;.
-          </p>
-        )}
-           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-           <button style={btnStyles.primary} onClick={generateCodeChangeRequest} disabled={devBusy}>
-             {devBusy ? "Genero il pacchetto…" : "Genera ZIP richiesta modifica codice"}
-           </button>
-           <button style={btnStyles.secondary} onClick={exportImplementation}>Esporta piano di sviluppo (MD)</button>
-           <button style={{ ...btnStyles.secondary, background: '#fff7ed', borderColor: '#f59e0b', color: '#92400e' }} onClick={generateDevelopmentDocument} disabled={devBusy}>
-             {devBusy ? 'Generazione documento…' : 'Genera documento sviluppo (AI)'}
-           </button>
-         </div>
-      </details>
 
       {toastMsg && (
         <div role="status" aria-live="polite" style={styles.toast}>
