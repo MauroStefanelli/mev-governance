@@ -64,9 +64,15 @@ export const PAGE_MANUALS = {
     chapter('Configurazione', 'Verificare la destinazione dei dati', ['Controlla l’ambiente prima di consultare o aggiornare la configurazione.', 'Usa solo i campi e i comandi presenti nella pagina e attendi la conferma di verifica o salvataggio.', 'Non condividere password o stringhe di connessione nei documenti operativi o nei messaggi di assistenza.'], accessNote),
   ] },
   sviluppo: { title: 'Sviluppo iniziative', summary: 'Trasforma una valutazione del Configuratore in schede per attività, progetto di avvio, file generati e richiesta di modifica codice.', chapters: [
+    chapter('Il percorso in sei fasi', 'Fonti, Schede, Progetto, Codice, Consegna, Verifica', [
+      'La barra in alto mostra le sei fasi e, per ciascuna, avanzamento e stato: ✓ completa, numero blu in corso, grigio da fare. Clicca una fase per aprirla, oppure usa i pulsanti «← / →» in fondo alla pagina.',
+      'Il riquadro «Prossimo passo» indica la prima cosa da fare e porta alla fase giusta con un clic. L’avanzamento complessivo considera solo le fasi obbligatorie (Schede, Consegna, Verifica): Progetto e Codice sono facoltative e la cartella dei sorgenti, che va riselezionata a ogni sessione, non lo abbassa.',
+      '«Mostra le regole della fase» spiega a cosa serve la fase, cosa serve per completarla, cosa produce e quali regole vigono. Nella fase Consegna elenca anche i quattro controlli da soddisfare.',
+      'Le fasi non sono bloccate: puoi lavorare in ordine diverso. La sequenza consigliata è Fonti → Schede → (Progetto) → (Codice) → Consegna → Verifica.',
+    ], 'Una scheda è «definita» solo con file, soluzione e criteri di accettazione. Una proposta AI non la rende definita finché non la inserisci tu.'),
     chapter('Parti da qui', 'Dalla valutazione salvata allo sviluppo', [
       'Salva prima la valutazione nel Configuratore (Revisione → “Salva valutazione”, oppure “Salva e vai a Sviluppo →”). Lo Sviluppo mostra solo le iniziative già valutate nell’ambiente attivo.',
-      'Cerca l’iniziativa per GOTO, titolo o sistema e aprila. Il GOTO e il titolo restano visibili nell’intestazione fissa.',
+      'Cerca l’iniziativa per GOTO, titolo o sistema e aprila: nell’elenco vedi per ciascuna quante schede sono definite e verificate. Il GOTO e il titolo restano visibili nell’intestazione fissa.',
       'Offerta, importi e catalogo restano nel Configuratore: qui lavori su schede, progetto e consegna. Per cambiare l’offerta torna al Configuratore.',
     ], 'Se le schede erano state salvate nel Configuratore prima di questa applicazione, vengono caricate come punto di partenza: premi “Salva sviluppo” per renderle definitive.'),
     chapter('Salvataggio e collaborazione', 'Conservare il lavoro senza sovrascrivere i colleghi', [
@@ -75,7 +81,7 @@ export const PAGE_MANUALS = {
       'Se l’offerta viene rivista nel Configuratore, le schede restano legate alla riga originale. Se descrizione o numero di attività cambiano, lo Sviluppo lo segnala: controlla le schede delle righe modificate.',
     ], 'Salvare lo sviluppo non modifica la valutazione dell’offerta e salvare l’offerta non modifica lo sviluppo.'),
     chapter('Schede per attività e AI', 'Una scheda per ogni riga importata', [
-      'Ogni riga di dettaglio ha una scheda: ad esempio un intervento con 29 righe produce 29 schede distinte. Controlla l’applicativo associato e il percorso sorgenti configurato.',
+      'Ogni riga di dettaglio ha una scheda: ad esempio un intervento con 29 righe produce 29 schede distinte. Filtra per stato con i pulsanti in alto, che mostrano anche quante schede hai in ciascuno. Ogni scheda mostra i cinque passaggi (Requisito, Proposta AI, Scheda definita, File generati, Verificata) e il prossimo passo da fare.',
       'Premi “Seleziona cartella sorgenti per questa sessione” e scegli la cartella del repository. Il browser non conserva il permesso: va riselezionata dopo un ricaricamento, solo per nuove analisi o generazioni. Proposte e schede salvate si consultano senza cartella.',
       'Inizia da una sola attività con “Prepara scheda con AI”: usa la descrizione e un campione di sorgenti (fino a 60 file letti e otto estratti inviati). Non è una scansione completa e non esegue compilazioni o test. Configura prima il servizio AI personale dal Profilo.',
       'Leggi soluzione, criteri, file e righe citati. I riferimenti sono controllati rispetto agli estratti inviati: confermano dove si trovano nel campione, non la correttezza della soluzione. Un file ipotizzato non è un file letto.',
