@@ -3,6 +3,7 @@ import { developmentActivities } from './developmentActivityModel';
 import { activitySourceContext, createSourceCache } from './activitySourceContext';
 import { prepareActivityDevelopment } from '../services/mevService';
 import ActivityCodeGenerator from './ActivityCodeGenerator';
+import { planInsertion, applyInsertion, undoInsertion, draftPatch } from './draftInsertion';
 import { ACTIVITY_STATES, stateAllowed, isDefined, hasProposal, hasCode, isVerified, activityNextStep } from './developmentJourney';
 
 export default function DevelopmentActivities({ items, plans, onChange, applications, onSelectFiles, sourceFiles = [], embedded = false }) {
@@ -17,6 +18,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
   const [batch, setBatch] = useState(null);
   const [regenerate, setRegenerate] = useState(false);
   const stop = useRef(false);
+  const undoRef = useRef(() => ({ before: {}, after: {} }));
   const buildProposal = async item => {
     const description = item.detail?.detailDescription || item.reason || '';
     const source = await activitySourceContext(sourceFiles, description, cache);
@@ -35,6 +37,23 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
     setBusy(key); setError('');
     try { store(key, await buildProposal(item)); }
     catch (e) { setError(e.message); } finally { setBusy(''); }
+  };
+  const [overwrite, setOverwrite] = useState(false);
+  const [insertion, setInsertion] = useState(null);
+  const insert = () => {
+    const { eligible, skipped } = planInsertion(activities, plans, selected, overwrite);
+    if (!eligible.length) { setInsertion({ done: 0, skipped, undo: null }); return; }
+    const replaced = eligible.filter(a => plans[a.key]?.files || plans[a.key]?.solution || plans[a.key]?.acceptance).length;
+    if (!window.confirm(`Inserire la bozza AI in ${eligible.length} schede?${replaced ? ` In ${replaced} sostituirà file, soluzione e criteri già presenti.` : ''} Le schede restano “Da analizzare”, non vengono dichiarate verificate e puoi annullare subito dopo.${skipped.length ? ` ${skipped.length} selezionate saranno saltate.` : ''}`)) return;
+    let result = null;
+    onChange(previous => { result = applyInsertion(previous, eligible.map(a => a.key)); return result.next; });
+    setInsertion({ done: eligible.length, skipped, undo: true, numbers: eligible.map(a => a.number) });
+    undoRef.current = () => result;
+  };
+  const undo = () => {
+    let kept = [];
+    onChange(previous => { const { before, after } = undoRef.current(); const restored = undoInsertion(previous, before, after); kept = restored.kept; return restored.next; });
+    setInsertion({ done: 0, skipped: [], undo: false, numbers: [], undone: true, kept });
   };
   const toggle = key => setSelected(previous => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   const MAX_CONSECUTIVE_FAILURES = 3;
@@ -101,6 +120,16 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
         {!sourceFiles.length && <span className="dev-hint">Seleziona prima la cartella dei sorgenti.</span>}
         {sourceFiles.length > 0 && !selected.size && <span className="dev-hint">Spunta le attività nell’elenco per prepararle in blocco.</span>}
       </div>
+      <div className="dev-batch-run dev-batch-insert">
+        <button type="button" disabled={!selected.size || batch?.running} onClick={insert}>Inserisci bozza nelle {planInsertion(activities, plans, selected, overwrite).eligible.length} schede selezionate</button>
+        <label className="dev-batch-option"><input type="checkbox" checked={overwrite} onChange={e => { setOverwrite(e.target.checked); setInsertion(null); }} disabled={batch?.running} /> Sostituisci anche le schede già compilate</label>
+      </div>
+      {insertion?.undone && <div className="dev-batch-progress" role="status"><p>Inserimento annullato. {insertion.kept.length ? 'Le schede modificate dopo l’inserimento sono state lasciate come le hai scritte.' : ''}</p></div>}
+      {insertion && !insertion.undone && <div className="dev-batch-progress" role="status" aria-live="polite">
+        <p><b>{insertion.done} {insertion.done === 1 ? 'scheda aggiornata' : 'schede aggiornate'}</b>{insertion.done ? ` (attività ${insertion.numbers.join(', ')}). Salva lo sviluppo per conservarle.` : '. Nessuna scheda aggiornata.'}{insertion.skipped.length ? ` ${insertion.skipped.length} saltate.` : ''}</p>
+        {insertion.skipped.length > 0 && <ul className="dev-batch-errors">{insertion.skipped.map(entry => <li key={entry.key}><b>Attività {entry.number}</b>: {entry.reason}</li>)}</ul>}
+        {insertion.undo && <button type="button" onClick={undo}>Annulla l’inserimento</button>}
+      </div>}
       {batch && <div className="dev-batch-progress" role="status" aria-live="polite">
         {batch.running ? <><span className="dev-bar" aria-hidden="true"><i style={{ width: `${Math.round(100 * (batch.done + batch.failures.length) / batch.total)}%` }} /></span>
           <p>Attività {batch.current}: {batch.done + batch.failures.length} di {batch.total} elaborate · {batch.done} riuscite{batch.failures.length ? ` · ${batch.failures.length} con errore` : ''}</p></>
@@ -140,8 +169,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
           <h4>Punti aperti</h4><p>{typeof proposals[key].analysis.openQuestions === 'string' ? proposals[key].analysis.openQuestions : JSON.stringify(proposals[key].analysis.openQuestions || '')}</p>
           <button type="button" onClick={() => {
             if (!window.confirm('Inserire la bozza AI nella scheda? I campi file, soluzione e criteri correnti saranno sostituiti; non verrà dichiarata verificata.')) return;
-            update(key, { files: [...new Set(proposals[key].evidence.map(e => e.path))].join('\n'), solution: proposals[key].analysis.solution,
-              acceptance: proposals[key].analysis.acceptance, status: 'Da analizzare', aiDraft: proposals[key] });
+            update(key, draftPatch(plan, proposals[key]));
           }}>Inserisci bozza nella scheda</button>
         </div>}
         <h4>Scheda tecnica</h4>

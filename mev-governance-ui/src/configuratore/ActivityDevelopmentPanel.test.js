@@ -137,4 +137,68 @@ describe('batch preparation', () => {
     fireEvent.click(screen.getByText('Deseleziona'));
     expect(count()).toBe('0');
   });
+
+  describe('bulk draft insertion', () => {
+    const prop = n => ({ analysis: { solution: `Soluzione ${n}`, acceptance: `Criteri ${n}`, evidence: [] }, evidence: [{ path: `src/F${n}.java` }], coverage: {} });
+    const insertButton = () => screen.getByText(/Inserisci bozza nelle \d+ schede selezionate/);
+
+    test('writes the draft only into the selected sheets and keeps them out of verified states', () => {
+      render(<View initial={{ d1: { aiProposal: prop(1) }, d2: { aiProposal: prop(2) }, d3: { aiProposal: prop(3) } }} />);
+      pick(1); pick(3);
+      fireEvent.click(insertButton());
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('2 schede'));
+      expect(latest.d1).toMatchObject({ solution: 'Soluzione 1', acceptance: 'Criteri 1', files: 'src/F1.java', status: 'Da analizzare' });
+      expect(latest.d3.solution).toBe('Soluzione 3');
+      expect(latest.d2.solution).toBeUndefined();
+      expect(screen.getByText(/2 schede aggiornate/)).toBeInTheDocument();
+    });
+
+    test('does not overwrite a sheet written by hand unless asked, and says why it was skipped', () => {
+      render(<View initial={{ d1: { aiProposal: prop(1), solution: 'scritta da me', files: 'mio.java' }, d2: { aiProposal: prop(2) } }} />);
+      pick(1); pick(2);
+      fireEvent.click(insertButton());
+      expect(latest.d1.solution).toBe('scritta da me');
+      expect(latest.d2.solution).toBe('Soluzione 2');
+      expect(screen.getByText(/scheda già compilata/)).toBeInTheDocument();
+    });
+
+    test('replaces a written sheet with the explicit option and the confirmation warns about it', () => {
+      render(<View initial={{ d1: { aiProposal: prop(1), solution: 'scritta da me', files: 'mio.java' } }} />);
+      pick(1);
+      fireEvent.click(screen.getByLabelText(/Sostituisci anche le schede già compilate/));
+      fireEvent.click(insertButton());
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('sostituirà'));
+      expect(latest.d1.solution).toBe('Soluzione 1');
+    });
+
+    test('never touches verified sheets, even with the replace option', () => {
+      render(<View initial={{ d1: { aiProposal: prop(1), status: 'Verificata', solution: 'ok', verification: 'test ok' } }} />);
+      pick(1);
+      fireEvent.click(screen.getByLabelText(/Sostituisci anche/));
+      fireEvent.click(insertButton());
+      expect(latest.d1.solution).toBe('ok');
+      expect(screen.getByText(/Nessuna scheda aggiornata/)).toBeInTheDocument();
+      expect(screen.getByText(/stato «Verificata»/)).toBeInTheDocument();
+    });
+
+    test('the confirmation can be declined and the undo restores the previous sheets', () => {
+      render(<View initial={{ d1: { aiProposal: prop(1) } }} />);
+      pick(1);
+      window.confirm = jest.fn(() => false);
+      fireEvent.click(insertButton());
+      expect(latest.d1.solution).toBeUndefined();
+      window.confirm = jest.fn(() => true);
+      fireEvent.click(insertButton());
+      expect(latest.d1.solution).toBe('Soluzione 1');
+      fireEvent.click(screen.getByText('Annulla l’inserimento'));
+      expect(latest.d1.solution).toBeUndefined();
+      expect(latest.d1.aiProposal).toBeDefined();
+      expect(screen.getByText(/Inserimento annullato/)).toBeInTheDocument();
+    });
+
+    test('needs a selection', () => {
+      render(<View initial={{ d1: { aiProposal: prop(1) } }} />);
+      expect(insertButton()).toBeDisabled();
+    });
+  });
 });
