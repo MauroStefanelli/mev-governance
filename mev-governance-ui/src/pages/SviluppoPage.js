@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DevelopmentActivities from '../configuratore/ActivityDevelopmentPanel';
 import ProjectPreparationPanel from '../configuratore/ProjectPreparationPanel';
 import JourneyBar from '../configuratore/JourneyBar';
+import CollaborationPanel from '../configuratore/CollaborationPanel';
+import { indexSummaries, initiativeKey, activityLine, displayName } from '../configuratore/developmentCollaboration';
 import { developmentActivities } from '../configuratore/developmentActivityModel';
 import { DEVELOPMENT_ENTITY, parseRecordPayload, loadDevelopmentState, saveDevelopmentState, loadApplicationsFor, catalogFor, applicationsForInitiative, applicationScope, applicationDiagnosis,
   activitySignature, activityChanges, DEFAULT_DELIVERY } from '../configuratore/developmentRecord';
 import { computeJourney, developmentSummary, hasCode } from '../configuratore/developmentJourney';
 import { approvedInterventions, buildCodeChangeRequest, implementationMarkdown, developmentDocumentMarkdown, downloadBlob, repositorySummary } from '../configuratore/developmentPackages';
 import { saveAndClose } from '../configuratore/saveAndClose';
-import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi } from '../services/mevService';
+import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi, developmentRequest } from '../services/mevService';
 import { APP_DATA, appNorm, sourceFileAllowed, ignoredSourcePath } from '../configuratore/configuratoreCore';
 import '../configuratore/initiativeWorkspace.css';
 import '../configuratore/developmentPage.css';
@@ -27,6 +29,7 @@ const unauthorized = error => { try { const status = JSON.parse(error.message).s
 export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContratto }) {
   const [list, setList] = useState([]);
   const [summaries, setSummaries] = useState({});
+  const [activity, setActivity] = useState({});
   const [contracts, setContracts] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState('');
@@ -63,6 +66,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
         result[record.record_key] = developmentSummary(bySuffix.get(key), (evaluation.items || []).length);
       });
       setList(records); setContracts(catalogs); setSummaries(result);
+      developmentRequest('summary').then(entries => setActivity(indexSummaries(entries))).catch(() => setActivity({}));
     } catch (e) { if (unauthorized(e)) return onUnauthorized?.(); setListError(`Elenco iniziative non disponibile: ${e.message}`); }
     finally { setLoadingList(false); }
   }, [contractId, onUnauthorized]);
@@ -99,7 +103,9 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     try {
       const revision = await saveDevelopmentState(loaded, { plans, preparation, delivery, activities: activitySignature(activities) });
       setLoaded(previous => ({ ...previous, revision, source: 'saved', savedActivities: activitySignature(activities) })); setDirty(false);
-      setMessage(`Sviluppo salvato e confermato dal server (revisione ${revision}).`); return true;
+      setMessage(`Sviluppo salvato e confermato dal server (revisione ${revision}).`);
+      developmentRequest('worked', { goto: heading.code || heading.title }).catch(() => {});
+      return true;
     } catch (e) { setError(`Salvataggio non riuscito: ${e.message}`); return false; } finally { setBusy(''); }
   };
   const close = () => { setLoaded(null); setDirty(false); refresh(); };
@@ -156,6 +162,9 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
               <small>{summary.defined}/{count} schede · {summary.verified} verificate</small>
               <span className="dev-bar" aria-hidden="true"><i style={{ width: `${count ? Math.round(100 * summary.defined / count) : 0}%` }} /></span></> :
               <><span className="dev-pill">Da avviare</span><small>Nessuno sviluppo salvato</small></>}</span>
+            <span className="dev-list-people">{(() => { const line = activityLine(activity[initiativeKey(evaluation.initiative?.code || evaluation.initiative?.title)]);
+              return <><small className="dev-list-worked">{line.worked}</small>
+                {line.online.length > 0 && <span className="dev-list-online" title={line.online.map(displayName).join(', ')}><span className="dev-live-dot" aria-hidden="true" />{line.online.length === 1 ? `${displayName(line.online[0])} è collegato` : `${line.online.length} collegati ora`}</span>}</>; })()}</span>
             <span className="dev-list-go" aria-hidden="true">›</span>
           </button>;
         })}
@@ -231,6 +240,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     {error && <p role="alert" className="development-alert">{error}</p>}
     {message && <p role="status" className="development-status">{message}</p>}
     {changed ? <p role="alert" className="development-alert">Dall’ultimo salvataggio lo sviluppo ha {changes.added.length} attività nuove, {changes.removed.length} rimosse e {changes.changed.length} con descrizione cambiata (l’offerta è stata rivista nel Configuratore). Controlla le schede delle attività modificate: restano legate alla riga e non si aggiornano da sole.</p> : null}
+    <CollaborationPanel key={initiativeKey(heading.code || heading.title)} code={String(heading.code || heading.title || '').trim()} onNotify={setMessage} />
     <JourneyBar journey={journey} current={phase} onSelect={setPhase} showGuide={showGuide} onToggleGuide={() => setShowGuide(value => !value)} />
     <div className="dev-phase" role="region" aria-label={`Fase: ${journey.phases.find(p => p.id === phase).label}`}>{body[phase]}</div>
     <nav className="dev-pager" aria-label="Cambio fase">

@@ -605,6 +605,30 @@ using (var scope = app.Services.CreateScope())
                 UNIQUE (""AmbienteId"", ""Goto"", ""Version"")
             );");
 
+        // Presence, last worker and chat of the Sviluppo application.
+        db.Database.ExecuteSqlRaw($@"
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""DevelopmentPresences"" (
+                ""Id"" BIGSERIAL PRIMARY KEY,
+                ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" VARCHAR(120) NOT NULL,
+                ""Username"" VARCHAR(120) NOT NULL,
+                ""FullName"" TEXT NOT NULL DEFAULT '',
+                ""LastSeenAt"" TIMESTAMPTZ NOT NULL,
+                ""LastWorkedAt"" TIMESTAMPTZ NULL,
+                UNIQUE (""AmbienteId"", ""Goto"", ""Username"")
+            );
+            CREATE TABLE IF NOT EXISTS ""{sch}"".""DevelopmentMessages"" (
+                ""Id"" BIGSERIAL PRIMARY KEY,
+                ""AmbienteId"" INTEGER NOT NULL,
+                ""Goto"" VARCHAR(120) NOT NULL,
+                ""Author"" VARCHAR(120) NOT NULL,
+                ""AuthorFullName"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                ""Text"" TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_DevelopmentMessages_AmbienteId_Goto_Id""
+                ON ""{sch}"".""DevelopmentMessages"" (""AmbienteId"", ""Goto"", ""Id"");");
+
         // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
         try
         {

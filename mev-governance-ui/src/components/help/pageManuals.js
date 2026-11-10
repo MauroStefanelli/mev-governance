@@ -75,6 +75,13 @@ export const PAGE_MANUALS = {
       'Cerca l’iniziativa per GOTO, titolo o sistema e aprila: nell’elenco vedi per ciascuna quante schede sono definite e verificate. Il GOTO e il titolo restano visibili nell’intestazione fissa.',
       'Offerta, importi e catalogo restano nel Configuratore: qui lavori su schede, progetto e consegna. Per cambiare l’offerta torna al Configuratore.',
     ], 'Se le schede erano state salvate nel Configuratore prima di questa applicazione, vengono caricate come punto di partenza: premi “Salva sviluppo” per renderle definitive.'),
+    chapter('Colleghi collegati e chat', 'Sapere chi sta lavorando e parlarsi', [
+      'Nell’elenco delle iniziative ogni riga mostra chi ha salvato per ultimo lo sviluppo e quando, e chi è collegato in questo momento. Conta come «ultimo lavoro» solo un salvataggio confermato dal server: aprire l’iniziativa non basta.',
+      'Aprendo un’iniziativa compare il riquadro di collaborazione: i colleghi collegati, un avviso in giallo se qualcuno sta lavorando sulla stessa iniziativa e la chat. Quando un collega si collega mentre sei dentro, ricevi una notifica.',
+      'La presenza si aggiorna ogni 15 secondi e si considera spenta dopo 45 secondi senza segnali, oppure subito se chiudi l’iniziativa o la pagina. Con la scheda del browser nascosta l’aggiornamento si ferma e riprende al ritorno.',
+      'La chat è unica per iniziativa e per ambiente: tutti quelli che lavorano allo sviluppo vedono gli stessi messaggi, anche se si collegano dopo. La cronologia è conservata e i messaggi più vecchi si caricano con «Mostra messaggi precedenti». Invio per inviare, Maiusc+Invio per andare a capo; massimo 2.000 caratteri.',
+      'Il messaggio non inviato resta nella casella, così non si perde. I messaggi non si modificano né si cancellano. Non scrivere password, chiavi o dati riservati: la cronologia è visibile ai colleghi dello stesso ambiente.',
+    ], 'La presenza e la chat avvisano ma non bloccano: due persone possono comunque salvare. Lo sviluppo si salva per intero e il secondo salvataggio viene rifiutato con un conflitto se il primo è avvenuto dopo la tua apertura. Coordinatevi nella chat prima di salvare.'),
     chapter('Salvataggio e collaborazione', 'Conservare il lavoro senza sovrascrivere i colleghi', [
       '“Salva sviluppo” scrive schede, proposte AI, progetto e dati di consegna in un archivio dedicato e mostra la conferma solo dopo il riscontro del server. “Salva e chiudi” chiude solo se il salvataggio riesce.',
       'Se un collega ha salvato lo sviluppo della stessa iniziativa dopo la tua apertura, ricevi un conflitto e la pagina resta aperta con le tue modifiche. Non ricaricare: copia ciò che serve, riapri l’iniziativa e riconcilia.',

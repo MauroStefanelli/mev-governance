@@ -66,6 +66,21 @@ const fetchWithRefresh = async (url, options = {}) => {
   return res;
 };
 
+// Presence, last worker and chat of the Sviluppo application (always scoped by the server to the active environment).
+export async function developmentRequest(path, body) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/development/${path}`, {
+    method: body ? 'POST' : 'GET', headers: authHeaders(),
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || (response.status === 404 ? 'Il backend non espone ancora la collaborazione in Sviluppo: aggiorna il backend DEV.' : `Collaborazione: errore ${response.status}`));
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
 export async function workspaceRequest(path, body) {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/workspaces/${path}`, {
     method: body ? 'POST' : 'GET', headers: authHeaders(),

@@ -20,6 +20,7 @@ var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<str
 using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite("Data Source=:memory:").Options, config);
 db.Database.OpenConnection(); db.Database.EnsureCreated();
 await WorkspaceRegression.Run(db, Check);
+await DevelopmentCollaborationRegression.Run(db, Check);
 OfferWorkbookRegression.Run(Check);
 if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }
 var user = new AppUser { Username = "operator", Role = "Admin" };
