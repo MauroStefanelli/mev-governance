@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { developmentActivities } from './developmentActivityModel';
-import { activitySourceContext } from './activitySourceContext';
+import { activitySourceContext, createSourceCache } from './activitySourceContext';
 import { prepareActivityDevelopment } from '../services/mevService';
 import ActivityCodeGenerator from './ActivityCodeGenerator';
 import { ACTIVITY_STATES, stateAllowed, isDefined, hasProposal, hasCode, isVerified, activityNextStep } from './developmentJourney';
@@ -11,20 +11,47 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
   const [error, setError] = useState('');
   // Proposals are persisted with the plan even before applying their fields.
   const proposals = Object.fromEntries(Object.entries(plans).filter(([, plan]) => plan.aiProposal || plan.aiDraft).map(([key, plan]) => [key, plan.aiProposal || plan.aiDraft]));
+  // Files are read and hashed once per selected folder and shared by every activity.
+  const cache = useMemo(() => createSourceCache(), [sourceFiles]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [selected, setSelected] = useState(() => new Set());
+  const [batch, setBatch] = useState(null);
+  const [regenerate, setRegenerate] = useState(false);
+  const stop = useRef(false);
+  const buildProposal = async item => {
+    const description = item.detail?.detailDescription || item.reason || '';
+    const source = await activitySourceContext(sourceFiles, description, cache);
+    if (!source.files.length) throw new Error('Nessun file sorgente leggibile: seleziona la cartella dei sorgenti per questa sessione.');
+    const result = await prepareActivityDevelopment({ activity: { interventionId: item.interventionId, description, technology: item.detail?.technology }, source });
+    if (typeof result.analysis?.solution !== 'string' || typeof result.analysis?.acceptance !== 'string') throw new Error('Risposta AI incompleta: la scheda corrente non è stata modificata.');
+    const evidence = (Array.isArray(result.analysis.evidence) ? result.analysis.evidence : []).filter(entry => {
+      const file = source.files.find(f => f.path === entry.path);
+      return file && Number.isInteger(entry.startLine) && Number.isInteger(entry.endLine) && entry.startLine >= file.startLine && entry.endLine <= file.endLine && entry.endLine >= entry.startLine;
+    }).map(entry => ({ ...entry, sha256: source.files.find(f => f.path === entry.path).sha256 }));
+    return { ...result, evidence, coverage: source.coverage, excerpts: source.files };
+  };
+  // Only the proposal is written: the editable fields of the sheet are never touched here.
+  const store = (key, proposal) => onChange(previous => ({ ...previous, [key]: { ...previous[key], aiProposal: proposal } }));
   const prepare = async (key, item) => {
     setBusy(key); setError('');
-    try {
-      const description = item.detail?.detailDescription || item.reason || '';
-      const source = await activitySourceContext(sourceFiles, description);
-      if (!source.files.length) throw new Error('Nessun file sorgente leggibile: seleziona la cartella NPSO per questa sessione.');
-      const result = await prepareActivityDevelopment({ activity: { interventionId: item.interventionId, description, technology: item.detail?.technology }, source });
-      if (typeof result.analysis?.solution !== 'string' || typeof result.analysis?.acceptance !== 'string') throw new Error('Risposta AI incompleta: la scheda corrente non è stata modificata.');
-      const evidence = (Array.isArray(result.analysis.evidence) ? result.analysis.evidence : []).filter(entry => {
-        const file = source.files.find(f => f.path === entry.path);
-        return file && Number.isInteger(entry.startLine) && Number.isInteger(entry.endLine) && entry.startLine >= file.startLine && entry.endLine <= file.endLine && entry.endLine >= entry.startLine;
-      }).map(entry => ({ ...entry, sha256: source.files.find(f => f.path === entry.path).sha256 }));
-      onChange(previous => ({ ...previous, [key]: { ...previous[key], aiProposal: { ...result, evidence, coverage: source.coverage, excerpts: source.files } } }));
-    } catch (e) { setError(e.message); } finally { setBusy(''); }
+    try { store(key, await buildProposal(item)); }
+    catch (e) { setError(e.message); } finally { setBusy(''); }
+  };
+  const toggle = key => setSelected(previous => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  const MAX_CONSECUTIVE_FAILURES = 3;
+  const runBatch = async list => {
+    stop.current = false; setError('');
+    const failures = []; let done = 0; let streak = 0; let halted = false;
+    setBatch({ running: true, done: 0, total: list.length, current: list[0].number, failures: [] });
+    for (const { key, item, number } of list) {
+      if (stop.current) { halted = true; break; }
+      setBatch(previous => ({ ...previous, current: number }));
+      try { store(key, await buildProposal(item)); done += 1; streak = 0; }
+      catch (e) { failures.push({ number, message: e.message }); streak += 1; if (streak >= MAX_CONSECUTIVE_FAILURES) { halted = true; break; } }
+      const progress = { done, failures: [...failures] };
+      setBatch(previous => ({ ...previous, ...progress }));
+    }
+    setBatch({ running: false, done, total: list.length, failures, halted, stopped: stop.current, pending: list.length - done - failures.length });
+    if (done) setSelected(previous => { const next = new Set(previous); list.forEach(({ key }, index) => { if (!failures.some(f => f.number === list[index].number)) next.delete(key); }); return next; });
   };
   const activities = developmentActivities(items);
   const states = ACTIVITY_STATES;
@@ -37,6 +64,9 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
   });
   const counts = Object.fromEntries(states.map(state => [state, activities.filter(a => (plans[a.key]?.status || 'Da analizzare') === state).length]));
   const visible = activities.filter(a => filter === 'Tutte' || (plans[a.key]?.status || 'Da analizzare') === filter);
+  const chosen = activities.filter(a => selected.has(a.key));
+  const toPrepare = regenerate ? chosen : chosen.filter(a => !hasProposal(plans[a.key]));
+  const skipped = chosen.length - toPrepare.length;
   const stepsFor = plan => [
     ['Requisito', true], ['Proposta AI', hasProposal(plan)], ['Scheda definita', isDefined(plan)], ['File generati', hasCode(plan)], ['Verificata', isVerified(plan)],
   ];
@@ -54,6 +84,31 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
       {['Tutte', ...states].map(state => <button type="button" key={state} className={filter === state ? 'is-active' : ''} aria-pressed={filter === state} onClick={() => setFilter(state)}>{state}<b>{state === 'Tutte' ? activities.length : counts[state]}</b></button>)}
     </div>
     {error && <p role="alert">{error}</p>}
+    <div className="dev-batch" aria-label="Preparazione AI di più attività">
+      <div className="dev-batch-select">
+        <button type="button" onClick={() => setSelected(new Set(visible.map(a => a.key)))} disabled={!visible.length || batch?.running}>Seleziona le {visible.length} visibili</button>
+        <button type="button" onClick={() => setSelected(new Set(visible.filter(a => !hasProposal(plans[a.key])).map(a => a.key)))} disabled={!visible.length || batch?.running}>Solo senza proposta</button>
+        <button type="button" onClick={() => setSelected(new Set())} disabled={!selected.size || batch?.running}>Deseleziona</button>
+        <span className="dev-batch-count"><b>{selected.size}</b> selezionate</span>
+      </div>
+      <label className="dev-batch-option"><input type="checkbox" checked={regenerate} onChange={e => setRegenerate(e.target.checked)} disabled={batch?.running} /> Rigenera anche le attività che hanno già una proposta (la sostituisce)</label>
+      <div className="dev-batch-run">
+        <button type="button" className="dev-btn-primary" disabled={!toPrepare.length || !sourceFiles.length || !!busy || batch?.running} onClick={() => {
+          if (!window.confirm(`Preparare con l’AI ${toPrepare.length} attività? Verranno fatte ${toPrepare.length} richieste AI, una alla volta. Le schede già compilate non vengono modificate: viene salvata solo la proposta.${skipped ? ` ${skipped} attività selezionate con proposta già presente saranno saltate.` : ''}`)) return;
+          runBatch(toPrepare);
+        }}>{batch?.running ? 'Preparazione in corso…' : `Prepara con AI le ${toPrepare.length} attività selezionate`}</button>
+        {batch?.running && <button type="button" onClick={() => { stop.current = true; }}>Ferma dopo questa</button>}
+        {!sourceFiles.length && <span className="dev-hint">Seleziona prima la cartella dei sorgenti.</span>}
+        {sourceFiles.length > 0 && !selected.size && <span className="dev-hint">Spunta le attività nell’elenco per prepararle in blocco.</span>}
+      </div>
+      {batch && <div className="dev-batch-progress" role="status" aria-live="polite">
+        {batch.running ? <><span className="dev-bar" aria-hidden="true"><i style={{ width: `${Math.round(100 * (batch.done + batch.failures.length) / batch.total)}%` }} /></span>
+          <p>Attività {batch.current}: {batch.done + batch.failures.length} di {batch.total} elaborate · {batch.done} riuscite{batch.failures.length ? ` · ${batch.failures.length} con errore` : ''}</p></>
+          : <p><b>{batch.done} su {batch.total} proposte preparate.</b>{batch.failures.length ? ` ${batch.failures.length} con errore.` : ''}{batch.pending > 0 ? ` ${batch.pending} non elaborate${batch.halted && !batch.stopped ? ' (interrotto dopo errori consecutivi)' : ' (fermato)'}.` : ''} Salva lo sviluppo per conservarle.</p>}
+        {!batch.running && batch.failures.length > 0 && <ul className="dev-batch-errors">{batch.failures.map(f => <li key={f.number}><b>Attività {f.number}</b>: {f.message}</li>)}</ul>}
+        {!batch.running && batch.failures.length > 0 && <button type="button" onClick={() => runBatch(activities.filter(a => batch.failures.some(f => f.number === a.number)))}>Riprova le {batch.failures.length} con errore</button>}
+      </div>}
+    </div>
     {!visible.length && <p className="dev-empty">Nessuna attività in questo stato.</p>}
     {visible.map(({ key, item, number }) => {
       const plan = plans[key] || {};
@@ -61,6 +116,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
       const status = plan.status || 'Da analizzare';
       return <details className="development-activity" key={key} open={openKey === key} onToggle={e => { if (e.currentTarget.open) setOpenKey(key); else if (openKey === key) setOpenKey(null); }}>
         <summary>
+          <label className="dev-pick" onClick={e => e.stopPropagation()}><input type="checkbox" aria-label={`Seleziona attività ${number}`} checked={selected.has(key)} disabled={batch?.running} onChange={() => toggle(key)} /></label>
           <span className="dev-activity-number">Attività {number}</span>
           <span className="dev-activity-title"><strong>{item.interventionId} · {item.detail?.componentApplication || item.detail?.name || item.id}</strong>
             <small>{String(item.detail?.detailDescription || item.reason || '').slice(0, 140)}</small></span>

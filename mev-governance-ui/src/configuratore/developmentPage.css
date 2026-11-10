@@ -88,7 +88,7 @@
 .dev-filter button b { font-size: 11px; background: #e9eef5; border-radius: 10px; padding: 0 7px; color: #53657c; } .dev-filter button.is-active { background: var(--brand) !important; border-color: var(--brand) !important; color: #fff !important; } .dev-filter button.is-active b { background: #ffffff33; color: #fff; }
 .development-activity { margin-top: 10px; border: 1px solid var(--line) !important; border-radius: 12px; padding: 0 !important; background: #fff; overflow: hidden; }
 .development-activity[open] { border-color: #8fb0dc !important; box-shadow: 0 6px 20px #24466e12; }
-.development-activity > summary { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 16px !important; background: #fff !important; border-radius: 0 !important; cursor: pointer; list-style: none; }
+.development-activity > summary { display: grid !important; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 16px !important; background: #fff !important; border-radius: 0 !important; cursor: pointer; list-style: none; }
 .development-activity > summary::-webkit-details-marker { display: none; }
 .development-activity[open] > summary { background: #f4f8ff !important; border-bottom: 1px solid var(--line); }
 .dev-activity-number { font-size: 12px; font-weight: 800; color: var(--brand); background: var(--run-soft); border-radius: 8px; padding: 4px 9px; white-space: nowrap; }
@@ -121,3 +121,12 @@
 
 .dev-app .initiative-workspace summary, .dev-app .project-preparation summary { min-height: 36px; display: flex; align-items: center; }
 .dev-app .development-activity > summary { min-height: 56px; }
+
+.dev-pick { display: grid; place-items: center; width: 36px; height: 36px; margin: -6px; cursor: pointer; } .dev-pick input { width: 18px; height: 18px; accent-color: var(--brand); cursor: pointer; margin: 0; }
+.dev-batch { background: linear-gradient(120deg, #f4f8ff, #fbfdff); border: 1px solid #c6daf6; border-radius: 12px; padding: 14px 16px; margin: 4px 0 14px; display: flex; flex-direction: column; gap: 10px; }
+.dev-batch-select, .dev-batch-run { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dev-batch-count { margin-left: auto; font-size: 13px; color: var(--muted); } .dev-batch-count b { color: var(--brand); font-size: 16px; }
+.dev-batch-option { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: #3d5878; min-height: 32px; } .dev-batch-option input { accent-color: var(--brand); width: 16px; height: 16px; }
+.dev-batch-progress { border-top: 1px solid #d5e3f7; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; } .dev-batch-progress p { margin: 0; font-size: 13px; }
+.dev-batch-errors { margin: 0; padding-left: 18px; font-size: 12.5px; color: #9c361b; } .dev-batch-errors li { margin-bottom: 3px; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .development-activity > summary { grid-template-columns: auto auto minmax(0, 1fr); } .dev-activity-steps, .dev-state { grid-column: 3; } .dev-batch-count { margin-left: 0; } }
