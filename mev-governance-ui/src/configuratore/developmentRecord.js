@@ -1,7 +1,7 @@
 import { getConfiguratoreRecords, upsertConfiguratoreRecord, getSharedApplications } from '../services/mevService';
 import { verifiedPlanSnapshot } from './saveInitiativeSnapshot';
 import { newProjectPreparation } from './projectPackage';
-import { applicationsFor, applicationContextFor } from './configuratoreCore';
+import { applicationsFor, applicationContextFor, applicationIdentity } from './configuratoreCore';
 
 export const DEVELOPMENT_ENTITY = 'implementation_plan';
 export const DEFAULT_DELIVERY = { tool: 'vscode', branch: '', notes: '', tests: '' };
@@ -56,6 +56,13 @@ export async function saveDevelopmentState(loaded, { plans, preparation, deliver
   return payload.revision;
 }
 
+// The Configuratore stores applications under the catalog contract chosen for the estimate
+// (catalogSource), not under the environment contract code used to key the evaluation.
+export const applicationScope = (evaluation, fallback) => {
+  const source = evaluation?.catalogSource;
+  return { contractId: source?.contractId || fallback.contractId, lot: String(source?.lot ?? fallback.lot) };
+};
+
 export async function loadApplications(contractId, lot) {
   const builtin = contractId === 'poste-tet-2025';
   try {
@@ -65,6 +72,17 @@ export async function loadApplications(contractId, lot) {
   let local = applicationsFor(contractId, lot, builtin);
   if (!local.length && builtin) local = applicationsFor(contractId, String(lot) === '1' ? '2' : '1', true);
   return local;
+}
+
+// Applications from both places the Configuratore may have saved them: the catalog scope of the
+// estimate and the environment scope. Same application (code + name) is listed once, catalog scope first.
+export async function loadApplicationsFor(evaluation, fallback) {
+  const scope = applicationScope(evaluation, fallback);
+  const sameScope = scope.contractId === fallback.contractId && scope.lot === String(fallback.lot);
+  const lists = [await loadApplications(scope.contractId, scope.lot)];
+  if (!sameScope) lists.push(await loadApplications(fallback.contractId, fallback.lot));
+  const seen = new Set();
+  return lists.flat().filter(app => { const id = applicationIdentity(app); if (seen.has(id)) return false; seen.add(id); return true; });
 }
 
 export const catalogFor = (contracts, appData, source) => {
@@ -86,4 +104,11 @@ export function activityChanges(saved, current) {
   const before = new Map(saved.map(entry => [entry.key, entry])); const now = new Map(current.map(entry => [entry.key, entry]));
   return { changed: current.filter(entry => before.has(entry.key) && (before.get(entry.key).description !== entry.description || before.get(entry.key).interventionId !== entry.interventionId)).map(entry => entry.key),
     added: current.filter(entry => !before.has(entry.key)).map(entry => entry.key), removed: saved.filter(entry => !now.has(entry.key)).map(entry => entry.key) };
+}
+
+// Short explanation shown when no application matches the system of the initiative.
+export function applicationDiagnosis(system, applications, scope) {
+  const where = `contratto «${scope.contractId}», lotto «${scope.lot}»`;
+  if (!applications.length) return `Nel ${where} non risulta nessun applicativo configurato.`;
+  return `Nel ${where} ci sono ${applications.length} applicativi (${applications.slice(0, 6).map(app => app.name).join(', ')}${applications.length > 6 ? '…' : ''}) ma nessuno corrisponde al sistema «${system || '—'}». Aggiungi il nome «${system || ''}» come alias dell’applicativo corretto, oppure crealo.`;
 }

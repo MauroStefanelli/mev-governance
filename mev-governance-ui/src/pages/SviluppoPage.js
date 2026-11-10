@@ -3,7 +3,7 @@ import DevelopmentActivities from '../configuratore/ActivityDevelopmentPanel';
 import ProjectPreparationPanel from '../configuratore/ProjectPreparationPanel';
 import JourneyBar from '../configuratore/JourneyBar';
 import { developmentActivities } from '../configuratore/developmentActivityModel';
-import { DEVELOPMENT_ENTITY, parseRecordPayload, loadDevelopmentState, saveDevelopmentState, loadApplications, catalogFor, applicationsForInitiative,
+import { DEVELOPMENT_ENTITY, parseRecordPayload, loadDevelopmentState, saveDevelopmentState, loadApplicationsFor, catalogFor, applicationsForInitiative, applicationScope, applicationDiagnosis,
   activitySignature, activityChanges, DEFAULT_DELIVERY } from '../configuratore/developmentRecord';
 import { computeJourney, developmentSummary, hasCode } from '../configuratore/developmentJourney';
 import { approvedInterventions, buildCodeChangeRequest, implementationMarkdown, developmentDocumentMarkdown, downloadBlob, repositorySummary } from '../configuratore/developmentPackages';
@@ -73,7 +73,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     const token = ++opening.current; setBusy('open'); setError(''); setMessage('');
     try {
       const state = await loadDevelopmentState(record);
-      const apps = await loadApplications(state.contractId, state.lot);
+      const apps = await loadApplicationsFor(state.evaluation, { contractId: state.contractId, lot: state.lot });
       if (token !== opening.current) return;
       setLoaded(state); setPlans(state.plans); setPreparation(state.preparation); setDelivery(state.delivery);
       setApplications(apps); setFiles([]); setDirty(false); setPhase(state.source === 'new' ? 'fonti' : 'schede');
@@ -170,7 +170,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
       <div className="dev-source-grid">
         <div className="dev-source"><span className="dev-source-label">Applicativi associati al sistema «{heading.system || '—'}»</span>
           {linkedApplications.length ? linkedApplications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b><code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>)
-            : <p className="dev-warn">Nessun applicativo corrisponde al sistema dell’iniziativa. Nel Configuratore apri «Risorse e configurazione → Applicativi» e collegalo.</p>}</div>
+            : <p className="dev-warn">Nessun applicativo corrisponde al sistema dell’iniziativa. {applicationDiagnosis(heading.system, applications, applicationScope(loaded.evaluation, { contractId: loaded.contractId, lot: loaded.lot }))} Per collegarlo, nel Configuratore apri «Risorse e configurazione → Applicativi».</p>}</div>
         <div className="dev-source"><span className="dev-source-label">Cartella dei sorgenti (questa sessione)</span>
           {files.length ? <p><b>{files.length} file selezionati</b> · {sourceCount} sorgenti presi in considerazione</p> : techProfile ? <p>Nessuna cartella: uso il profilo tecnico dell’applicativo ({techProfile.totalFiles || 0} file, {techProfile.readFiles || 0} analizzati).</p> : <p className="dev-warn">Nessuna cartella selezionata: le proposte AI e la generazione dei file non sono disponibili.</p>}
           <button type="button" className="dev-btn dev-btn-primary" onClick={selectFolder}>{files.length ? 'Cambia cartella' : 'Seleziona cartella sorgenti'}</button>

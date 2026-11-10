@@ -66,3 +66,43 @@ test('reports changed, added and removed activities after the offer is re-import
   expect(activityChanges(saved, now)).toEqual({ changed: ['a'], added: ['c'], removed: ['b'] });
   expect(activityChanges(null, now)).toEqual({ changed: [], added: [], removed: [] });
 });
+
+describe('applications of an initiative', () => {
+  const { loadApplicationsFor, applicationScope, applicationDiagnosis } = require('./developmentRecord');
+  const { getSharedApplications } = require('../services/mevService');
+  const bep = { id: 'b', name: 'BEP', codeUrl: '/src/bep' };
+  beforeEach(() => getSharedApplications.mockReset());
+
+  test('looks under the catalog contract the estimate was built on, not the environment code', async () => {
+    getSharedApplications.mockImplementation(async (contract, lot) => (contract === 'poste-tet-2025' && lot === '2' ? [bep] : null));
+    const apps = await loadApplicationsFor({ catalogSource: { contractId: 'poste-tet-2025', lot: '2' } }, { contractId: '4490015980', lot: '2' });
+    expect(apps).toEqual([bep]);
+    expect(getSharedApplications).toHaveBeenCalledWith('poste-tet-2025', '2');
+  });
+
+  test('also includes applications saved under the environment scope, without duplicates', async () => {
+    getSharedApplications.mockImplementation(async (contract) => (contract === '4490015980' ? [bep, { id: 'x', code: 'AP-1', name: 'Altra' }] : [{ id: 'y', code: 'AP-1', name: 'Altra' }]));
+    const apps = await loadApplicationsFor({ catalogSource: { contractId: 'altro-contratto', lot: '2' } }, { contractId: '4490015980', lot: '2' });
+    expect(apps.map(app => app.name)).toEqual(['Altra', 'BEP']);
+  });
+
+  test('finds an application added in the environment scope even when the catalog scope has the built-in defaults', async () => {
+    getSharedApplications.mockImplementation(async (contract) => (contract === '4490015980' ? [bep] : null));
+    const apps = await loadApplicationsFor({ catalogSource: { contractId: 'poste-tet-2025', lot: '2' } }, { contractId: '4490015980', lot: '2' });
+    expect(apps.some(app => app.name === 'BEP')).toBe(true);
+    expect(apps.length).toBeGreaterThan(1);
+  });
+
+  test('uses the environment scope for evaluations saved without a catalog source', async () => {
+    getSharedApplications.mockResolvedValue([bep]);
+    await loadApplicationsFor({}, { contractId: '4490015980', lot: '2' });
+    expect(getSharedApplications).toHaveBeenCalledWith('4490015980', '2');
+    expect(applicationScope({}, { contractId: 'C', lot: 3 })).toEqual({ contractId: 'C', lot: '3' });
+  });
+
+  test('the diagnosis says where it looked and what it found', () => {
+    expect(applicationDiagnosis('BEP', [], { contractId: 'C', lot: '2' })).toContain('nessun applicativo configurato');
+    const text = applicationDiagnosis('BEP', [{ name: 'NPSO' }, { name: 'IPER' }], { contractId: 'C', lot: '2' });
+    expect(text).toContain('NPSO, IPER'); expect(text).toContain('alias');
+  });
+});
