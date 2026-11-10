@@ -140,3 +140,32 @@ test('an invalid message is refused before reaching the server', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('Massimo 4000');
   expect(server.calls.some(([path]) => path === 'messages')).toBe(false);
 });
+
+test('an empty conversation shows only the writing area: no suggested questions and no placeholder message', async () => {
+  const { container } = render(<Harness />);
+  const box = await screen.findByLabelText('Messaggio per l’AI');
+  expect(box).toHaveAttribute('placeholder', 'Scrivi qui il tuo messaggio per l’AI…');
+  expect(screen.queryByText(/Nessun messaggio/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Inizia con una di queste domande/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Perché servono questi interventi e cosa succede/)).not.toBeInTheDocument();
+  expect(container.querySelector('.rat-desk')).not.toHaveClass('has-messages');
+  expect(container.querySelector('.rat-desk')).toContainElement(box);
+});
+
+test('once there are messages the history and the writing area share the same desk', async () => {
+  server.messages = [{ id: 1, role: 'user', mine: true, text: 'Primo messaggio', createdAt: new Date().toISOString(), author: 'io', authorFullName: 'Io' }];
+  const { container } = render(<Harness />);
+  const box = await screen.findByLabelText('Messaggio per l’AI');
+  await screen.findByText('Primo messaggio');
+  const desk = container.querySelector('.rat-desk');
+  expect(desk).toHaveClass('has-messages');
+  expect(desk).toContainElement(box);
+  expect(desk).toContainElement(screen.getByText('Primo messaggio'));
+});
+
+test('clicking the empty part of the desk puts the cursor in the writing box', async () => {
+  const { container } = render(<Harness />);
+  const box = await screen.findByLabelText('Messaggio per l’AI');
+  fireEvent.click(container.querySelector('.rat-desk'));
+  expect(box).toHaveFocus();
+});

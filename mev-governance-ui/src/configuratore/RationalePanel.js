@@ -4,12 +4,6 @@ import { KINDS, KIND_ORDER, MAX_QUESTION, MAX_ENTRY, kindLabel, validateText, in
 import { displayName, relativeTime } from './developmentCollaboration';
 import './rationalePanel.css';
 
-const SUGGESTIONS = [
-  'Perché servono questi interventi e cosa succede se non li facciamo?',
-  'Quali vincoli tecnici o di processo dobbiamo rispettare?',
-  'Quali parti dell’offerta potrebbero non essere necessarie?',
-];
-
 // Chat with the AI about why interventions are needed + the confirmed knowledge distilled from it.
 // The AI only proposes: a person confirms. Confirmed entries feed the offer review and Sviluppo.
 export default function RationalePanel({ initiative, interventions = [], onKnowledge }) {
@@ -27,7 +21,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [adding, setAdding] = useState(null);
   const [editing, setEditing] = useState({});
   const [tab, setTab] = useState('proposals');
-  const listRef = useRef(null); const stick = useRef(true);
+  const listRef = useRef(null); const inputRef = useRef(null); const stick = useRef(true);
 
   const report = useCallback(list => onKnowledge?.(list), [onKnowledge]);
   useEffect(() => {
@@ -124,24 +118,25 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     {code && <div className="rat-grid">
       <div className="rat-chat">
         <h4>Conversazione</h4>
-        <ol className="rat-messages" ref={listRef} onScroll={onScroll} aria-label="Cronologia della conversazione" aria-live="polite">
-          {hasMore && <li className="rat-more"><button type="button" onClick={loadOlder}>Mostra messaggi precedenti</button></li>}
-          {loading && <li className="rat-empty">Caricamento…</li>}
-          {!loading && !messages.length && <li className="rat-empty">Nessun messaggio. Inizia con una di queste domande oppure scrivi liberamente.
-            <span className="rat-suggest">{SUGGESTIONS.map(suggestion => <button type="button" key={suggestion} onClick={() => setText(suggestion)}>{suggestion}</button>)}</span></li>}
-          {messages.map(message => <li key={message.id} className={`rat-msg ${message.role === 'assistant' ? 'is-ai' : message.mine ? 'is-mine' : ''}`}>
-            <span className="rat-msg-meta"><b>{message.role === 'assistant' ? 'Assistente AI' : message.mine ? 'Tu' : displayName({ fullName: message.authorFullName, username: message.author })}</b>
-              <time dateTime={message.createdAt} title={new Date(message.createdAt).toLocaleString('it-IT')}>{relativeTime(message.createdAt)}</time></span>
-            <span className="rat-msg-text">{message.text}</span></li>)}
-          {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">L’AI sta ragionando…</span></li>}
-        </ol>
+        <div className={`rat-desk${messages.length || loading || busy ? ' has-messages' : ''}`} onClick={event => { if (!event.target.closest('button, textarea, time')) inputRef.current?.focus(); }}>
+          <ol className="rat-messages" ref={listRef} onScroll={onScroll} aria-label="Cronologia della conversazione" aria-live="polite">
+            {hasMore && <li className="rat-more"><button type="button" onClick={loadOlder}>Mostra messaggi precedenti</button></li>}
+            {loading && <li className="rat-loading" role="status">Caricamento…</li>}
+            {messages.map(message => <li key={message.id} className={`rat-msg ${message.role === 'assistant' ? 'is-ai' : message.mine ? 'is-mine' : ''}`}>
+              <span className="rat-msg-meta"><b>{message.role === 'assistant' ? 'Assistente AI' : message.mine ? 'Tu' : displayName({ fullName: message.authorFullName, username: message.author })}</b>
+                <time dateTime={message.createdAt} title={new Date(message.createdAt).toLocaleString('it-IT')}>{relativeTime(message.createdAt)}</time></span>
+              <span className="rat-msg-text">{message.text}</span></li>)}
+            {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">L’AI sta ragionando…</span></li>}
+          </ol>
+          <form className="rat-form rat-compose" onSubmit={event => { event.preventDefault(); ask(text); }}>
+            <label className="rat-sr" htmlFor="rat-input">Messaggio per l’AI</label>
+            <textarea id="rat-input" ref={inputRef} value={text} disabled={busy} maxLength={MAX_QUESTION + 200} placeholder="Scrivi qui il tuo messaggio per l’AI…"
+              onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} />
+            <span className="rat-compose-bar"><small>Invio per inviare · Maiusc+Invio per andare a capo</small>
+              <button type="submit" className="rat-primary" disabled={busy || !text.trim()}>{busy ? 'Invio…' : 'Invia all’AI'}</button></span>
+          </form>
+        </div>
         {questions.length > 0 && <div className="rat-questions"><b>L’AI chiede di chiarire:</b><ul>{questions.map(question => <li key={question}>{question}</li>)}</ul></div>}
-        <form className="rat-form" onSubmit={event => { event.preventDefault(); ask(text); }}>
-          <label className="rat-sr" htmlFor="rat-input">Messaggio per l’AI</label>
-          <textarea id="rat-input" rows={3} value={text} disabled={busy} maxLength={MAX_QUESTION + 200} placeholder="Es. Questo intervento serve perché il chiamante può inviare la stessa prenotazione due volte…  (Invio per inviare, Maiusc+Invio per andare a capo)"
-            onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} />
-          <button type="submit" className="rat-primary" disabled={busy || !text.trim()}>{busy ? 'Invio…' : 'Invia all’AI'}</button>
-        </form>
         <small className="rat-hint">Le risposte dell’AI sono proposte da verificare. La conversazione è conservata e visibile ai colleghi dello stesso ambiente: non scrivere password o dati riservati.</small>
       </div>
       <div className="rat-know">
