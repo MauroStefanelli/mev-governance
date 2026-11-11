@@ -754,14 +754,10 @@ public class AuthController : ControllerBase
             new Claim("ambienteId", ambienteId.ToString())
         };
 
-        foreach (var role in ContractRoles.ForUser(_db, user, ambienteId))
+        // Roles come from the selected contract. The account role contributes only "Client" (see ContractRoles.TokenRoles):
+        // the per-app permission matrix needs it, and it grants no powers. Admin/Developer/Editor/Bid Manager never come from the account.
+        foreach (var role in ContractRoles.TokenRoles(ContractRoles.ForUser(_db, user, ambienteId), user.Role))
             claims.Add(new Claim(ClaimTypes.Role, role));
-
-        // Aggiunge sempre il ruolo primario (es. "Client") se non già presente tra i claim
-        // — necessario per il configuratore app-role-permissions che discrimina per ruolo primario
-        if (!string.IsNullOrWhiteSpace(user.Role) &&
-            !claims.Any(c => c.Type == ClaimTypes.Role && c.Value == user.Role))
-            claims.Add(new Claim(ClaimTypes.Role, user.Role));
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

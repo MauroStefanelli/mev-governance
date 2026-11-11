@@ -1,4 +1,4 @@
-import { SOLUTION_FIELDS, FIELD_KEYS, MAX_FIELD, MAX_SUMMARY, emptyEntry, isEmptyEntry, interventionList, solutionRows, solutionProgress, validateEntry, validateSolution, withField, withSummary, solutionMarkdown, solutionFileName } from './solutionModel';
+import { rationaleContext, rationaleCounts, entryProvenance, KIND_LABEL, SOLUTION_FIELDS, FIELD_KEYS, MAX_FIELD, MAX_SUMMARY, emptyEntry, isEmptyEntry, interventionList, solutionRows, solutionProgress, validateEntry, validateSolution, withField, withSummary, solutionMarkdown, solutionFileName } from './solutionModel';
 
 const interventions = [
   { id: 'OTT-1', titolo: 'Invio prenotazione', descrizione: 'Esporre il servizio', attivita: 'Sviluppo API', sistema: 'NPSO', requisiti: 'REQ-4', mappings: [{ name: 'Servizio REST', type: 'REALIZZAZIONE', complexity: 'Medio', qty: 2, componentApplication: 'Gateway', technology: 'Java', detailDescription: 'dettaglio' }] },
@@ -82,21 +82,93 @@ test('an intervention without a solution says so instead of inventing one', () =
   expect(md).not.toContain('## Sintesi della soluzione');
 });
 
-test('only confirmed rationale is included, tied to its intervention or general', () => {
-  const knowledge = [
-    { status: 'confermata', kind: 'vincolo', text: 'Nessuna modifica allo schema', interventionId: 'OTT-1' },
-    { status: 'confermata', kind: 'razionale', text: 'Regola generale' },
-    { status: 'proposta', kind: 'vincolo', text: 'PROPOSTA-NON-CONFERMATA' },
-    { status: 'revocata', kind: 'vincolo', text: 'REVOCATA' },
-    { status: 'confermata', kind: 'vincolo', text: 'Solo per altro', interventionId: 'OTT-2' },
-  ];
-  const md = solutionMarkdown({ initiative: { code: 'G' }, interventions, solution: {}, knowledge });
+const rationale = [
+  { id: 1, kind: 'vincolo', status: 'confermata', text: 'Nessuna modifica allo schema', interventionId: 'OTT-1', decidedByFullName: 'Anna Rossi', decidedAt: '2026-05-04T10:00:00Z', byAi: true },
+  { id: 2, kind: 'razionale', status: 'confermata', text: 'Regola generale', createdByFullName: 'Luca Verdi', decidedByFullName: 'Luca Verdi', decidedAt: '2026-05-05T10:00:00Z', byAi: false },
+  { id: 3, kind: 'decisione', status: 'proposta', text: 'PROPOSTA-DELL-AI', interventionId: 'OTT-1', byAi: true },
+  { id: 4, kind: 'vincolo', status: 'proposta', text: 'PROPOSTA-GENERALE', byAi: true },
+  { id: 5, kind: 'vincolo', status: 'revocata', text: 'REVOCATA' },
+  { id: 6, kind: 'vincolo', status: 'scartata', text: 'SCARTATA' },
+  { id: 7, kind: 'vincolo', status: 'confermata', text: 'Solo per altro intervento', interventionId: 'OTT-2', decidedByFullName: 'Anna Rossi' },
+  { id: 8, kind: 'razionale', status: 'confermata', text: 'Ripresa da altra iniziativa', sourceEntryId: 99, decidedByFullName: 'Anna Rossi', byAi: false },
+];
+
+test('an intervention sees its own and the general entries, split into confirmed and still to confirm', () => {
+  const first = rationaleContext(rationale, 'OTT-1');
+  expect(first.confirmed.map(e => e.id)).toEqual([1, 2, 8]);
+  expect(first.toConfirm.map(e => e.id)).toEqual([4, 3]);
+  const second = rationaleContext(rationale, 'OTT-2');
+  expect(second.confirmed.map(e => e.id)).toEqual([7, 2, 8]);
+  expect(second.toConfirm.map(e => e.id)).toEqual([4]);
+  const other = rationaleContext(rationale, 'ZZZ');
+  expect(other.confirmed.map(e => e.id)).toEqual([2, 8]);
+});
+
+test('discarded and revoked entries are never part of the context', () => {
+  const all = rationaleContext(rationale, null);
+  [...all.confirmed, ...all.toConfirm].forEach(entry => expect(['confermata', 'proposta']).toContain(entry.status));
+  expect(rationaleContext(undefined, 'OTT-1')).toEqual({ confirmed: [], toConfirm: [] });
+});
+
+test('constraints come first, then decisions, then rationale', () => {
+  const sorted = rationaleContext([{ id: 1, kind: 'razionale', status: 'confermata' }, { id: 2, kind: 'vincolo', status: 'confermata' }, { id: 3, kind: 'decisione', status: 'confermata' }], null).confirmed;
+  expect(sorted.map(e => e.kind)).toEqual(['vincolo', 'decisione', 'razionale']);
+});
+
+test('counts cover the whole initiative, including entries tied to interventions', () => {
+  expect(rationaleCounts(rationale)).toEqual({ confirmed: 4, toConfirm: 2, byKind: { vincolo: 2, decisione: 0, razionale: 2 } });
+  expect(rationaleCounts(undefined)).toEqual({ confirmed: 0, toConfirm: 0, byKind: { vincolo: 0, decisione: 0, razionale: 0 } });
+});
+
+test('provenance says who decided, when, whether the AI proposed it and whether it came from another initiative', () => {
+  expect(entryProvenance(rationale[0])).toMatch(/confermata da Anna Rossi il .*2026/);
+  expect(entryProvenance(rationale[0])).toContain('proposta dall’AI');
+  expect(entryProvenance(rationale[1])).toContain('inserita da Luca Verdi');
+  expect(entryProvenance(rationale[2])).toBe('proposta dall’AI, non ancora confermata');
+  expect(entryProvenance(rationale[7])).toContain('ripresa da un’altra iniziativa');
+  expect(entryProvenance({ status: 'proposta' })).toBe('proposta, non ancora confermata');
+  expect(KIND_LABEL.vincolo).toBe('Vincolo');
+});
+
+test('the Markdown puts confirmed entries as facts and unconfirmed ones in a flagged "to confirm" block, under the right intervention', () => {
+  const md = solutionMarkdown({ initiative: { code: 'G' }, interventions, solution: {}, knowledge: rationale });
   const first = md.slice(md.indexOf('### 1.'), md.indexOf('### 2.'));
-  expect(first).toContain('Nessuna modifica allo schema');
-  expect(first).not.toContain('Solo per altro');
-  expect(md).toContain('## Razionali e vincoli generali dell’iniziativa');
-  expect(md).toContain('Regola generale');
-  ['PROPOSTA-NON-CONFERMATA', 'REVOCATA'].forEach(word => expect(md).not.toContain(word));
+  const second = md.slice(md.indexOf('### 2.'), md.indexOf('## Razionali e vincoli dell’iniziativa'));
+  expect(first).toContain('**Razionali, vincoli e decisioni confermati**');
+  expect(first).toContain('**Vincolo**: Nessuna modifica allo schema');
+  expect(first).toMatch(/_confermata da Anna Rossi il .*proposta dall’AI_/);
+  expect(first).toContain('**⚠ Da confermare — proposte non verificate**');
+  expect(first).toContain('PROPOSTA-DELL-AI');
+  expect(first).toContain('PROPOSTA-GENERALE');
+  expect(first).toContain('vale per tutta l’iniziativa');
+  expect(first).not.toContain('Solo per altro intervento');
+  expect(second).toContain('Solo per altro intervento');
+  expect(second).not.toContain('PROPOSTA-DELL-AI');
+  ['REVOCATA', 'SCARTATA'].forEach(word => expect(md).not.toContain(word));
+});
+
+test('the unconfirmed block is explicit that those are hypotheses, never requirements', () => {
+  const md = solutionMarkdown({ initiative: { code: 'G' }, interventions, solution: {}, knowledge: rationale });
+  expect(md).toContain('trattarle come ipotesi, non come requisiti');
+  expect(md).not.toMatch(/\*\*Vincolo\*\*: PROPOSTA/);
+});
+
+test('the initiative-level section summarises the counts and lists general entries once', () => {
+  const md = solutionMarkdown({ initiative: { code: 'G' }, interventions, solution: {}, knowledge: rationale });
+  const general = md.slice(md.indexOf('## Razionali e vincoli dell’iniziativa'));
+  expect(general).toContain('4 confermati (2 vincoli · 0 decisioni · 2 razionali), 2 proposte ancora da confermare');
+  expect(general).toContain('### Validi per tutta l’iniziativa');
+  expect(general).toContain('Regola generale');
+  expect(general).toContain('### ⚠ Da confermare');
+  expect(general).toContain('PROPOSTA-GENERALE');
+  expect(general).not.toContain('Nessuna modifica allo schema');
+});
+
+test('without any rationale the file has no rationale section and no empty headings', () => {
+  const md = solutionMarkdown({ initiative: { code: 'G' }, interventions, solution: {}, knowledge: [] });
+  expect(md).not.toContain('## Razionali e vincoli dell’iniziativa');
+  expect(md).not.toContain('Da confermare');
+  expect(md).not.toContain('confermati**');
 });
 
 test('an orphan solution is exported with a warning', () => {

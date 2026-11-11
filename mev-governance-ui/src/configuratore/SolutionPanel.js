@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SOLUTION_FIELDS, MAX_FIELD, MAX_SUMMARY, solutionRows, solutionProgress, withField, withSummary, validateSolution, solutionMarkdown, solutionFileName } from './solutionModel';
+import { SOLUTION_FIELDS, MAX_FIELD, MAX_SUMMARY, solutionRows, solutionProgress, withField, withSummary, validateSolution, solutionMarkdown, solutionFileName, rationaleContext, rationaleCounts, entryProvenance, KIND_LABEL } from './solutionModel';
 import { loadSolution, saveSolution } from './solutionStore';
 import { displayName, relativeTime } from './developmentCollaboration';
 import './solutionPanel.css';
@@ -39,6 +39,7 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
 
   const rows = useMemo(() => solutionRows(interventions, solution), [interventions, solution]);
   const progress = solutionProgress(rows);
+  const counts = rationaleCounts(knowledge);
   const dirty = JSON.stringify({ e: solution.entries, s: solution.summary || '' }) !== JSON.stringify({ e: saved.entries, s: saved.summary || '' });
   useEffect(() => { onProgress?.({ ...progress, dirty, revision }); }, [progress.total, progress.filled, progress.orphans, dirty, revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -83,6 +84,11 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
       {noInterventions && !loading && <p className="sol-empty">L’offerta non ha ancora interventi. Importa la Tabella di Offerta (pulsante «Importa Tabella di Offerta» in alto) e qui comparirà un intervento per riga.</p>}
 
       {!!rows.length && <>
+        {(counts.confirmed > 0 || counts.toConfirm > 0) && <div className="sol-feed" role="status" aria-label="Informazioni dei Razionali e vincoli usate dalla soluzione">
+          <b>Dai Razionali e vincoli:</b> {counts.confirmed} confermati ({counts.byKind.vincolo} vincoli · {counts.byKind.decisione} decisioni · {counts.byKind.razionale} razionali)
+          {counts.toConfirm > 0 && <span className="sol-feed-warn"> · {counts.toConfirm} proposte ancora da confermare (non verificate)</span>}.
+          <small> Compaiono sotto ogni intervento e nel file MD, con chi le ha confermate.</small></div>}
+        {counts.confirmed === 0 && counts.toConfirm === 0 && <p className="sol-feed sol-feed-empty">Nessuna voce in «Razionali e vincoli con l’AI»: spiega all’AI perché servono gli interventi e conferma le voci proposte, così compariranno qui e nel file MD.</p>}
         <label className="sol-summary">Sintesi generale della soluzione
           <textarea rows={3} value={solution.summary || ''} maxLength={MAX_SUMMARY + 200} disabled={!canEdit} placeholder="In poche righe: l’idea complessiva della soluzione per l’intera iniziativa."
             onChange={event => { setSolution(withSummary(solution, event.target.value)); setNotice(''); }} />
@@ -94,7 +100,7 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
         </div>
         {!visible.length && <p className="sol-empty">Nessun intervento in questo filtro.</p>}
         <ul className="sol-list">
-          {visible.map(row => { const open = openId === row.id; const rationale = knowledge.filter(entry => entry.status === 'confermata' && (!entry.interventionId || String(entry.interventionId) === row.id));
+          {visible.map(row => { const open = openId === row.id; const rationale = rationaleContext(knowledge, row.id);
             return <li key={row.id} className={`sol-item${open ? ' is-open' : ''}${row.orphan ? ' is-orphan' : ''}`}>
               <button type="button" className="sol-item-head" aria-expanded={open} onClick={() => setOpenId(open ? null : row.id)}>
                 <span className="sol-id">{row.id}</span>
@@ -110,8 +116,12 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
                   {row.requirements && <p><b>Copertura requisiti</b><br />{row.requirements}</p>}
                   {row.mappings.length > 0 && <div className="sol-table-wrap" role="region" aria-label={`Attività dell’intervento ${row.id}`} tabIndex={0}><table><thead><tr><th>Voce di catalogo</th><th>Tipo</th><th>Complessità</th><th>Q.tà</th><th>Componente</th><th>Tecnologia</th></tr></thead>
                     <tbody>{row.mappings.map((m, index) => <tr key={index}><td>{m.name}</td><td>{m.type}</td><td>{m.complexity}</td><td>{m.qty || ''}</td><td>{m.component}</td><td>{m.technology}</td></tr>)}</tbody></table></div>}
-                  {rationale.length > 0 && <div className="sol-rationale"><b>Razionali e vincoli confermati</b><ul>{rationale.map(entry => <li key={entry.id}><i>{entry.kind}</i> {entry.text}</li>)}</ul></div>}
-                  {!row.description && !row.activity && !row.requirements && !row.mappings.length && !rationale.length && !row.orphan && <p className="sol-hint">Nessun dettaglio importato per questo intervento.</p>}
+                  {rationale.confirmed.length > 0 && <div className="sol-rationale" aria-label={`Razionali e vincoli confermati per ${row.id}`}><b>Razionali, vincoli e decisioni confermati</b>
+                    <ul>{rationale.confirmed.map(entry => <li key={entry.id}><i>{KIND_LABEL[entry.kind] || entry.kind}</i> {entry.text}<small>{entryProvenance(entry)}{entry.interventionId ? '' : ' · vale per tutta l’iniziativa'}</small></li>)}</ul></div>}
+                  {rationale.toConfirm.length > 0 && <div className="sol-rationale sol-rationale-unverified" aria-label={`Proposte da confermare per ${row.id}`}><b>⚠ Da confermare — proposte non verificate</b>
+                    <p>Trattale come ipotesi: nessuno le ha ancora confermate in «Razionali e vincoli con l’AI».</p>
+                    <ul>{rationale.toConfirm.map(entry => <li key={entry.id}><i>{KIND_LABEL[entry.kind] || entry.kind}</i> {entry.text}<small>{entryProvenance(entry)}{entry.interventionId ? '' : ' · vale per tutta l’iniziativa'}</small></li>)}</ul></div>}
+                  {!row.description && !row.activity && !row.requirements && !row.mappings.length && !rationale.confirmed.length && !rationale.toConfirm.length && !row.orphan && <p className="sol-hint">Nessun dettaglio importato per questo intervento.</p>}
                 </div>
                 <div className="sol-fields">
                   <h4>Soluzione <small>{canEdit ? 'modificabile' : 'sola lettura'}</small></h4>

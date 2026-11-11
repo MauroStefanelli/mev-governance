@@ -5,6 +5,7 @@ import LibraryPanel from "../configuratore/LibraryPanel";
 import SectionRow from "../configuratore/SectionRow";
 import SolutionPanel from "../configuratore/SolutionPanel";
 import KnowledgeOverview from "../configuratore/KnowledgeOverview";
+import { loadPmPoste, pmOptions, pmSelectValue, pmFromSelect, showsFreeText, OTHER } from "../configuratore/pmPoste";
 import { rationaleFacts, solutionFacts, analysisFacts, sourceFacts, knowledgeFacts } from "../configuratore/sectionSummaries";
 import { knowledgeForAi, entriesForIntervention } from "../configuratore/rationaleKnowledge";
 import { saveAndClose } from "../configuratore/saveAndClose";
@@ -87,7 +88,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [showContractForm, setShowContractForm] = useState(false);
   const [contractForm, setContractForm] = useState({ name: "", rulesFile: "", lots: [{ id: "1", name: "", catalogFile: null, priceFile: null, tow5Share: 65 }] });
 
-  const [initiative, setInitiative] = useState({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
+  const [initiative, setInitiative] = useState({ code: "", title: "", system: "", contractType: "", release: "", pmPoste: "", requirements: "", description: "" });
   const [importedInterventions, setImportedInterventions] = useState([]);
   const [items, setItems] = useState([]);
   const [workspaceContext, setWorkspaceContext] = useState(null);
@@ -138,6 +139,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   });
   const [showDescModal, setShowDescModal] = useState(false);
   const [releaseList, setReleaseList] = useState([]);
+  const [pmOtherPicked, setPmOtherPicked] = useState(false);
+  const [pmList, setPmList] = useState(null); // PM Poste values already used in MEV / MEV-CAP (null = not available)
   const [towImpattoDb, setTowImpattoDb] = useState({});
   const [towImpattoSrc, setTowImpattoSrc] = useState("");
   const [economyNotes, setEconomyNotes] = useState("");
@@ -565,7 +568,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setDevelopmentPlans({});
     setProjectPreparation(newProjectPreparation());
     detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false); setDetailReviewProgress('');
-    setInitiative({ code: "", title: "", system: "", contractType: "", release: "", requirements: "", description: "" });
+    setInitiative({ code: "", title: "", system: "", contractType: "", release: "", pmPoste: "", requirements: "", description: "" });
     setImportedInterventions([]);
     setItems([]);
     setSuggestions([]);
@@ -1115,6 +1118,13 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       .catch(() => setReleaseList([]));
   }, [ambienteId, selectedContractId]); // eslint-disable-line
 
+  // PM Poste: same list MEV and MEV-CAP use for the active contract, so a person is always written the same way.
+  useEffect(() => {
+    let alive = true;
+    loadPmPoste().then(list => { if (alive) setPmList(list); });
+    return () => { alive = false; };
+  }, [ambienteId]);
+
   const deleteArchiveRecord = async (id) => {
     if (!window.confirm("Eliminare definitivamente questa iniziativa memorizzata?")) return;
     try {
@@ -1179,7 +1189,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setTowPriceSourceId(source?.towPriceSourceId || '');
     setDevelopmentPlans(snapshot.developmentPlans || {});
     setProjectPreparation(snapshot.projectPreparation || newProjectPreparation());
-    setInitiative({ ...(snapshot.initiative || {}), code, title: state.title || '', system: state.system || '' });
+    setInitiative({ ...(snapshot.initiative || {}), code, title: state.title || '', system: state.system || '', pmPoste: snapshot.initiative?.pmPoste || state.pmPoste || '' });
     setItems(snapshot.items || []);
     setImportedInterventions(snapshot.importedInterventions || []);
     setSuggestions(snapshot.suggestions || []);
@@ -1958,30 +1968,19 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 1: INIZIATIVA */}
       {step === 1 && (
         <div className="init-sections">
-          {/* Bottone import Excel visibile */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: mappedLoading ? "not-allowed" : "pointer",
-              background: mappedLoading ? "#c8d6e5" : "linear-gradient(135deg, #102a47 0%, #1a73e8 100%)",
-              color: "#fff", padding: "12px 24px", borderRadius: 8, fontSize: 15, fontWeight: 700,
-              boxShadow: "0 2px 8px rgba(16,42,71,0.18)", border: "none",
-              opacity: mappedLoading ? 0.7 : 1, transition: "opacity 0.2s" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              {mappedLoading ? "Elaborazione in corso…" : "Importa Tabella di Offerta"}
-              <input type="file" accept=".xlsx" style={{ display: "none" }} disabled={mappedLoading}
-                onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0]); e.target.value = ""; }} />
-            </label>
-                  <p style={{ ...styles.hint, marginTop: 8, marginBottom: 0 }}>
-                Carica il workbook dell&apos;iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).
-            </p>
-          </div>
           {/* 1 · Dati iniziativa */}
           <SectionRow number="1" id="sezione-dati" title="Dati iniziativa" open={isOpen('dati')} onToggle={() => toggleSection('dati')} keepMounted
-            facts={[initiative.code && `GOTO ${initiative.code}`, initiative.title, initiative.system && `Sistema ${initiative.system}`, importedInterventions.length > 0 && `${importedInterventions.length} interventi`, selectedAppIds.length > 0 && `${selectedAppIds.length} applicativi`]}
+            facts={[initiative.code && `GOTO ${initiative.code}`, initiative.title, initiative.system && `Sistema ${initiative.system}`, initiative.pmPoste && `PM ${initiative.pmPoste}`, importedInterventions.length > 0 && `${importedInterventions.length} interventi`, selectedAppIds.length > 0 && `${selectedAppIds.length} applicativi`]}
             status={initiative.code || initiative.title ? undefined : 'Da compilare'} tone={initiative.code || initiative.title ? 'neutral' : 'warn'}>
             <div ref={initiativeFieldsRef} style={{ ...styles.card, marginTop: 12, scrollMarginTop: 20 }}>
-              <h3 style={{ margin: "0 0 12px" }}>Dati iniziativa</h3>
+              <div className="init-card-head">
+                <h3 style={{ margin: 0 }}>Dati iniziativa</h3>
+                <label className={`init-import${mappedLoading ? ' is-busy' : ''}`} title="Carica il workbook dell’iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi) per compilare i dati e gli interventi">
+                  {mappedLoading ? 'Elaborazione in corso…' : 'Importa Tabella di Offerta'}
+                  <input type="file" accept=".xlsx" hidden disabled={mappedLoading} aria-label="Importa Tabella di Offerta"
+                    onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0]); e.target.value = ""; }} />
+                </label>
+              </div>
               <div style={styles.grid2}>
                 <label style={styles.label}>Codice GOTO
                   <input style={styles.input} value={initiative.code} onChange={(e) => setInitiative((i) => ({ ...i, code: e.target.value }))} />
@@ -2100,6 +2099,25 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                       <input style={styles.input} value={initiative.release}
                         placeholder="es. R2025-04 oppure TBD (opzionale)"
                         onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                    )}
+                  </label>
+                  <label style={styles.label}>PM Poste
+                    {pmList && pmList.length > 0 ? (
+                      <>
+                        <select style={styles.input} aria-label="PM Poste" value={pmOtherPicked ? OTHER : pmSelectValue(pmList, initiative.pmPoste)}
+                          onChange={(e) => { setPmOtherPicked(e.target.value === OTHER); setInitiative((i) => ({ ...i, pmPoste: pmFromSelect(pmList, e.target.value, i.pmPoste) })); }}>
+                          <option value="">— nessuno —</option>
+                          {pmOptions(pmList, "").map(name => <option key={name} value={name}>{name}</option>)}
+                          <option value={OTHER}>Altro (testo libero)…</option>
+                        </select>
+                        {showsFreeText(pmList, initiative.pmPoste, pmOtherPicked) && (
+                          <input style={{ ...styles.input, marginTop: 4 }} aria-label="PM Poste (testo libero)" value={initiative.pmPoste || ""} placeholder="Nome e cognome del PM Poste"
+                            onChange={(e) => setInitiative((i) => ({ ...i, pmPoste: e.target.value }))} />
+                        )}
+                      </>
+                    ) : (
+                      <input style={styles.input} aria-label="PM Poste" value={initiative.pmPoste || ""} placeholder="Nome e cognome del PM Poste (opzionale)"
+                        onChange={(e) => setInitiative((i) => ({ ...i, pmPoste: e.target.value }))} />
                     )}
                   </label>
                 <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti

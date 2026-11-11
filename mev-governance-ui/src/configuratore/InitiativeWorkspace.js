@@ -4,7 +4,7 @@ import InitiativeDocuments from './InitiativeDocuments';
 import InitiativeConversation from './InitiativeConversation';
 
 const fields = {
-  title: 'Titolo', system: 'Sistema', family: 'Famiglia applicativa', pmPoste: 'PM Poste',
+  title: 'Titolo', system: 'Sistema', family: 'Famiglia applicativa',
   asIs: 'Analisi AS-IS', toBe: 'Analisi TO-BE', facts: 'Fatti verificati ed evidenze',
   assumptions: 'Ipotesi non verificate', openQuestions: 'Punti da confermare con Poste',
   sources: 'Fonti documentali (file, pagina, riferimento)', repositories: 'Repository (URL, branch, commit)',
@@ -55,10 +55,12 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
     }, 400);
     return () => { alive = false; clearTimeout(timer); };
   }, [code, draft.system, draft.family, initiative.system]);
+  // The PM Poste of the initiative (Dati iniziativa) is the one the analysis, the AI and the exports use.
+  const analysisWithPm = initiative.pmPoste ? { ...draft, pmPoste: initiative.pmPoste } : draft;
   useEffect(() => {
-    onContextChange({ goto: code, version: base, saved: !dirty, analysis: draft,
+    onContextChange({ goto: code, version: base, saved: !dirty, analysis: analysisWithPm,
       priorEvaluations: related.map(r => ({ goto: r.goto, version: r.version, author: r.author, source: `workspace:${r.goto}:v${r.version}`, analysis: parse(r) })) });
-  }, [code, base, dirty, draft, related, onContextChange]);
+  }, [code, base, dirty, draft, related, onContextChange, initiative.pmPoste]); // eslint-disable-line react-hooks/exhaustive-deps
   const edit = (key, value) => { setDraft(d => ({ ...d, [key]: value })); setDirty(true); };
   const save = async approve => {
     setBusy(true); setError('');
@@ -101,7 +103,7 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       }} />
       <details open><summary>Analisi, fonti e decisioni</summary>
         <fieldset disabled={!canEdit || busy} style={{ border: 0, padding: 0 }}>
-          <div className="workspace-fields">{Object.entries(fields).map(([key, label]) => <label key={key} className={['title', 'system', 'family', 'pmPoste'].includes(key) ? 'workspace-short-field' : ''}>{label}<textarea style={input} rows={['title', 'system', 'family', 'pmPoste'].includes(key) ? 1 : 3} value={draft[key] || ''} onChange={e => edit(key, e.target.value)} /></label>)}</div>
+          <div className="workspace-fields">{Object.entries(fields).map(([key, label]) => <label key={key} className={['title', 'system', 'family'].includes(key) ? 'workspace-short-field' : ''}>{label}<textarea style={input} rows={['title', 'system', 'family'].includes(key) ? 1 : 3} value={draft[key] || ''} onChange={e => edit(key, e.target.value)} /></label>)}</div>
           <h4>Decisioni (approvazione esplicita)</h4>
           {(draft.decisions || []).map((d, i) => <div key={d.id} style={{ padding: 10, border: '1px solid #dce3eb', marginBottom: 8 }}>
             <label>Decisione<textarea style={input} disabled={!!d.approvedAt} value={d.text} onChange={e => edit('decisions', draft.decisions.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} /></label>
@@ -129,7 +131,7 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
         }}>Riprendi analisi e stima · v{r.version}</button></p>)}
         <label>Versione<select value={comparison} onChange={e => setComparison(e.target.value)}><option value="">Seleziona</option>{revisions.map(r => <option key={r.version}>{r.version}</option>)}</select></label>
         <label>Confronta con<select value={against} onChange={e => setAgainst(e.target.value)}><option value="">Seleziona</option>{revisions.map(r => <option key={r.version}>{r.version}</option>)}</select></label>
-        {compared && previous && changedWorkspaceFields(parse(previous), parse(compared)).map(key => <div key={key}><h4>{fields[key] || key}</h4><pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(parse(previous)[key], null, 2)} → {JSON.stringify(parse(compared)[key], null, 2)}</pre></div>)}
+        {compared && previous && changedWorkspaceFields(parse(previous), parse(compared)).map(key => <div key={key}><h4>{fields[key] || (key === 'pmPoste' ? 'PM Poste' : key)}</h4><pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(parse(previous)[key], null, 2)} → {JSON.stringify(parse(compared)[key], null, 2)}</pre></div>)}
       </details>
       <details open={related.length > 0}><summary>Memoria correlata: stesso sistema o famiglia ({related.length})</summary>{related.map(r => <article key={r.id}><strong>{r.goto} · v{r.version} · {parse(r).title}</strong><p>{parse(r).toBe}</p><p>Fonte workspace:{r.goto}:v{r.version} · {r.author}</p></article>)}</details>
     </>}

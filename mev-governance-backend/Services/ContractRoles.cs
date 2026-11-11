@@ -21,6 +21,17 @@ public static class ContractRoles
         if (globals.Contains("SuperAdmin")) return new[] { "SuperAdmin" };
         return assigned.Where(Allowed.Contains).Concat(isBidManager ? new[] { "Bid Manager" } : Array.Empty<string>()).Distinct().ToArray();
     }
+    // The account role adds to the token only what the per-app permission matrix needs and that never grants powers:
+    // "Client". Roles that open features (Admin, Developer, Editor, Bid Manager) must come from the selected contract,
+    // otherwise an account-level Admin who is only an Editor on a contract would act as Admin there.
+    public static readonly string[] AccountRolesInToken = { "Client" };
+    public static IEnumerable<string> TokenRoles(IEnumerable<string> contractRoles, string? accountRole)
+    {
+        var roles = contractRoles.ToList();
+        if (!string.IsNullOrWhiteSpace(accountRole) && AccountRolesInToken.Contains(accountRole) && !roles.Contains(accountRole)) roles.Add(accountRole);
+        return roles;
+    }
+
     public static string[] ForUser(AppDbContext db, AppUser user, int ambienteId)
     {
         var global = db.UserRoles.Where(x => x.UserId == user.Id).Select(x => x.Role).ToList();

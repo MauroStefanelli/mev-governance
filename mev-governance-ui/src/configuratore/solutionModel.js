@@ -64,6 +64,40 @@ export function withField(solution, id, key, value) {
 }
 export const withSummary = (solution, summary) => ({ ...(solution || {}), entries: solution?.entries || {}, summary });
 
+// ---- What the solution knows from "Razionali e vincoli con l'AI" ----
+// Confirmed entries are facts decided by the team. Proposals the AI made and nobody confirmed yet are shown too, but always
+// as unverified. Discarded and revoked entries are never used. An entry tied to an intervention applies to it; one without applies to all.
+export const KIND_LABEL = { razionale: 'Razionale', vincolo: 'Vincolo', decisione: 'Decisione' };
+export const KIND_SORT = ['vincolo', 'decisione', 'razionale'];
+const byKind = (a, b) => KIND_SORT.indexOf(a.kind) - KIND_SORT.indexOf(b.kind) || a.id - b.id;
+const appliesTo = (entry, id) => !entry.interventionId || String(entry.interventionId).trim() === String(id).trim();
+
+export function rationaleContext(entries, interventionId) {
+  const list = Array.isArray(entries) ? entries : [];
+  const scoped = interventionId == null ? list : list.filter(entry => appliesTo(entry, interventionId));
+  return {
+    confirmed: scoped.filter(entry => entry.status === 'confermata').sort(byKind),
+    toConfirm: scoped.filter(entry => entry.status === 'proposta').sort(byKind),
+  };
+}
+export function rationaleCounts(entries) {
+  const { confirmed, toConfirm } = rationaleContext(entries, null);
+  return { confirmed: confirmed.length, toConfirm: toConfirm.length, byKind: Object.fromEntries(KIND_SORT.map(kind => [kind, confirmed.filter(entry => entry.kind === kind).length])) };
+}
+
+// Where an entry comes from, for the people reading the file: who decided it and when, or that the AI proposed it.
+export function entryProvenance(entry) {
+  const by = String(entry.decidedByFullName || entry.decidedBy || '').trim();
+  const when = entry.decidedAt ? new Date(entry.decidedAt).toLocaleDateString('it-IT') : '';
+  const parts = [];
+  if (entry.status === 'confermata') parts.push(by ? `confermata da ${by}${when ? ` il ${when}` : ''}` : 'confermata');
+  else parts.push(entry.byAi ? 'proposta dall’AI, non ancora confermata' : 'proposta, non ancora confermata');
+  if (entry.status === 'confermata' && entry.byAi) parts.push('proposta dall’AI');
+  if (entry.status === 'confermata' && !entry.byAi) parts.push(`inserita da ${String(entry.createdByFullName || entry.createdBy || 'un utente').trim()}`);
+  if (entry.sourceEntryId) parts.push('ripresa da un’altra iniziativa');
+  return parts.join(' · ');
+}
+
 // ---- Markdown for Visual Studio Code ----
 const fence = text => String(text || '').replace(/\r\n/g, '\n').trim();
 const slug = value => String(value || 'iniziativa').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'iniziativa';
@@ -71,7 +105,7 @@ export const solutionFileName = initiative => `SOLUZIONE_${slug(initiative?.code
 
 export function solutionMarkdown({ initiative = {}, interventions = [], solution = {}, knowledge = [], applications = [], generatedAt = new Date() }) {
   const rows = solutionRows(interventions, solution);
-  const confirmed = (knowledge || []).filter(entry => entry.status === 'confermata');
+  const counts = rationaleCounts(knowledge);
   const lines = [];
   lines.push(`# Soluzione · ${initiative.code ? initiative.code + ' · ' : ''}${initiative.title || 'Iniziativa senza titolo'}`, '');
   lines.push('> Documento per lo sviluppo, da aprire in Visual Studio Code. Il contenuto è scritto e rivisto dal team nel Configuratore Offerta TOW: **non è stato verificato sul codice** né compilato.', '');
@@ -95,14 +129,20 @@ export function solutionMarkdown({ initiative = {}, interventions = [], solution
       row.mappings.forEach(m => lines.push(`| ${[m.name, m.type, m.complexity, m.qty || '', m.component, m.technology].map(v => String(v).replace(/\|/g, '\\|')).join(' | ')} |`));
       lines.push('');
     }
-    const applicable = confirmed.filter(entry => !entry.interventionId || String(entry.interventionId) === row.id);
-    if (applicable.length) lines.push('**Razionali e vincoli confermati**', '', ...applicable.map(entry => `- _${entry.kind}_: ${entry.text}`), '');
+    const context = rationaleContext(knowledge, row.id);
+    if (context.confirmed.length) lines.push('**Razionali, vincoli e decisioni confermati**', '', ...context.confirmed.map(entry => `- **${KIND_LABEL[entry.kind] || entry.kind}**: ${entry.text}  \n  _${entryProvenance(entry)}${entry.interventionId ? '' : ' · vale per tutta l’iniziativa'}_`), '');
+    if (context.toConfirm.length) lines.push('**⚠ Da confermare — proposte non verificate**', '', '> Queste voci sono state proposte ma nessuno le ha ancora confermate: trattarle come ipotesi, non come requisiti.', '', ...context.toConfirm.map(entry => `- ${KIND_LABEL[entry.kind] || entry.kind}: ${entry.text}  \n  _${entryProvenance(entry)}${entry.interventionId ? '' : ' · vale per tutta l’iniziativa'}_`), '');
     const written = SOLUTION_FIELDS.filter(([key]) => fence(row.entry[key]));
     if (!written.length) lines.push('_Soluzione non ancora descritta per questo intervento._', '');
     written.forEach(([key, label]) => lines.push(`**${label}**`, '', fence(row.entry[key]), ''));
   });
-  const general = confirmed.filter(entry => !entry.interventionId);
-  if (general.length) lines.push('## Razionali e vincoli generali dell’iniziativa', '', ...general.map(entry => `- _${entry.kind}_: ${entry.text}`), '');
+  const generalContext = rationaleContext((knowledge || []).filter(entry => !entry.interventionId), null);
+  if (counts.confirmed || counts.toConfirm) {
+    lines.push('## Razionali e vincoli dell’iniziativa', '');
+    lines.push(`${counts.confirmed} confermati (${counts.byKind.vincolo} vincoli · ${counts.byKind.decisione} decisioni · ${counts.byKind.razionale} razionali)${counts.toConfirm ? `, ${counts.toConfirm} proposte ancora da confermare` : ''}. Quelli collegati a un intervento sono riportati sotto l’intervento; qui trovi quelli validi per l’intera iniziativa.`, '');
+    if (generalContext.confirmed.length) lines.push('### Validi per tutta l’iniziativa', '', ...generalContext.confirmed.map(entry => `- **${KIND_LABEL[entry.kind] || entry.kind}**: ${entry.text}  \n  _${entryProvenance(entry)}_`), '');
+    if (generalContext.toConfirm.length) lines.push('### ⚠ Da confermare', '', '> Proposte non verificate: trattarle come ipotesi.', '', ...generalContext.toConfirm.map(entry => `- ${KIND_LABEL[entry.kind] || entry.kind}: ${entry.text}  \n  _${entryProvenance(entry)}_`), '');
+  }
   lines.push('---', '', '_Generato dal Configuratore Offerta TOW. Le sezioni vuote indicano informazioni non ancora fornite dal team._', '');
   return lines.join('\n');
 }

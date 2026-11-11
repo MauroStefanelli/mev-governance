@@ -57,6 +57,26 @@ var encoded = (string)tokenMethod.Invoke(auth, new object?[] { user, a.Id, null 
 var jwt = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
 var tokenRoles = jwt.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role").Select(c => c.Value).ToArray();
 Check(tokenRoles.Contains("Editor") && tokenRoles.Contains("Developer") && !tokenRoles.Contains("Admin"), "JWT uses selected contract roles");
+string[] TokenFor(AppUser u, int env) { var enc = (string)tokenMethod.Invoke(auth, new object?[] { u, env, null })!; return new JwtSecurityTokenHandler().ReadJwtToken(enc).Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role").Select(c => c.Value).OrderBy(x => x).ToArray(); }
+// The account role never grants powers in a contract: only "Client" (needed by the per-app permission matrix) is carried over.
+var clientAccount = new AppUser { Username = "cliente", Role = "Client" }; var clientEditor = new AppUser { Username = "cliente-editor", Role = "Client" };
+var adminOutside = new AppUser { Username = "admin-fuori", Role = "Admin" }; var devAccount = new AppUser { Username = "dev", Role = "Developer" }; var bidAccount = new AppUser { Username = "bid2", Role = "Bid Manager" }; var editorAccount = new AppUser { Username = "ed", Role = "Editor" };
+db.Users.AddRange(clientAccount, clientEditor, adminOutside, devAccount, bidAccount, editorAccount); db.SaveChanges();
+db.UserAmbienti.AddRange(new UserAmbiente { UserId = clientAccount.Id, AmbienteId = a.Id, Ruolo = ContractRoles.Store(new[] { "Client" }) }, new UserAmbiente { UserId = clientEditor.Id, AmbienteId = a.Id, Ruolo = ContractRoles.Store(new[] { "Editor" }) },
+    new UserAmbiente { UserId = devAccount.Id, AmbienteId = a.Id, Ruolo = ContractRoles.Store(new[] { "Client" }) }, new UserAmbiente { UserId = editorAccount.Id, AmbienteId = a.Id, Ruolo = ContractRoles.Store(new[] { "Client" }) }); db.SaveChanges();
+Check(TokenFor(clientAccount, a.Id).SequenceEqual(new[] { "Client" }), "A Client account gets exactly Client in the token");
+Check(TokenFor(clientEditor, a.Id).SequenceEqual(new[] { "Client", "Editor" }), "A Client account keeps Client for the permission matrix even with another contract role");
+Check(!TokenFor(adminOutside, 0).Contains("Admin"), "An account-level Admin with no contract gets no Admin power in the token");
+Check(TokenFor(adminOutside, 0).Length == 0, "No contract and no Client account role means no operational roles");
+Check(!TokenFor(devAccount, a.Id).Contains("Developer"), "An account-level Developer is not Developer on a contract that gave only Client");
+Check(!TokenFor(editorAccount, a.Id).Contains("Editor"), "An account-level Editor is not Editor on a contract that gave only Client");
+Check(TokenFor(bidAccount, 0).SequenceEqual(ContractRoles.ForUser(db, bidAccount, 0).OrderBy(x => x).ToArray()), "Bid Manager comes from ContractRoles, not from the account role alone");
+Check(TokenFor(super, 0).SequenceEqual(new[] { "SuperAdmin" }), "SuperAdmin token carries only SuperAdmin");
+Check(ContractRoles.TokenRoles(new[] { "Editor" }, "Admin").SequenceEqual(new[] { "Editor" }), "TokenRoles ignores an Admin account role");
+Check(ContractRoles.TokenRoles(new[] { "Editor" }, "Developer").SequenceEqual(new[] { "Editor" }), "TokenRoles ignores a Developer account role");
+Check(ContractRoles.TokenRoles(new[] { "Editor" }, "Client").SequenceEqual(new[] { "Editor", "Client" }), "TokenRoles adds Client from the account");
+Check(ContractRoles.TokenRoles(new[] { "Client" }, "Client").SequenceEqual(new[] { "Client" }), "TokenRoles does not duplicate Client");
+Check(ContractRoles.TokenRoles(Array.Empty<string>(), null).Count() == 0 && ContractRoles.TokenRoles(Array.Empty<string>(), "  ").Count() == 0, "TokenRoles handles a missing account role");
 b.IsActive = false; db.SaveChanges();
 Check(ContractRoles.ForUser(db, user, b.Id).Length == 0, "Inactive contract grants no roles");
 var dummyController = new TestContractController();

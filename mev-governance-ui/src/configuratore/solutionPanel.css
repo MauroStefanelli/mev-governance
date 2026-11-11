@@ -28,3 +28,7 @@
 .sol-meta { margin: 0; font-size: 12px; color: #4d6179; }
 @media (max-width: 900px) { .sol-item-body { grid-template-columns: 1fr; } .sol .sol-item-head { flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .sol * { transition: none !important; } }
+
+.sol-feed { margin: 0; background: #f4f8ff; border: 1px solid #c6daf6; border-radius: 10px; padding: 9px 14px; font-size: 13px; color: #1e416b; line-height: 1.55; } .sol-feed small { color: #4d6179; } .sol-feed-warn { color: #8a5200; font-weight: 600; } .sol-feed-empty { background: #f7f9fc; border-style: dashed; color: #4d6179; }
+.sol-rationale li small { display: block; color: #4d6179; font-size: 11.5px; margin-top: 1px; }
+.sol-rationale-unverified { background: #fff8e6; border-color: #f0cf8d; } .sol-rationale-unverified > p { margin: 3px 0 0; font-size: 12.3px; color: #7a4700; }

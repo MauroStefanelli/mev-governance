@@ -10,7 +10,7 @@ const interventions = [
   { id: 'OTT-1', titolo: 'Invio prenotazione', descrizione: 'Esporre il servizio', attivita: 'Sviluppo API', sistema: 'NPSO', requisiti: 'REQ-4', mappings: [{ name: 'Servizio REST', type: 'REALIZZAZIONE', complexity: 'Medio', qty: 2, componentApplication: 'Gateway', technology: 'Java' }] },
   { id: 'OTT-2', titolo: 'Notifiche', mappings: [] },
 ];
-const knowledge = [{ id: 1, kind: 'vincolo', status: 'confermata', text: 'Nessuna modifica allo schema', interventionId: 'OTT-1' }, { id: 2, kind: 'razionale', status: 'proposta', text: 'PROPOSTA-NON-CONFERMATA' }];
+const knowledge = [{ id: 1, kind: 'vincolo', status: 'confermata', text: 'Nessuna modifica allo schema', interventionId: 'OTT-1', decidedByFullName: 'Anna Rossi', decidedAt: '2026-05-04T10:00:00Z' }, { id: 2, kind: 'razionale', status: 'proposta', text: 'PROPOSTA-NON-CONFERMATA', byAi: true }, { id: 3, kind: 'vincolo', status: 'revocata', text: 'REVOCATA' }, { id: 4, kind: 'decisione', status: 'scartata', text: 'SCARTATA' }];
 const props = { initiative, contractId: 'C1', lot: '2', interventions, knowledge, applications: [{ name: 'NPSO', codeUrl: '/src/npso' }], author: 'Anna Rossi' };
 let blobs; let clicked;
 beforeEach(() => {
@@ -43,8 +43,16 @@ test('every intervention is a row; opening one shows its details read-only and t
   expect(details).toHaveTextContent('REQ-4');
   expect(within(details).getByText('Servizio REST')).toBeInTheDocument();
   expect(details).toHaveTextContent('Nessuna modifica allo schema');
-  expect(details).not.toHaveTextContent('PROPOSTA-NON-CONFERMATA');
   expect(within(details).queryAllByRole('textbox')).toHaveLength(0);
+  const confirmed = screen.getByLabelText('Razionali e vincoli confermati per OTT-1');
+  expect(confirmed).toHaveTextContent('Nessuna modifica allo schema');
+  expect(confirmed).toHaveTextContent(/confermata da Anna Rossi/);
+  expect(confirmed).not.toHaveTextContent('PROPOSTA-NON-CONFERMATA');
+  const unverified = screen.getByLabelText('Proposte da confermare per OTT-1');
+  expect(unverified).toHaveTextContent('Da confermare — proposte non verificate');
+  expect(unverified).toHaveTextContent('PROPOSTA-NON-CONFERMATA');
+  expect(unverified).toHaveTextContent(/proposta dall’AI, non ancora confermata/);
+  ['REVOCATA', 'SCARTATA'].forEach(word => expect(details).not.toHaveTextContent(word));
 });
 
 test('the solution fields are editable and the page shows unsaved changes', async () => {
@@ -101,7 +109,11 @@ test('the download is a Markdown file with the details, the team text, the confi
   expect(md).toContain('| Servizio REST | REALIZZAZIONE | Medio | 2 | Gateway | Java |');
   expect(md).toContain('Nessuna modifica allo schema');
   expect(md).toContain('`/src/npso`');
-  expect(md).not.toContain('PROPOSTA-NON-CONFERMATA');
+  expect(md).toContain('confermata da Anna Rossi');
+  expect(md).toContain('Da confermare — proposte non verificate');
+  expect(md).toContain('PROPOSTA-NON-CONFERMATA');
+  expect(md).toContain('trattarle come ipotesi, non come requisiti');
+  ['REVOCATA', 'SCARTATA'].forEach(word => expect(md).not.toContain(word));
 });
 
 test('the download includes unsaved edits, and the page says so', async () => {
@@ -169,4 +181,27 @@ test('it reports progress to the page so the closed row can show it', async () =
   openItem('OTT-1');
   fireEvent.change(screen.getByLabelText('Soluzione proposta'), { target: { value: 'x' } });
   await waitFor(() => expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ total: 2, filled: 1, dirty: true })));
+});
+
+test('a strip above the list says how much the solution draws from Razionali e vincoli, and flags what is unverified', async () => {
+  render(<SolutionPanel {...props} />);
+  const feed = await screen.findByLabelText('Informazioni dei Razionali e vincoli usate dalla soluzione');
+  expect(feed).toHaveTextContent('1 confermati (1 vincoli · 0 decisioni · 0 razionali)');
+  expect(feed).toHaveTextContent('1 proposte ancora da confermare (non verificate)');
+});
+
+test('with no rationale at all the panel tells the user where it comes from', async () => {
+  render(<SolutionPanel {...props} knowledge={[]} />);
+  expect(await screen.findByText(/Nessuna voce in «Razionali e vincoli con l’AI»/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('Informazioni dei Razionali e vincoli usate dalla soluzione')).not.toBeInTheDocument();
+});
+
+test('changing the rationale updates the solution immediately, without reloading it', async () => {
+  const { rerender } = render(<SolutionPanel {...props} knowledge={[]} />);
+  await screen.findByRole('button', { name: /OTT-1/ });
+  openItem('OTT-1');
+  expect(screen.queryByLabelText('Razionali e vincoli confermati per OTT-1')).not.toBeInTheDocument();
+  rerender(<SolutionPanel {...props} knowledge={[{ id: 9, kind: 'vincolo', status: 'confermata', text: 'Appena confermato', interventionId: 'OTT-1' }]} />);
+  expect(screen.getByLabelText('Razionali e vincoli confermati per OTT-1')).toHaveTextContent('Appena confermato');
+  expect(loadSolution).toHaveBeenCalledTimes(1);
 });
