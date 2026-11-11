@@ -327,3 +327,11 @@ test('a record the server cannot return does not break the panel: the user is to
   expect(within(dialog).queryByLabelText('Dettaglio dell’iniziativa')).not.toBeInTheDocument();
   expect(within(dialog).getByText('Iniziativa 1')).toBeInTheDocument();
 });
+
+test('the open panel is attached to the page body, outside the page content, so a bar above the content cannot cover its header', async () => {
+  const { container } = render(<LedgerPanel canEdit />);
+  fireEvent.click(trigger());
+  const dialog = await screen.findByRole('dialog', { name: 'Storico delle iniziative' });
+  expect(container.contains(dialog)).toBe(false);
+  expect(dialog.closest('.ledger-overlay').parentElement).toBe(document.body);
+});

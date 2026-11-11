@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { historyImportRequest } from '../services/mevService';
 import { parseManifest, readNotes, classifyNotes, bySystem, buildReport, filterAlreadyRead, runImport, pendingLabel, KIND_LABEL } from './historyImportModel';
@@ -96,7 +97,7 @@ export default function HistoryImportPanel({ canEdit = true }) {
     <button type="button" ref={trigger} className="hi-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open} title="Importa la conoscenza già raccolta con assistenti AI: razionali e vincoli da confermare">
       <KnowledgeIcon /><span className="hi-trigger-text"><strong>Conoscenza storica AI</strong><small>{summary ? (count ? pendingLabel(count) : summary.filesRead ? `${summary.filesRead} note lette` : 'Importa dal tuo lavoro') : 'Importa dal tuo lavoro'}</small></span>
     </button>
-    {open && <div className="hi-overlay" onMouseDown={event => { if (event.target === event.currentTarget && !run?.busy) close(); }}>
+    {open && createPortal(<div className="hi-overlay" onMouseDown={event => { if (event.target === event.currentTarget && !run?.busy) close(); }}>
       <aside className="hi" role="dialog" aria-modal="true" aria-label="Conoscenza storica AI">
         <header className="hi-head">
           <span className="hi-head-icon"><KnowledgeIcon size={26} /></span>
@@ -178,6 +179,6 @@ export default function HistoryImportPanel({ canEdit = true }) {
             {pending.hasMore && <p className="hi-hint">Ne mostro {entries.length} per volta: dopo averle decise compaiono le successive.</p>}</>}
         </section>
       </aside>
-    </div>}
+    </div>, document.body)}
   </>;
 }

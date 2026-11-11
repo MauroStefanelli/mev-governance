@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ledgerRequest } from '../services/mevService';
 import { parseInitiativeLedger, STATUSES } from './initiativeLedgerParser';
@@ -141,7 +142,7 @@ export default function LedgerPanel({ canEdit = true, onOpenInitiative }) {
     <button type="button" ref={trigger} className="ledger-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open} title="Storico delle iniziative: stato, release, PM e cronologia delle modifiche">
       <LedgerIcon /><span className="ledger-trigger-text"><strong>Storico iniziative</strong><small>{data ? (data.total ? `${data.total} iniziative` : 'Nessuna ancora') : 'Apri lo storico'}</small></span>
     </button>
-    {open && <div className="ledger-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
+    {open && createPortal(<div className="ledger-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
       <aside className="ledger" role="dialog" aria-modal="true" aria-label="Storico delle iniziative">
         <header className="ledger-head">
           <span className="ledger-head-icon"><LedgerIcon size={26} /></span>
@@ -253,6 +254,6 @@ export default function LedgerPanel({ canEdit = true, onOpenInitiative }) {
           </>}
         </section>}
       </aside>
-    </div>}
+    </div>, document.body)}
   </>;
 }

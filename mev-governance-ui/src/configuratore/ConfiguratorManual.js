@@ -9,7 +9,7 @@ const chapters = [
     'Importa la Tabella di Offerta esistente oppure prepara l’analisi nel workspace. Prosegui attraverso Iniziativa → Interventi → Offerta → Revisione.',
   ], note: 'Il GOTO collega storico, allegati e conversazione nell’ambiente attivo. Per mantenere separati lavori distinti usa GOTO distinti.' },
   { title: 'Il passo Iniziativa: le sette sezioni', subtitle: 'Un percorso a righe apribili', steps: [
-    'Il passo Iniziativa è composto da sette sezioni, sempre nello stesso ordine: 1 Dati iniziativa · 2 Workspace documentale · 3 Razionali e vincoli con l’AI · 4 Soluzione · 5 Analisi condivisa · 6 Codice sorgente · 7 CONOSCENZA DELL’INIZIATIVA.',
+    'Il passo Iniziativa è composto da sette sezioni, sempre nello stesso ordine: 1 Dati iniziativa · 2 Workspace documentale · 3 Razionali e vincoli con l’AI · 4 Soluzione · 5 Analisi condivisa · 6 Codice sorgente · 7 Conoscenza dell’Iniziativa.',
     'Ogni sezione è una riga chiusa che mostra già il titolo e le informazioni principali (per esempio «5 documenti · 2 memorie iniziali», «3 confermate: 1 razionali · 2 vincoli», «2 di 5 interventi descritti»). Premi la riga per aprirla e rivederla per chiuderla. Puoi tenerne aperte più di una; all’apertura della pagina è aperta solo «Dati iniziativa».',
     'Se hai aperto un’iniziativa (codice GOTO o titolo) le sezioni 2, 3, 4 e 5 sono attive. Senza iniziativa la riga indica «Bloccato» e spiega cosa fare: non vengono caricati dati né fatte richieste.',
     'Chiudere una riga non fa perdere nulla: quello che hai scritto resta nella pagina. La sezione 7 riassume tutta la conoscenza raccolta e ogni scheda apre la sezione corrispondente.',
@@ -56,7 +56,7 @@ const chapters = [
     '“Nuova Iniziativa” svuota il lavoro corrente dopo conferma se sono presenti dati. Salva prima le modifiche da conservare.',
   ] },
   { title: 'Storico delle iniziative', subtitle: 'Lo stato di tutte le iniziative, sempre aggiornato', steps: [
-    'In alto a destra, accanto al Manuale, l’icona dell’orologio “Storico iniziative” apre un pannello con tutte le iniziative: rilasciate, rilasciate parzialmente, approvate, in approvazione, in analisi/stima e CR da stimare. Il numero accanto all’icona è il totale.',
+    'In alto a destra, accanto al Manuale, l’icona dell’orologio “Storico iniziative” apre un pannello con tutte le iniziative: rilasciate, rilasciate parzialmente, approvate, in approvazione, in analisi/stima e CR da stimare. Il numero accanto all’icona è il totale. Il pannello si apre sopra tutta la pagina, barra in alto compresa, e si chiude con ✕, con Esc o cliccando fuori.',
     'Le schede per stato sono cliccabili e filtrano l’elenco; la ricerca e i filtri per sistema, PM Poste e release si possono combinare. “Archiviate” mostra le iniziative messe da parte.',
     'Per caricare o aggiornare lo storico usa “Importa file .md” con il file dello stato delle iniziative. Prima di salvare vedi un’anteprima: quante iniziative sono nuove, aggiornate o invariate, e le eventuali righe da controllare. Nulla viene salvato finché non confermi.',
     'L’identità di un’iniziativa è GOTO + sistema + titolo: lo stesso GOTO può comparire su più sistemi. Se il GOTO è “TBD” l’iniziativa è riconosciuta da sistema e titolo e, quando il codice arriva, basta importare il file con il GOTO vero: l’iniziativa esistente viene aggiornata, non duplicata.',

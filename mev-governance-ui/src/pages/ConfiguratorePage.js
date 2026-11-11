@@ -2327,7 +2327,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </SectionRow>
 
           {/* 7 · Conoscenza dell'iniziativa */}
-          <SectionRow number="7" id="sezione-conoscenza" title="CONOSCENZA DELL’INIZIATIVA" open={isOpen('conoscenza')} onToggle={() => toggleSection('conoscenza')} keepMounted
+          <SectionRow number="7" id="sezione-conoscenza" title="Conoscenza dell’Iniziativa" open={isOpen('conoscenza')} onToggle={() => toggleSection('conoscenza')} keepMounted
             facts={knowledgeFacts({ rationale, libraryFacts, solutionProgress, importedInterventions, mappingCount, tow5Total })}>
             <KnowledgeOverview initiative={initiative} rationale={rationale} solution={solutionProgress} interventions={importedInterventions} mappingCount={mappingCount} tow5Total={tow5Total} library={libraryFacts} onOpen={openSection} />
            <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />

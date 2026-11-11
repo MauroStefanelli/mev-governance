@@ -181,3 +181,11 @@ describe('with the real backup', () => {
     expect(names).toContain('ilp-despatch-id-anagldv.md');
   }, 180000);
 });
+
+test('the open panel is attached to the page body, outside the page content, so a bar above the content cannot cover its header', async () => {
+  const { container } = render(<HistoryImportPanel canEdit />);
+  fireEvent.click(trigger());
+  const dialog = await screen.findByRole('dialog', { name: 'Conoscenza storica AI' });
+  expect(container.contains(dialog)).toBe(false);
+  expect(dialog.closest('.hi-overlay').parentElement).toBe(document.body);
+});

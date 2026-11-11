@@ -15,7 +15,7 @@ jest.mock('../services/mevService', () => {
 });
 jest.mock('../configuratore/InitiativeConversation', () => () => null);
 
-const SECTIONS = ['Dati iniziativa', 'Workspace documentale', 'Razionali e vincoli con l’AI', 'Soluzione', 'Analisi condivisa', 'Codice sorgente', 'CONOSCENZA DELL’INIZIATIVA'];
+const SECTIONS = ['Dati iniziativa', 'Workspace documentale', 'Razionali e vincoli con l’AI', 'Soluzione', 'Analisi condivisa', 'Codice sorgente', 'Conoscenza dell’Iniziativa'];
 const sectionButtons = () => [...document.querySelectorAll('.secrow-toggle')];
 const row = title => sectionButtons().find(button => button.textContent.includes(title));
 const mount = () => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} />);
@@ -110,7 +110,7 @@ test('the knowledge section opens with its overview and the cards open the match
   await waitFor(() => expect(sectionButtons()).toHaveLength(7));
   fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '145480' } });
   fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'Invio' } });
-  fireEvent.click(row('CONOSCENZA DELL’INIZIATIVA'));
+  fireEvent.click(row('Conoscenza dell’Iniziativa'));
   const overview = await screen.findByLabelText('Riepilogo della conoscenza dell’iniziativa');
   fireEvent.click(within(overview).getByRole('button', { name: /Razionali e vincoli/ }));
   expect(row('Razionali e vincoli con l’AI')).toHaveAttribute('aria-expanded', 'true');
