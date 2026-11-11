@@ -23,6 +23,7 @@ await WorkspaceRegression.Run(db, Check);
 await DevelopmentCollaborationRegression.Run(db, Check);
 await RationaleRegression.Run(db, Check);
 await DocumentLibraryRegression.Run(db, Check);
+await InitiativeLedgerRegression.Run(db, Check);
 OfferWorkbookRegression.Run(Check);
 if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }
 var user = new AppUser { Username = "operator", Role = "Admin" };

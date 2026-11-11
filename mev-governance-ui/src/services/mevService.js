@@ -66,6 +66,19 @@ const fetchWithRefresh = async (url, options = {}) => {
   return res;
 };
 
+// History of the initiatives of the active environment (the server scopes everything to it).
+export async function ledgerRequest(path, { method, body } = {}) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ledger${path ? `/${path}` : ''}`, {
+    method: method || (body ? 'POST' : 'GET'), headers: authHeaders(), ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || (response.status === 404 ? 'Il backend non espone ancora lo storico delle iniziative: aggiorna il backend DEV.' : response.status === 403 ? 'Non hai i permessi per questa operazione.' : `Storico: errore ${response.status}`));
+    error.status = response.status; throw error;
+  }
+  return response.json();
+}
+
 // Documentary workspace of an initiative: folders, versions, search, questions answered from the documents.
 // Uploads use multipart; downloads reuse the existing per-document endpoint.
 export async function libraryRequest(path, { method, body, form, blob } = {}) {

@@ -709,6 +709,71 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS ""IX_RationaleEntries_AmbienteId_Goto""
                 ON ""{sch}"".""RationaleEntries"" (""AmbienteId"", ""Goto"");");
 
+        // Storico delle iniziative: record per identita' (GOTO + sistema + titolo), cronologia dei cambi, esecuzioni di import.
+        try
+        {
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""LedgerInitiatives"" (
+                    ""Id"" BIGSERIAL PRIMARY KEY,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""Key"" VARCHAR(300) NOT NULL,
+                    ""Goto"" VARCHAR(60) NULL,
+                    ""Title"" TEXT NOT NULL,
+                    ""System"" VARCHAR(120) NOT NULL,
+                    ""PmPoste"" VARCHAR(120) NULL,
+                    ""Status"" VARCHAR(24) NOT NULL,
+                    ""Release"" VARCHAR(60) NULL,
+                    ""PlannedRelease"" VARCHAR(60) NULL,
+                    ""CollaudoDate"" TIMESTAMPTZ NULL,
+                    ""CollaudoText"" TEXT NULL,
+                    ""Notes"" TEXT NULL,
+                    ""Released"" TEXT NULL,
+                    ""Missing"" TEXT NULL,
+                    ""AmountsJson"" TEXT NULL,
+                    ""Source"" TEXT NOT NULL DEFAULT 'file',
+                    ""SourceFile"" TEXT NULL,
+                    ""SourceDate"" TIMESTAMPTZ NULL,
+                    ""CreatedAt"" TIMESTAMPTZ NOT NULL,
+                    ""CreatedBy"" TEXT NOT NULL DEFAULT '',
+                    ""UpdatedAt"" TIMESTAMPTZ NOT NULL,
+                    ""UpdatedBy"" TEXT NOT NULL DEFAULT '',
+                    ""Revision"" INTEGER NOT NULL DEFAULT 1,
+                    ""Archived"" BOOLEAN NOT NULL DEFAULT FALSE
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_LedgerInitiatives_AmbienteId_Key"" ON ""{sch}"".""LedgerInitiatives"" (""AmbienteId"", ""Key"");
+                CREATE INDEX IF NOT EXISTS ""IX_LedgerInitiatives_AmbienteId_Status"" ON ""{sch}"".""LedgerInitiatives"" (""AmbienteId"", ""Status"");
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""LedgerEvents"" (
+                    ""Id"" BIGSERIAL PRIMARY KEY,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""InitiativeId"" BIGINT NOT NULL,
+                    ""Kind"" VARCHAR(24) NOT NULL,
+                    ""Summary"" TEXT NOT NULL,
+                    ""ChangesJson"" TEXT NULL,
+                    ""Actor"" TEXT NOT NULL DEFAULT '',
+                    ""ActorFullName"" TEXT NOT NULL DEFAULT '',
+                    ""At"" TIMESTAMPTZ NOT NULL,
+                    ""ImportId"" BIGINT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ""IX_LedgerEvents_AmbienteId_InitiativeId_Id"" ON ""{sch}"".""LedgerEvents"" (""AmbienteId"", ""InitiativeId"", ""Id"");
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""LedgerImports"" (
+                    ""Id"" BIGSERIAL PRIMARY KEY,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""FileName"" TEXT NOT NULL,
+                    ""Sha256"" VARCHAR(64) NOT NULL,
+                    ""SourceDate"" TIMESTAMPTZ NULL,
+                    ""Rows"" INTEGER NOT NULL,
+                    ""Created"" INTEGER NOT NULL,
+                    ""Updated"" INTEGER NOT NULL,
+                    ""Unchanged"" INTEGER NOT NULL,
+                    ""Skipped"" INTEGER NOT NULL,
+                    ""Actor"" TEXT NOT NULL DEFAULT '',
+                    ""At"" TIMESTAMPTZ NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ""IX_LedgerImports_AmbienteId_Id"" ON ""{sch}"".""LedgerImports"" (""AmbienteId"", ""Id"");");
+            Console.WriteLine("[PRE-PATCH] Storico iniziative verificato.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Ledger ERROR] {ex.Message}"); }
+
         // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
         try
         {

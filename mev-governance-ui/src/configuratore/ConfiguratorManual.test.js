@@ -12,11 +12,14 @@ test('opens the manual, navigates its chapters and closes without leaving the in
   render(<ConfiguratorManual />);
   fireEvent.click(screen.getByRole('button', { name: /Manuale d’uso/ }));
   expect(screen.getByRole('dialog', { name: 'Configuratore Offerta TOW' })).toBeVisible();
-  expect(screen.getByText('Capitolo 1 di 13')).toBeInTheDocument();
+  expect(screen.getByText('Capitolo 1 di 14')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Catalogo e verifica AI/ }));
-  expect(screen.getByText('Capitolo 9 di 13')).toBeInTheDocument();
+  expect(screen.getByText('Capitolo 10 di 14')).toBeInTheDocument();
   expect(screen.getByText(/coerenza AI delle righe/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Dall’Excel al codice/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Storico delle iniziative/ }));
+  expect(screen.getByText('Capitolo 7 di 14')).toBeInTheDocument();
+  expect(screen.getByText(/GOTO \+ sistema \+ titolo/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Revisioni e collaborazione/ }));
   expect(screen.getByText(/applicazione Sviluppo iniziative della Home/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Chiudi manuale' }));

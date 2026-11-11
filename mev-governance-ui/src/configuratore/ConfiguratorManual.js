@@ -55,6 +55,16 @@ const chapters = [
     'Una revisione condivisa conserva analisi e snapshot economico. La riapertura recupera i dati disponibili; un catalogo non più disponibile impedisce il ripristino dello snapshot.',
     '“Nuova Iniziativa” svuota il lavoro corrente dopo conferma se sono presenti dati. Salva prima le modifiche da conservare.',
   ] },
+  { title: 'Storico delle iniziative', subtitle: 'Lo stato di tutte le iniziative, sempre aggiornato', steps: [
+    'In alto a destra, accanto al Manuale, l’icona dell’orologio “Storico iniziative” apre un pannello con tutte le iniziative: rilasciate, rilasciate parzialmente, approvate, in approvazione, in analisi/stima e CR da stimare. Il numero accanto all’icona è il totale.',
+    'Le schede per stato sono cliccabili e filtrano l’elenco; la ricerca e i filtri per sistema, PM Poste e release si possono combinare. “Archiviate” mostra le iniziative messe da parte.',
+    'Per caricare o aggiornare lo storico usa “Importa file .md” con il file dello stato delle iniziative. Prima di salvare vedi un’anteprima: quante iniziative sono nuove, aggiornate o invariate, e le eventuali righe da controllare. Nulla viene salvato finché non confermi.',
+    'L’identità di un’iniziativa è GOTO + sistema + titolo: lo stesso GOTO può comparire su più sistemi. Se il GOTO è “TBD” l’iniziativa è riconosciuta da sistema e titolo e, quando il codice arriva, basta importare il file con il GOTO vero: l’iniziativa esistente viene aggiornata, non duplicata.',
+    'L’importazione non cancella mai: un campo vuoto nel file non svuota quello già presente, le iniziative assenti dal file restano, e un file più vecchio di quanto già registrato compila solo i campi mancanti senza riportare indietro la data.',
+    'Ogni iniziativa si apre in una scheda con i dati modificabili (stato, release, PM Poste, collaudo, note, cosa è rilasciato e cosa manca) e la cronologia: cambi di stato, importazioni, note e attività, con chi e quando e il valore precedente e quello nuovo. Se un collega modifica la stessa iniziativa prima di te, il salvataggio è rifiutato e il tuo testo resta sullo schermo.',
+    '“Apri nel Configuratore” porta GOTO, titolo, sistema, release e PM Poste nell’iniziativa in lavorazione; se ne hai già una aperta ti viene chiesta conferma. “Scarica .md aggiornato” produce il file dello stato nello stesso formato di quello importato. Importare, creare, modificare e archiviare sono riservati a chi può lavorare sulle iniziative; gli altri possono consultare e scaricare.',
+    'Lo storico non si aggiorna da solo quando salvi un’offerta o una soluzione: le attività che vuoi ricordare si aggiungono dalla scheda come “Attività” o “Nota”.',
+  ] },
   { title: 'Contratto e listino', subtitle: 'Scegliere la fonte economica corretta', steps: [
     'In “Risorse e configurazione” scegli il catalogo del contratto di sistema e il lotto. “Poste TeT” è un catalogo incluso nell’app: è distinto dal contratto dell’Archivio.',
     'Quando la stima contiene righe, la selezione del catalogo è bloccata. Per un altro contratto avvia una nuova iniziativa.',

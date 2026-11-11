@@ -3,6 +3,8 @@ import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import RationalePanel from "../configuratore/RationalePanel";
 import LibraryPanel from "../configuratore/LibraryPanel";
 import SectionRow from "../configuratore/SectionRow";
+import LedgerPanel from "../configuratore/LedgerPanel";
+import { initiativeFromLedger } from "../configuratore/ledgerModel";
 import SolutionPanel from "../configuratore/SolutionPanel";
 import KnowledgeOverview from "../configuratore/KnowledgeOverview";
 import { loadPmPoste, pmOptions, pmSelectValue, pmFromSelect, showsFreeText, OTHER } from "../configuratore/pmPoste";
@@ -175,6 +177,13 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const isAdminDeveloper = myRoles.includes("Admin") && myRoles.includes("Developer");
   const hasInitiative = !!(initiative.code || initiative.title);
   const canEditInitiative = myRoles.some(r => ['Admin', 'Developer', 'SuperAdmin'].includes(r));
+  // Brings the identifying fields of a ledger record into the open initiative. Work already typed is never discarded silently.
+  const openFromLedger = (record) => {
+    const next = initiativeFromLedger(record);
+    const differs = (initiative.code || initiative.title) && (initiative.code !== next.code || initiative.title !== next.title);
+    if (differs && !window.confirm('Stai già lavorando su un’altra iniziativa. Vuoi sostituirne i dati identificativi (GOTO, titolo, sistema, release, PM Poste) con quelli dello storico? Il resto del lavoro non viene cancellato.')) return;
+    setInitiative((current) => ({ ...current, ...next }));
+  };
   const currentUserName = (typeof localStorage !== 'undefined' && (localStorage.getItem('fullName') || localStorage.getItem('XUSER'))) || '';
   // SuperAdmin ha sempre accesso completo
   const canAiApp = isAdminDeveloper || myRoles.includes("SuperAdmin");
@@ -1534,6 +1543,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
     <div className="tow-workbench" style={{ padding: "clamp(16px, 2.5vw, 36px)", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", background: "#f5f7fa", color: "#172b4d", lineHeight: 1.5, minWidth: 0, maxWidth: 1600, margin: "0 auto", boxSizing: "border-box", overflowWrap: "anywhere" }}>
       <InitiativeHeading initiative={initiative} contractId={initiativeContractId} lot={lot} catalogCount={catalog.length}>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <LedgerPanel canEdit={canEditInitiative} onOpenInitiative={openFromLedger} />
         <ConfiguratorManual />
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}

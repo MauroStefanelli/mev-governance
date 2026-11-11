@@ -27,6 +27,7 @@ beforeEach(() => {
   Object.keys(answers).forEach(name => service[name].mockReset().mockImplementation(async () => answers[name]));
   service.rationaleRequest.mockReset().mockImplementation(async path => (String(path).startsWith('related') ? [] : { messages: [], hasMore: false, entries: [] }));
   service.libraryRequest.mockReset();
+  service.ledgerRequest.mockReset().mockImplementation(async path => (/^\d+$/.test(String(path)) ? {} : { initiatives: [{ id: 5, key: 'k', goto: '145480', gotoPlaceholder: false, title: 'Add-on collaudo', system: 'NPSO', pmPoste: 'Lerro', status: 'approvata', release: 'R01.2027', revision: 1, archived: false, amounts: [] }], total: 1, shown: 1, counts: { approvata: 1 }, systems: ['NPSO'], pms: ['Lerro'], releases: ['R01.2027'], canWork: true }));
   service.rationaleRequest.mockImplementation(async path => (String(path).startsWith('related') ? [] : { messages: [], hasMore: false, entries: [] }));
   service.libraryRequest.mockImplementation(async () => ({ documents: [], folders: [], historical: 0, pendingIndex: 0, limit: 300, ocrAvailable: true }));
 });
@@ -266,5 +267,37 @@ describe('PM Poste survives reopening a shared analysis revision', () => {
     fireEvent.click(await screen.findByText('Revisione 3', { exact: false }));
     await waitFor(() => expect(row('Dati iniziativa')).toHaveTextContent('GOTO GOTO-9'));
     expect(screen.getByLabelText('PM Poste', { selector: 'select' })).toHaveValue('');
+  });
+});
+
+describe('Storico delle iniziative', () => {
+  test('the icon sits in the page header next to the manual and shows the total without opening', async () => {
+    mount();
+    const trigger = await screen.findByRole('button', { name: /Storico iniziative/ });
+    expect(trigger.closest('.tow-heading-top')).not.toBeNull();
+    expect(await screen.findByText('1 iniziative')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Storico delle iniziative' })).not.toBeInTheDocument();
+  });
+
+  test('"Apri nel Configuratore" fills the identifying fields of the initiative from the ledger record', async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Storico iniziative/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Storico delle iniziative' });
+    service.ledgerRequest.mockImplementation(async path => (/^\d+$/.test(String(path)) ? { initiative: { id: 5, goto: '145480', gotoPlaceholder: false, title: 'Add-on collaudo', system: 'NPSO', pmPoste: 'Lerro', status: 'approvata', release: 'R01.2027', revision: 1, amounts: [] }, events: [] } : {}));
+    fireEvent.click(await within(dialog).findByRole('button', { name: /Add-on collaudo/ }));
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Apri nel Configuratore' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Storico delle iniziative' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue('145480')).toBeInTheDocument());
+    expect(screen.getAllByDisplayValue('Add-on collaudo').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('PM Poste', { selector: 'input' })).toHaveValue('Lerro');
+    expect(row('Dati iniziativa')).toHaveTextContent('145480');
+  });
+
+  test('a user who cannot work on initiatives sees the ledger but not the import', async () => {
+    render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Client" roles={['Client']} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Storico iniziative/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Storico delle iniziative' });
+    expect(await within(dialog).findByText('Add-on collaudo')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Importa file .md' })).not.toBeInTheDocument();
   });
 });
