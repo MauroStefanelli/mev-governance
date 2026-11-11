@@ -4,6 +4,7 @@ import RationalePanel from "../configuratore/RationalePanel";
 import LibraryPanel from "../configuratore/LibraryPanel";
 import SectionRow from "../configuratore/SectionRow";
 import LedgerPanel from "../configuratore/LedgerPanel";
+import HistoryImportPanel from "../configuratore/HistoryImportPanel";
 import { initiativeFromLedger } from "../configuratore/ledgerModel";
 import SolutionPanel from "../configuratore/SolutionPanel";
 import KnowledgeOverview from "../configuratore/KnowledgeOverview";
@@ -1544,6 +1545,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       <InitiativeHeading initiative={initiative} contractId={initiativeContractId} lot={lot} catalogCount={catalog.length}>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <LedgerPanel canEdit={canEditInitiative} onOpenInitiative={openFromLedger} />
+        <HistoryImportPanel canEdit={canEditInitiative} />
         <ConfiguratorManual />
         <button onClick={() => setShowContractForm((v) => !v)} style={btnStyles.secondary}>
           {showContractForm ? "Chiudi" : "⚙ Catalogo / Listino"}

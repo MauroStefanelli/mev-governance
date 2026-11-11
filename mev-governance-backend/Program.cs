@@ -238,6 +238,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IRationaleAssistant, MevGovernanceBackend.Services.AiRationaleAssistant>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IDocumentAssistant, MevGovernanceBackend.Services.AiDocumentAssistant>();
+builder.Services.AddScoped<MevGovernanceBackend.Services.IKnowledgeExtractor, MevGovernanceBackend.Services.AiKnowledgeExtractor>();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.IOcrEngine, MevGovernanceBackend.Services.TesseractOcrEngine>();
 builder.Services.AddHttpClient("ConfiguratoreAi", client =>
 {
@@ -773,6 +774,36 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[PRE-PATCH] Storico iniziative verificato.");
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Ledger ERROR] {ex.Message}"); }
+
+        // Conoscenza storica importata dal lavoro svolto con assistenti AI: provenienza sulle voci e registro dei file gia' letti.
+        try
+        {
+            db.Database.ExecuteSqlRaw($@"
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SourceFile""   TEXT NULL;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SourceSha""    VARCHAR(64) NULL;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SourceAuthor"" TEXT NULL;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""ImportedBy""   TEXT NULL;
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""KnowledgeImportFiles"" (
+                    ""Id"" BIGSERIAL PRIMARY KEY,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""Sha256"" VARCHAR(64) NOT NULL,
+                    ""FileName"" TEXT NOT NULL DEFAULT '',
+                    ""SourcePath"" TEXT NOT NULL DEFAULT '',
+                    ""SourceAuthor"" TEXT NOT NULL DEFAULT '',
+                    ""System"" VARCHAR(120) NOT NULL DEFAULT '',
+                    ""Goto"" VARCHAR(120) NOT NULL DEFAULT '',
+                    ""Outcome"" VARCHAR(24) NOT NULL DEFAULT '',
+                    ""Proposals"" INTEGER NOT NULL DEFAULT 0,
+                    ""Truncated"" BOOLEAN NOT NULL DEFAULT FALSE,
+                    ""Actor"" TEXT NOT NULL DEFAULT '',
+                    ""ActorFullName"" TEXT NOT NULL DEFAULT '',
+                    ""At"" TIMESTAMPTZ NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_KnowledgeImportFiles_AmbienteId_Sha256"" ON ""{sch}"".""KnowledgeImportFiles"" (""AmbienteId"", ""Sha256"");
+                CREATE INDEX IF NOT EXISTS ""IX_KnowledgeImportFiles_AmbienteId_Id"" ON ""{sch}"".""KnowledgeImportFiles"" (""AmbienteId"", ""Id"");");
+            Console.WriteLine("[PRE-PATCH] Conoscenza storica verificata.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Knowledge ERROR] {ex.Message}"); }
 
         // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
         try

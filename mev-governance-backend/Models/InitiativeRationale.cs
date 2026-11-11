@@ -40,4 +40,9 @@ public class RationaleEntry
     [MaxLength(120)] public string? DecidedBy { get; set; }
     public string? DecidedByFullName { get; set; }
     public DateTime? DecidedAt { get; set; }
+    // Provenance of an entry that comes from the work history of an AI assistant (null for everything written in the app).
+    public string? SourceFile { get; set; }
+    [MaxLength(64)] public string? SourceSha { get; set; }
+    public string? SourceAuthor { get; set; }
+    public string? ImportedBy { get; set; }
 }

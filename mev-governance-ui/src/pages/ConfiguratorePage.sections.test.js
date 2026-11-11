@@ -27,6 +27,7 @@ beforeEach(() => {
   Object.keys(answers).forEach(name => service[name].mockReset().mockImplementation(async () => answers[name]));
   service.rationaleRequest.mockReset().mockImplementation(async path => (String(path).startsWith('related') ? [] : { messages: [], hasMore: false, entries: [] }));
   service.libraryRequest.mockReset();
+  service.historyImportRequest.mockReset().mockImplementation(async path => (String(path).startsWith('pending') ? { entries: [], hasMore: false, total: 0, bySystem: [] } : { filesRead: 0, withProposals: 0, pending: 0, confirmed: 0 }));
   service.ledgerRequest.mockReset().mockImplementation(async path => (/^\d+$/.test(String(path)) ? {} : { initiatives: [{ id: 5, key: 'k', goto: '145480', gotoPlaceholder: false, title: 'Add-on collaudo', system: 'NPSO', pmPoste: 'Lerro', status: 'approvata', release: 'R01.2027', revision: 1, archived: false, amounts: [] }], total: 1, shown: 1, counts: { approvata: 1 }, systems: ['NPSO'], pms: ['Lerro'], releases: ['R01.2027'], canWork: true }));
   service.rationaleRequest.mockImplementation(async path => (String(path).startsWith('related') ? [] : { messages: [], hasMore: false, entries: [] }));
   service.libraryRequest.mockImplementation(async () => ({ documents: [], folders: [], historical: 0, pendingIndex: 0, limit: 300, ocrAvailable: true }));
@@ -299,5 +300,22 @@ describe('Storico delle iniziative', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Storico delle iniziative' });
     expect(await within(dialog).findByText('Add-on collaudo')).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Importa file .md' })).not.toBeInTheDocument();
+  });
+
+  test('the historical knowledge import is offered only to those who can work on initiatives', async () => {
+    const { unmount } = render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Client" roles={['Client']} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conoscenza storica AI/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Conoscenza storica AI' });
+    expect(within(dialog).queryByLabelText('Zip della cartella')).not.toBeInTheDocument();
+    unmount();
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Conoscenza storica AI/ }));
+    expect(await screen.findByLabelText('Zip della cartella')).toBeInTheDocument();
+  });
+  test('the historical knowledge button sits in the page header next to the history', async () => {
+    mount();
+    const history = await screen.findByRole('button', { name: /Storico iniziative/ });
+    const knowledge = await screen.findByRole('button', { name: /Conoscenza storica AI/ });
+    expect(knowledge.parentElement).toBe(history.parentElement); expect(knowledge.closest('.tow-heading-top')).not.toBeNull();
   });
 });

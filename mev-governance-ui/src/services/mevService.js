@@ -79,6 +79,19 @@ export async function ledgerRequest(path, { method, body } = {}) {
   return response.json();
 }
 
+// Knowledge written in the past by AI assistants, imported as proposals to confirm (one note per request).
+export async function historyImportRequest(path, { method, body } = {}) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/history-import/${path}`, {
+    method: method || (body ? 'POST' : 'GET'), headers: authHeaders(), ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || (response.status === 404 ? 'Il backend non espone ancora l’importazione dello storico AI: aggiorna il backend DEV.' : response.status === 403 ? 'Non hai i permessi per questa operazione.' : `Importazione: errore ${response.status}`));
+    error.status = response.status; error.details = details; throw error;
+  }
+  return response.json();
+}
+
 // Documentary workspace of an initiative: folders, versions, search, questions answered from the documents.
 // Uploads use multipart; downloads reuse the existing per-document endpoint.
 export async function libraryRequest(path, { method, body, form, blob } = {}) {

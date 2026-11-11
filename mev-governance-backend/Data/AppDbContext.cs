@@ -39,6 +39,7 @@ public class AppDbContext : DbContext
     public DbSet<DevelopmentMessage> DevelopmentMessages => Set<DevelopmentMessage>();
     public DbSet<RationaleMessage> RationaleMessages => Set<RationaleMessage>();
     public DbSet<RationaleEntry> RationaleEntries => Set<RationaleEntry>();
+    public DbSet<KnowledgeImportFile> KnowledgeImportFiles => Set<KnowledgeImportFile>();
     public DbSet<LedgerInitiative> LedgerInitiatives => Set<LedgerInitiative>();
     public DbSet<LedgerEvent> LedgerEvents => Set<LedgerEvent>();
     public DbSet<LedgerImport> LedgerImports => Set<LedgerImport>();
