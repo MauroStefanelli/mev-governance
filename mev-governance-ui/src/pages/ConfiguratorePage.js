@@ -285,7 +285,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       })
       .catch((err) => {
         if (err && (err.status === 401 || err.status === 403)) return onUnauthorized();
-        setError("Impossibile caricare i dati del Configuratore Offerta");
+        setError("Impossibile caricare i dati del Configuratore Iniziative");
       })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };

@@ -11,7 +11,7 @@ beforeEach(() => {
 test('opens the manual, navigates its chapters and closes without leaving the initiative', () => {
   render(<ConfiguratorManual />);
   fireEvent.click(screen.getByRole('button', { name: /Manuale d’uso/ }));
-  expect(screen.getByRole('dialog', { name: 'Configuratore Offerta TOW' })).toBeVisible();
+  expect(screen.getByRole('dialog', { name: 'Configuratore Iniziative' })).toBeVisible();
   expect(screen.getByText('Capitolo 1 di 15')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Catalogo e verifica AI/ }));
   expect(screen.getByText('Capitolo 11 di 15')).toBeInTheDocument();

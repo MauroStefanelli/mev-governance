@@ -155,5 +155,5 @@ export function UserManual({ chapters, title, subtitle, triggerLabel = 'Manuale 
 }
 
 export default function ConfiguratorManual() {
-  return <UserManual chapters={chapters} title="Configuratore Offerta TOW" subtitle="Dall’iniziativa alla proposta tecnica ed economica." triggerHint="Guida al configuratore" />;
+  return <UserManual chapters={chapters} title="Configuratore Iniziative" subtitle="Dall’iniziativa alla proposta tecnica ed economica." triggerHint="Guida al configuratore" />;
 }

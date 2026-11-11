@@ -177,7 +177,7 @@ const PAGE_DEFS = [
   },
   {
     id: "configuratore",
-    label: "Configuratore Offerta",
+    label: "Configuratore Iniziative",
     description: "Strumento per costruire e analizzare offerte contrattuali con AI.",
     accent: "#0ea5e9",
     accentDark: "#0284c7",

@@ -250,7 +250,7 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                     {saving ? 'Salvataggio…' : 'Salva % impatto'}
                   </button>
                   {saved && <span role="status" style={{ color: '#166534', fontWeight: 700, fontSize: 13 }}>Salvato — il Configuratore userà questi valori come default</span>}
-                  <span style={{ color: '#64748b', fontSize: 12 }}>I valori si applicano ai TOW automatici (TOWxx.1, TOWxx.3, TOWxx.4) nel Configuratore Offerta.</span>
+                  <span style={{ color: '#64748b', fontSize: 12 }}>I valori si applicano ai TOW automatici (TOWxx.1, TOWxx.3, TOWxx.4) nel Configuratore Iniziative.</span>
                 </div>
               )}
             </>

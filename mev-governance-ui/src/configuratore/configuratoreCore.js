@@ -1,7 +1,7 @@
 import { catalogEntryInScope } from "./suggestionScope";
 import { catalogUnitPrice, resolveCatalogEntry } from "./catalogReconciliation";
 // ============================================================
-// Configuratore Offerta — modulo core (logica pura portata
+// Configuratore Iniziative — modulo core (logica pura portata
 // dal Configuratore standalone: parsing, calcolo, suggerimenti,
 // snapshot, export). Framework-agnostic: usa le API del browser
 // ma nessun DOM dell'app host; i component React orchestrano i dati.

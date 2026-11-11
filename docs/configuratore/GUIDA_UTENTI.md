@@ -1,4 +1,4 @@
-# Configuratore Offerta TOW — logica di lavoro condivisa
+# Configuratore Iniziative — logica di lavoro condivisa
 
 ## Obiettivo
 

@@ -124,7 +124,7 @@ export const PAGE_MANUALS = {
       'Esegui build e test del modulo con gli strumenti del progetto (per NPSO WLS, OSB, BPEL e microservizi possono differire). Riporta comandi, esiti e commit nella scheda, imposta “Verificata” solo con evidenze e salva lo sviluppo.',
     ], 'Il worker automatico di compilazione e test non è ancora disponibile: la prontezza al rilascio si dimostra con le verifiche del repository e dell’ambiente destinatario.'),
   ] },
-  configuratore: { title: 'Configuratore Offerta TOW', summary: 'Trasforma requisiti, analisi e interventi in una proposta tecnica ed economica con storico e supporto AI.' },
+  configuratore: { title: 'Configuratore Iniziative', summary: 'Trasforma requisiti, analisi e interventi in una proposta tecnica ed economica con storico e supporto AI.' },
 };
 
 export function homeManualChapters(pageIds) {

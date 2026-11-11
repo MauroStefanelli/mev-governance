@@ -108,7 +108,7 @@ export function solutionMarkdown({ initiative = {}, interventions = [], solution
   const counts = rationaleCounts(knowledge);
   const lines = [];
   lines.push(`# Soluzione · ${initiative.code ? initiative.code + ' · ' : ''}${initiative.title || 'Iniziativa senza titolo'}`, '');
-  lines.push('> Documento per lo sviluppo, da aprire in Visual Studio Code. Il contenuto è scritto e rivisto dal team nel Configuratore Offerta TOW: **non è stato verificato sul codice** né compilato.', '');
+  lines.push('> Documento per lo sviluppo, da aprire in Visual Studio Code. Il contenuto è scritto e rivisto dal team nel Configuratore Iniziative: **non è stato verificato sul codice** né compilato.', '');
   lines.push('| | |', '|---|---|', `| Codice GOTO | ${initiative.code || '—'} |`, `| Sistema | ${initiative.system || '—'} |`, `| Generato il | ${new Date(generatedAt).toLocaleString('it-IT')} |`);
   if (solution.updatedBy) lines.push(`| Ultima modifica | ${solution.updatedBy}${solution.updatedAt ? ' · ' + new Date(solution.updatedAt).toLocaleString('it-IT') : ''} |`);
   lines.push('');
@@ -143,6 +143,6 @@ export function solutionMarkdown({ initiative = {}, interventions = [], solution
     if (generalContext.confirmed.length) lines.push('### Validi per tutta l’iniziativa', '', ...generalContext.confirmed.map(entry => `- **${KIND_LABEL[entry.kind] || entry.kind}**: ${entry.text}  \n  _${entryProvenance(entry)}_`), '');
     if (generalContext.toConfirm.length) lines.push('### ⚠ Da confermare', '', '> Proposte non verificate: trattarle come ipotesi.', '', ...generalContext.toConfirm.map(entry => `- ${KIND_LABEL[entry.kind] || entry.kind}: ${entry.text}  \n  _${entryProvenance(entry)}_`), '');
   }
-  lines.push('---', '', '_Generato dal Configuratore Offerta TOW. Le sezioni vuote indicano informazioni non ancora fornite dal team._', '');
+  lines.push('---', '', '_Generato dal Configuratore Iniziative. Le sezioni vuote indicano informazioni non ancora fornite dal team._', '');
   return lines.join('\n');
 }

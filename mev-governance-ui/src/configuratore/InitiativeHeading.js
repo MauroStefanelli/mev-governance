@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function InitiativeHeading({ initiative, contractId, lot, catalogCount, title = 'Configuratore Offerta TOW', children }) {
+export default function InitiativeHeading({ initiative, contractId, lot, catalogCount, title = 'Configuratore Iniziative', children }) {
   return <header className="tow-sticky-heading" aria-label="Iniziativa corrente">
     <div className="tow-heading-top"><div>
       <h2>{title}</h2>

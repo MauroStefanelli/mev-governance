@@ -666,7 +666,7 @@ export const setUserRoles = async (id, roles) => {
   return response.json();
 };
 
-// ── Configuratore Offerta ──────────────────────────────────────────────────
+// ── Configuratore Iniziative ──────────────────────────────────────────────────
 // Contratti e lotti (entity_type 'contract' / 'contract_lot' su PC_DataRecords)
 export const getConfiguratoreContracts = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts`, {
@@ -1037,7 +1037,7 @@ export const renameReleaseSchedule = async (contractId, id, oldName, newName) =>
   });
 };
 
-// ── Configuratore Offerta — AI (secondo parere e sviluppo) ───────────────────
+// ── Configuratore Iniziative — AI (secondo parere e sviluppo) ───────────────────
 export const testAiConnection = async () => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/ai/test`, {
     method: "GET", headers: authHeaders(),
