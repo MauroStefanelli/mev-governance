@@ -103,7 +103,7 @@ public class HistoryImportController : BaseController
         return Ok(new { outcome = created.Count > 0 ? "elaborato" : "senza-voci", proposals = created.Count, dropped, @goto = code, model = result.Model });
     }
 
-    static object View(RationaleEntry e) => new { e.Id, @goto = e.Goto, e.GotoLabel, system = e.SystemKey, e.Kind, e.Text, e.SourceFile, e.SourceAuthor, e.CreatedAt, e.Status };
+    static object View(RationaleEntry e) => new { e.Id, @goto = e.Goto, e.GotoLabel, system = e.SystemKey, e.Kind, e.Text, e.SourceFile, e.SourceAuthor, e.CreatedAt, e.Status, e.DecidedBy, e.DecidedByFullName, e.DecidedAt };
 
     // The proposals that came from the history and still wait for a person, by system.
     [HttpGet("pending")]
@@ -119,6 +119,33 @@ public class HistoryImportController : BaseController
         if (after is long cursor) query = query.Where(e => e.Id > cursor);
         var page = await query.OrderBy(e => e.Id).Take(PageSize + 1).ToListAsync();
         return Ok(new { entries = page.Take(PageSize).Select(View).ToList(), hasMore = page.Count > PageSize, bySystem, total = bySystem.Sum(g => g.count) });
+    }
+
+    // What the history already put into the knowledge, whatever its state: to look at it, search it and filter it. Read-only.
+    // Only entries that came from the history (they carry a source file); what people wrote in the app is not listed here.
+    [HttpGet("entries")]
+    public async Task<IActionResult> Entries([FromQuery] string? status, [FromQuery] string? system, [FromQuery] string? kind, [FromQuery] string? q, [FromQuery] long? before)
+    {
+        if (!CanRead || GetAmbienteId() <= 0 || Who() is null) return Forbid();
+        var state = (status ?? "confermata").Trim().ToLowerInvariant();
+        if (state != "confermata" && state != "scartata" && state != "proposta" && state != "revocata") return BadRequest(new { message = "Stato non valido." });
+        var environment = GetAmbienteId();
+        var inState = db.RationaleEntries.AsNoTracking().Where(e => e.AmbienteId == environment && e.Status == state && e.SourceFile != null);
+        // the filters offer only what exists, with how many: counted before the filters are applied
+        var systems = (await inState.GroupBy(e => e.SystemKey).Select(g => new { system = g.Key, count = g.Count() }).ToListAsync()).OrderBy(g => g.system).ToList();
+        var kinds = (await inState.GroupBy(e => e.Kind).Select(g => new { kind = g.Key, count = g.Count() }).ToListAsync()).OrderBy(g => g.kind).ToList();
+        var query = inState;
+        var systemKey = (system ?? "").Trim().ToLowerInvariant();
+        if (systemKey.Length > 0) query = query.Where(e => e.SystemKey == systemKey);
+        var kindKey = (kind ?? "").Trim().ToLowerInvariant();
+        if (kindKey.Length > 0) query = query.Where(e => e.Kind == kindKey);
+        var term = (q ?? "").Trim().ToLowerInvariant();
+        if (term.Length > 200) return BadRequest(new { message = "La ricerca è troppo lunga." });
+        if (term.Length > 0) query = query.Where(e => e.Text.ToLower().Contains(term) || (e.SourceFile ?? "").ToLower().Contains(term));
+        var matching = await query.CountAsync();
+        if (before is long cursor) query = query.Where(e => e.Id < cursor);
+        var page = await query.OrderByDescending(e => e.Id).Take(PageSize + 1).ToListAsync();
+        return Ok(new { entries = page.Take(PageSize).Select(View).ToList(), hasMore = page.Count > PageSize, matching, total = systems.Sum(g => g.count), systems, kinds, status = state });
     }
 
     // A person confirms or discards the selected proposals. Only history proposals, only the caller's environment, never more than a page at a time.

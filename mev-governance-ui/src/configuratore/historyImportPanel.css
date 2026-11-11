@@ -40,3 +40,10 @@
 .hi-sys { font-size: 11.5px; font-weight: 700; color: #5d4783; }
 @media (max-width: 640px) { .hi-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hi-head { padding: 14px; } .hi-card, .hi-error, .hi-notice, .hi-warn { margin-left: 14px; margin-right: 14px; } .hi-trigger-text small { display: none; } }
 @media (prefers-reduced-motion: reduce) { .hi, .hi-trigger, .hi-bar span { animation: none !important; transition: none !important; } }
+
+.hi-tabs { display: flex; gap: 6px; margin: 0 22px; border-bottom: 2px solid #ddd3ee; }
+.hi-tab { font: inherit; font-size: 13.5px; font-weight: 700; padding: 9px 16px; min-height: 40px; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; background: none; color: #5d4783; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border-radius: 8px 8px 0 0; }
+.hi-tab:hover { background: #efe8fb; } .hi-tab.is-active { color: #43207a; border-bottom-color: #6a35b6; background: #fff; }
+.hi-states { display: flex; flex-wrap: wrap; gap: 6px; }
+.hi-search { font: inherit; font-size: 13.5px; width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid #cdbfe6; border-radius: 9px; background: #fff; color: inherit; } .hi-search:focus { border-color: #6a35b6; }
+@media (max-width: 640px) { .hi-tabs { margin: 0 14px; } .hi-tab { padding: 8px 10px; font-size: 13px; } }

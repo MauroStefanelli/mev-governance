@@ -132,6 +132,33 @@ public static class HistoryImportRegression
         db.RationaleEntries.Add(manual); await db.SaveChangesAsync();
         check(Ok(await anna.Decide(new(new() { manual.Id }, "confermata"))).GetProperty("decided").GetInt32() == 0 && db.RationaleEntries.Single(e => e.Id == manual.Id).Status == "proposta", "Entries not coming from the history cannot be decided here");
 
+        // ---- looking at what was imported: confirmed entries stay visible, searchable and filterable ----
+        check(await As("Client").Entries("confermata", null, null, null, null) is ForbidResult, "Client cannot list imported entries");
+        check(await anna.Entries("boh", null, null, null, null) is BadRequestObjectResult, "An unknown state is rejected");
+        var confirmedList = Ok(await anna.Entries(null, null, null, null, null));
+        check(confirmedList.GetProperty("status").GetString() == "confermata" && confirmedList.GetProperty("entries").EnumerateArray().All(e => e.GetProperty("status").GetString() == "confermata" && e.GetProperty("decidedBy").GetString() == "anna"), "The default list is the confirmed entries, with who confirmed them");
+        check(confirmedList.GetProperty("total").GetInt32() == db.RationaleEntries.Count(e => e.AmbienteId == 1 && e.Status == "confermata" && e.SourceFile != null) && confirmedList.GetProperty("total").GetInt32() >= 2, "The total counts the confirmed history entries of the environment");
+        check(confirmedList.GetProperty("entries").EnumerateArray().All(e => !string.IsNullOrEmpty(e.GetProperty("sourceFile").GetString())), "Every listed entry shows the note it came from");
+        check(!confirmedList.GetProperty("entries").EnumerateArray().Any(e => e.GetProperty("id").GetInt64() == manual.Id), "What people wrote in the app is not listed among the imported entries");
+        var firstKind = confirmedList.GetProperty("entries")[0].GetProperty("kind").GetString();
+        var byKind = Ok(await anna.Entries("confermata", null, firstKind, null, null));
+        check(byKind.GetProperty("entries").EnumerateArray().All(e => e.GetProperty("kind").GetString() == firstKind) && byKind.GetProperty("matching").GetInt32() <= confirmedList.GetProperty("total").GetInt32(), "The kind filter returns only that kind");
+        check(Ok(await anna.Entries("confermata", "npso", null, null, null)).GetProperty("entries").GetArrayLength() == 0, "The system filter returns only that system");
+        var searched = Ok(await anna.Entries("confermata", null, null, "ITEM-CORE", null));
+        check(searched.GetProperty("matching").GetInt32() >= 1 && searched.GetProperty("entries").EnumerateArray().All(e => e.GetProperty("text").GetString()!.ToLower().Contains("item-core")), "The search is case-insensitive and matches the text");
+        check(Ok(await anna.Entries("confermata", null, null, "ilp-fix", null)).GetProperty("matching").GetInt32() >= 1, "The search also matches the source note name");
+        check(Ok(await anna.Entries("confermata", null, null, "zzz-nessuna", null)).GetProperty("matching").GetInt32() == 0, "A search with no match returns nothing");
+        check(confirmedList.GetProperty("systems").EnumerateArray().Any(g => g.GetProperty("system").GetString() == "ilp"), "The system filters show only systems that exist, with counts");
+        var toDiscard = db.RationaleEntries.Where(e => e.AmbienteId == 1 && e.SourceFile != null && e.Status == "proposta").Select(e => e.Id).Take(1).ToList();
+        check(toDiscard.Count == 1 && Ok(await anna.Decide(new(toDiscard, "scartata"))).GetProperty("decided").GetInt32() == 1, "(setup) one entry is discarded");
+        check(Ok(await anna.Entries("scartata", null, null, null, null)).GetProperty("entries").EnumerateArray().Any(e => e.GetProperty("id").GetInt64() == toDiscard[0]), "Discarded entries can be listed too");
+        check(Ok(await As("Developer", 2).Entries("confermata", null, null, null, null)).GetProperty("total").GetInt32() == 0, "Another environment lists nothing");
+        var firstId = confirmedList.GetProperty("entries")[0].GetProperty("id").GetInt64();
+        var older = Ok(await anna.Entries("confermata", null, null, null, firstId));
+        check(older.GetProperty("entries").GetArrayLength() == confirmedList.GetProperty("total").GetInt32() - 1 && !older.GetProperty("entries").EnumerateArray().Any(e => e.GetProperty("id").GetInt64() >= firstId), "The cursor returns exactly the entries older than the last one seen, none repeated");
+        var ids2 = confirmedList.GetProperty("entries").EnumerateArray().Select(e => e.GetProperty("id").GetInt64()).ToList();
+        check(ids2.SequenceEqual(ids2.OrderByDescending(x => x)), "The list is newest first");
+
         // ---- environments are isolated ----
         check(Ok(await As("Developer", 2).Pending(null, null)).GetProperty("total").GetInt32() == 0, "Another environment sees nothing");
         var otherEnv = db.RationaleEntries.Where(e => e.SourceFile != null && e.Status == "proposta").Select(e => e.Id).Take(1).ToList();

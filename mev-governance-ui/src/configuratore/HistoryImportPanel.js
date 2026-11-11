@@ -32,6 +32,11 @@ export default function HistoryImportPanel({ canEdit = true }) {
   const [system, setSystem] = useState('');
   const [deciding, setDeciding] = useState(false);
   const [lastReport, setLastReport] = useState('');
+  const [view, setView] = useState('review');
+  const [browse, setBrowse] = useState({ status: 'confermata', system: '', kind: '', q: '' });
+  const [library, setLibrary] = useState(null);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const trigger = useRef(null); const closeButton = useRef(null); const alive = useRef(true); const cancelled = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -40,6 +45,19 @@ export default function HistoryImportPanel({ canEdit = true }) {
     try { const r = await historyImportRequest(`pending${filter ? `?system=${encodeURIComponent(filter)}` : ''}`); if (alive.current) { setPending(r); setSelected([]); setError(''); } }
     catch (e) { if (alive.current) setError(e.message); }
   }, [system]);
+  const loadLibrary = useCallback(async (filters, more = false, cursor = null) => {
+    setLibraryLoading(true);
+    try {
+      const params = new URLSearchParams({ status: filters.status });
+      ['system', 'kind', 'q'].forEach(k => { if (filters[k]) params.set(k, filters[k]); });
+      if (cursor) params.set('before', String(cursor));
+      const r = await historyImportRequest(`entries?${params}`);
+      if (alive.current) { setLibrary(previous => more && previous ? { ...r, entries: [...previous.entries, ...r.entries] } : r); setError(''); }
+    } catch (e) { if (alive.current) setError(e.message); }
+    finally { if (alive.current) setLibraryLoading(false); }
+  }, []);
+  useEffect(() => { if (open && view === 'library') loadLibrary(browse); }, [open, view, browse, loadLibrary]);
+  useEffect(() => { const timer = setTimeout(() => setBrowse(previous => previous.q === searchText.trim() ? previous : { ...previous, q: searchText.trim() }), 350); return () => clearTimeout(timer); }, [searchText]);
   useEffect(() => { loadSummary(); }, [loadSummary]);
   useEffect(() => { if (open) loadPending(); }, [open, system]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -158,7 +176,11 @@ export default function HistoryImportPanel({ canEdit = true }) {
             </div></>}
         </section>}
 
-        <section className="hi-card" aria-label="Voci da confermare">
+        <div className="hi-tabs" role="tablist" aria-label="Cosa vuoi vedere">
+          <button type="button" role="tab" id="hi-tab-review" aria-selected={view === 'review'} aria-controls="hi-panel-review" className={`hi-tab${view === 'review' ? ' is-active' : ''}`} onClick={() => setView('review')}>Da confermare{summary ? <span className="hi-pill">{summary.pending}</span> : null}</button>
+          <button type="button" role="tab" id="hi-tab-library" aria-selected={view === 'library'} aria-controls="hi-panel-library" className={`hi-tab${view === 'library' ? ' is-active' : ''}`} onClick={() => setView('library')}>Cosa è stato importato{summary ? <span className="hi-pill">{summary.confirmed}</span> : null}</button>
+        </div>
+        {view === 'review' && <section className="hi-card" id="hi-panel-review" role="tabpanel" aria-labelledby="hi-tab-review" aria-label="Voci da confermare">
           <h3>Voci da confermare {pending ? <span className="hi-pill">{pending.total}</span> : null}</h3>
           {pending && pending.bySystem.length > 0 && <div className="hi-filter" role="group" aria-label="Filtra per sistema">
             <button type="button" className={`hi-chip hi-chip-btn${system === '' ? ' is-active' : ''}`} aria-pressed={system === ''} onClick={() => setSystem('')}>Tutti · {pending.total}</button>
@@ -177,7 +199,30 @@ export default function HistoryImportPanel({ canEdit = true }) {
                 <p>{e.text}</p><small>da <code>{(e.sourceFile || '').split('/').pop()}</code>{e.sourceAuthor ? ` · ${e.sourceAuthor}` : ''} · {stamp(e.createdAt)}</small></div>
             </li>)}</ul>
             {pending.hasMore && <p className="hi-hint">Ne mostro {entries.length} per volta: dopo averle decise compaiono le successive.</p>}</>}
-        </section>
+        </section>}
+        {view === 'library' && <section className="hi-card" id="hi-panel-library" role="tabpanel" aria-labelledby="hi-tab-library" aria-label="Cosa è stato importato">
+          <div className="hi-states" role="group" aria-label="Stato delle voci">
+            {[['confermata', 'Confermate'], ['scartata', 'Scartate'], ['proposta', 'Da confermare']].map(([id, label]) => <button type="button" key={id} className={`hi-chip hi-chip-btn${browse.status === id ? ' is-active' : ''}`} aria-pressed={browse.status === id} onClick={() => setBrowse(previous => ({ ...previous, status: id, system: '', kind: '' }))}>{label}</button>)}
+          </div>
+          <input type="search" className="hi-search" aria-label="Cerca tra le voci importate" placeholder="Cerca nel testo o nel nome della nota…" value={searchText} maxLength={200} onChange={e => setSearchText(e.target.value)} />
+          {library && library.systems.length > 0 && <div className="hi-filter" role="group" aria-label="Filtra per sistema">
+            <button type="button" className={`hi-chip hi-chip-btn${browse.system === '' ? ' is-active' : ''}`} aria-pressed={browse.system === ''} onClick={() => setBrowse(previous => ({ ...previous, system: '' }))}>Tutti i sistemi · {library.total}</button>
+            {library.systems.map(g => <button type="button" key={g.system} className={`hi-chip hi-chip-btn${browse.system === g.system ? ' is-active' : ''}`} aria-pressed={browse.system === g.system} onClick={() => setBrowse(previous => ({ ...previous, system: g.system }))}>{g.system.toUpperCase()} · {g.count}</button>)}
+          </div>}
+          {library && library.kinds.length > 0 && <div className="hi-filter" role="group" aria-label="Filtra per tipo">
+            <button type="button" className={`hi-chip hi-chip-btn${browse.kind === '' ? ' is-active' : ''}`} aria-pressed={browse.kind === ''} onClick={() => setBrowse(previous => ({ ...previous, kind: '' }))}>Tutti i tipi</button>
+            {library.kinds.map(g => <button type="button" key={g.kind} className={`hi-chip hi-chip-btn${browse.kind === g.kind ? ' is-active' : ''}`} aria-pressed={browse.kind === g.kind} onClick={() => setBrowse(previous => ({ ...previous, kind: g.kind }))}>{KIND_LABEL[g.kind] || g.kind} · {g.count}</button>)}
+          </div>}
+          {library && <p className="hi-hint" role="status">{library.matching === library.total ? `${library.total} voci` : `${library.matching} voci su ${library.total}`}{browse.q ? ` per «${browse.q}»` : ''}.</p>}
+          {libraryLoading && !library && <p className="hi-hint">Caricamento…</p>}
+          {library && library.entries.length === 0 && <p className="hi-empty">{library.total === 0 ? (browse.status === 'confermata' ? 'Ancora nessuna voce confermata. Importa un backup e conferma le voci nella scheda «Da confermare».' : 'Nessuna voce in questo stato.') : 'Nessuna voce corrisponde ai filtri.'}</p>}
+          {library && library.entries.length > 0 && <ul className="hi-entries">{library.entries.map(e => <li key={e.id} className="hi-entry">
+            <div><span className={`hi-kind hi-kind-${e.kind}`}>{KIND_LABEL[e.kind] || e.kind}</span> <span className="hi-sys">{(e.system || '').toUpperCase()}{e.goto && !e.goto.startsWith('storico-') ? ` · ${e.goto}` : ''}</span>
+              <p>{e.text}</p>
+              <small>da <code>{(e.sourceFile || '').split('/').pop()}</code>{e.sourceAuthor ? ` · ${e.sourceAuthor}` : ''}{e.decidedAt ? ` · ${e.status === 'scartata' ? 'scartata' : 'confermata'} da ${e.decidedByFullName || e.decidedBy} il ${stamp(e.decidedAt)}` : ` · importata ${stamp(e.createdAt)}`}</small></div>
+          </li>)}</ul>}
+          {library?.hasMore && <button type="button" className="hi-btn" disabled={libraryLoading} onClick={() => loadLibrary(browse, true, library.entries[library.entries.length - 1].id)}>{libraryLoading ? 'Caricamento…' : 'Mostra altre'}</button>}
+        </section>}
       </aside>
     </div>, document.body)}
   </>;

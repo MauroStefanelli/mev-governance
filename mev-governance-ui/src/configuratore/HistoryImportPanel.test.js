@@ -24,11 +24,22 @@ const note = (name, body) => [`projects/-home-m/memory/${name}`, body];
 
 beforeEach(() => {
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true }); if (!globalThis.TextEncoder) globalThis.TextEncoder = NodeTextEncoder;
-  server = { calls: [], pending: [entry(1), entry(2, { kind: 'vincolo', system: 'npso', goto: 'storico-npso' })], summary: { filesRead: 0, withProposals: 0, pending: 2, confirmed: 0 }, known: [], replies: {}, failAll: null };
+  server = { library: [entry(11, { status: 'confermata', text: 'Le route item-core non erano caricate', decidedBy: 'anna', decidedByFullName: 'Anna Rossi', decidedAt: '2026-11-10T09:00:00Z' }), entry(12, { status: 'confermata', kind: 'vincolo', system: 'npso', text: 'Il consolidamento avviene a fine giornata', sourceFile: 'projects/x/npso-uno.md', decidedBy: 'anna', decidedByFullName: 'Anna Rossi', decidedAt: '2026-11-10T09:00:00Z' }), entry(13, { status: 'scartata', text: 'Voce scartata di prova', decidedBy: 'anna', decidedAt: '2026-11-10T09:00:00Z' })], calls: [], pending: [entry(1), entry(2, { kind: 'vincolo', system: 'npso', goto: 'storico-npso' })], summary: { filesRead: 0, withProposals: 0, pending: 2, confirmed: 0 }, known: [], replies: {}, failAll: null };
   historyImportRequest.mockReset().mockImplementation(async (path, options = {}) => {
     server.calls.push([path, options.body]);
     if (path === 'summary') return server.summary;
     if (path.startsWith('pending')) { const key = (new URLSearchParams(path.split('?')[1] || '').get('system') || ''); return pendingOf(server.pending.filter(r => !key || r.system === key)); }
+    if (path.startsWith('entries')) {
+      const q = new URLSearchParams(path.split('?')[1] || ''); const status = q.get('status') || 'confermata';
+      let rows = server.library.filter(r => r.status === status);
+      const systems = [...new Set(rows.map(r => r.system))].map(system => ({ system, count: rows.filter(r => r.system === system).length }));
+      const kinds = [...new Set(rows.map(r => r.kind))].map(kind => ({ kind, count: rows.filter(r => r.kind === kind).length }));
+      const total = rows.length;
+      if (q.get('system')) rows = rows.filter(r => r.system === q.get('system'));
+      if (q.get('kind')) rows = rows.filter(r => r.kind === q.get('kind'));
+      if (q.get('q')) rows = rows.filter(r => (r.text + r.sourceFile).toLowerCase().includes(q.get('q').toLowerCase()));
+      return { entries: rows, hasMore: false, matching: rows.length, total, systems, kinds, status };
+    }
     if (path === 'check') return { known: server.known };
     if (path === 'decide') { server.pending = server.pending.filter(r => !options.body.ids.includes(r.id)); return { decided: options.body.ids.length, skipped: 0 }; }
     if (path === 'file') { if (server.failAll) throw server.failAll; return server.replies[options.body.fileName] || { outcome: 'elaborato', proposals: 2 }; }
@@ -188,4 +199,86 @@ test('the open panel is attached to the page body, outside the page content, so 
   const dialog = await screen.findByRole('dialog', { name: 'Conoscenza storica AI' });
   expect(container.contains(dialog)).toBe(false);
   expect(dialog.closest('.hi-overlay').parentElement).toBe(document.body);
+});
+
+
+describe('looking at what was imported', () => {
+  const openLibrary = async (props = {}) => { const dialog = await openPanel(props); fireEvent.click(within(dialog).getByRole('tab', { name: /Cosa è stato importato/ })); return { dialog, panel: await within(dialog).findByLabelText('Cosa è stato importato') }; };
+
+  test('after leaving and coming back, the confirmed entries are listed with who confirmed them, when, and the note they came from', async () => {
+    const first = render(<HistoryImportPanel canEdit />); first.unmount();                       // the user left the app...
+    const { panel } = await openLibrary();                                                      // ...and came back
+    expect(await within(panel).findByText('Le route item-core non erano caricate')).toBeInTheDocument();
+    expect(within(panel).getByText('Il consolidamento avviene a fine giornata')).toBeInTheDocument();
+    expect(within(panel).queryByText('Voce scartata di prova')).not.toBeInTheDocument();
+    expect(panel).toHaveTextContent(/confermata da Anna Rossi/); expect(panel).toHaveTextContent('ilp-a.md'); expect(panel).toHaveTextContent('npso-uno.md');
+    expect(within(panel).getByRole('status')).toHaveTextContent('2 voci');
+  });
+
+  test('the tabs say how many entries wait and how many are confirmed, and can be switched with the keyboard-reachable buttons', async () => {
+    const dialog = await openPanel();
+    const review = within(dialog).getByRole('tab', { name: /Da confermare/ }); const library = within(dialog).getByRole('tab', { name: /Cosa è stato importato/ });
+    expect(review).toHaveAttribute('aria-selected', 'true'); expect(library).toHaveAttribute('aria-selected', 'false');
+    fireEvent.click(library); expect(library).toHaveAttribute('aria-selected', 'true'); expect(within(dialog).queryByLabelText('Voci da confermare')).not.toBeInTheDocument();
+    fireEvent.click(review); expect(await within(dialog).findByLabelText('Voci da confermare')).toBeInTheDocument();
+  });
+
+  test('the filters offer only what exists, and narrow the list on the server', async () => {
+    const { panel } = await openLibrary(); await within(panel).findByText('Le route item-core non erano caricate');
+    fireEvent.click(within(panel).getByRole('button', { name: /NPSO · 1/ }));
+    await waitFor(() => expect(server.calls.some(([path]) => path.includes('system=npso'))).toBe(true));
+    expect(await within(panel).findByText('Il consolidamento avviene a fine giornata')).toBeInTheDocument(); expect(within(panel).queryByText('Le route item-core non erano caricate')).not.toBeInTheDocument();
+    expect(within(panel).getByRole('status')).toHaveTextContent('1 voci su 2');
+    fireEvent.click(within(panel).getByRole('button', { name: /Tutti i sistemi/ })); fireEvent.click(within(panel).getByRole('button', { name: /Vincolo · 1/ }));
+    await waitFor(() => expect(server.calls.some(([path]) => path.includes('kind=vincolo'))).toBe(true));
+  });
+
+  test('the search waits a moment, then looks in the text and in the note name', async () => {
+    const { panel } = await openLibrary(); await within(panel).findByText('Le route item-core non erano caricate');
+    fireEvent.change(within(panel).getByLabelText('Cerca tra le voci importate'), { target: { value: 'npso-uno' } });
+    await waitFor(() => expect(server.calls.some(([path]) => path.includes('q=npso-uno'))).toBe(true));
+    expect(await within(panel).findByText('Il consolidamento avviene a fine giornata')).toBeInTheDocument();
+    expect(within(panel).getByRole('status')).toHaveTextContent('per «npso-uno»');
+    fireEvent.change(within(panel).getByLabelText('Cerca tra le voci importate'), { target: { value: 'zzz' } });
+    expect(await within(panel).findByText('Nessuna voce corrisponde ai filtri.')).toBeInTheDocument();
+  });
+
+  test('switching state clears the system and type filters, because they may not exist in the other state', async () => {
+    const { panel } = await openLibrary(); await within(panel).findByText('Le route item-core non erano caricate');
+    fireEvent.click(within(panel).getByRole('button', { name: /NPSO · 1/ })); await within(panel).findByText('Il consolidamento avviene a fine giornata');
+    server.calls.length = 0;
+    fireEvent.click(within(panel).getByRole('button', { name: 'Scartate' }));
+    await waitFor(() => expect(server.calls.some(([path]) => path.startsWith('entries') && path.includes('status=scartata'))).toBe(true));
+    expect(server.calls.filter(([path]) => path.startsWith('entries')).every(([path]) => !path.includes('system='))).toBe(true);
+    expect(await within(panel).findByText('Voce scartata di prova')).toBeInTheDocument();
+  });
+
+  test('discarded entries can be looked at too', async () => {
+    const { panel } = await openLibrary(); await within(panel).findByText('Le route item-core non erano caricate');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Scartate' }));
+    expect(await within(panel).findByText('Voce scartata di prova')).toBeInTheDocument(); expect(panel).toHaveTextContent(/scartata da/);
+  });
+
+  test('with nothing confirmed yet the panel explains where entries come from', async () => {
+    server.library = [];
+    const { panel } = await openLibrary();
+    expect(await within(panel).findByText(/Ancora nessuna voce confermata/)).toBeInTheDocument();
+  });
+
+  test('the list is read-only: no confirm, discard or selection controls, even for who can import', async () => {
+    const { panel } = await openLibrary(); await within(panel).findByText('Le route item-core non erano caricate');
+    expect(within(panel).queryByRole('checkbox')).not.toBeInTheDocument(); expect(within(panel).queryByRole('button', { name: /^Conferma\b/ })).not.toBeInTheDocument(); expect(within(panel).queryByRole('button', { name: /^Scarta\b/ })).not.toBeInTheDocument(); expect(within(panel).queryByLabelText(/Seleziona tutte/)).not.toBeInTheDocument();
+  });
+
+  test('a read-only user can look at what was imported', async () => {
+    const { panel } = await openLibrary({ canEdit: false });
+    expect(await within(panel).findByText('Le route item-core non erano caricate')).toBeInTheDocument();
+  });
+
+  test('a server error is shown instead of an empty list', async () => {
+    const { dialog } = await openLibrary(); await screen.findByText('Le route item-core non erano caricate');
+    historyImportRequest.mockImplementationOnce(async () => { throw new Error('Importazione: errore 500'); });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Scartate' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('errore 500');
+  });
 });
