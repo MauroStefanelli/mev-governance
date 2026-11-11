@@ -69,7 +69,7 @@ export default function InitiativeDocuments({ code, canEdit, onUseSource, onUseE
       {canEdit && <button type="button" disabled={busy} onClick={() => extract(document, true)}>Estrai testo</button>}
       {canEdit && <button className="document-remove" type="button" disabled={busy} onClick={() => removeDocument(document)}>Elimina allegato</button>}</div>
       {extractions[document.id] && <div>
-        {extractions[document.id].extractorVersion !== '2' && canEdit && <p>Estratto precedente: premi “Estrai testo” per leggere fino a 500.000 caratteri senza ricaricare il file.</p>}
+        {extractions[document.id].extractorVersion !== '3' && canEdit && <p>Estratto precedente: premi “Estrai testo” per leggere fino a 500.000 caratteri senza ricaricare il file.</p>}
         <DocumentReader document={document} extraction={extractions[document.id]} selected={selected[document.id] || []}
           canEdit={canEdit} onSelect={indices => setSelected(previous => ({ ...previous, [document.id]: indices }))} />
         {canEdit && extractions[document.id].passages.length > 0 && <>

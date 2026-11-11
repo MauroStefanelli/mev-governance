@@ -20,6 +20,8 @@ public class ConfiguratoreAiController : ControllerBase
         _db = db;
     }
 
+    private int GetAmbienteId() => int.TryParse(User.FindFirst("ambienteId")?.Value, out var id) ? id : 0;
+
     private bool CanAccess()
     {
         return User.IsInRole("SuperAdmin") || User.IsInRole("Developer") || User.IsInRole("Admin");
@@ -145,8 +147,11 @@ public class ConfiguratoreAiController : ControllerBase
         try
         {
             var (key, ep, mdl, sty, auth) = GetUserAiSettings();
-            var (analysis, provider, model, usage) = await _ai.AnalyzeAsync(context, key, ep, mdl, sty, auth);
-            return Ok(new { analysis, provider, model, usage });
+            // The documents of the open initiative are attached by the server, in the user's own environment only:
+            // the browser never chooses which documents are read.
+            var enriched = await DocumentContext.AttachAsync(_db, GetAmbienteId(), System.Text.Json.Nodes.JsonNode.Parse(context.GetRawText())!.AsObject());
+            var (analysis, provider, model, usage) = await _ai.AnalyzeAsync(JsonSerializer.Deserialize<JsonElement>(enriched.Context.ToJsonString()), key, ep, mdl, sty, auth);
+            return Ok(new { analysis, provider, model, usage, documentSources = enriched.Sources });
         }
         catch (Exception ex)
         {

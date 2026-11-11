@@ -66,6 +66,21 @@ const fetchWithRefresh = async (url, options = {}) => {
   return res;
 };
 
+// Documentary workspace of an initiative: folders, versions, search, questions answered from the documents.
+// Uploads use multipart; downloads reuse the existing per-document endpoint.
+export async function libraryRequest(path, { method, body, form, blob } = {}) {
+  const headers = form ? { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` } : authHeaders();
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/library/${path}`, {
+    method: method || (form || body ? 'POST' : 'GET'), headers, ...(form ? { body: form } : body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || (response.status === 404 ? 'Il backend non espone ancora il workspace documentale: aggiorna il backend DEV.' : response.status === 403 ? 'Non hai i permessi per questa operazione.' : `Documenti: errore ${response.status}`));
+    error.status = response.status; throw error;
+  }
+  return blob ? response.blob() : response.json();
+}
+
 // Rationale chat and confirmed knowledge of an initiative (scoped by the server to the active environment).
 export async function rationaleRequest(path, body) {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/rationale${path ? `/${path}` : ''}`, {

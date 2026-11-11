@@ -1,6 +1,7 @@
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import RationalePanel from "../configuratore/RationalePanel";
+import LibraryPanel from "../configuratore/LibraryPanel";
 import { knowledgeForAi, entriesForIntervention } from "../configuratore/rationaleKnowledge";
 import { saveAndClose } from "../configuratore/saveAndClose";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
@@ -2133,6 +2134,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             </div>
           </div>
           <RationalePanel initiative={initiative} interventions={importedInterventions} onKnowledge={setRationale} />
+          <LibraryPanel initiative={initiative} canEdit={myRoles.some(r => ['Admin', 'Developer', 'SuperAdmin'].includes(r))} />
         </div>
       )}
       <div>

@@ -33,6 +33,7 @@ public class AppDbContext : DbContext
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<InitiativeRevision> InitiativeRevisions => Set<InitiativeRevision>();
     public DbSet<InitiativeDocument> InitiativeDocuments => Set<InitiativeDocument>();
+    public DbSet<InitiativeDocumentEvent> InitiativeDocumentEvents => Set<InitiativeDocumentEvent>();
     public DbSet<InitiativeConversation> InitiativeConversations => Set<InitiativeConversation>();
     public DbSet<DevelopmentPresence> DevelopmentPresences => Set<DevelopmentPresence>();
     public DbSet<DevelopmentMessage> DevelopmentMessages => Set<DevelopmentMessage>();

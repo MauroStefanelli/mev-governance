@@ -237,6 +237,7 @@ builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IRationaleAssistant, MevGovernanceBackend.Services.AiRationaleAssistant>();
+builder.Services.AddScoped<MevGovernanceBackend.Services.IDocumentAssistant, MevGovernanceBackend.Services.AiDocumentAssistant>();
 builder.Services.AddHttpClient("ConfiguratoreAi", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(360);
@@ -591,6 +592,42 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""Extraction"" TEXT NULL;
             ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""RemovedAt"" TIMESTAMPTZ NULL;
             ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""RemovedBy"" TEXT NOT NULL DEFAULT '';");
+
+        // Workspace documentale: folders, versions, search index and audit trail. Separate block so that a
+        // failure never prevents the application from starting. Existing documents are backfilled.
+        try
+        {
+            db.Database.ExecuteSqlRaw($@"
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""Category"" TEXT NOT NULL DEFAULT 'Allegati ricevuti';
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""GroupId"" UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""Version"" INTEGER NOT NULL DEFAULT 1;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IsCurrent"" BOOLEAN NOT NULL DEFAULT TRUE;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""AiEnabled"" BOOLEAN NOT NULL DEFAULT TRUE;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""SearchText"" TEXT NULL;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexVersion"" INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexedAt"" TIMESTAMPTZ NULL;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexStatus"" TEXT NOT NULL DEFAULT 'pending';
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexedChars"" INTEGER NOT NULL DEFAULT 0;
+                UPDATE ""{sch}"".""InitiativeDocuments"" SET ""GroupId"" = ""Id"" WHERE ""GroupId"" = '00000000-0000-0000-0000-000000000000';
+                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_InitiativeDocuments_AmbienteId_GroupId_Version""
+                    ON ""{sch}"".""InitiativeDocuments"" (""AmbienteId"", ""GroupId"", ""Version"");
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""InitiativeDocumentEvents"" (
+                    ""Id"" BIGSERIAL PRIMARY KEY,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""Goto"" VARCHAR(120) NOT NULL,
+                    ""GroupId"" UUID NOT NULL,
+                    ""DocumentId"" UUID NOT NULL,
+                    ""Version"" INTEGER NOT NULL,
+                    ""Action"" VARCHAR(32) NOT NULL,
+                    ""Detail"" TEXT NOT NULL DEFAULT '',
+                    ""Actor"" TEXT NOT NULL DEFAULT '',
+                    ""At"" TIMESTAMPTZ NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ""IX_InitiativeDocumentEvents_AmbienteId_Goto_GroupId""
+                    ON ""{sch}"".""InitiativeDocumentEvents"" (""AmbienteId"", ""Goto"", ""GroupId"");");
+            Console.WriteLine("[PRE-PATCH] Workspace documentale verificato.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH DocumentWorkspace ERROR] {ex.Message}"); }
 
         // Immutable initiative revisions, scoped to the configured database schema.
         db.Database.ExecuteSqlRaw($@"

@@ -26,7 +26,7 @@ public class InitiativeWorkspaceController : BaseController
     {
         if (!CanRead || GetAmbienteId() <= 0) return Forbid();
         return Ok(await db.InitiativeDocuments.AsNoTracking()
-            .Where(d => d.AmbienteId == GetAmbienteId() && d.Goto == code && d.RemovedAt == null)
+            .Where(d => d.AmbienteId == GetAmbienteId() && d.Goto == code && d.RemovedAt == null && d.IsCurrent)
             .OrderByDescending(d => d.CreatedAt)
             .Select(d => new { d.Id, d.Goto, d.FileName, d.ContentType, d.Size, d.Sha256, d.Author, d.CreatedAt }).ToListAsync());
     }
@@ -48,7 +48,8 @@ public class InitiativeWorkspaceController : BaseController
         if (string.IsNullOrWhiteSpace(name) || name.Length > 255) return BadRequest(new { message = "Nome file non valido." });
         var document = new InitiativeDocument { AmbienteId = GetAmbienteId(), Goto = code, FileName = name,
             ContentType = "application/octet-stream", Size = bytes.LongLength, Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
-            Author = author, CreatedAt = DateTime.UtcNow, Content = bytes };
+            Author = author, CreatedAt = DateTime.UtcNow, Content = bytes, Category = DocumentLibraryController.SuggestCategory(name) };
+        DocumentIndexer.Index(document);
         db.InitiativeDocuments.Add(document);
         await db.SaveChangesAsync();
         return Ok(document);
@@ -105,11 +106,10 @@ public class InitiativeWorkspaceController : BaseController
         if (!CanWork || GetAmbienteId() <= 0) return Forbid();
         var document = await db.InitiativeDocuments.SingleOrDefaultAsync(d => d.Id == id && d.Goto == code && d.AmbienteId == GetAmbienteId());
         if (document == null || document.RemovedAt != null) return NotFound();
-        if (document.Extraction != null && JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions) is { ExtractorVersion: "2" } saved) return Ok(saved);
-        var extraction = InitiativeDocumentExtractor.Extract(document.FileName, document.Content);
-        document.Extraction = JsonSerializer.Serialize(extraction, JsonOptions);
+        if (document.Extraction != null && JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction, JsonOptions) is { } saved && saved.ExtractorVersion == InitiativeDocumentExtractor.Version) return Ok(saved);
+        DocumentIndexer.Index(document);
         await db.SaveChangesAsync();
-        return Ok(extraction);
+        return Ok(JsonSerializer.Deserialize<DocumentExtraction>(document.Extraction!, JsonOptions));
     }
 
     [HttpGet("{code}/revisions")]
