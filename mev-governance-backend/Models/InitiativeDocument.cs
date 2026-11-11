@@ -37,6 +37,12 @@ public class InitiativeDocument
     public DateTime? IndexedAt { get; set; }
     public string IndexStatus { get; set; } = "pending";
     public int IndexedChars { get; set; }
+
+    // OCR for images. "none" = not requested; "done" = text read; "unavailable" = requested but the engine is missing;
+    // "failed" = engine ran but the image could not be read; "empty" = engine ran and found no text.
+    public string OcrStatus { get; set; } = "none";
+    public string? OcrLanguage { get; set; }
+    public DateTime? OcrAt { get; set; }
 }
 
 // Audit trail of what happened to a document: upload, new version, folder change, AI use, removal.

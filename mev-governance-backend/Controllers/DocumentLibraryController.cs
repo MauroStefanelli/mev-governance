@@ -31,9 +31,10 @@ public class DocumentLibraryController : BaseController
 
     private readonly AppDbContext db;
     private readonly IDocumentAssistant assistant;
+    private readonly IOcrEngine ocr;
     // Test seam only: runs between the version check and the atomic switch, where a concurrent colleague could act.
     public Func<Task>? BeforeVersionSwitch { get; set; }
-    public DocumentLibraryController(AppDbContext db, IDocumentAssistant assistant) { this.db = db; this.assistant = assistant; }
+    public DocumentLibraryController(AppDbContext db, IDocumentAssistant assistant, IOcrEngine ocr) { this.db = db; this.assistant = assistant; this.ocr = ocr; }
     private bool CanWork => User.IsInRole("Admin") || User.IsInRole("Developer") || User.IsInRole("SuperAdmin");
     private bool CanRead => CanWork || User.IsInRole("Bid Manager");
     private bool IsAdmin => User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
@@ -63,17 +64,18 @@ public class DocumentLibraryController : BaseController
         public long Size { get; set; } public string Sha256 { get; set; } = ""; public string Author { get; set; } = ""; public DateTime CreatedAt { get; set; }
         public int Version { get; set; } public bool IsCurrent { get; set; } public bool AiEnabled { get; set; } public string IndexStatus { get; set; } = ""; public int IndexedChars { get; set; }
         public int IndexVersion { get; set; } public DateTime? IndexedAt { get; set; }
+        public string OcrStatus { get; set; } = "none";
     }
     static IQueryable<DocMeta> Meta(IQueryable<InitiativeDocument> q) => q.Select(d => new DocMeta { Id = d.Id, GroupId = d.GroupId, FileName = d.FileName, Category = d.Category, Size = d.Size, Sha256 = d.Sha256,
-        Author = d.Author, CreatedAt = d.CreatedAt, Version = d.Version, IsCurrent = d.IsCurrent, AiEnabled = d.AiEnabled, IndexStatus = d.IndexStatus, IndexedChars = d.IndexedChars, IndexVersion = d.IndexVersion, IndexedAt = d.IndexedAt });
+        Author = d.Author, CreatedAt = d.CreatedAt, Version = d.Version, IsCurrent = d.IsCurrent, AiEnabled = d.AiEnabled, IndexStatus = d.IndexStatus, IndexedChars = d.IndexedChars, IndexVersion = d.IndexVersion, IndexedAt = d.IndexedAt, OcrStatus = d.OcrStatus });
 
     object View(DocMeta d, int versions) => new
     {
         d.Id, d.GroupId, d.FileName, extension = Path.GetExtension(d.FileName).ToLowerInvariant().TrimStart('.'), d.Category, d.Size, d.Sha256, d.Author, d.CreatedAt, d.Version, versions,
-        d.AiEnabled, d.IndexStatus, d.IndexedChars, d.IndexedAt, isMemory = d.Category == MemoryCategory, canDelete = IsAdmin || string.Equals(d.Author, Actor, StringComparison.OrdinalIgnoreCase),
+        d.AiEnabled, d.IndexStatus, d.IndexedChars, d.IndexedAt, d.OcrStatus, isImage = OcrSupport.IsImage(d.FileName), ocrAvailable = ocr.IsAvailable, isMemory = d.Category == MemoryCategory, canDelete = IsAdmin || string.Equals(d.Author, Actor, StringComparison.OrdinalIgnoreCase),
     };
     static DocMeta MetaOf(InitiativeDocument d) => new() { Id = d.Id, GroupId = d.GroupId, FileName = d.FileName, Category = d.Category, Size = d.Size, Sha256 = d.Sha256, Author = d.Author, CreatedAt = d.CreatedAt,
-        Version = d.Version, IsCurrent = d.IsCurrent, AiEnabled = d.AiEnabled, IndexStatus = d.IndexStatus, IndexedChars = d.IndexedChars, IndexVersion = d.IndexVersion, IndexedAt = d.IndexedAt };
+        Version = d.Version, IsCurrent = d.IsCurrent, AiEnabled = d.AiEnabled, IndexStatus = d.IndexStatus, IndexedChars = d.IndexedChars, IndexVersion = d.IndexVersion, IndexedAt = d.IndexedAt, OcrStatus = d.OcrStatus };
 
     [HttpGet("{code}")]
     public async Task<IActionResult> List(string code)
@@ -87,13 +89,13 @@ public class DocumentLibraryController : BaseController
         return Ok(new
         {
             documents = current.Select(d => View(d, counts.GetValueOrDefault(d.GroupId, 1))).ToList(),
-            folders, categories = Categories, historical = all.Count - current.Count,
+            folders, categories = Categories, historical = all.Count - current.Count, ocrAvailable = ocr.IsAvailable,
             pendingIndex = current.Count(d => d.IndexVersion < DocumentIndexer.CurrentIndexVersion), limit = MaxDocumentsPerInitiative,
         });
     }
 
     [HttpPost("{code}/upload"), RequestSizeLimit(52 * 1024 * 1024)]
-    public async Task<IActionResult> Upload(string code, [FromForm] IFormFileCollection files, [FromForm] string? category)
+    public async Task<IActionResult> Upload(string code, [FromForm] IFormFileCollection files, [FromForm] string? category, [FromForm] string[]? ocrFiles = null)
     {
         if (!CanWork || GetAmbienteId() <= 0 || string.IsNullOrWhiteSpace(Actor)) return Forbid();
         if (Code(code) is not { } c) return BadRequest(new { message = "Indica l’iniziativa." });
@@ -102,6 +104,8 @@ public class DocumentLibraryController : BaseController
         var chosen = string.IsNullOrWhiteSpace(category) ? null : CategoryOf(category);
         if (!string.IsNullOrWhiteSpace(category) && chosen == null) return BadRequest(new { message = "Cartella non valida." });
         var existing = await Docs(c).Where(d => d.RemovedAt == null && d.IsCurrent).CountAsync();
+        // OCR is opt-in and only for images: the file names the user ticked, matched exactly. Anything else is ignored.
+        var wantsOcr = new HashSet<string>((ocrFiles ?? Array.Empty<string>()).Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()), StringComparer.OrdinalIgnoreCase);
         var results = new List<object>();
         foreach (var file in files)
         {
@@ -119,11 +123,19 @@ public class DocumentLibraryController : BaseController
             var document = new InitiativeDocument { AmbienteId = GetAmbienteId(), Goto = c, FileName = name, Size = bytes.LongLength, Author = Actor, CreatedAt = DateTime.UtcNow, Content = bytes,
                 Sha256 = sha, Category = chosen ?? SuggestCategory(name) };
             DocumentIndexer.Index(document);
+            var ocrNote = "";
+            if (OcrSupport.IsImage(name) && wantsOcr.Contains(name))
+            {
+                var ocrResult = await ocr.ReadAsync(bytes, name);
+                DocumentIndexer.ApplyOcr(document, ocrResult);
+                ocrNote = ocrResult.Message;
+            }
             db.InitiativeDocuments.Add(document);
             Log(document, "caricato", $"{document.Category} · {document.Size} byte");
+            if (document.OcrStatus != "none") Log(document, "ocr", document.OcrStatus == "done" ? $"Testo riconosciuto ({document.IndexedChars} caratteri)" : ocrNote);
             await db.SaveChangesAsync();
             existing++;
-            results.Add(new { fileName = name, ok = true, message = "", document = View(MetaOf(document), 1) });
+            results.Add(new { fileName = name, ok = true, message = "", ocr = document.OcrStatus, ocrMessage = ocrNote, document = View(MetaOf(document), 1) });
         }
         return Ok(new { results });
     }
@@ -157,6 +169,23 @@ public class DocumentLibraryController : BaseController
         try { await db.SaveChangesAsync(); await transaction.CommitAsync(); }
         catch (DbUpdateException) { await transaction.RollbackAsync(); db.ChangeTracker.Clear(); return Conflict(new { message = "Un collega ha caricato una versione nello stesso momento. Aggiorna l’elenco e riprova." }); }
         return Ok(View(MetaOf(next), next.Version));
+    }
+
+    // OCR on an image already stored (the user changed their mind, or the engine was not available at upload time).
+    [HttpPost("{code}/groups/{groupId:guid}/ocr")]
+    public async Task<IActionResult> RunOcr(string code, Guid groupId)
+    {
+        if (!CanWork || GetAmbienteId() <= 0 || string.IsNullOrWhiteSpace(Actor)) return Forbid();
+        if (Code(code) is not { } c) return BadRequest(new { message = "Indica l’iniziativa." });
+        var document = await Docs(c).SingleOrDefaultAsync(d => d.GroupId == groupId && d.IsCurrent && d.RemovedAt == null);
+        if (document == null) return NotFound();
+        if (!OcrSupport.IsImage(document.FileName)) return BadRequest(new { message = "L’OCR è disponibile solo per le immagini." });
+        if (!ocr.IsAvailable) return StatusCode(503, new { message = "Il motore OCR non è installato su questo server: l’immagine resta consultabile ma il testo non può essere letto." });
+        var result = await ocr.ReadAsync(document.Content, document.FileName);
+        DocumentIndexer.ApplyOcr(document, result);
+        Log(document, "ocr", result.Status == "done" ? $"Testo riconosciuto ({document.IndexedChars} caratteri)" : result.Message);
+        await db.SaveChangesAsync();
+        return Ok(new { ocr = document.OcrStatus, message = result.Message, document = View(MetaOf(document), 1) });
     }
 
     [HttpPut("{code}/groups/{groupId:guid}")]

@@ -14,6 +14,7 @@ beforeEach(() => {
   libraryRequest.mockReset().mockImplementation(async (path, options = {}) => {
     server.calls.push([path, options]);
     if (path.endsWith('/upload')) return { results: [...options.form.getAll('files')].map(file => ({ fileName: file.name, ok: !file.name.startsWith('dup'), message: file.name.startsWith('dup') ? 'Già presente: stesso contenuto.' : '' })) };
+    if (path.endsWith('/ocr')) return { ocr: 'done', message: 'ok', document: {} };
     if (path.includes('/search')) return { terms: ['timeout'], truncated: false, results: [{ document: doc({ id: 'd9', fileName: 'note.txt' }), nameMatch: false, score: 9, snippets: [{ location: 'riga 4', text: 'Il timeout massimo è di 5 secondi' }] }] };
     if (path.endsWith('/ask')) return server.answer || { answer: 'Il timeout è di 5 secondi [1]', citations: [], noSources: false, model: 'm', sources: [{ n: 1, fileName: 'note.txt', version: 2, category: 'Requisiti cliente', location: 'riga 4', text: 'Il timeout massimo è di 5 secondi' }] };
     if (path.endsWith('/history')) return { versions: [{ id: 'd2', version: 2, fileName: 'requisiti_v2.pdf', size: 3000, author: 'luca', createdAt: new Date().toISOString(), isCurrent: true }, { id: 'd1', version: 1, fileName: 'requisiti.pdf', size: 2000, author: 'anna', createdAt: new Date().toISOString(), isCurrent: false }], events: [{ id: 1, action: 'nuova versione', detail: 'v1 → v2', actor: 'luca', at: new Date().toISOString(), version: 2 }] };
@@ -224,4 +225,129 @@ test('opening another initiative clears the previous results and answers', async
   await screen.findByText('altra.pdf');
   expect(screen.queryByText('note.txt')).not.toBeInTheDocument();
   expect(screen.queryByText('requisiti.pdf')).not.toBeInTheDocument();
+});
+
+describe('OCR question for images', () => {
+  const pick = files => fireEvent.change(screen.getByLabelText('Carica documenti'), { target: { files } });
+  const uploads = () => calls(path => path.endsWith('/upload'));
+  beforeEach(() => { server.ocrAvailable = true; });
+
+  test('files that are not images are uploaded at once, without any question', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'relazione.pdf'), new File(['y'], 'dati.xlsx'), new File(['<svg/>'], 'logo.svg')]);
+    await waitFor(() => expect(uploads()).toHaveLength(1));
+    expect(screen.queryByRole('dialog', { name: /Riconoscimento del testo/ })).not.toBeInTheDocument();
+    expect(uploads()[0][1].form.getAll('ocrFiles')).toEqual([]);
+  });
+
+  test('a selection with an image asks whether to read its text, and sends nothing until answered', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'schermata.png'), new File(['y'], 'relazione.pdf')]);
+    const dialog = await screen.findByRole('dialog', { name: /Riconoscimento del testo/ });
+    expect(within(dialog).getByText(/Vuoi leggere il testo contenuto nelle immagini/)).toBeInTheDocument();
+    expect(within(dialog).getByText('schermata.png')).toBeInTheDocument();
+    expect(within(dialog).queryByText('relazione.pdf')).not.toBeInTheDocument();
+    expect(uploads()).toHaveLength(0);
+  });
+
+  test('confirming without ticking uploads everything with no OCR', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'schermata.png')]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Carica senza OCR' }));
+    await waitFor(() => expect(uploads()).toHaveLength(1));
+    expect(uploads()[0][1].form.getAll('files').map(f => f.name)).toEqual(['schermata.png']);
+    expect(uploads()[0][1].form.getAll('ocrFiles')).toEqual([]);
+  });
+
+  test('only the ticked images are sent for OCR', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'uno.png'), new File(['y'], 'due.jpg'), new File(['z'], 'nota.txt')]);
+    const dialog = await screen.findByRole('dialog', { name: /Riconoscimento del testo/ });
+    fireEvent.click(within(dialog).getByLabelText(/due\.jpg/));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Carica con OCR su 1' }));
+    await waitFor(() => expect(uploads()).toHaveLength(1));
+    expect(uploads()[0][1].form.getAll('files').map(f => f.name)).toEqual(['uno.png', 'due.jpg', 'nota.txt']);
+    expect(uploads()[0][1].form.getAll('ocrFiles')).toEqual(['due.jpg']);
+  });
+
+  test('"use OCR on all" ticks every image and "none" clears them', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'uno.png'), new File(['y'], 'due.png')]);
+    const dialog = await screen.findByRole('dialog', { name: /Riconoscimento del testo/ });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Usa OCR su tutte' }));
+    expect(within(dialog).getByRole('button', { name: 'Carica con OCR su 2' })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Nessuna' }));
+    expect(within(dialog).getByRole('button', { name: 'Carica senza OCR' })).toBeInTheDocument();
+  });
+
+  test('cancelling the question uploads nothing', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'schermata.png')]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Annulla' }));
+    expect(screen.queryByRole('dialog', { name: /Riconoscimento del testo/ })).not.toBeInTheDocument();
+    expect(uploads()).toHaveLength(0);
+  });
+
+  test('images that the local checks refuse do not raise the question', async () => {
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File([''], 'vuota.png')]);
+    await waitFor(() => expect(screen.getByText(/1 non caricati/)).toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: /Riconoscimento del testo/ })).not.toBeInTheDocument();
+  });
+
+  test('the report says what the OCR did for each image', async () => {
+    libraryRequest.mockImplementation(async (path, options = {}) => {
+      server.calls.push([path, options]);
+      if (path.endsWith('/upload')) return { results: [{ fileName: 'a.png', ok: true, ocr: 'done', ocrMessage: '' }, { fileName: 'b.png', ok: true, ocr: 'unavailable', ocrMessage: 'Il motore OCR non è installato su questo server.' }, { fileName: 'c.png', ok: true, ocr: 'none' }] };
+      return { documents: server.documents, folders: [], historical: 0, pendingIndex: 0, limit: 300, ocrAvailable: true };
+    });
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'a.png'), new File(['y'], 'b.png'), new File(['z'], 'c.png')]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Usa OCR su tutte' }));
+    fireEvent.click(screen.getByRole('button', { name: /Carica con OCR su 3/ }));
+    expect(await screen.findByText('Testo riconosciuto con OCR')).toBeInTheDocument();
+    expect(screen.getAllByText('OCR non disponibile su questo server').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Il motore OCR non è installato/)).toBeInTheDocument();
+  });
+
+  test('when the engine is missing the question warns before the user commits', async () => {
+    libraryRequest.mockImplementation(async (path, options = {}) => { server.calls.push([path, options]); return { documents: server.documents, folders: [], historical: 0, pendingIndex: 0, limit: 300, ocrAvailable: false }; });
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('requisiti.pdf');
+    pick([new File(['x'], 'schermata.png')]);
+    expect(await screen.findByText(/motore OCR non risulta installato/)).toBeInTheDocument();
+  });
+
+  test('an image stored without OCR offers "Leggi il testo (OCR)" and runs it on that document only', async () => {
+    server.documents = [doc({ id: 'i1', groupId: 'gi', fileName: 'schema.png', extension: 'png', isImage: true, ocrAvailable: true, ocrStatus: 'none', indexStatus: 'unsupported' }), doc({ id: 'p1', groupId: 'gp', isImage: false, ocrAvailable: true, ocrStatus: 'none' })];
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('schema.png');
+    expect(screen.getAllByRole('button', { name: 'Leggi il testo (OCR)' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Leggi il testo (OCR)' }));
+    await waitFor(() => expect(calls(path => path.endsWith('/groups/gi/ocr'))).toHaveLength(1));
+    expect(await screen.findByText(/OCR eseguito su «schema.png»/)).toBeInTheDocument();
+  });
+
+  test('the OCR button is hidden when the text was already read or the engine is missing', async () => {
+    server.documents = [doc({ id: 'i1', groupId: 'gi', fileName: 'letta.png', isImage: true, ocrAvailable: true, ocrStatus: 'done' }), doc({ id: 'i2', groupId: 'gj', fileName: 'senza-motore.png', isImage: true, ocrAvailable: false, ocrStatus: 'none' })];
+    render(<DocumentLibrary initiative={initiative} />);
+    await screen.findByText('letta.png');
+    expect(screen.queryByRole('button', { name: 'Leggi il testo (OCR)' })).not.toBeInTheDocument();
+    expect(screen.getByText('Testo riconosciuto con OCR')).toBeInTheDocument();
+  });
+
+  test('a read-only user never sees the OCR action', async () => {
+    server.documents = [doc({ fileName: 'schema.png', isImage: true, ocrAvailable: true, ocrStatus: 'none' })];
+    render(<DocumentLibrary initiative={initiative} canEdit={false} />);
+    await screen.findByText('schema.png');
+    expect(screen.queryByRole('button', { name: 'Leggi il testo (OCR)' })).not.toBeInTheDocument();
+  });
 });

@@ -19,6 +19,13 @@ RUN find . -name '._*' -delete \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
+# OCR per le immagini caricate nel Workspace documentale (opzionale: se l'installazione fallisce l'app parte lo stesso
+# e segnala all'utente che l'OCR non è disponibile). Italiano + inglese; il motore è chiamato dal backend via TESSERACT_PATH.
+RUN (apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*) \
+    || echo "ATTENZIONE: Tesseract non installato, l'OCR non sarà disponibile"
+
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_ENVIRONMENT=Production

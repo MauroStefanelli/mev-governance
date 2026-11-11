@@ -1,0 +1,18 @@
+.secrow { background: #fff; border: 1px solid #d9e3ef; border-radius: 14px; box-shadow: 0 2px 10px #24466e08; color: #17314f; overflow: hidden; }
+.secrow.is-open { border-color: #9db9de; box-shadow: 0 6px 20px #24466e12; }
+.secrow-head { margin: 0; font: inherit; }
+.secrow-toggle { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 16px; min-height: 56px; border: 0; border-radius: 0; background: #fff; color: inherit; font: inherit; cursor: pointer; }
+.secrow-toggle:hover { background: #f5f9ff; } .secrow.is-open .secrow-toggle { background: #f4f8ff; border-bottom: 1px solid #d9e3ef; }
+.secrow-toggle:focus-visible { outline: 3px solid #75a7f7; outline-offset: -3px; }
+.secrow-num { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #e8f0fd; color: #1f5fbf; font-size: 13px; font-weight: 800; }
+.secrow-title { flex: 0 0 auto; font-size: 15px; font-weight: 700; letter-spacing: -.2px; }
+.secrow-facts { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.secrow-fact { font-size: 12.5px; font-weight: 500; color: #3d5878; background: #f2f6fb; border: 1px solid #d9e3ef; border-radius: 20px; padding: 2px 10px; overflow-wrap: anywhere; }
+.secrow-status { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; border-radius: 20px; padding: 3px 11px; background: #eef1f5; color: #3d5878; white-space: nowrap; }
+.secrow-status-ok { background: #e4f5ec; color: #16794a; } .secrow-status-warn { background: #fff4dc; color: #8a5200; } .secrow-status-info { background: #e8f0fd; color: #1b4f9a; } .secrow-status-lock { background: #eef1f5; color: #4d6179; }
+.secrow-chevron { flex: 0 0 auto; color: #4d6179; font-size: 14px; width: 16px; text-align: center; }
+.secrow-body { padding: 0; }
+.secrow-body > * { margin-top: 0; margin-bottom: 0; }
+.secrow-body > .lib, .secrow-body > .rat, .secrow-body > .initiative-workspace, .secrow-body > .sol { border: 0; border-radius: 0; box-shadow: none; margin: 0; }
+@media (max-width: 760px) { .secrow-toggle { flex-wrap: wrap; row-gap: 6px; } .secrow-facts { flex-basis: 100%; order: 5; } }
+@media (prefers-reduced-motion: reduce) { .secrow * { transition: none !important; } }

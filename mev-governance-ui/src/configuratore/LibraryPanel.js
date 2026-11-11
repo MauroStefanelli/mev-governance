@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { libraryRequest, workspaceDocument } from '../services/mevService';
-import { FOLDERS, MEMORY, fileKind, formatSize, planUpload, folderCounts, filterDocuments, indexStatus, isSearchable, describeResults, highlightParts, sourceLabel, eventLabel } from './libraryModel';
+import { FOLDERS, MEMORY, fileKind, formatSize, planUpload, folderCounts, filterDocuments, indexStatus, isSearchable, describeResults, highlightParts, sourceLabel, eventLabel, imagesNeedingOcrChoice, ocrChoiceState, ocrOutcome } from './libraryModel';
 import { initiativeCode } from './rationaleKnowledge';
+import { libraryFactsText } from './sectionSummaries';
 import { displayName, relativeTime } from './developmentCollaboration';
 import './libraryPanel.css';
 
@@ -13,7 +14,7 @@ function Highlight({ text, terms }) {
 
 // Documentary workspace of the open initiative: folders, upload, search, versions, and questions answered from the documents.
 // Enabled only when an initiative (GOTO or title) is open, exactly like the other initiative features.
-export default function LibraryPanel({ initiative, canEdit = true }) {
+export default function LibraryPanel({ initiative, canEdit = true, onSummary }) {
   const code = initiativeCode(initiative);
   const [data, setData] = useState({ documents: [], folders: [], historical: 0, pendingIndex: 0, limit: 300 });
   const [loading, setLoading] = useState(false);
@@ -48,7 +49,24 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
     load();
   }, [code, load]);
 
-  const upload = async fileList => {
+  // Files waiting for the OCR question. Nothing is sent until the user answers when the selection contains images.
+  const [pending, setPending] = useState(null);
+  const [ocrChoices, setOcrChoices] = useState({});
+  const startUpload = fileList => {
+    const files = [...fileList];
+    const images = imagesNeedingOcrChoice(files);
+    if (!images.length) { upload(files, []); return; }
+    setOcrChoices({}); setPending({ files, images });
+  };
+  const confirmPending = () => { const { files, images } = pending; const names = images.filter(file => ocrChoices[file.name]).map(file => file.name); setPending(null); upload(files, names); };
+  const cancelPending = () => { setPending(null); setOcrChoices({}); };
+
+  // The closed row of the section shows these facts without opening it.
+  useEffect(() => {
+    onSummary?.(code ? libraryFactsText({ documents: data.documents.length, memory: data.documents.filter(d => d.isMemory).length, searchable: data.documents.filter(isSearchable).length }) : '');
+  }, [code, data.documents, onSummary]);
+
+  const upload = async (fileList, ocrNames = []) => {
     const plan = planUpload(fileList);
     if (!plan.batches.length && !plan.refused.length) return;
     setError(''); setNotice(''); setReport(plan.refused);
@@ -56,6 +74,7 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
     setUploading({ done, total });
     for (const batch of plan.batches) {
       const form = new FormData(); batch.forEach(file => form.append('files', file)); if (uploadFolder) form.append('category', uploadFolder);
+      batch.filter(file => ocrNames.includes(file.name)).forEach(file => form.append('ocrFiles', file.name));
       try {
         const response = await libraryRequest(`${encodeURIComponent(code)}/upload`, { form });
         setReport(previous => [...previous, ...response.results]);
@@ -64,8 +83,8 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
     }
     if (alive.current) { setUploading(null); await load(); }
   };
-  const onDrop = event => { event.preventDefault(); setDragging(false); if (canEdit && !uploading) upload(event.dataTransfer.files); };
-  const chooseFiles = event => { const files = [...event.target.files]; event.target.value = ''; upload(files); };
+  const onDrop = event => { event.preventDefault(); setDragging(false); if (canEdit && !uploading && !pending) startUpload(event.dataTransfer.files); };
+  const chooseFiles = event => { const files = [...event.target.files]; event.target.value = ''; if (!pending) startUpload(files); };
 
   const act = async (fn, success) => { setError(''); setNotice(''); try { await fn(); if (success) setNotice(success); await load(); } catch (e) { setError(e.message); } };
   const move = (document, category) => act(() => libraryRequest(`${encodeURIComponent(code)}/groups/${document.groupId}`, { method: 'PUT', body: { category } }), `Spostato in «${category}».`);
@@ -81,6 +100,7 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
       const url = URL.createObjectURL(blob); const link = window.document.createElement('a'); link.href = url; link.download = document.fileName; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setError(e.message); }
   };
+  const runOcr = document => act(() => libraryRequest(`${encodeURIComponent(code)}/groups/${document.groupId}/ocr`, { method: 'POST', body: {} }), `OCR eseguito su «${document.fileName}».`);
   const pickVersion = document => { versionTarget.current = document; versionInput.current?.click(); };
   const sendVersion = async event => {
     const file = event.target.files?.[0]; event.target.value = ''; const target = versionTarget.current;
@@ -130,6 +150,18 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
     </header>
 
     {idle ? <p className="lib-lock" role="status"><span aria-hidden="true">🔒</span> Apri o crea un’iniziativa (codice GOTO e titolo) per usare il workspace documentale.</p> : <>
+      {pending && <div className="lib-ocr" role="dialog" aria-label="Riconoscimento del testo nelle immagini">
+        <div className="lib-ocr-head"><strong>Vuoi leggere il testo contenuto nelle immagini (OCR)?</strong>
+          <span>{pending.images.length === 1 ? 'Hai selezionato un’immagine.' : `Hai selezionato ${pending.images.length} immagini.`} L’OCR trasforma in testo ciò che è scritto nell’immagine, così la ricerca e l’AI possono usarlo. Richiede qualche secondo per immagine e può contenere errori. Senza OCR l’immagine è conservata ma si cerca solo per nome.</span></div>
+        <ul className="lib-ocr-list">{pending.images.map(file => <li key={file.name}>
+          <label><input type="checkbox" checked={!!ocrChoices[file.name]} onChange={event => setOcrChoices({ ...ocrChoices, [file.name]: event.target.checked })} /> <b>{file.name}</b> <small>{formatSize(file.size)}</small></label></li>)}</ul>
+        <div className="lib-ocr-actions">
+          <button type="button" onClick={() => setOcrChoices(Object.fromEntries(pending.images.map(file => [file.name, true])))}>Usa OCR su tutte</button>
+          <button type="button" onClick={() => setOcrChoices({})}>Nessuna</button>
+          <button type="button" className="lib-primary" onClick={confirmPending}>{ocrChoiceState(pending.images, ocrChoices).picked ? `Carica con OCR su ${ocrChoiceState(pending.images, ocrChoices).picked}` : 'Carica senza OCR'}</button>
+          <button type="button" onClick={cancelPending}>Annulla</button></div>
+        {data.ocrAvailable === false && <p className="lib-ocr-warn" role="status">Il motore OCR non risulta installato su questo server: se lo richiedi, le immagini vengono caricate ma il testo non potrà essere letto.</p>}
+      </div>}
       {canEdit && <div className={`lib-drop${dragging ? ' is-over' : ''}${uploading ? ' is-busy' : ''}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
         <div className="lib-drop-text"><strong>{uploading ? `Caricamento: ${uploading.done} di ${uploading.total}…` : 'Trascina qui i documenti'}</strong>
           <span>PDF, Word, Excel, PowerPoint, testo, CSV, ZIP, RAR, EML, MSG, XML, JSON, immagini… fino a 10 MB ciascuno. Puoi sceglierne più di uno.</span></div>
@@ -137,7 +169,7 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
           <select value={uploadFolder} onChange={event => setUploadFolder(event.target.value)} disabled={!!uploading}>
             <option value="">Automatica (email → «Email e comunicazioni», altro → «Allegati ricevuti»)</option>
             {FOLDERS.map(name => <option key={name} value={name}>{name === MEMORY ? `${name} — base di contesto permanente` : name}</option>)}</select></label>
-        <button type="button" className="lib-primary" disabled={!!uploading} onClick={() => fileInput.current?.click()}>Carica Documenti</button>
+        <button type="button" className="lib-primary" disabled={!!uploading || !!pending} onClick={() => fileInput.current?.click()}>Carica Documenti</button>
         <input ref={fileInput} type="file" multiple hidden aria-label="Carica documenti" onChange={chooseFiles} />
         <input ref={versionInput} type="file" hidden aria-label="Carica nuova versione" onChange={sendVersion} />
         {uploading && <span className="lib-bar" aria-hidden="true"><i style={{ width: `${Math.round(100 * uploading.done / Math.max(1, uploading.total))}%` }} /></span>}
@@ -146,7 +178,7 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
 
       {report.length > 0 && <div className={`lib-report${refused.length ? ' has-errors' : ''}`} role="status">
         <b>{report.filter(r => r.ok).length} caricati{refused.length ? `, ${refused.length} non caricati` : ''}</b>
-        <ul>{report.map((r, index) => <li key={index} className={r.ok ? 'ok' : 'ko'}><span aria-hidden="true">{r.ok ? '✓' : '✕'}</span><b>{r.fileName}</b>{!r.ok && <span> — {r.message}</span>}
+        <ul>{report.map((r, index) => <li key={index} className={r.ok ? 'ok' : 'ko'}><span aria-hidden="true">{r.ok ? '✓' : '✕'}</span><b>{r.fileName}</b>{!r.ok && <span> — {r.message}</span>}{r.ok && r.ocr && r.ocr !== 'none' && <span className={`lib-ocr-tag lib-badge-${ocrOutcome(r.ocr).tone}`}>{ocrOutcome(r.ocr).text}</span>}{r.ok && r.ocr && r.ocr !== 'none' && r.ocr !== 'done' && r.ocrMessage && <span> — {r.ocrMessage}</span>}
           {!r.ok && r.canVersion && canEdit && <button type="button" onClick={() => { const target = data.documents.find(d => d.groupId === r.existingGroupId); if (target) pickVersion(target); }}>Carica come nuova versione</button>}</li>)}</ul>
         <button type="button" onClick={() => setReport([])}>Chiudi riepilogo</button></div>}
       {error && <p className="lib-error" role="alert">{error}</p>}
@@ -174,6 +206,7 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
               <span className="lib-badges">
                 {document.isMemory && <span className="lib-badge lib-badge-memory">Memoria iniziale</span>}
                 <span className={`lib-badge lib-badge-${status.tone}`} title={status.hint}>{status.label}</span>
+                {document.ocrStatus && document.ocrStatus !== 'none' && <span className={`lib-badge lib-badge-${ocrOutcome(document.ocrStatus).tone}`}>{ocrOutcome(document.ocrStatus).text}</span>}
                 <span className={`lib-badge ${document.aiEnabled ? 'lib-badge-ai' : 'lib-badge-muted'}`} title={document.aiEnabled ? 'L’AI può usare questo documento.' : 'Escluso dall’AI.'}>{document.aiEnabled ? 'Usato dall’AI' : 'Escluso dall’AI'}</span>
               </span>
             </div>
@@ -181,6 +214,7 @@ export default function LibraryPanel({ initiative, canEdit = true }) {
               <button type="button" onClick={() => download(document)}>Scarica</button>
               {canEdit && <label className="lib-move"><span className="lib-sr">Cartella di {document.fileName}</span><select value={document.category} onChange={event => move(document, event.target.value)}>{FOLDERS.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
               {canEdit && <button type="button" onClick={() => pickVersion(document)}>Sostituisci / nuova versione</button>}
+              {canEdit && document.isImage && document.ocrAvailable && document.ocrStatus !== 'done' && <button type="button" onClick={() => runOcr(document)}>Leggi il testo (OCR)</button>}
               {canEdit && <button type="button" onClick={() => toggleAi(document)}>{document.aiEnabled ? 'Escludi dall’AI' : 'Usa nell’AI'}</button>}
               <button type="button" aria-expanded={openId === document.groupId} onClick={() => toggleHistory(document)}>Storia{document.versions > 1 ? ` (${document.versions})` : ''}</button>
               {canEdit && document.canDelete && <button type="button" className="lib-danger" onClick={() => remove(document)}>Elimina</button>}

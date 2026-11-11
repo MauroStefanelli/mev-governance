@@ -238,6 +238,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IRationaleAssistant, MevGovernanceBackend.Services.AiRationaleAssistant>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IDocumentAssistant, MevGovernanceBackend.Services.AiDocumentAssistant>();
+builder.Services.AddSingleton<MevGovernanceBackend.Services.IOcrEngine, MevGovernanceBackend.Services.TesseractOcrEngine>();
 builder.Services.AddHttpClient("ConfiguratoreAi", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(360);
@@ -608,6 +609,9 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexedAt"" TIMESTAMPTZ NULL;
                 ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexStatus"" TEXT NOT NULL DEFAULT 'pending';
                 ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""IndexedChars"" INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""OcrStatus"" TEXT NOT NULL DEFAULT 'none';
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""OcrLanguage"" TEXT NULL;
+                ALTER TABLE ""{sch}"".""InitiativeDocuments"" ADD COLUMN IF NOT EXISTS ""OcrAt"" TIMESTAMPTZ NULL;
                 UPDATE ""{sch}"".""InitiativeDocuments"" SET ""GroupId"" = ""Id"" WHERE ""GroupId"" = '00000000-0000-0000-0000-000000000000';
                 CREATE UNIQUE INDEX IF NOT EXISTS ""IX_InitiativeDocuments_AmbienteId_GroupId_Version""
                     ON ""{sch}"".""InitiativeDocuments"" (""AmbienteId"", ""GroupId"", ""Version"");

@@ -10,6 +10,19 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+public class FakeOcr : IOcrEngine
+{
+    public bool IsAvailable { get; set; } = true;
+    public string Status = "done"; public string Text = "TIMEOUT-OCR 12 secondi per la prenotazione";
+    public int Calls;
+    public Task<OcrResult> ReadAsync(byte[] image, string fileName, CancellationToken cancel = default)
+    {
+        Calls++;
+        if (!IsAvailable) return Task.FromResult(new OcrResult("unavailable", "", "Il motore OCR non è installato su questo server."));
+        return Task.FromResult(Status == "done" ? new OcrResult("done", Text, "Testo riconosciuto automaticamente.", "ita+eng") : new OcrResult(Status, "", "Nessun testo."));
+    }
+}
+
 public class FakeDocumentAssistant : IDocumentAssistant
 {
     public List<DocumentAskRequest> Seen = new();
@@ -86,7 +99,8 @@ public static class DocumentLibraryRegression
         var user = new AppUser { Username = "carla", FullName = "Carla Neri", Role = "Developer", IsActive = true };
         db.Users.Add(user); await db.SaveChangesAsync();
         var fake = new FakeDocumentAssistant();
-        DocumentLibraryController As(string name, string role, int environment = 1) => new(db, fake) {
+        var ocr = new FakeOcr();
+        DocumentLibraryController As(string name, string role, int environment = 1) => new(db, fake, ocr) {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, name), new Claim(ClaimTypes.Role, role), new Claim("ambienteId", environment.ToString()) }, "test")) } }
         };
@@ -265,5 +279,58 @@ public static class DocumentLibraryRegression
         check(!(await DocumentContext.AttachAsync(db, offerEnv, jo("{\"initiative\":{\"code\":\"sconosciuta\"}}"))).Context.ToJsonString().Contains("documentKnowledge"), "An initiative with no documents gets the context unchanged");
         db.InitiativeDocuments.Where(d => d.AmbienteId == offerEnv).ExecuteUpdate(set => set.SetProperty(d => d.AiEnabled, false));
         check(!(await DocumentContext.AttachAsync(db, offerEnv, jo("{\"initiative\":{\"code\":\"off1\",\"title\":\"Prenotazione\"}}"))).Context.ToJsonString().Contains("idempotenza"), "Documents excluded from AI are not attached to the offer analysis");
+
+        // ---- OCR on images ----
+        fake.Throw = false; fake.Unreadable = false;
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 };
+        var noOcr = Ok(await anna.Upload("OC1", Files(File("schema.png", png)), null)).GetProperty("results")[0];
+        check(noOcr.GetProperty("ok").GetBoolean() && noOcr.GetProperty("ocr").GetString() == "none" && ocr.Calls == 0, "An image uploaded without asking for OCR is never sent to the OCR engine");
+        var plainImage = noOcr.GetProperty("document");
+        check(plainImage.GetProperty("isImage").GetBoolean() && plainImage.GetProperty("indexStatus").GetString() == "unsupported", "An image without OCR is honestly marked as not readable");
+        check(plainImage.GetProperty("ocrAvailable").GetBoolean(), "The list tells the user whether OCR can be run");
+
+        var withOcr = Ok(await anna.Upload("OC1", Files(File("schermata.png", new byte[] { 0x89, 0x50, 9, 9 })), null, new[] { "schermata.png" })).GetProperty("results")[0];
+        check(withOcr.GetProperty("ocr").GetString() == "done" && ocr.Calls == 1, "OCR runs only on the image the user asked for");
+        check(withOcr.GetProperty("document").GetProperty("indexStatus").GetString() == "ready" && withOcr.GetProperty("document").GetProperty("indexedChars").GetInt32() > 10, "Recognized text makes the image indexed");
+        var ocrDoc = db.InitiativeDocuments.AsNoTracking().Single(d => d.FileName == "schermata.png");
+        check(ocrDoc.OcrStatus == "done" && ocrDoc.OcrLanguage == "ita+eng" && ocrDoc.OcrAt != null && ocrDoc.Content.Length == 4, "OCR status is stored and the original image bytes are untouched");
+        check(Ok(await anna.Search("OC1", "timeout-ocr", null, null, null, null, false)).GetProperty("results").EnumerateArray().Any(r => r.GetProperty("document").GetProperty("fileName").GetString() == "schermata.png" && r.GetProperty("snippets")[0].GetProperty("location").GetString()!.StartsWith("OCR")), "Text read by OCR is searchable and labelled as OCR");
+        var ocrAsk = Ok(await anna.Ask("OC1", new("Quanto vale il timeout-ocr?")));
+        check(!ocrAsk.GetProperty("noSources").GetBoolean() && ocrAsk.GetProperty("sources").EnumerateArray().Any(src => src.GetProperty("location").GetString()!.StartsWith("OCR")), "Text read by OCR is available to the AI, with its OCR source");
+
+        var mixed = Ok(await anna.Upload("OC2", Files(File("nota.txt", "documento di testo"), File("foto.jpg", new byte[] { 0xFF, 0xD8, 7 })), null, new[] { "nota.txt", "foto.jpg" })).GetProperty("results");
+        check(mixed[0].GetProperty("ocr").GetString() == "none" && mixed[1].GetProperty("ocr").GetString() == "done", "OCR requested for a non-image file is ignored");
+        check(ocr.Calls == 2, "Only images reach the OCR engine, even if other names are ticked");
+        check(Ok(await anna.Upload("OC2", Files(File("diagramma.svg", "<svg><text>etichetta vettoriale</text></svg>")), null, new[] { "diagramma.svg" })).GetProperty("results")[0].GetProperty("ocr").GetString() == "none", "SVG is text and never needs OCR");
+
+        ocr.IsAvailable = false;
+        var unavailable = Ok(await anna.Upload("OC3", Files(File("scan.png", new byte[] { 0x89, 5, 5 })), null, new[] { "scan.png" })).GetProperty("results")[0];
+        check(unavailable.GetProperty("ok").GetBoolean() && unavailable.GetProperty("ocr").GetString() == "unavailable" && unavailable.GetProperty("ocrMessage").GetString()!.Contains("non è installato"), "A missing OCR engine never blocks the upload and is reported");
+        check(unavailable.GetProperty("document").GetProperty("indexStatus").GetString() == "unsupported" && !unavailable.GetProperty("document").GetProperty("ocrAvailable").GetBoolean(), "Without the engine the image stays unreadable and says so");
+        var groupNoEngine = db.InitiativeDocuments.AsNoTracking().Single(d => d.FileName == "scan.png").GroupId;
+        check(await anna.RunOcr("OC3", groupNoEngine) is ObjectResult { StatusCode: 503 }, "Running OCR without the engine reports 503");
+        ocr.IsAvailable = true; ocr.Status = "failed";
+        var failed = Ok(await anna.Upload("OC3", Files(File("rotta.png", new byte[] { 0x89, 6, 6 })), null, new[] { "rotta.png" })).GetProperty("results")[0];
+        check(failed.GetProperty("ok").GetBoolean() && failed.GetProperty("ocr").GetString() == "failed" && failed.GetProperty("document").GetProperty("indexStatus").GetString() == "unsupported", "An image the engine cannot read is stored and reported, not lost");
+        ocr.Status = "empty";
+        check(Ok(await anna.Upload("OC3", Files(File("bianca.png", new byte[] { 0x89, 7, 7 })), null, new[] { "bianca.png" })).GetProperty("results")[0].GetProperty("ocr").GetString() == "empty", "An image with no text is reported as empty");
+
+        var tricky = Ok(await anna.Upload("OC4", Files(File("a.png", new byte[] { 0x89, 1, 1 }), File("b.png", new byte[] { 0x89, 2, 2 })), null, new[] { "a.png|b.png" })).GetProperty("results");
+        check(tricky[0].GetProperty("ocr").GetString() == "none" && tricky[1].GetProperty("ocr").GetString() == "none", "OCR names are matched one by one: a name containing | never selects another file");
+        check(Ok(await anna.List("OC4")).GetProperty("ocrAvailable").GetBoolean() == ocr.IsAvailable, "The library says whether OCR can be run");
+
+        // Running OCR afterwards on an image uploaded without it.
+        ocr.Status = "done"; ocr.Text = "RIPETUTO-DOPO la conferma del fornitore";
+        var laterGroup = db.InitiativeDocuments.AsNoTracking().Single(d => d.FileName == "schema.png").GroupId;
+        check(await capo.RunOcr("OC1", laterGroup) is ForbidResult, "Supervisor cannot run OCR");
+        check(await anna.RunOcr("OC1", Guid.NewGuid()) is NotFoundResult, "OCR on an unknown document is not found");
+        check(await As("anna", "Developer", 2).RunOcr("OC1", laterGroup) is NotFoundResult, "OCR is isolated by environment");
+        var after = Ok(await anna.RunOcr("OC1", laterGroup));
+        check(after.GetProperty("ocr").GetString() == "done" && after.GetProperty("document").GetProperty("indexStatus").GetString() == "ready", "OCR can be requested after the upload");
+        check(Ok(await anna.Search("OC1", "ripetuto-dopo", null, null, null, null, false)).GetProperty("results").GetArrayLength() == 1, "Text from a later OCR becomes searchable");
+        check(await anna.RunOcr("OC2", db.InitiativeDocuments.AsNoTracking().Single(d => d.FileName == "nota.txt").GroupId) is BadRequestObjectResult, "OCR is refused for files that are not images");
+        check(Ok(await anna.History("OC1", laterGroup)).GetProperty("events").EnumerateArray().Any(e => e.GetProperty("action").GetString() == "ocr"), "OCR runs are recorded in the document history");
+        var callsBefore = ocr.Calls;
+        check(await anna.Upload("OC1", Files(File("schema.png", png)), null, new[] { "schema.png" }) is OkObjectResult && ocr.Calls == callsBefore, "A duplicate image is refused before any OCR work is done");
     }
 }

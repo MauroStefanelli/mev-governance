@@ -81,3 +81,25 @@ export const sourceLabel = source => `${source.fileName} · v${source.version} �
 
 export const TIMELINE = { caricato: 'Caricato', 'nuova versione': 'Nuova versione', cartella: 'Cartella cambiata', 'ai-attivata': 'Usato dall’AI', 'ai-disattivata': 'Escluso dall’AI', eliminato: 'Eliminato' };
 export const eventLabel = action => TIMELINE[action] || action;
+
+// OCR (text recognition) is only meaningful for raster images. SVG is text and is read as such.
+export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tif', 'tiff', 'webp'];
+export const isRasterImage = name => IMAGE_EXTENSIONS.includes(extensionOf(name));
+
+// What the user must be asked before sending: one question per upload, only if it contains images.
+export const imagesNeedingOcrChoice = files => [...files].filter(file => isRasterImage(file.name) && !checkFile(file));
+
+// 'ask' = show the question, 'none' = no image in the selection. The choice is made per image, with shortcuts for all/none.
+export function ocrChoiceState(images, choices) {
+  const picked = images.filter(file => choices[file.name]).length;
+  return { total: images.length, picked, all: picked === images.length && images.length > 0, none: picked === 0 };
+}
+
+export const ocrOutcomeLabel = {
+  done: { text: 'Testo riconosciuto con OCR', tone: 'ok' },
+  empty: { text: 'OCR eseguito: nessun testo trovato', tone: 'warn' },
+  failed: { text: 'OCR non riuscito', tone: 'bad' },
+  unavailable: { text: 'OCR non disponibile su questo server', tone: 'warn' },
+  none: { text: '', tone: 'muted' },
+};
+export const ocrOutcome = status => ocrOutcomeLabel[status] || ocrOutcomeLabel.none;

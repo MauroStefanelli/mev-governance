@@ -1,4 +1,4 @@
-import { extensionOf, fileKind, formatSize, checkFile, planUpload, folderCounts, filterDocuments, indexStatus, isSearchable, describeResults, highlightParts, sourceLabel, eventLabel, MAX_FILE, MAX_FILES, FOLDERS } from './libraryModel';
+import { extensionOf, fileKind, formatSize, checkFile, planUpload, folderCounts, filterDocuments, indexStatus, isSearchable, describeResults, highlightParts, sourceLabel, eventLabel, MAX_FILE, MAX_FILES, FOLDERS, isRasterImage, imagesNeedingOcrChoice, ocrChoiceState, ocrOutcome } from './libraryModel';
 
 const file = (name, size = 100) => ({ name, size });
 
@@ -75,4 +75,27 @@ test('sources and history events have readable labels', () => {
   expect(sourceLabel({ fileName: 'req.docx', version: 3, location: 'paragrafo 4' })).toBe('req.docx · v3 · paragrafo 4');
   expect(eventLabel('nuova versione')).toBe('Nuova versione');
   expect(eventLabel('boh')).toBe('boh');
+});
+
+test('only raster images raise the OCR question: SVG, documents and archives never do', () => {
+  ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tif', 'tiff', 'webp'].forEach(ext => expect(isRasterImage(`a.${ext}`)).toBe(true));
+  ['svg', 'pdf', 'docx', 'txt', 'zip', 'eml', 'png.exe', 'noext'].forEach(name => expect(isRasterImage(name)).toBe(false));
+  expect(isRasterImage('FOTO.JPG')).toBe(true);
+  const files = [file('a.png'), file('b.pdf'), file('c.svg'), file('d.jpeg'), file('vuota.png', 0), file('grande.jpg', MAX_FILE + 1), file('virus.exe')];
+  expect(imagesNeedingOcrChoice(files).map(f => f.name)).toEqual(['a.png', 'd.jpeg']);
+  expect(imagesNeedingOcrChoice([file('b.pdf'), file('t.txt')])).toEqual([]);
+});
+
+test('the OCR choice summary tells how many images were ticked', () => {
+  const images = [file('a.png'), file('b.png')];
+  expect(ocrChoiceState(images, {})).toEqual({ total: 2, picked: 0, all: false, none: true });
+  expect(ocrChoiceState(images, { 'a.png': true })).toEqual({ total: 2, picked: 1, all: false, none: false });
+  expect(ocrChoiceState(images, { 'a.png': true, 'b.png': true }).all).toBe(true);
+  expect(ocrChoiceState([], {}).all).toBe(false);
+});
+
+test('every OCR outcome has a label and unknown ones are silent', () => {
+  ['done', 'empty', 'failed', 'unavailable'].forEach(status => expect(ocrOutcome(status).text.length).toBeGreaterThan(5));
+  expect(ocrOutcome('none').text).toBe('');
+  expect(ocrOutcome(undefined).text).toBe('');
 });

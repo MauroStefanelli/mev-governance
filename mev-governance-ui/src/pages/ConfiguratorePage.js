@@ -2,6 +2,10 @@ import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import RationalePanel from "../configuratore/RationalePanel";
 import LibraryPanel from "../configuratore/LibraryPanel";
+import SectionRow from "../configuratore/SectionRow";
+import SolutionPanel from "../configuratore/SolutionPanel";
+import KnowledgeOverview from "../configuratore/KnowledgeOverview";
+import { rationaleFacts, solutionFacts, analysisFacts, sourceFacts, knowledgeFacts } from "../configuratore/sectionSummaries";
 import { knowledgeForAi, entriesForIntervention } from "../configuratore/rationaleKnowledge";
 import { saveAndClose } from "../configuratore/saveAndClose";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
@@ -99,6 +103,12 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [detailReviews, setDetailReviews] = useState({});
   const [developmentPlans, setDevelopmentPlans] = useState({});
   const [rationale, setRationale] = useState([]); // confirmed + proposed entries of the open initiative
+  const [openSections, setOpenSections] = useState(() => new Set(['dati']));
+  const [libraryFacts, setLibraryFacts] = useState('');
+  const [solutionProgress, setSolutionProgress] = useState({ total: 0, filled: 0, orphans: 0, dirty: false, revision: 0 });
+  const isOpen = id => openSections.has(id);
+  const toggleSection = id => setOpenSections(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const openSection = id => { setOpenSections(previous => new Set(previous).add(id)); requestAnimationFrame(() => { const target = document.getElementById(`sezione-${id}`); if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); };
   const [projectPreparation, setProjectPreparation] = useState(newProjectPreparation);
   const [detailReviewBusy, setDetailReviewBusy] = useState(false);
   const [detailReviewProgress, setDetailReviewProgress] = useState('');
@@ -160,6 +170,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   // Utente con ruolo Admin E Developer → può generare schede AI applicativi
   const myRoles = (roles && roles.length > 0) ? roles : (role ? [role] : []);
   const isAdminDeveloper = myRoles.includes("Admin") && myRoles.includes("Developer");
+  const hasInitiative = !!(initiative.code || initiative.title);
+  const canEditInitiative = myRoles.some(r => ['Admin', 'Developer', 'SuperAdmin'].includes(r));
+  const currentUserName = (typeof localStorage !== 'undefined' && (localStorage.getItem('fullName') || localStorage.getItem('XUSER'))) || '';
   // SuperAdmin ha sempre accesso completo
   const canAiApp = isAdminDeveloper || myRoles.includes("SuperAdmin");
 
@@ -1944,7 +1957,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
 
       {/* STEP 1: INIZIATIVA */}
       {step === 1 && (
-        <div>
+        <div className="init-sections">
           {/* Bottone import Excel visibile */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: mappedLoading ? "not-allowed" : "pointer",
@@ -1963,381 +1976,411 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                 Carica il workbook dell&apos;iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi).
             </p>
           </div>
-          <div ref={initiativeFieldsRef} style={{ ...styles.card, marginTop: 12, scrollMarginTop: 20 }}>
-            <h3 style={{ margin: "0 0 12px" }}>Dati iniziativa</h3>
-            <div style={styles.grid2}>
-              <label style={styles.label}>Codice GOTO
-                <input style={styles.input} value={initiative.code} onChange={(e) => setInitiative((i) => ({ ...i, code: e.target.value }))} />
-              </label>
-              <label style={styles.label}>Titolo
-                <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
-              </label>
-              <label style={styles.label}>Sistema / applicazione
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {/* Valore da Excel — read-only */}
-                  {initiative.system && (
-                    <input
-                      style={{ ...styles.input, background: "#f4f7fb", color: "#334155" }}
-                      value={initiative.system}
-                      readOnly
-                      title="Valorizzato dal file Excel importato"
-                    />
-                  )}
-                  {/* App selezionate come badge rimovibili */}
-                  {selectedAppIds.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {selectedAppIds.map(aid => {
-                        const app = applications.find(a => String(a.id) === aid);
-                        if (!app) return null;
-                        return (
-                          <span key={aid} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 600 }}>
-                            {app.name}{app.code ? ` (${app.code})` : ""}
-                            <button
-                              type="button"
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#1d4ed8", fontWeight: 700, padding: 0, lineHeight: 1, fontSize: 13 }}
-                              onClick={() => {
-                                const next = selectedAppIds.filter(id => id !== aid);
-                                setSelectedAppIds(next);
-                                if (next.length === 0) { setTechProfile(null); setSelectedAppId(""); }
-                                else {
-                                  setSelectedAppId(next[0]);
-                                  const firstApp = applications.find(a => String(a.id) === next[0]);
-                                  if (firstApp?.techProfile) setTechProfile(firstApp.techProfile);
-                                }
-                              }}>×</button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {/* Selettore multi — aggiunge senza sostituire */}
-                  <select
-                    style={{ ...styles.input }}
-                    value=""
-                    onChange={(e) => {
-                      const appId = e.target.value;
-                      if (!appId) return;
-                      if (selectedAppIds.includes(appId)) return;
-                      const app = applications.find((a) => String(a.id) === appId);
-                      if (!app) return;
-                      const next = [...selectedAppIds, appId];
-                      setSelectedAppIds(next);
-                      setSelectedAppId(appId);
-                      if (app.techProfile) setTechProfile(app.techProfile);
-                      setImplementationFiles([]);
-                      toast(`Applicativo "${app.name}" aggiunto`);
-                    }}>
-                    <option value="">+ Aggiungi applicativo…</option>
-                    {applications
-                      .filter(a => !selectedAppIds.includes(String(a.id)))
-                      .map((a) => (
-                        <option key={a.id} value={String(a.id)}>{a.name}{a.code ? ` (${a.code})` : ""}</option>
-                      ))}
-                   </select>
-                 </div>
-               </label>
-               <label style={styles.label}>Tipo contratto
-                 <select style={styles.input}
-                   value={initiative.contractType || ""}
-                   onChange={(e) => {
-                     const val = e.target.value;
-                     setInitiative((i) => ({ ...i, contractType: val }));
-                     // Se towImpattoDb non è ancora caricato, forzalo ora
-                     if (val && Object.keys(towImpattoDb).length === 0) {
-                       getTowImpatto().then(imp => {
-                         if (imp && typeof imp === "object" && Object.keys(imp).length > 0)
-                           setTowImpattoDb(imp);
-                       }).catch(() => {});
-                     }
-                   }}>
-                   <option value="">— nessuno —</option>
-                   {Object.keys(towImpattoDb).length > 0
-                     ? Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)
-                     : ["BASE", "QDO"].map(k => <option key={k} value={k}>{k}</option>)
-                   }
-                 </select>
-               </label>
-                <label style={styles.label}>Release
-                  {releaseList.length > 0 ? (
-                    <>
-                      <select style={styles.input}
-                        value={releaseList.includes(initiative.release) || initiative.release === "" || initiative.release === "Da pianificare" || initiative.release === "TBD" ? initiative.release : "__altro__"}
-                        onChange={(e) => {
-                          if (e.target.value !== "__altro__") setInitiative((i) => ({ ...i, release: e.target.value }));
-                          else setInitiative((i) => ({ ...i, release: "" }));
-                        }}>
-                        <option value="">— nessuna —</option>
-                        <option value="Da pianificare">Da pianificare</option>
-                        <option value="TBD">TBD (To Be Defined)</option>
-                        {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
-                        <option value="__altro__">Altro (testo libero)…</option>
-                      </select>
-                      {(!releaseList.includes(initiative.release) && initiative.release !== "" && initiative.release !== "Da pianificare" && initiative.release !== "TBD") && (
-                        <input style={{ ...styles.input, marginTop: 4 }}
-                          value={initiative.release}
-                          placeholder="Inserisci release (es. TBD, R2025-09…)"
-                          onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
-                      )}
-                    </>
-                  ) : (
-                    <input style={styles.input} value={initiative.release}
-                      placeholder="es. R2025-04 oppure TBD (opzionale)"
-                      onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
-                  )}
+          {/* 1 · Dati iniziativa */}
+          <SectionRow number="1" id="sezione-dati" title="Dati iniziativa" open={isOpen('dati')} onToggle={() => toggleSection('dati')} keepMounted
+            facts={[initiative.code && `GOTO ${initiative.code}`, initiative.title, initiative.system && `Sistema ${initiative.system}`, importedInterventions.length > 0 && `${importedInterventions.length} interventi`, selectedAppIds.length > 0 && `${selectedAppIds.length} applicativi`]}
+            status={initiative.code || initiative.title ? undefined : 'Da compilare'} tone={initiative.code || initiative.title ? 'neutral' : 'warn'}>
+            <div ref={initiativeFieldsRef} style={{ ...styles.card, marginTop: 12, scrollMarginTop: 20 }}>
+              <h3 style={{ margin: "0 0 12px" }}>Dati iniziativa</h3>
+              <div style={styles.grid2}>
+                <label style={styles.label}>Codice GOTO
+                  <input style={styles.input} value={initiative.code} onChange={(e) => setInitiative((i) => ({ ...i, code: e.target.value }))} />
                 </label>
-              <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
-                <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
-              </label>
-              <label style={{ ...styles.label, gridColumn: "1 / -1" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <span>Descrizione</span>
-                  <button type="button"
-                    style={{ fontSize: 11, padding: "2px 9px", border: "1px solid #bdc9d4", borderRadius: 5, background: "#f1f5f9", cursor: "pointer", color: "#334155" }}
-                    onClick={() => setShowDescModal(true)}>
-                    ⤢ Espandi
-                  </button>
-                </div>
-                <textarea style={styles.textarea} value={initiative.description} onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))} rows={3} />
-              </label>
-              {/* Modale descrizione */}
-              {showDescModal && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
-                  onClick={() => setShowDescModal(false)}>
-                  <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "min(860px, 94vw)", boxSizing: "border-box", overflowY: "auto", maxHeight: "88dvh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(0,0,0,0.22)" }}
-                    onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                      <strong style={{ fontSize: 16, color: "#102a47" }}>Descrizione iniziativa</strong>
-                      <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b", lineHeight: 1 }} onClick={() => setShowDescModal(false)}>✕</button>
-                    </div>
-                    <textarea
-                      autoFocus
-                      style={{ flex: 1, minHeight: "min(420px, 48dvh)", resize: "vertical", border: "1px solid #bdc9d4", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, fontFamily: "inherit" }}
-                      value={initiative.description}
-                      onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))}
-                    />
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-                      <button style={btnStyles.primary} onClick={() => setShowDescModal(false)}>Chiudi</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <button style={{ ...btnStyles.primary, opacity: analyzeBusy ? 0.7 : 1 }} onClick={analyze} disabled={analyzeBusy}>
-                {analyzeBusy
-                  ? "⟳ Analisi in corso…"
-                  : importedInterventions.length > 0
-                    ? `Analizza integrazioni (${importedInterventions.length} interventi)`
-                    : "Analizza e suggerisci"}
-              </button>
-              <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
-            </div>
-          </div>
-          <RationalePanel initiative={initiative} interventions={importedInterventions} onKnowledge={setRationale} />
-          <LibraryPanel initiative={initiative} canEdit={myRoles.some(r => ['Admin', 'Developer', 'SuperAdmin'].includes(r))} />
-        </div>
-      )}
-      <div>
-        {importHistoryError && <p role="alert">{importHistoryError}</p>}
-        <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}:${workspaceReload}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
-          onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
-          estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, developmentPlans, projectPreparation, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
-      </div>
-      {step === 1 && (
-        <div>
-          {/* ── Codice sorgente: una riga per app selezionata ── */}
-          <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#102a47", marginBottom: selectedAppIds.length > 0 ? 10 : 0 }}>⌘ Codice sorgente</div>
-            {selectedAppIds.length === 0 ? (
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>Nessun profilo tecnico — seleziona un applicativo nel campo &quot;Sistema / applicazione&quot; sopra</span>
-            ) : (() => {
-              const AppProfileRow = ({ appId }) => {
-                const app = applications.find(a => String(a.id) === appId);
-                const tp = app?.techProfile || (appId === selectedAppId ? techProfile : null);
-                if (!app) return null;
-                if (!tp) return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #dbe9fb" }}>
-                    <span style={{ fontSize: 18 }}>📂</span>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: "#102a47" }}>{app.name}</span>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>— nessun profilo tecnico caricato</span>
-                  </div>
-                );
-                const langs   = tp.technologies || [];
-                const ifaces  = tp.interfaces   || [];
-                const integr  = tp.integrations || [];
-                const dbs     = tp.databases    || [];
-                const testing = tp.testing      || [];
-                const langStr = langs.slice(0, 4).join(", ") + (langs.length > 4 ? ` +${langs.length - 4}` : "");
-                const counts  = [
-                  ifaces.length  ? `${ifaces.length} interfacce` : null,
-                  integr.length  ? `${integr.length} integrazioni` : null,
-                  dbs.length     ? `${dbs.length} sorgenti dati` : null,
-                  testing.length ? "test rilevati" : null,
-                ].filter(Boolean).join(" · ");
-                return (
-                  <details style={{ borderBottom: "1px solid #dbe9fb" }}>
-                    <summary style={{ cursor: "pointer", listStyle: "none", userSelect: "none", padding: "9px 4px", display: "flex", alignItems: "center", gap: 10 }}>
-                      {/* icona toggle */}
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        width: 22, height: 22, borderRadius: 6,
-                        background: "linear-gradient(135deg,#1a73e8,#0d47a1)",
-                        color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
-                        boxShadow: "0 1px 4px rgba(26,115,232,0.3)"
-                      }}>▾</span>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: "#102a47", minWidth: 80 }}>{app.name}</span>
-                      {app.code && <span style={{ fontSize: 11, color: "#64748b", background: "#e2e8f0", borderRadius: 4, padding: "1px 6px" }}>{app.code}</span>}
-                      <span style={{ fontSize: 12, color: "#475569", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {langStr ? `${langStr}` : ""}
-                        {counts ? <span style={{ color: "#94a3b8", marginLeft: 6 }}>· {counts}</span> : null}
-                      </span>
-                      {tp.totalFiles > 0 && (
-                        <span style={{ fontSize: 11, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 7px", flexShrink: 0, fontWeight: 600 }}>
-                          {tp.totalFiles} file
-                        </span>
-                      )}
-                    </summary>
-
-                    <div style={{ padding: "12px 4px 4px" }}>
-                      {/* metriche */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(100px,1fr))", gap: 6, marginBottom: 12 }}>
-                        {[["File totali", tp.totalFiles], ["Analizzati", tp.readFiles], ["Test", tp.testFiles], ["Config", tp.configFiles]]
-                          .filter(([, v]) => v != null)
-                          .map(([label, val]) => (
-                            <div key={label} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "6px 8px", textAlign: "center" }}>
-                              <div style={{ fontSize: 10, color: "#64748b" }}>{label}</div>
-                              <div style={{ fontSize: 18, fontWeight: 800, color: "#1d4ed8" }}>{val}</div>
-                            </div>
-                          ))}
+                <label style={styles.label}>Titolo
+                  <input style={styles.input} value={initiative.title} onChange={(e) => setInitiative((i) => ({ ...i, title: e.target.value }))} />
+                </label>
+                <label style={styles.label}>Sistema / applicazione
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {/* Valore da Excel — read-only */}
+                    {initiative.system && (
+                      <input
+                        style={{ ...styles.input, background: "#f4f7fb", color: "#334155" }}
+                        value={initiative.system}
+                        readOnly
+                        title="Valorizzato dal file Excel importato"
+                      />
+                    )}
+                    {/* App selezionate come badge rimovibili */}
+                    {selectedAppIds.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {selectedAppIds.map(aid => {
+                          const app = applications.find(a => String(a.id) === aid);
+                          if (!app) return null;
+                          return (
+                            <span key={aid} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 600 }}>
+                              {app.name}{app.code ? ` (${app.code})` : ""}
+                              <button
+                                type="button"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#1d4ed8", fontWeight: 700, padding: 0, lineHeight: 1, fontSize: 13 }}
+                                onClick={() => {
+                                  const next = selectedAppIds.filter(id => id !== aid);
+                                  setSelectedAppIds(next);
+                                  if (next.length === 0) { setTechProfile(null); setSelectedAppId(""); }
+                                  else {
+                                    setSelectedAppId(next[0]);
+                                    const firstApp = applications.find(a => String(a.id) === next[0]);
+                                    if (firstApp?.techProfile) setTechProfile(firstApp.techProfile);
+                                  }
+                                }}>×</button>
+                            </span>
+                          );
+                        })}
                       </div>
-                      {/* sezioni tecniche */}
-                      {(() => {
-                        const TagList = ({ items }) => (items?.length
-                          ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 5px", marginTop: 3 }}>
-                              {items.map(t => <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px", fontSize: 11, fontWeight: 600 }}>{t}</span>)}
-                            </div>
-                          : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>);
-                        const Section = ({ title, items }) => items?.length
-                          ? <div><div style={{ fontWeight: 700, fontSize: 11, color: "#475569", marginBottom: 1 }}>{title}</div><TagList items={items} /></div>
-                          : null;
-                        return (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "8px 14px", marginBottom: 10 }}>
-                            <Section title="Linguaggi"               items={tp.technologies} />
-                            <Section title="Framework"               items={tp.frameworks} />
-                            <Section title="Dati e persistenza"      items={tp.databases} />
-                            <Section title="Integrazioni"            items={tp.integrations} />
-                            <Section title="Interfacce"              items={tp.interfaces} />
-                            <Section title="Sicurezza"               items={tp.security} />
-                            <Section title="Test"                    items={tp.testing} />
-                            <Section title="Infrastruttura"          items={tp.infrastructure} />
-                            <Section title="Componenti"              items={tp.components} />
-                          </div>
-                        );
-                      })()}
-                      {tp.catalogSignals?.length > 0 && (
-                        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
-                          <div style={{ fontWeight: 700, fontSize: 11, color: "#92400e", marginBottom: 4 }}>Indizi catalogo Lotto {lot}</div>
-                          {tp.catalogSignals.map(x => (
-                            <div key={x.id} style={{ fontSize: 11, color: "#78350f" }}><strong>ID {x.id} · {x.name}</strong>{x.reason ? ` — ${x.reason}` : ""}</div>
-                          ))}
-                        </div>
-                      )}
-                      {tp.risks?.length > 0 && (
-                        <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "8px 10px" }}>
-                          <div style={{ fontWeight: 700, fontSize: 11, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
-                          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#881337" }}>
-                            {tp.risks.map((r, i) => <li key={i}>{r}</li>)}
-                          </ul>
-                        </div>
-                      )}
+                    )}
+                    {/* Selettore multi — aggiunge senza sostituire */}
+                    <select
+                      style={{ ...styles.input }}
+                      value=""
+                      onChange={(e) => {
+                        const appId = e.target.value;
+                        if (!appId) return;
+                        if (selectedAppIds.includes(appId)) return;
+                        const app = applications.find((a) => String(a.id) === appId);
+                        if (!app) return;
+                        const next = [...selectedAppIds, appId];
+                        setSelectedAppIds(next);
+                        setSelectedAppId(appId);
+                        if (app.techProfile) setTechProfile(app.techProfile);
+                        setImplementationFiles([]);
+                        toast(`Applicativo "${app.name}" aggiunto`);
+                      }}>
+                      <option value="">+ Aggiungi applicativo…</option>
+                      {applications
+                        .filter(a => !selectedAppIds.includes(String(a.id)))
+                        .map((a) => (
+                          <option key={a.id} value={String(a.id)}>{a.name}{a.code ? ` (${a.code})` : ""}</option>
+                        ))}
+                     </select>
+                   </div>
+                 </label>
+                 <label style={styles.label}>Tipo contratto
+                   <select style={styles.input}
+                     value={initiative.contractType || ""}
+                     onChange={(e) => {
+                       const val = e.target.value;
+                       setInitiative((i) => ({ ...i, contractType: val }));
+                       // Se towImpattoDb non è ancora caricato, forzalo ora
+                       if (val && Object.keys(towImpattoDb).length === 0) {
+                         getTowImpatto().then(imp => {
+                           if (imp && typeof imp === "object" && Object.keys(imp).length > 0)
+                             setTowImpattoDb(imp);
+                         }).catch(() => {});
+                       }
+                     }}>
+                     <option value="">— nessuno —</option>
+                     {Object.keys(towImpattoDb).length > 0
+                       ? Object.keys(towImpattoDb).map(k => <option key={k} value={k}>{k}</option>)
+                       : ["BASE", "QDO"].map(k => <option key={k} value={k}>{k}</option>)
+                     }
+                   </select>
+                 </label>
+                  <label style={styles.label}>Release
+                    {releaseList.length > 0 ? (
+                      <>
+                        <select style={styles.input}
+                          value={releaseList.includes(initiative.release) || initiative.release === "" || initiative.release === "Da pianificare" || initiative.release === "TBD" ? initiative.release : "__altro__"}
+                          onChange={(e) => {
+                            if (e.target.value !== "__altro__") setInitiative((i) => ({ ...i, release: e.target.value }));
+                            else setInitiative((i) => ({ ...i, release: "" }));
+                          }}>
+                          <option value="">— nessuna —</option>
+                          <option value="Da pianificare">Da pianificare</option>
+                          <option value="TBD">TBD (To Be Defined)</option>
+                          {releaseList.map(r => <option key={r} value={r}>{r}</option>)}
+                          <option value="__altro__">Altro (testo libero)…</option>
+                        </select>
+                        {(!releaseList.includes(initiative.release) && initiative.release !== "" && initiative.release !== "Da pianificare" && initiative.release !== "TBD") && (
+                          <input style={{ ...styles.input, marginTop: 4 }}
+                            value={initiative.release}
+                            placeholder="Inserisci release (es. TBD, R2025-09…)"
+                            onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                        )}
+                      </>
+                    ) : (
+                      <input style={styles.input} value={initiative.release}
+                        placeholder="es. R2025-04 oppure TBD (opzionale)"
+                        onChange={(e) => setInitiative((i) => ({ ...i, release: e.target.value }))} />
+                    )}
+                  </label>
+                <label style={{ ...styles.label, gridColumn: "1 / -1" }}>Requisiti
+                  <textarea style={styles.textarea} value={initiative.requirements} onChange={(e) => setInitiative((i) => ({ ...i, requirements: e.target.value }))} rows={2} />
+                </label>
+                <label style={{ ...styles.label, gridColumn: "1 / -1" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span>Descrizione</span>
+                    <button type="button"
+                      style={{ fontSize: 11, padding: "2px 9px", border: "1px solid #bdc9d4", borderRadius: 5, background: "#f1f5f9", cursor: "pointer", color: "#334155" }}
+                      onClick={() => setShowDescModal(true)}>
+                      ⤢ Espandi
+                    </button>
+                  </div>
+                  <textarea style={styles.textarea} value={initiative.description} onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))} rows={3} />
+                </label>
+                {/* Modale descrizione */}
+                {showDescModal && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    onClick={() => setShowDescModal(false)}>
+                    <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: "min(860px, 94vw)", boxSizing: "border-box", overflowY: "auto", maxHeight: "88dvh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(0,0,0,0.22)" }}
+                      onClick={e => e.stopPropagation()}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                        <strong style={{ fontSize: 16, color: "#102a47" }}>Descrizione iniziativa</strong>
+                        <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b", lineHeight: 1 }} onClick={() => setShowDescModal(false)}>✕</button>
+                      </div>
+                      <textarea
+                        autoFocus
+                        style={{ flex: 1, minHeight: "min(420px, 48dvh)", resize: "vertical", border: "1px solid #bdc9d4", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, fontFamily: "inherit" }}
+                        value={initiative.description}
+                        onChange={(e) => setInitiative((i) => ({ ...i, description: e.target.value }))}
+                      />
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+                        <button style={btnStyles.primary} onClick={() => setShowDescModal(false)}>Chiudi</button>
+                      </div>
                     </div>
-                  </details>
-                );
-              };
-              return selectedAppIds.map(aid => <AppProfileRow key={aid} appId={aid} />);
-            })()}
-          </div>
-
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
-          {importedInterventions.length > 0 && (
-            <div style={styles.card}>
-              <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
-              <details>
-                <summary style={{ cursor: "pointer", margin: "8px 0", fontWeight: 600 }}>Mostra dettaglio importato</summary>
-                <div style={{ overflowX: "auto", marginTop: 8 }}>
-                  {importedInterventions.map((x, xi) => (
-                    <ImportedInterventionGroup key={x.id} intervention={x} items={items}>
-                      {x.mappings.length > 0 ? (
-                        <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, fontSize: 13 }}>
-                          <thead>
-                            <tr style={{ background: "#102a47", color: "#fff" }}>
-                              <th style={{ padding: "10px 12px", textAlign: "left" }}>Componente</th>
-                              <th style={{ padding: "10px 12px", textAlign: "left" }}>Tipo</th>
-                              <th style={{ padding: "10px 12px", textAlign: "left" }}>Complessità</th>
-                              <th style={{ padding: "10px 12px", textAlign: "right" }}>Q.tà</th>
-                              <th style={{ padding: "10px 12px", textAlign: "right" }}>Prezzo unitario (€)</th>
-                              <th style={{ padding: "10px 12px", textAlign: "right" }}>Totale (€)</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {x.mappings.map((m, mi) => {
-                              const cc = catalog.find(c => c.id === m.catalogId || c.nome === m.name);
-                              const validC = cc ? validComplexities(cc, m.type) : ["Semplice", "Medio", "Complesso"];
-                              const currentValues = importedMappingValues(m, items);
-                              const updMapping = (patch) => {
-                                const changed = { ...m, qty: currentValues.quantity, unit: currentValues.price, ...patch };
-                                if (patch.type || patch.complexity) changed.unit = catalogUnitPrice({ id: m.catalogId, ...changed }, catalog);
-                                const row = items.find(it => m.sourceRowId ? it.sourceRowId === m.sourceRowId : it.detail === m);
-                                if (row) updateItem(row.key, { type: changed.type, complexity: changed.complexity, qty: changed.qty, unit: changed.unit });
-                                setImportedInterventions(prev => prev.map((iv, ivi) => ivi !== xi ? iv : { ...iv, mappings: iv.mappings.map((mm, mmi) => mmi !== mi ? mm : changed) }));
-                              };
-                              const qty = currentValues.quantity;
-                              const unit = currentValues.price ?? 0;
-                              return (
-                                <tr key={mi} style={{ background: mi % 2 ? "#f7f9fb" : "#fff", borderBottom: "1px solid #eef2f5" }}>
-                                  <td style={{ padding: "10px 12px" }}>
-                                    <div style={{ fontWeight: 600 }}>{esc(m.name)}</div>
-                                    {m.detailDescription ? <div style={{ color: "#667482", fontSize: 11 }}>{esc(m.detailDescription)}</div> : null}
-                                  </td>
-                                  <td style={{ padding: "10px 12px" }}>
-                                    <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.type || "REALIZZAZIONE"}
-                                      onChange={e => updMapping({ type: e.target.value, unit: null })}>
-                                      <option>REALIZZAZIONE</option><option>MODIFICA</option>
-                                    </select>
-                                  </td>
-                                  <td style={{ padding: "10px 12px" }}>
-                                    <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.complexity || "Medio"}
-                                      onChange={e => updMapping({ complexity: e.target.value, unit: null })}>
-                                      {validC.map(v => <option key={v}>{v}</option>)}
-                                    </select>
-                                  </td>
-                                  <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                                    <input type="number" min={0} step={0.01} value={qty}
-                                      onChange={e => updMapping({ qty: Number(e.target.value) || 0, total: (Number(e.target.value) || 0) * unit })}
-                                      style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
-                                  </td>
-                                  <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                                    <input type="number" min={0} step={0.01} value={unit}
-                                      onChange={e => updMapping({ unit: Number(e.target.value) || 0, total: qty * (Number(e.target.value) || 0) })}
-                                      style={{ ...styles.input, width: 90, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
-                                  </td>
-                                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                    {currentValues.total == null ? 'Non disponibile' : euro.format(currentValues.total)}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table></div>
-                      ) : (
-                        <div style={{ padding: "8px 12px", color: "#667482", fontSize: 12 }}>Nessuna valorizzazione di catalogo.</div>
-                      )}
-                    </ImportedInterventionGroup>
-                  ))}
-                </div>
-              </details>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                <button style={{ ...btnStyles.primary, opacity: analyzeBusy ? 0.7 : 1 }} onClick={analyze} disabled={analyzeBusy}>
+                  {analyzeBusy
+                    ? "⟳ Analisi in corso…"
+                    : importedInterventions.length > 0
+                      ? `Analizza integrazioni (${importedInterventions.length} interventi)`
+                      : "Analizza e suggerisci"}
+                </button>
+                <button style={btnStyles.secondary} onClick={resetInitiative}>Reset</button>
+              </div>
             </div>
-          )}
+          </SectionRow>
+
+          {/* 2 · Workspace documentale */}
+          <SectionRow number="2" id="sezione-documenti" title="Workspace documentale" open={isOpen('documenti')} onToggle={() => toggleSection('documenti')} keepMounted={hasInitiative}
+            facts={hasInitiative ? [libraryFacts] : ['Apri o crea un’iniziativa per usarlo']} status={hasInitiative ? undefined : 'Bloccato'} tone={hasInitiative ? 'neutral' : 'lock'}>
+            <LibraryPanel initiative={initiative} canEdit={canEditInitiative} onSummary={setLibraryFacts} />
+          </SectionRow>
+
+          {/* 3 · Razionali e vincoli con l'AI */}
+          <SectionRow number="3" id="sezione-razionali" title="Razionali e vincoli con l’AI" open={isOpen('razionali')} onToggle={() => toggleSection('razionali')} keepMounted={hasInitiative}
+            facts={hasInitiative ? rationaleFacts(rationale) : ['Apri o crea un’iniziativa per usarlo']} status={hasInitiative ? undefined : 'Bloccato'} tone={hasInitiative ? 'neutral' : 'lock'}>
+            <RationalePanel initiative={initiative} interventions={importedInterventions} onKnowledge={setRationale} />
+          </SectionRow>
+
+          {/* 4 · Soluzione */}
+          <SectionRow number="4" id="sezione-soluzione" title="Soluzione" open={isOpen('soluzione')} onToggle={() => toggleSection('soluzione')} keepMounted={hasInitiative}
+            facts={hasInitiative ? solutionFacts(solutionProgress) : ['Apri o crea un’iniziativa per usarla']} status={!hasInitiative ? 'Bloccata' : solutionProgress.dirty ? 'Non salvata' : undefined} tone={!hasInitiative ? 'lock' : solutionProgress.dirty ? 'warn' : 'neutral'}>
+            <SolutionPanel initiative={initiative} contractId={initiativeContractId} lot={lot} interventions={importedInterventions} knowledge={rationale} applications={applicationContextFor(initiative.system, applications, lot)} canEdit={canEditInitiative} author={currentUserName} onProgress={setSolutionProgress} />
+          </SectionRow>
+
+          {/* 5 · Analisi condivisa */}
+          <SectionRow number="5" id="sezione-analisi" title="Analisi condivisa" open={isOpen('analisi')} onToggle={() => toggleSection('analisi')} keepMounted={hasInitiative}
+            facts={hasInitiative ? analysisFacts(workspaceContext) : ['Inserisci il codice GOTO per usarla']} status={hasInitiative ? undefined : 'Bloccata'} tone={hasInitiative ? 'neutral' : 'lock'}>
+          {importHistoryError && <p role="alert">{importHistoryError}</p>}
+          <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}:${workspaceReload}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
+            onRestore={restoreWorkspace} onSaved={refreshWorkspaceArchive}
+            estimate={{ initiative, items, importedInterventions, suggestions, selectedAppIds, aiProposals, detailReviews, developmentPlans, projectPreparation, economicNotes: economyNotes, sourceWorkbookName, catalogSource: { contractId: selectedContractId, lot, towPriceSourceId }, discount, contingency, tow, towPercentages }} />
+          </SectionRow>
+
+          {/* 6 · Codice sorgente */}
+          <SectionRow number="6" id="sezione-codice" title="Codice sorgente" open={isOpen('codice')} onToggle={() => toggleSection('codice')} keepMounted
+            facts={sourceFacts(selectedAppIds, applications, techProfile)}>
+            {/* ── Codice sorgente: una riga per app selezionata ── */}
+            <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#102a47", marginBottom: selectedAppIds.length > 0 ? 10 : 0 }}>⌘ Codice sorgente</div>
+              {selectedAppIds.length === 0 ? (
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Nessun profilo tecnico — seleziona un applicativo nel campo &quot;Sistema / applicazione&quot; sopra</span>
+              ) : (() => {
+                const AppProfileRow = ({ appId }) => {
+                  const app = applications.find(a => String(a.id) === appId);
+                  const tp = app?.techProfile || (appId === selectedAppId ? techProfile : null);
+                  if (!app) return null;
+                  if (!tp) return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #dbe9fb" }}>
+                      <span style={{ fontSize: 18 }}>📂</span>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: "#102a47" }}>{app.name}</span>
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>— nessun profilo tecnico caricato</span>
+                    </div>
+                  );
+                  const langs   = tp.technologies || [];
+                  const ifaces  = tp.interfaces   || [];
+                  const integr  = tp.integrations || [];
+                  const dbs     = tp.databases    || [];
+                  const testing = tp.testing      || [];
+                  const langStr = langs.slice(0, 4).join(", ") + (langs.length > 4 ? ` +${langs.length - 4}` : "");
+                  const counts  = [
+                    ifaces.length  ? `${ifaces.length} interfacce` : null,
+                    integr.length  ? `${integr.length} integrazioni` : null,
+                    dbs.length     ? `${dbs.length} sorgenti dati` : null,
+                    testing.length ? "test rilevati" : null,
+                  ].filter(Boolean).join(" · ");
+                  return (
+                    <details style={{ borderBottom: "1px solid #dbe9fb" }}>
+                      <summary style={{ cursor: "pointer", listStyle: "none", userSelect: "none", padding: "9px 4px", display: "flex", alignItems: "center", gap: 10 }}>
+                        {/* icona toggle */}
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 22, height: 22, borderRadius: 6,
+                          background: "linear-gradient(135deg,#1a73e8,#0d47a1)",
+                          color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
+                          boxShadow: "0 1px 4px rgba(26,115,232,0.3)"
+                        }}>▾</span>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: "#102a47", minWidth: 80 }}>{app.name}</span>
+                        {app.code && <span style={{ fontSize: 11, color: "#64748b", background: "#e2e8f0", borderRadius: 4, padding: "1px 6px" }}>{app.code}</span>}
+                        <span style={{ fontSize: 12, color: "#475569", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {langStr ? `${langStr}` : ""}
+                          {counts ? <span style={{ color: "#94a3b8", marginLeft: 6 }}>· {counts}</span> : null}
+                        </span>
+                        {tp.totalFiles > 0 && (
+                          <span style={{ fontSize: 11, background: "#dbeafe", color: "#1d4ed8", borderRadius: 5, padding: "2px 7px", flexShrink: 0, fontWeight: 600 }}>
+                            {tp.totalFiles} file
+                          </span>
+                        )}
+                      </summary>
+
+                      <div style={{ padding: "12px 4px 4px" }}>
+                        {/* metriche */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(100px,1fr))", gap: 6, marginBottom: 12 }}>
+                          {[["File totali", tp.totalFiles], ["Analizzati", tp.readFiles], ["Test", tp.testFiles], ["Config", tp.configFiles]]
+                            .filter(([, v]) => v != null)
+                            .map(([label, val]) => (
+                              <div key={label} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "6px 8px", textAlign: "center" }}>
+                                <div style={{ fontSize: 10, color: "#64748b" }}>{label}</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: "#1d4ed8" }}>{val}</div>
+                              </div>
+                            ))}
+                        </div>
+                        {/* sezioni tecniche */}
+                        {(() => {
+                          const TagList = ({ items }) => (items?.length
+                            ? <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 5px", marginTop: 3 }}>
+                                {items.map(t => <span key={t} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px", fontSize: 11, fontWeight: 600 }}>{t}</span>)}
+                              </div>
+                            : <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>);
+                          const Section = ({ title, items }) => items?.length
+                            ? <div><div style={{ fontWeight: 700, fontSize: 11, color: "#475569", marginBottom: 1 }}>{title}</div><TagList items={items} /></div>
+                            : null;
+                          return (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "8px 14px", marginBottom: 10 }}>
+                              <Section title="Linguaggi"               items={tp.technologies} />
+                              <Section title="Framework"               items={tp.frameworks} />
+                              <Section title="Dati e persistenza"      items={tp.databases} />
+                              <Section title="Integrazioni"            items={tp.integrations} />
+                              <Section title="Interfacce"              items={tp.interfaces} />
+                              <Section title="Sicurezza"               items={tp.security} />
+                              <Section title="Test"                    items={tp.testing} />
+                              <Section title="Infrastruttura"          items={tp.infrastructure} />
+                              <Section title="Componenti"              items={tp.components} />
+                            </div>
+                          );
+                        })()}
+                        {tp.catalogSignals?.length > 0 && (
+                          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
+                            <div style={{ fontWeight: 700, fontSize: 11, color: "#92400e", marginBottom: 4 }}>Indizi catalogo Lotto {lot}</div>
+                            {tp.catalogSignals.map(x => (
+                              <div key={x.id} style={{ fontSize: 11, color: "#78350f" }}><strong>ID {x.id} · {x.name}</strong>{x.reason ? ` — ${x.reason}` : ""}</div>
+                            ))}
+                          </div>
+                        )}
+                        {tp.risks?.length > 0 && (
+                          <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 6, padding: "8px 10px" }}>
+                            <div style={{ fontWeight: 700, fontSize: 11, color: "#9f1239", marginBottom: 4 }}>Verifiche tecniche consigliate</div>
+                            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#881337" }}>
+                              {tp.risks.map((r, i) => <li key={i}>{r}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  );
+                };
+                return selectedAppIds.map(aid => <AppProfileRow key={aid} appId={aid} />);
+              })()}
+            </div>
+          </SectionRow>
+
+          {/* 7 · Conoscenza dell'iniziativa */}
+          <SectionRow number="7" id="sezione-conoscenza" title="CONOSCENZA DELL’INIZIATIVA" open={isOpen('conoscenza')} onToggle={() => toggleSection('conoscenza')} keepMounted
+            facts={knowledgeFacts({ rationale, libraryFacts, solutionProgress, importedInterventions, mappingCount, tow5Total })}>
+            <KnowledgeOverview initiative={initiative} rationale={rationale} solution={solutionProgress} interventions={importedInterventions} mappingCount={mappingCount} tow5Total={tow5Total} library={libraryFacts} onOpen={openSection} />
+           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+           {importedInterventions.length > 0 && (
+             <div style={styles.card}>
+               <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
+               <details>
+                 <summary style={{ cursor: "pointer", margin: "8px 0", fontWeight: 600 }}>Mostra dettaglio importato</summary>
+                 <div style={{ overflowX: "auto", marginTop: 8 }}>
+                   {importedInterventions.map((x, xi) => (
+                     <ImportedInterventionGroup key={x.id} intervention={x} items={items}>
+                       {x.mappings.length > 0 ? (
+                         <div role="region" aria-label="Dettaglio valori di catalogo" tabIndex={0} style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderRadius: 10, border: "1px solid #e2e8f0" }}><table style={{ ...styles.table, fontSize: 13 }}>
+                           <thead>
+                             <tr style={{ background: "#102a47", color: "#fff" }}>
+                               <th style={{ padding: "10px 12px", textAlign: "left" }}>Componente</th>
+                               <th style={{ padding: "10px 12px", textAlign: "left" }}>Tipo</th>
+                               <th style={{ padding: "10px 12px", textAlign: "left" }}>Complessità</th>
+                               <th style={{ padding: "10px 12px", textAlign: "right" }}>Q.tà</th>
+                               <th style={{ padding: "10px 12px", textAlign: "right" }}>Prezzo unitario (€)</th>
+                               <th style={{ padding: "10px 12px", textAlign: "right" }}>Totale (€)</th>
+                             </tr>
+                           </thead>
+                           <tbody>
+                             {x.mappings.map((m, mi) => {
+                               const cc = catalog.find(c => c.id === m.catalogId || c.nome === m.name);
+                               const validC = cc ? validComplexities(cc, m.type) : ["Semplice", "Medio", "Complesso"];
+                               const currentValues = importedMappingValues(m, items);
+                               const updMapping = (patch) => {
+                                 const changed = { ...m, qty: currentValues.quantity, unit: currentValues.price, ...patch };
+                                 if (patch.type || patch.complexity) changed.unit = catalogUnitPrice({ id: m.catalogId, ...changed }, catalog);
+                                 const row = items.find(it => m.sourceRowId ? it.sourceRowId === m.sourceRowId : it.detail === m);
+                                 if (row) updateItem(row.key, { type: changed.type, complexity: changed.complexity, qty: changed.qty, unit: changed.unit });
+                                 setImportedInterventions(prev => prev.map((iv, ivi) => ivi !== xi ? iv : { ...iv, mappings: iv.mappings.map((mm, mmi) => mmi !== mi ? mm : changed) }));
+                               };
+                               const qty = currentValues.quantity;
+                               const unit = currentValues.price ?? 0;
+                               return (
+                                 <tr key={mi} style={{ background: mi % 2 ? "#f7f9fb" : "#fff", borderBottom: "1px solid #eef2f5" }}>
+                                   <td style={{ padding: "10px 12px" }}>
+                                     <div style={{ fontWeight: 600 }}>{esc(m.name)}</div>
+                                     {m.detailDescription ? <div style={{ color: "#667482", fontSize: 11 }}>{esc(m.detailDescription)}</div> : null}
+                                   </td>
+                                   <td style={{ padding: "10px 12px" }}>
+                                     <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.type || "REALIZZAZIONE"}
+                                       onChange={e => updMapping({ type: e.target.value, unit: null })}>
+                                       <option>REALIZZAZIONE</option><option>MODIFICA</option>
+                                     </select>
+                                   </td>
+                                   <td style={{ padding: "10px 12px" }}>
+                                     <select style={{ ...styles.input, fontSize: 11, padding: "3px 6px" }} value={m.complexity || "Medio"}
+                                       onChange={e => updMapping({ complexity: e.target.value, unit: null })}>
+                                       {validC.map(v => <option key={v}>{v}</option>)}
+                                     </select>
+                                   </td>
+                                   <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                                     <input type="number" min={0} step={0.01} value={qty}
+                                       onChange={e => updMapping({ qty: Number(e.target.value) || 0, total: (Number(e.target.value) || 0) * unit })}
+                                       style={{ ...styles.input, width: 60, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
+                                   </td>
+                                   <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                                     <input type="number" min={0} step={0.01} value={unit}
+                                       onChange={e => updMapping({ unit: Number(e.target.value) || 0, total: qty * (Number(e.target.value) || 0) })}
+                                       style={{ ...styles.input, width: 90, fontSize: 11, padding: "3px 6px", textAlign: "right" }} />
+                                   </td>
+                                   <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                     {currentValues.total == null ? 'Non disponibile' : euro.format(currentValues.total)}
+                                   </td>
+                                 </tr>
+                               );
+                             })}
+                           </tbody>
+                         </table></div>
+                       ) : (
+                         <div style={{ padding: "8px 12px", color: "#667482", fontSize: 12 }}>Nessuna valorizzazione di catalogo.</div>
+                       )}
+                     </ImportedInterventionGroup>
+                   ))}
+                 </div>
+               </details>
+             </div>
+           )}
+          </SectionRow>
         </div>
       )}
 

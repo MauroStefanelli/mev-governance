@@ -44,3 +44,10 @@
 .lib-sources { margin: 0; padding-left: 18px; max-height: 280px; overflow-y: auto; font-size: 12.5px; } .lib-sources li { margin-bottom: 8px; } .lib-sources small { display: block; color: #4d6179; } .lib-sources p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #3d5878; }
 @media (max-width: 1000px) { .lib-drop { grid-template-columns: 1fr; } .lib-tools { grid-template-columns: 1fr; } .lib-doc-main { grid-template-columns: auto minmax(0, 1fr); } .lib-badges { grid-column: 1 / -1; justify-content: flex-start; } }
 @media (prefers-reduced-motion: reduce) { .lib * { transition: none !important; } }
+
+.lib-ocr { border: 2px solid #1f5fbf; background: #f4f8ff; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.lib-ocr-head { display: flex; flex-direction: column; gap: 4px; } .lib-ocr-head strong { font-size: 15px; } .lib-ocr-head span { font-size: 13px; color: #3d5878; line-height: 1.55; }
+.lib-ocr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+.lib-ocr-list label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; min-height: 36px; cursor: pointer; overflow-wrap: anywhere; } .lib-ocr-list input { width: 18px; height: 18px; accent-color: #1f5fbf; flex: 0 0 auto; } .lib-ocr-list small { color: #4d6179; }
+.lib-ocr-actions { display: flex; gap: 8px; flex-wrap: wrap; } .lib-ocr-warn { margin: 0; background: #fff8e6; border: 1px solid #f0cf8d; color: #7a4700; border-radius: 9px; padding: 8px 12px; font-size: 12.5px; }
+.lib-ocr-tag { margin-left: 8px; border-radius: 20px; padding: 1px 9px; font-size: 11px; font-weight: 700; }
