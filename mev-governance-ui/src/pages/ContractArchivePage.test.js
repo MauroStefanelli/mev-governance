@@ -4,7 +4,7 @@ import ContractArchivePage from './ContractArchivePage';
 import * as service from '../services/mevService';
 
 jest.mock('../services/mevService', () => ({
-  getConfiguratoreContracts: jest.fn(), updateConfiguratoreLot: jest.fn(), deleteConfiguratoreContract: jest.fn(), mergeConfiguratoreContracts: jest.fn(),
+  getConfiguratoreContracts: jest.fn(), updateConfiguratoreLot: jest.fn(), deleteConfiguratoreContract: jest.fn(), mergeConfiguratoreContracts: jest.fn(), getContractOrphans: jest.fn(), repairContractLinks: jest.fn(),
   importConfiguratoreContract: jest.fn(), uploadConfiguratoreContractLot: jest.fn(), getGare: jest.fn(), importaGaraComContratto: jest.fn(),
   getAmbientiUtenti: jest.fn(), addUtenteAmbiente: jest.fn(), removeUtenteAmbiente: jest.fn(), updateUtenteAmbienteRuolo: jest.fn(),
 }));
@@ -14,7 +14,7 @@ const contracts = [
   { contractId: 'b', name: 'Contratto Beta', builtin: true, lots: [{ lotId: '1', name: 'Manutenzione', active: true, codiceContratto: 'MEV-A' }] },
   { contractId: 'c', name: 'Contratto Gamma', builtin: true, lots: [{ lotId: '1', name: 'Nuovi servizi', active: true }] },
 ];
-beforeEach(() => { localStorage.clear(); jest.clearAllMocks(); service.getConfiguratoreContracts.mockResolvedValue(contracts); service.updateConfiguratoreLot.mockResolvedValue({}); service.getAmbientiUtenti.mockResolvedValue([]); window.confirm = jest.fn(() => true); });
+beforeEach(() => { localStorage.clear(); jest.clearAllMocks(); service.getContractOrphans.mockResolvedValue([]); service.getConfiguratoreContracts.mockResolvedValue(contracts); service.updateConfiguratoreLot.mockResolvedValue({}); service.getAmbientiUtenti.mockResolvedValue([]); window.confirm = jest.fn(() => true); });
 const open = async () => { render(<ContractArchivePage ambienti={ambienti} />); return await screen.findByRole('heading', { name: 'Contratto Alpha' }); };
 test('search selects the matching contract and keeps the directory usable with no results', async () => {
   await open(); fireEvent.change(screen.getByLabelText('Cerca contratto'), { target: { value: 'Manutenzione' } });
@@ -128,5 +128,24 @@ describe('deleting a duplicate contract', () => {
   test('the built-in contract has no delete button', async () => {
     render(<ContractArchivePage ambienti={ambienti} />); await screen.findByRole('heading', { name: 'Tracciatura e Logistica Integrata' }); fireEvent.click(await screen.findByRole('button', { name: /Poste TeT \(built-in\)/ }));
     await screen.findByRole('heading', { name: /Poste TeT/ }); expect(screen.queryByRole('button', { name: 'Elimina contratto…' })).not.toBeInTheDocument(); expect(screen.getByText('Contratto di sistema')).toBeInTheDocument();
+  });
+});
+
+describe('links to a contract that no longer exists', () => {
+  const orphans = [{ missingContractId: 'accordo-quadro', lot: '2', revisions: 6, evaluations: 2, goto: ['145480'] }];
+  beforeEach(() => { HTMLDialogElement.prototype.showModal = jest.fn(function () { this.setAttribute('open', ''); }); HTMLDialogElement.prototype.close = jest.fn(function () { this.removeAttribute('open'); }); });
+  test('nothing is shown when every link is fine', async () => { await open(); expect(screen.queryByRole('button', { name: 'Ripara i collegamenti…' })).not.toBeInTheDocument(); });
+  test('broken links are announced with their number and a way to fix them', async () => {
+    service.getContractOrphans.mockResolvedValue(orphans); await open();
+    const alert = await screen.findByRole('alert'); expect(alert).toHaveTextContent('6 revisioni e 2 valutazioni salvate fanno riferimento a un contratto che non esiste più'); expect(within(alert).getByRole('button', { name: 'Ripara i collegamenti…' })).toBeInTheDocument();
+  });
+  test('the button opens the repair dialog with a preview and nothing is changed yet', async () => {
+    service.getContractOrphans.mockResolvedValue(orphans); service.repairContractLinks.mockResolvedValue({ canRepair: true, toName: 'Contratto Alpha', blockers: [], orphans, revisions: 6, evaluations: 2 });
+    await open(); fireEvent.click(await screen.findByRole('button', { name: 'Ripara i collegamenti…' }));
+    expect(await screen.findByRole('dialog', { name: 'Ripara i collegamenti ai contratti' })).toBeInTheDocument(); await waitFor(() => expect(service.repairContractLinks).toHaveBeenCalledWith(expect.any(String), { preview: true }));
+    expect(service.repairContractLinks.mock.calls.every(c => c[1]?.preview)).toBe(true);
+  });
+  test('a failure of the check never blocks the archive', async () => {
+    service.getContractOrphans.mockRejectedValue(new Error('500')); await open(); expect(screen.queryByRole('button', { name: 'Ripara i collegamenti…' })).not.toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Contratto Alpha' })).toBeInTheDocument();
   });
 });

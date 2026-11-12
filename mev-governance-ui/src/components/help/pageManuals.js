@@ -68,6 +68,13 @@ export const PAGE_MANUALS = {
         ['Serve per le mie iniziative?', 'No. Per le iniziative reali scegli il contratto importato e collegato al codice MEV del tuo ambiente.'],
       ] },
     }),
+    chapter('Ripara i collegamenti ai contratti', 'Quando una revisione non si apre perché il suo catalogo non c’è più', [
+      'Se una revisione dell’analisi o una valutazione salvata si apre con il messaggio «Questa revisione non si può aprire perché il contratto usato … non esiste più», non è stato perso nulla: il lavoro corrente è conservato e la revisione è intatta. Succede quando il contratto da cui prendeva il catalogo è stato eliminato.',
+      'In cima all’elenco dell’Archivio, se ci sono collegamenti rotti, compare un avviso con quanti sono («6 revisioni e 2 valutazioni salvate fanno riferimento a un contratto che non esiste più») e il pulsante «Ripara i collegamenti…».',
+      'Nella finestra scegli il contratto da cui prendere il catalogo (quello con i prezzi è già proposto) e leggi l’anteprima: quante revisioni e valutazioni verranno ricollegate e quali iniziative sono coinvolte. Spunta «Ho letto cosa succede e voglio procedere» e premi «Ricollega».',
+      'Cambia soltanto il riferimento al catalogo: decisioni, documenti, stima e lotto di ogni revisione restano come sono. Se il contratto scelto non ha il lotto che la revisione usava, il pulsante resta spento e la finestra dice quale lotto manca, senza indovinare.',
+      'Da ora, quando elimini un contratto con «Elimina contratto…», le revisioni che lo usavano vengono ricollegate in automatico a quello che resta: la riparazione serve solo per i collegamenti già rotti.',
+    ], 'L’operazione è unica: o riesce tutta oppure non cambia niente. Se la finestra non compare il backend non è aggiornato; se compare un errore, nulla è stato modificato.'),
     chapter('Contratto MEV e utenti', 'Accessi al contesto operativo', ['Seleziona un contratto MEV oppure crealo con il comando dedicato.', 'Consulta gli utenti associati e assegna i ruoli previsti dal sistema.', 'Verifica che ciascun utente abbia solo i ruoli necessari nel contratto corretto; il ruolo operativo può cambiare tra ambienti.'], accessNote),
   ] },
   admin: { title: 'Amministrazione utenti', summary: 'Gestisci account, ruoli e abilitazioni alle funzioni.', chapters: [

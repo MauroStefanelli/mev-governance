@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import './contractArchive.css';
 import ContractMembers from '../components/contracts/ContractMembers';
 import ContractMergeDialog from '../components/contracts/ContractMergeDialog';
-import { contractHealth, likelyDuplicates } from '../configuratore/contractMergeModel';
+import ContractRepairDialog from '../components/contracts/ContractRepairDialog';
+import { contractHealth, likelyDuplicates, orphanHeadline } from '../configuratore/contractMergeModel';
 import {
   getConfiguratoreContracts,
   updateConfiguratoreLot,
   importConfiguratoreContract,
   uploadConfiguratoreContractLot,
   getGare,
+  getContractOrphans,
   importaGaraComContratto,
 } from '../services/mevService';
 import { CONTRACT_SUMMARIES } from '../configuratore/contractSummaries';
@@ -518,6 +520,8 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
   // Lotti — toggle / codice MEV
   const [deleting, setDeleting] = useState(false);
   const [mergeFor, setMergeFor] = useState(null);
+  const [orphans, setOrphans] = useState([]);
+  const [repairing, setRepairing] = useState(false);
   const [togglingLot, setToggling]    = useState({});
   const [lotCodes, setLotCodes]       = useState({});
   const [lotEnvSel, setLotEnvSel]     = useState({});
@@ -550,6 +554,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
     try {
       const cs = await getConfiguratoreContracts();
       setContracts(cs);
+      getContractOrphans().then(list => setOrphans(Array.isArray(list) ? list : [])).catch(() => setOrphans([]));
       const codes = {};
       const envSel = {};
       cs.forEach(c => {
@@ -1009,6 +1014,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
             <div className="ca-workspace">
               <aside className="ca-directory" aria-label="Elenco contratti">
                 <div className="ca-directory-head"><strong>Archivio</strong><span>{filteredContracts.length} contratti</span></div>
+                {orphans.length > 0 && <div className="ca-health ca-health-block" role="alert">{orphanHeadline(orphans)} <button type="button" className="ca-merge-btn" onClick={() => setRepairing(true)}>Ripara i collegamenti…</button></div>}
                 {likelyDuplicates(archContracts).map(group => <p key={group.map(c => c.contractId).join('|')} className="ca-health ca-health-block" role="note">Possibile duplicato: {group.map(c => c.name || c.contractId).join(' e ')} hanno gli stessi lotti e lo stesso catalogo. Apri quello da togliere e usa «Elimina contratto…»: i dati utili passano all’altro.</p>)}
                 <label className="ca-search">Cerca contratto<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Nome, lotto o codice MEV" /></label>
                 <label className="ca-search">Mostra<select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Tutti i contratti</option><option value="unlinked">Da collegare a MEV</option></select></label>
@@ -1289,6 +1295,8 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
       }
     </div>
     <LotDataModal modal={modal} onClose={() => setModal(null)} onSaveTowImpact={handleSaveTowImpact} />
+    {repairing && <ContractRepairDialog orphans={orphans} contracts={archContracts} onClose={() => setRepairing(false)}
+      onDone={async result => { setRepairing(false); setMsg({ type: 'ok', text: `${result.message} ${result.revisions} revisioni e ${result.evaluations} valutazioni ora usano il catalogo del contratto scelto.` }); await loadContracts(); }} />}
     {mergeFor && archContracts.find(c => c.contractId === mergeFor) && <ContractMergeDialog contract={archContracts.find(c => c.contractId === mergeFor)} contracts={archContracts} onClose={() => setMergeFor(null)}
       onDone={async result => { setMergeFor(null); setMsg({ type: 'ok', text: `${result.message}${result.repointed ? ` ${result.repointed} valutazioni ricollegate al contratto che resta.` : ''}` }); setSelectedId(result.toContractId); await loadContracts(); }} />}
     </>

@@ -19,6 +19,9 @@ public static class ContractMergeRegression
         new JsonObject { ["applications"] = new JsonArray(names.Select(n => (JsonNode)new JsonObject { ["code"] = "AP-" + n, ["name"] = n }).ToArray()) }.ToJsonString());
     static ContractRow Evaluation(string key, string contractId, string catalogContract) => new(key, "initiative_evaluation", contractId, "2", "145480 · Prova",
         new JsonObject { ["catalogSource"] = new JsonObject { ["contractId"] = catalogContract, ["lot"] = "2" }, ["initiative"] = new JsonObject { ["code"] = "145480" } }.ToJsonString());
+    static RevisionRow Rev(long id, string goto_, int version, string? contractId, string lot = "2", string extra = "") => new(id, goto_, version,
+        new JsonObject { ["title"] = "Prova " + goto_, ["decisions"] = new JsonArray(new JsonObject { ["id"] = "D1", ["text"] = "scelta importante" }),
+            ["estimate"] = new JsonObject { ["items"] = new JsonArray(1, 2, 3), ["note"] = extra, ["catalogSource"] = contractId == null ? null : new JsonObject { ["contractId"] = contractId, ["lot"] = lot, ["towPriceSourceId"] = "" } } }.ToJsonString());
     static object Prices(int n) => Enumerable.Range(0, n).ToDictionary(i => $"TOW02.{i + 1}", i => 100.0 + i);
     static object Cat(int n) => Enumerable.Range(0, n).Select(i => new { id = i, nome = "Voce " + i }).ToArray();
 
@@ -32,6 +35,13 @@ public static class ContractMergeRegression
         {
             check(await As(role).MergeContracts(body) is ForbidResult, $"Merge: {role} cannot merge or delete contracts");
             check(await As(role).MergeContractsPreview(body) is ForbidResult, $"Merge: {role} cannot even preview a merge");
+        }
+        var repairBody = new ConfiguratoreController.RepairContractsRequest { ToContractId = "a" };
+        foreach (var role in new[] { "Client", "Admin", "Manager", "Bid Manager", "Editor" })
+        {
+            check(await As(role).RepairContracts(repairBody) is ForbidResult, $"Repair: {role} cannot repair contract links");
+            check(await As(role).RepairContractsPreview(repairBody) is ForbidResult, $"Repair: {role} cannot preview a repair");
+            check(await As(role).GetOrphans() is ForbidResult, $"Repair: {role} cannot list broken contract links");
         }
         foreach (var role in new[] { "SuperAdmin", "Developer" })
             check(await As(role).MergeContractsPreview(body) is not ForbidResult, $"Merge: {role} is allowed to preview a merge");
@@ -128,6 +138,56 @@ public static class ContractMergeRegression
         check(wb.DeleteKeys.All(k => k.StartsWith("accordo")) && !wb.DeleteKeys.Any(k => k.StartsWith("poste-tet-2025")), "Merge: folding into the system contract never deletes the system contract");
         check(wb.Upserts.Any(u => u.RecordKey == "poste-tet-2025|all|shared_applications"), "Merge: the applications of the duplicate are carried into the system contract");
         check(JsonNode.Parse(wb.Upserts.First(u => u.RecordKey.EndsWith("shared_applications")).PayloadJson)!["applications"]!.AsArray().Count == 1, "Merge: and arrive intact");
+
+
+        // ===== the revisions of the shared analysis (the case that broke: "Il catalogo della revisione non è disponibile") =====
+        var revRows = new List<ContractRow> { Head("a", "A"), LotRow("a", "2", Lot(Prices(5), Cat(27))), Head("b", "B"), LotRow("b", "2", Lot(null, Cat(27))) };
+        var revs = new List<RevisionRow> { Rev(1, "145480", 1, "b"), Rev(2, "145480", 2, "b"), Rev(3, "146023", 1, "a"), Rev(4, "999", 1, null) };
+        var pr = ContractMerge.Plan("b", "a", revRows, revs);
+        check(pr.Revisions.Select(r => r.Id).OrderBy(x => x).SequenceEqual(new long[] { 1, 2 }), "Merge: the revisions built on the deleted catalog are found, the others are not");
+        check(pr.DependentRecords == 2, "Merge: revisions count as dependent records");
+        var pw = ContractMerge.Apply(pr, revRows, revs);
+        check(pw.RevisionWrites!.Count == 2, "Merge: exactly the two revisions are rewritten");
+        var before = JsonNode.Parse(revs[0].PayloadJson)!; var afterNode = JsonNode.Parse(pw.RevisionWrites.First(w => w.Id == 1).PayloadJson)!;
+        check(afterNode["estimate"]!["catalogSource"]!["contractId"]!.GetValue<string>() == "a", "Merge: the revision now points at the contract that stays");
+        check(afterNode["estimate"]!["catalogSource"]!["lot"]!.GetValue<string>() == "2" && afterNode["title"]!.GetValue<string>() == before["title"]!.GetValue<string>(), "Merge: the lot and the title of the revision are untouched");
+        check(afterNode["decisions"]!.ToJsonString() == before["decisions"]!.ToJsonString() && afterNode["estimate"]!["items"]!.ToJsonString() == before["estimate"]!["items"]!.ToJsonString(), "Merge: decisions and estimate of the revision are byte-for-byte the same");
+        check(ContractMerge.CatalogOf(revs[3].PayloadJson) == null && ContractMerge.CatalogOf("not json") == null && ContractMerge.CatalogOf("{}") == null, "Merge: a revision with no catalog, or unreadable, is simply not involved");
+        check(ContractMerge.CatalogOf(new JsonObject { ["estimate"] = new JsonObject { ["catalogSource"] = new JsonObject { ["contractId"] = "z", ["lot"] = 2 } } }.ToJsonString())!.Lot == "2", "Merge: a lot saved as a number is read as text");
+        check(!ContractMerge.Plan("b", "a", revRows).Revisions.Any(), "Merge: without the revisions as input the plan simply does not list any");
+
+        // ===== repairing links that are ALREADY broken (the contract is gone) =====
+        var live = new List<ContractRow> { Head("tet", "Tracciatura e Logistica Integrata"), LotRow("tet", "2", Lot(Prices(5), Cat(27))) };
+        var broken = new List<RevisionRow> { Rev(10, "145480", 1, "accordo-quadro"), Rev(11, "145480", 2, "accordo-quadro"), Rev(12, "146023", 1, "tet"), Rev(13, "1", 1, "poste-tet-2025"), Rev(14, "2", 1, null) };
+        var orphans = ContractRepair.FindOrphans(live, broken);
+        check(orphans.Count == 1 && orphans[0].MissingContractId == "accordo-quadro" && orphans[0].Revisions == 2 && orphans[0].Goto.SequenceEqual(new[] { "145480" }), "Repair: only the revisions naming a contract that no longer exists are reported, with their GOTO");
+        check(!orphans.Any(o => o.MissingContractId == "poste-tet-2025" || o.MissingContractId == "tet"), "Repair: the system contract and an existing contract are never reported as missing");
+        var rp = ContractRepair.Plan("tet", live, broken);
+        check(rp.CanRepair && rp.RevisionFixes.Count == 2, "Repair: the plan can fix the two broken revisions");
+        var repairWrites = ContractRepair.Apply(rp, live, broken);
+        check(repairWrites.Revisions.Count == 2 && repairWrites.Revisions.All(r => JsonNode.Parse(r.PayloadJson)!["estimate"]!["catalogSource"]!["contractId"]!.GetValue<string>() == "tet"), "Repair: they are pointed at the chosen contract");
+        check(repairWrites.Revisions.All(r => { var o = JsonNode.Parse(broken.First(b => b.Id == r.Id).PayloadJson)!; var n = JsonNode.Parse(r.PayloadJson)!; return n["decisions"]!.ToJsonString() == o["decisions"]!.ToJsonString() && n["estimate"]!["items"]!.ToJsonString() == o["estimate"]!["items"]!.ToJsonString(); }), "Repair: nothing but the pointer to the catalog changes");
+        check(ContractRepair.Plan("", live, broken).CanRepair == false && ContractRepair.Plan("nope", live, broken).CanRepair == false, "Repair: an empty or non-existing target is refused");
+        check(ContractRepair.Plan("tet", live, new List<RevisionRow> { Rev(1, "1", 1, "tet") }).Blockers.Single() == "Non ci sono collegamenti da riparare.", "Repair: with nothing broken it says so instead of pretending");
+        var deletedLot = new List<ContractRow> { Head("tet", "T"), LotRow("tet", "2", Lot(Prices(1), Cat(1), deleted: true)) };
+        check(!ContractRepair.Plan("tet", deletedLot, new List<RevisionRow> { Rev(30, "1", 1, "gone") }).CanRepair, "Repair: a lot marked as deleted in the chosen contract does not count as present");
+        check(ContractRepair.Plan("tet", live, new List<RevisionRow> { Rev(31, "1", 1, "gone") }).CanRepair, "Repair: a lot with deleted = false counts as present");
+        var wrongLot = new List<RevisionRow> { Rev(20, "145480", 1, "accordo-quadro", "7") };
+        var rl = ContractRepair.Plan("tet", live, wrongLot);
+        // a target that does not exist is refused even when there ARE broken links to repair
+        var ghost = ContractRepair.Plan("fantasma", live, broken);
+        check(!ghost.CanRepair && ghost.Blockers.Contains("Il contratto scelto non esiste."), "Repair: a contract that does not exist is refused, with that reason");
+        check(ContractRepair.Apply(ghost, live, broken).Revisions.Count == 0 && ghost.RevisionFixes.Count == 0, "Repair: a refused repair lists no fixes and writes nothing");
+        // Apply must not trust the caller: even if a blocked plan is handed over, nothing is produced
+        var forced = new RepairPlan(rl.Orphans, "tet", "T", false, new List<string> { "x" }, new List<RevisionRepoint> { new(20, "145480", 1, "accordo-quadro", "7") }, new List<Reference>());
+        check(ContractRepair.Apply(forced, live, wrongLot).Revisions.Count == 0, "Repair: a plan that says it cannot be applied produces no writes even if it lists fixes");
+
+        check(!rl.CanRepair && rl.Blockers.Single().Contains("lotto 7"), "Repair: a revision on a lot the chosen contract does not have blocks the repair and says which lot");
+        check(ContractRepair.Apply(rl, live, wrongLot).Revisions.Count == 0, "Repair: a blocked repair writes nothing");
+        check(ContractRepair.Plan("poste-tet-2025", live, broken).CanRepair, "Repair: the system contract can be the target (its lots 1 and 2 live in the app)");
+        var evalOrphan = live.Append(Evaluation("env|2|initiative|x", "env", "accordo-quadro")).ToList();
+        var ep = ContractRepair.Plan("tet", evalOrphan, new List<RevisionRow>());
+        check(ep.CanRepair && ep.EvaluationFixes.Count == 1 && JsonNode.Parse(ContractRepair.Apply(ep, evalOrphan, new List<RevisionRow>()).Evaluations.Single().PayloadJson)!["catalogSource"]!["contractId"]!.GetValue<string>() == "tet", "Repair: saved evaluations naming a missing contract are repointed too");
 
         // blockers
         check(!ContractMerge.Plan(Keep, Keep, rows).CanRemove, "Merge: a contract cannot be merged into itself");

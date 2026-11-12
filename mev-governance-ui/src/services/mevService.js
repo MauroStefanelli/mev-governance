@@ -1710,3 +1710,18 @@ export const importTeam = async (rows) => {
   }
   return r.json();
 };
+
+// Links to a catalog contract that no longer exists (revisions and evaluations). Reading and repairing; the preview writes nothing.
+export const getContractOrphans = async () => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/orphans`, { headers: authHeaders() });
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
+  if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.message || (response.status === 404 ? "Il backend non espone ancora il controllo dei collegamenti: aggiorna il backend DEV." : `Collegamenti contratti: errore ${response.status}`)); }
+  return response.json();
+};
+export const repairContractLinks = async (toContractId, { preview = false } = {}) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/repair${preview ? '/preview' : ''}`, { method: "POST", headers: authHeaders(), body: JSON.stringify({ toContractId }) });
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) { const error = new Error(body.message || (response.status === 404 ? "Il backend non espone ancora la riparazione dei collegamenti: aggiorna il backend DEV." : `Riparazione collegamenti: errore ${response.status}`)); error.status = response.status; error.details = body; throw error; }
+  return body;
+};

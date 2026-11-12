@@ -42,3 +42,30 @@ export function summarizePlan(plan) {
   return { changes, lines, canRemove: !!plan?.canRemove, blockers: plan?.blockers || [], notes: plan?.notes || [],
     headline: !plan?.canRemove ? 'Non si può eliminare questo contratto' : changes ? `${changes} ${changes === 1 ? 'elemento verrà spostato' : 'elementi verranno spostati'} e poi il contratto sarà eliminato` : 'Non c’è nulla da spostare: il contratto che resta ha già tutto' };
 }
+
+// ---- Links to a contract that no longer exists ----
+export function orphanHeadline(orphans) {
+  const revisions = (orphans || []).reduce((n, o) => n + (o.revisions || 0), 0); const evaluations = (orphans || []).reduce((n, o) => n + (o.evaluations || 0), 0);
+  if (!revisions && !evaluations) return '';
+  const parts = [];
+  if (revisions) parts.push(`${revisions} ${revisions === 1 ? 'revisione' : 'revisioni'}`);
+  if (evaluations) parts.push(`${evaluations} ${evaluations === 1 ? 'valutazione salvata' : 'valutazioni salvate'}`);
+  return `${parts.join(' e ')} fanno riferimento a un contratto che non esiste più e non si possono aprire.`;
+}
+export const orphanInitiatives = orphans => [...new Set((orphans || []).flatMap(o => o.goto || o.Goto || []))].sort();
+// The contract proposed to receive the links: the one with the most prices, then the most catalog entries (same rule as for the merge).
+export function suggestedRepairTarget(contracts) {
+  const real = (contracts || []).filter(c => (c.lots || []).some(l => !l.deleted && l.active !== false));
+  if (!real.length) return '';
+  return real.reduce((best, c) => suggestedKeeper(best, c) === best ? best : c, real[0]).contractId;
+}
+
+// Shown when a saved revision cannot be opened because the catalog it was built on is gone. It must say what is missing, what is safe, and who can fix it.
+export function missingCatalogMessage(source, contracts = []) {
+  const known = (contracts || []).find(c => c.contractId === source?.contractId);
+  const lotOnly = !!known && (known.lots || []).some(l => String(l.lotId) === String(source?.lot) && l.active === false);
+  const what = known
+    ? (lotOnly ? `il lotto ${source.lot} del contratto «${known.name || known.contractId}» è stato disattivato` : `il contratto «${known.name || known.contractId}» non ha più il lotto ${source?.lot}`)
+    : `il contratto usato da questa revisione («${source?.contractId || 'sconosciuto'}», lotto ${source?.lot ?? '?'}) non esiste più`;
+  return `Questa revisione non si può aprire perché ${what}. Non è stato perso nulla: il lavoro corrente è conservato e la revisione è intatta. ${known && lotOnly ? 'Riattiva il lotto in Archivio contrattuale.' : 'Chi gestisce i contratti può ricollegarla da Archivio contrattuale → «Ripara i collegamenti…».'}`;
+}

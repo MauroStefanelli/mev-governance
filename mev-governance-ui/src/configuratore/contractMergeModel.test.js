@@ -1,4 +1,4 @@
-import { contractHealth, likelyDuplicates, suggestedKeeper, summarizePlan, ACTION_LABEL } from './contractMergeModel';
+import { contractHealth, likelyDuplicates, suggestedKeeper, summarizePlan, ACTION_LABEL, missingCatalogMessage } from './contractMergeModel';
 
 const cat = n => Array.from({ length: n }, (_, i) => ({ id: i }));
 const prices = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [`TOW02.${i + 1}`, i]));
@@ -61,4 +61,20 @@ describe('summarizePlan', () => {
   });
   test('an empty or missing plan does not crash', () => { expect(summarizePlan(undefined).canRemove).toBe(false); expect(summarizePlan({}).lines).toEqual([]); });
   test('every action has a readable label', () => { ['aggiungi', 'completa', 'nessuna', 'ignora'].forEach(a => expect(ACTION_LABEL[a]).toBeTruthy()); });
+});
+
+describe('missingCatalogMessage', () => {
+  const contracts = [{ contractId: 'tet', name: 'Tracciatura e Logistica Integrata', lots: [{ lotId: '1', active: true }, { lotId: '2', active: false }] }];
+  test('a contract that no longer exists is named by its id, says nothing was lost and points to the repair', () => {
+    const m = missingCatalogMessage({ contractId: 'accordo-quadro', lot: '2' }, contracts);
+    expect(m).toMatch(/il contratto usato da questa revisione \(«accordo-quadro», lotto 2\) non esiste più/); expect(m).toMatch(/Non è stato perso nulla/); expect(m).toMatch(/Ripara i collegamenti…/);
+  });
+  test('a lot that was switched off is reported as such and the fix is to reactivate it', () => {
+    const m = missingCatalogMessage({ contractId: 'tet', lot: '2' }, contracts);
+    expect(m).toMatch(/il lotto 2 del contratto «Tracciatura e Logistica Integrata» è stato disattivato/); expect(m).toMatch(/Riattiva il lotto/); expect(m).not.toMatch(/Ripara i collegamenti/);
+  });
+  test('a contract that exists but has no such lot says so', () => {
+    expect(missingCatalogMessage({ contractId: 'tet', lot: '9' }, contracts)).toMatch(/non ha più il lotto 9/);
+  });
+  test('an empty source does not crash', () => { expect(missingCatalogMessage(undefined, undefined)).toMatch(/non esiste più/); });
 });

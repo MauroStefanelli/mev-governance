@@ -481,6 +481,7 @@ public class ConfiguratoreController : ControllerBase
         lots = plan.Lots.Select(l => new { l.LotId, l.Action, l.Reason, l.FromPrices, l.ToPrices, l.FromCatalog, l.ToCatalog }),
         sharedApplications = plan.SharedApps.Select(a => new { a.LotKey, a.Action, a.FromApps, a.ToApps, a.Added }),
         references = plan.References.Select(r => new { r.RecordKey, r.EntityType, r.Title, r.Field }),
+        revisions = plan.Revisions.Select(r => new { r.Id, r.Goto, r.Version, r.Lot }),
         blockers = plan.Blockers, notes = plan.Notes,
     };
 
@@ -493,7 +494,8 @@ public class ConfiguratoreController : ControllerBase
         {
             await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
             var rows = await ContractMergeStore.LoadAllRows(conn, null, sch);
-            return Ok(PlanView(ContractMerge.Plan((req.FromContractId ?? "").Trim(), (req.ToContractId ?? "").Trim(), rows)));
+            var revisions = await ContractMergeStore.LoadRevisions(conn, null, sch);
+            return Ok(PlanView(ContractMerge.Plan((req.FromContractId ?? "").Trim(), (req.ToContractId ?? "").Trim(), rows, revisions)));
         }
         catch (Exception ex) { return StatusCode(500, new { message = "Impossibile preparare l'anteprima dell'unione dei contratti.", error = ex.Message }); }
     }
@@ -509,9 +511,62 @@ public class ConfiguratoreController : ControllerBase
             await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
             var outcome = await ContractMergeStore.MergeAsync(conn, sch, from, to);
             if (!outcome.Done) return Conflict(new { message = outcome.Message, plan = PlanView(outcome.Plan), references = outcome.Dangling });
-            return Ok(new { message = outcome.Message, fromContractId = from, toContractId = to, written = outcome.Written, removed = outcome.Removed, repointed = outcome.Plan.References.Count, lots = outcome.Plan.Lots.Select(l => new { l.LotId, l.Action }) });
+            return Ok(new { message = outcome.Message, fromContractId = from, toContractId = to, written = outcome.Written, removed = outcome.Removed, repointed = outcome.Plan.References.Count + outcome.Plan.Revisions.Count, lots = outcome.Plan.Lots.Select(l => new { l.LotId, l.Action }) });
         }
         catch (Exception ex) { return StatusCode(500, new { message = "Unione non riuscita: non è stato modificato nulla.", error = ex.Message }); }
+    }
+
+    // ============================================================
+    // Collegamenti rotti: revisioni e valutazioni che nominano un contratto che non esiste piu'.
+    //   GET  contracts/orphans                    -> cosa e' rotto e quanti elementi sono coinvolti (non scrive nulla)
+    //   POST contracts/repair/preview { toContractId } -> cosa verrebbe ricollegato
+    //   POST contracts/repair         { toContractId } -> ricollega, in una transazione; cambia SOLO il riferimento al catalogo
+    // ============================================================
+    public class RepairContractsRequest { public string? ToContractId { get; set; } }
+
+    private static object RepairView(RepairPlan plan) => new
+    {
+        toContractId = plan.ToContractId, toName = plan.ToName, canRepair = plan.CanRepair, blockers = plan.Blockers,
+        orphans = plan.Orphans.Select(o => new { o.MissingContractId, o.Lot, o.Revisions, o.Evaluations, o.Goto }),
+        revisions = plan.RevisionFixes.Count, evaluations = plan.EvaluationFixes.Count,
+    };
+
+    [HttpGet("contracts/orphans")]
+    public async Task<IActionResult> GetOrphans()
+    {
+        if (!CanAccess()) return Forbid();
+        var (sch, cs) = GetDbTarget();
+        try
+        {
+            await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
+            var rows = await ContractMergeStore.LoadAllRows(conn, null, sch); var revisions = await ContractMergeStore.LoadRevisions(conn, null, sch);
+            return Ok(ContractRepair.FindOrphans(rows, revisions).Select(o => new { o.MissingContractId, o.Lot, o.Revisions, o.Evaluations, o.Goto }));
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Impossibile controllare i collegamenti dei contratti.", error = ex.Message }); }
+    }
+
+    [HttpPost("contracts/repair/preview")]
+    public async Task<IActionResult> RepairContractsPreview([FromBody] RepairContractsRequest req)
+    {
+        if (!CanAccess()) return Forbid();
+        var (sch, cs) = GetDbTarget();
+        try { await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync(); return Ok(RepairView(await ContractRepairStore.PlanAsync(conn, sch, (req.ToContractId ?? "").Trim()))); }
+        catch (Exception ex) { return StatusCode(500, new { message = "Impossibile preparare l'anteprima della riparazione.", error = ex.Message }); }
+    }
+
+    [HttpPost("contracts/repair")]
+    public async Task<IActionResult> RepairContracts([FromBody] RepairContractsRequest req)
+    {
+        if (!CanAccess()) return Forbid();
+        var (sch, cs) = GetDbTarget();
+        try
+        {
+            await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
+            var outcome = await ContractRepairStore.RepairAsync(conn, sch, (req.ToContractId ?? "").Trim());
+            if (!outcome.Done) return Conflict(new { message = outcome.Message, plan = RepairView(outcome.Plan) });
+            return Ok(new { message = outcome.Message, toContractId = outcome.Plan.ToContractId, revisions = outcome.RevisionsFixed, evaluations = outcome.EvaluationsFixed });
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Riparazione non riuscita: non è stato modificato nulla.", error = ex.Message }); }
     }
 
     // ============================================================

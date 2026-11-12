@@ -6,6 +6,7 @@ import SectionRow from "../configuratore/SectionRow";
 import LedgerPanel from "../configuratore/LedgerPanel";
 import HistoryImportPanel from "../configuratore/HistoryImportPanel";
 import { initiativeFromLedger } from "../configuratore/ledgerModel";
+import { missingCatalogMessage } from "../configuratore/contractMergeModel";
 import SolutionPanel from "../configuratore/SolutionPanel";
 import KnowledgeOverview from "../configuratore/KnowledgeOverview";
 import { loadPmPoste, pmOptions, pmSelectValue, pmFromSelect, showsFreeText, OTHER } from "../configuratore/pmPoste";
@@ -1192,7 +1193,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     const snapshot = state.estimate || {};
     const source = snapshot.catalogSource;
     if (source && !allContracts.some(c => c.contractId === source.contractId && c.lots.some(l => String(l.lotId) === String(source.lot) && l.active !== false))) {
-      setError('Il catalogo della revisione non è disponibile. Il lavoro corrente è stato conservato.');
+      setError(missingCatalogMessage(source, allContracts));
       return false;
     }
     if (source) { setSelectedContractId(source.contractId); setLot(String(source.lot)); }

@@ -10,6 +10,11 @@ public record LotMove(string LotId, string Action, string Reason, int FromPrices
 public record SharedAppsMove(string LotKey, string Action, int FromApps, int ToApps, int Added);
 public record Reference(string RecordKey, string EntityType, string Title, string Field);
 
+// A revision of the shared analysis (table InitiativeRevisions). Immutable by design: a version is never rewritten, only its pointer to the
+// catalog it was built on is, and only when that catalog no longer exists. Everything else in the payload stays byte-for-byte as it was.
+public record RevisionRow(long Id, string Goto, int Version, string PayloadJson);
+public record RevisionRepoint(long Id, string Goto, int Version, string FromContractId, string Lot);
+
 // What moving a contract into another would do, decided entirely from the rows. Nothing is written by building it.
 public class MergePlan
 {
@@ -18,9 +23,10 @@ public class MergePlan
     public List<LotMove> Lots { get; } = new();
     public List<SharedAppsMove> SharedApps { get; } = new();
     public List<Reference> References { get; } = new();          // records that point at the contract being removed through their payload
+    public List<RevisionRepoint> Revisions { get; } = new();     // revisions of the shared analysis that were built on the contract being removed
     public List<string> Blockers { get; } = new();                // reasons the removal must not happen
     public List<string> Notes { get; } = new();
-    public int DependentRecords => References.Count;
+    public int DependentRecords => References.Count + Revisions.Count;
     public bool CanRemove => Blockers.Count == 0;
 }
 
@@ -43,13 +49,31 @@ public static class ContractMerge
     static string ContractKey(string id) => $"{id}|contract";
     static string LotKey(string id, string lot) => $"{id}|{lot}|contract-lot";
 
+    public record CatalogRef(string ContractId, string Lot);
+    // The catalog an analysis revision was built on, or null when it names none.
+    public static CatalogRef? CatalogOf(string payloadJson)
+    {
+        var estimate = Parse(payloadJson)["estimate"] as JsonObject;
+        var source = estimate?["catalogSource"] as JsonObject;
+        var id = Text(source?["contractId"]); if (id.Length == 0) return null;
+        var lot = source?["lot"] is JsonValue v ? (v.TryGetValue<string>(out var s1) ? s1 : v.TryGetValue<int>(out var i1) ? i1.ToString() : v.ToString()) : "";
+        return new CatalogRef(id, lot.Trim());
+    }
+    // The same payload with ONLY the catalog contract changed. Nothing else is touched, not even the order of the fields.
+    public static string Repoint(string payloadJson, string toContractId)
+    {
+        var node = Parse(payloadJson);
+        if (node["estimate"] is JsonObject estimate && estimate["catalogSource"] is JsonObject source) source["contractId"] = toContractId;
+        return node.ToJsonString();
+    }
+
     public static string AppIdentity(JsonNode? app)
     {
         static string N(string s) => new string(s.Normalize(System.Text.NormalizationForm.FormD).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
         return N(Text(app?["code"])) + "|" + N(Text(app?["name"]));
     }
 
-    public static MergePlan Plan(string fromId, string toId, IReadOnlyList<ContractRow> rows)
+    public static MergePlan Plan(string fromId, string toId, IReadOnlyList<ContractRow> rows, IReadOnlyList<RevisionRow>? revisions = null)
     {
         var plan = new MergePlan { FromId = fromId, ToId = toId };
         ContractRow? Find(string key) => rows.FirstOrDefault(r => r.RecordKey == key);
@@ -107,6 +131,9 @@ public static class ContractMerge
             if (holder != null && Text(holder["contractId"]) == fromId) plan.References.Add(new Reference(r.RecordKey, r.EntityType, r.Title, "catalogSource.contractId"));
             if (p["contractId"] is JsonNode c && Text(c) == fromId && r.ContractId != fromId && r.EntityType != "contract") plan.References.Add(new Reference(r.RecordKey, r.EntityType, r.Title, "contractId"));
         }
+        // revisions of the shared analysis: they remember the catalog they were built on inside estimate.catalogSource
+        foreach (var rev in revisions ?? Array.Empty<RevisionRow>())
+            if (CatalogOf(rev.PayloadJson) is { } src && src.ContractId == fromId) plan.Revisions.Add(new RevisionRepoint(rev.Id, rev.Goto, rev.Version, fromId, src.Lot));
         // records stored UNDER the source contract that this merge does not know how to carry over would be lost with the removal
         foreach (var r in rows.Where(r => r.ContractId == fromId && r.EntityType is not ("contract" or "contract_lot" or "shared_applications")))
             plan.Blockers.Add($"Il record «{(string.IsNullOrWhiteSpace(r.Title) ? r.RecordKey : r.Title)}» ({r.EntityType}) è salvato sotto il contratto da eliminare: spostarlo a mano o eliminarlo prima.");
@@ -116,12 +143,12 @@ public static class ContractMerge
     }
 
     // The rows that must be written for the move, given the plan. Returns upserts and the keys to delete. Writing them is the caller's job.
-    public record Writes(List<ContractRow> Upserts, List<string> DeleteKeys);
+    public record Writes(List<ContractRow> Upserts, List<string> DeleteKeys, List<(long Id, string PayloadJson)>? RevisionWrites = null);
 
-    public static Writes Apply(MergePlan plan, IReadOnlyList<ContractRow> rows)
+    public static Writes Apply(MergePlan plan, IReadOnlyList<ContractRow> rows, IReadOnlyList<RevisionRow>? revisions = null)
     {
-        var upserts = new List<ContractRow>(); var deletes = new List<string>();
-        if (!plan.CanRemove) return new Writes(upserts, deletes);
+        var upserts = new List<ContractRow>(); var deletes = new List<string>(); var revisionWrites = new List<(long, string)>();
+        if (!plan.CanRemove) return new Writes(upserts, deletes, revisionWrites);
         ContractRow Row(string key) => rows.First(r => r.RecordKey == key);
 
         foreach (var move in plan.Lots)
@@ -166,8 +193,13 @@ public static class ContractMerge
             else if (reference.Field == "contractId") p["contractId"] = plan.ToId;
             upserts.Add(row with { PayloadJson = p.ToJsonString() });
         }
+        foreach (var move in plan.Revisions)
+        {
+            var rev = revisions?.FirstOrDefault(r => r.Id == move.Id); if (rev == null) continue;
+            revisionWrites.Add((rev.Id, Repoint(rev.PayloadJson, plan.ToId)));
+        }
         deletes.Add(ContractKey(plan.FromId));
         deletes.AddRange(rows.Where(r => r.ContractId == plan.FromId && r.EntityType is "contract_lot" or "shared_applications").Select(r => r.RecordKey));
-        return new Writes(upserts, deletes.Distinct().ToList());
+        return new Writes(upserts, deletes.Distinct().ToList(), revisionWrites);
     }
 }
