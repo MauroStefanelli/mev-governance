@@ -1,4 +1,4 @@
-const chapter = (title, subtitle, steps, note) => ({ title, subtitle, steps, note });
+const chapter = (title, subtitle, steps, note, extra = {}) => ({ title, subtitle, steps, note, ...extra });
 const accessNote = 'Le azioni visibili dipendono dal ruolo e dai permessi assegnati. Verifica il contratto/ambiente nella barra superiore: i dati operativi sono riferiti al contesto attivo.';
 const tableChapter = chapter('Filtri e consultazione', 'Restringere i dati senza modificarli', [
   'Apri i filtri nelle intestazioni e seleziona i valori desiderati. Le opzioni si aggiornano considerando le selezioni negli altri filtri.',
@@ -64,36 +64,70 @@ export const PAGE_MANUALS = {
     chapter('Configurazione', 'Verificare la destinazione dei dati', ['Controlla l’ambiente prima di consultare o aggiornare la configurazione.', 'Usa solo i campi e i comandi presenti nella pagina e attendi la conferma di verifica o salvataggio.', 'Non condividere password o stringhe di connessione nei documenti operativi o nei messaggi di assistenza.'], accessNote),
   ] },
   sviluppo: { title: 'Sviluppo iniziative', summary: 'Trasforma una valutazione del Configuratore in schede per attività, progetto di avvio, file generati e richiesta di modifica codice.', chapters: [
-    chapter('Il percorso in sei fasi', 'Fonti, Schede, Progetto, Codice, Consegna, Verifica', [
-      'La barra in alto mostra le sei fasi e, per ciascuna, avanzamento e stato: ✓ completa, numero blu in corso, grigio da fare. Clicca una fase per aprirla, oppure usa i pulsanti «← / →» in fondo alla pagina.',
-      'Il riquadro «Prossimo passo» indica la prima cosa da fare e porta alla fase giusta con un clic. L’avanzamento complessivo considera solo le fasi obbligatorie (Schede, Consegna, Verifica): Progetto e Codice sono facoltative e la cartella dei sorgenti, che va riselezionata a ogni sessione, non lo abbassa.',
-      '«Mostra le regole della fase» spiega a cosa serve la fase, cosa serve per completarla, cosa produce e quali regole vigono. Nella fase Consegna elenca anche i quattro controlli da soddisfare.',
-      'Le fasi non sono bloccate: puoi lavorare in ordine diverso. La sequenza consigliata è Fonti → Schede → (Progetto) → (Codice) → Consegna → Verifica.',
-    ], 'Una scheda è «definita» solo con file, soluzione e criteri di accettazione. Una proposta AI non la rende definita finché non la inserisci tu.'),
-    chapter('Parti da qui', 'Dalla valutazione salvata allo sviluppo', [
-      'Salva prima la valutazione nel Configuratore (Revisione → “Salva valutazione”, oppure “Salva e vai a Sviluppo →”). Lo Sviluppo mostra solo le iniziative già valutate nell’ambiente attivo.',
-      'Cerca l’iniziativa per GOTO, titolo o sistema e aprila: nell’elenco vedi per ciascuna quante schede sono definite e verificate. Il GOTO e il titolo restano visibili nell’intestazione fissa.',
-      'Offerta, importi e catalogo restano nel Configuratore: qui lavori su schede, progetto e consegna. Per cambiare l’offerta torna al Configuratore.',
-    ], 'Se le schede erano state salvate nel Configuratore prima di questa applicazione, vengono caricate come punto di partenza: premi “Salva sviluppo” per renderle definitive.'),
-    chapter('Razionali e vincoli dell’iniziativa', 'La conoscenza confermata nel Configuratore', [
+    chapter('Introduzione e sequenza', 'A cosa serve e in che ordine si lavora', [
+      'Accedi con un ruolo Developer o SuperAdmin: sono i soli che vedono «Sviluppo iniziative» nella Home. Prima di aprirla, nel Configuratore, la valutazione deve essere stata salvata (passo Revisione → «Salva valutazione», oppure «Salva e vai a Sviluppo →»).',
+      'Dalla Home apri «Sviluppo iniziative». Nell’elenco «Iniziative valutate» cerca per GOTO, titolo o sistema e clicca la riga. Se hai modifiche non salvate su un’altra iniziativa l’app lo chiede: «Aprire un’altra iniziativa?».',
+      'Se l’iniziativa è nuova si apre la fase Fonti, altrimenti la fase Schede. In alto vedi sempre il riquadro «Prossimo passo»: indica la prima cosa da fare e il pulsante «Vai a … →» ti porta nella fase giusta.',
+      'Lavora le fasi nell’ordine consigliato: 1 Fonti → 2 Schede → 3 Progetto (facoltativa) → 4 Codice (facoltativa) → 5 Consegna → 6 Verifica. Non sono bloccate: puoi saltare avanti e tornare indietro con la barra in alto o con i pulsanti in fondo alla pagina.',
+      'Il pulsante «Mostra le regole della fase» spiega a cosa serve la fase, cosa serve per completarla, cosa produce e quali regole vigono. L’avanzamento complessivo (in alto) considera solo Schede, Consegna e Verifica: Progetto e Codice sono facoltative e la cartella dei sorgenti, che si perde a ogni ricarica, non lo fa scendere.',
+      'Salva spesso con «Salva sviluppo» (si attiva solo se ci sono modifiche). A fine lavoro usa «Salva e chiudi», che chiude solo se il salvataggio riesce, oppure «Chiudi senza salvare».',
+    ], 'L’app prepara materiale (schede, ZIP, bozze di codice) e tiene traccia di cosa è stato fatto. Non scrive nel repository, non compila, non esegue test né deploy: lo fai tu in Visual Studio Code.', {
+      intro: 'Sviluppo iniziative prende una valutazione già fatta nel Configuratore e la porta fino al codice. Per ogni riga di dettaglio dell’offerta crea una scheda tecnica (dove intervenire, come, come si accetta il risultato), aiuta a prepararla con l’AI leggendo i sorgenti, produce i pacchetti da dare a chi scrive il codice e raccoglie le evidenze che il lavoro è stato verificato. Si procede in sei fasi.',
+      figure: { id: 'development', title: 'Figura 1 — Le sei fasi.', caption: 'Quali fasi contano nell’avanzamento, quando una scheda è «definita» e gli stati che attraversa.', alt: 'Il percorso ha sei fasi in sequenza: 1 Fonti, 2 Schede, 3 Progetto (facoltativa), 4 Codice (facoltativa), 5 Consegna, 6 Verifica. Nell’avanzamento complessivo contano Schede, Consegna e Verifica. Una scheda è «definita» quando ha tutti e tre: file coinvolti, soluzione tecnica e criteri di accettazione; una proposta AI da sola non la rende definita. Gli stati di una scheda sono, in ordine: Da analizzare, Soluzione definita, Pronta per sviluppo, In sviluppo, Da verificare, Verificata. «Pronta per sviluppo» richiede la scheda definita; «Verificata» richiede le evidenze; modificare una scheda verificata la riporta a «Da verificare». L’app non scrive nel repository, non compila e non esegue test o deploy.' },
+    }),
+    chapter('L’elenco delle iniziative', 'Cosa vedi e come lo leggi', [
+      'L’elenco mostra le sole valutazioni salvate nel Configuratore per l’ambiente attivo. Un’iniziativa non salvata non compare: se è vuoto leggi «Nessuna iniziativa valutata in questo ambiente. Salva prima una valutazione nel Configuratore.».',
+      'Ogni riga riporta il GOTO (o «Senza GOTO»), il titolo, il sistema, il numero di attività e la data di valutazione. La pillola di stato dice a che punto è lo sviluppo.',
+      'Sotto la pillola vedi quante schede sono definite su quante e quante verificate, con una barra, e l’ultima attività («Ultimo lavoro: … ») con chi è collegato in questo momento. Il pulsante «↻ Aggiorna» ricarica l’elenco.',
+    ], 'Il campo di ricerca filtra per GOTO, titolo e sistema; non ci sono altri filtri.', {
+      fields: { caption: 'Le pillole di stato dell’elenco', rows: [
+        ['Da avviare', 'Non esiste ancora uno sviluppo salvato per questa iniziativa («Nessuno sviluppo salvato»).'],
+        ['Avviato', 'Lo sviluppo esiste ma nessuna scheda è ancora definita.'],
+        ['In corso', 'C’è almeno una scheda definita o verificata.'],
+        ['Verificato', 'Tutte le attività sono verificate.'],
+      ] },
+    }),
+    chapter('Fase 1 · Fonti', 'Collegare il codice e leggere i vincoli', [
+      'Controlla «Razionali e vincoli confermati»: sono le voci confermate nel Configuratore (passo Iniziativa), divise in razionali, vincoli e decisioni. Qui si consultano soltanto.',
+      'Guarda «Applicativi associati al sistema …». Il sistema dell’iniziativa è confrontato con codice, nome e alias degli applicativi configurati. Se nessuno corrisponde, l’app elenca dove ha cercato: aggiungi il sistema come alias dell’applicativo giusto in Configuratore → «Risorse e configurazione» → «Applicativi e tecnologie».',
+      'Premi «Seleziona cartella sorgenti» (poi «Cambia cartella») e scegli la cartella del repository. I file restano nel tuo browser: non vengono caricati sul server.',
+      'Verifica il messaggio sotto il pulsante: indica quanti file hai selezionato e quanti sorgenti sono presi in considerazione, oppure «Nessuna cartella: uso il profilo tecnico dell’applicativo». Senza cartella e senza profilo le proposte AI e la generazione di file non sono disponibili.',
+    ], 'Il browser non conserva il permesso di leggere la cartella: dopo un ricaricamento va riselezionata, ma solo per nuove analisi. Proposte e schede salvate si consultano senza cartella.', {
+      warnings: [
+        ['«Nessun applicativo collegato».', 'Nel Configuratore apri Risorse e configurazione → Applicativi, crea l’applicativo e imposta il percorso dei sorgenti.'],
+        ['«Razionali non disponibili».', 'Il servizio non ha risposto: Sviluppo continua a funzionare. Riapri l’iniziativa più tardi.'],
+        ['Un collega ha confermato nuovi razionali.', 'Si leggono all’apertura: chiudi e riapri l’iniziativa per includerli.'],
+      ],
+    }),
+    chapter('Razionali e vincoli dell’iniziativa', 'La conoscenza confermata nel Configuratore, usata ovunque', [
       'Nella fase Fonti trovi «Razionali e vincoli confermati»: le voci che il team ha confermato nel Configuratore (passo Iniziativa) per questa iniziativa, divise in razionali, vincoli e decisioni. Qui si consultano; per modificarle torna al Configuratore.',
       'Guidano il lavoro: sono incluse nelle richieste di «Prepara scheda con AI» e di «Genera codice», sono mostrate dentro ogni attività a cui si applicano (una voce collegata a un intervento vale per le sue attività, una generale per tutte) e finiscono negli ZIP in RAZIONALI_E_VINCOLI.md, nella richiesta JSON e nel progetto di avvio.',
       'Solo le voci confermate vengono usate. Se un vincolo rende impossibile una richiesta, la generazione dei file lo segnala come blocco. Se il servizio dei razionali non è disponibile, Sviluppo continua a funzionare e lo dice.',
       'I razionali si leggono quando apri l’iniziativa: se un collega ne conferma di nuovi mentre lavori, richiudi e riapri l’iniziativa per includerli.',
     ], 'Le voci non sostituiscono le verifiche: restano indicazioni del team, non prove che il codice le rispetti.'),
-    chapter('Colleghi collegati e chat', 'Sapere chi sta lavorando e parlarsi', [
-      'Nell’elenco delle iniziative ogni riga mostra chi ha salvato per ultimo lo sviluppo e quando, e chi è collegato in questo momento. Conta come «ultimo lavoro» solo un salvataggio confermato dal server: aprire l’iniziativa non basta.',
-      'Aprendo un’iniziativa compare il riquadro di collaborazione: i colleghi collegati, un avviso in giallo se qualcuno sta lavorando sulla stessa iniziativa e la chat. Quando un collega si collega mentre sei dentro, ricevi una notifica.',
-      'La presenza si aggiorna ogni 15 secondi e si considera spenta dopo 45 secondi senza segnali, oppure subito se chiudi l’iniziativa o la pagina. Con la scheda del browser nascosta l’aggiornamento si ferma e riprende al ritorno.',
-      'La chat è unica per iniziativa e per ambiente: tutti quelli che lavorano allo sviluppo vedono gli stessi messaggi, anche se si collegano dopo. La cronologia è conservata e i messaggi più vecchi si caricano con «Mostra messaggi precedenti». Invio per inviare, Maiusc+Invio per andare a capo; massimo 2.000 caratteri.',
-      'Il messaggio non inviato resta nella casella, così non si perde. I messaggi non si modificano né si cancellano. Non scrivere password, chiavi o dati riservati: la cronologia è visibile ai colleghi dello stesso ambiente.',
-    ], 'La presenza e la chat avvisano ma non bloccano: due persone possono comunque salvare. Lo sviluppo si salva per intero e il secondo salvataggio viene rifiutato con un conflitto se il primo è avvenuto dopo la tua apertura. Coordinatevi nella chat prima di salvare.'),
-    chapter('Salvataggio e collaborazione', 'Conservare il lavoro senza sovrascrivere i colleghi', [
-      '“Salva sviluppo” scrive schede, proposte AI, progetto e dati di consegna in un archivio dedicato e mostra la conferma solo dopo il riscontro del server. “Salva e chiudi” chiude solo se il salvataggio riesce.',
-      'Se un collega ha salvato lo sviluppo della stessa iniziativa dopo la tua apertura, ricevi un conflitto e la pagina resta aperta con le tue modifiche. Non ricaricare: copia ciò che serve, riapri l’iniziativa e riconcilia.',
-      'Se l’offerta viene rivista nel Configuratore, le schede restano legate alla riga originale. Se descrizione o numero di attività cambiano, lo Sviluppo lo segnala: controlla le schede delle righe modificate.',
-    ], 'Salvare lo sviluppo non modifica la valutazione dell’offerta e salvare l’offerta non modifica lo sviluppo.'),
-    chapter('Schede per attività e AI', 'Una scheda per ogni riga importata', [
+    chapter('Fase 2 · Schede, passo per passo', 'Compilare una scheda per ogni attività', [
+      'Apri la fase Schede. Ogni attività è un riquadro apribile, uno alla volta, con cinque tappe: Requisito → Proposta AI → Scheda definita → File generati → Verificata. Sotto, «Prossimo passo» dice cosa fare.',
+      'Filtra con i pulsanti degli stati (Tutte, Da analizzare, Soluzione definita, Pronta per sviluppo, In sviluppo, Da verificare, Verificata): accanto a ciascuno c’è il numero di schede.',
+      'Leggi il «Requisito» (sola lettura) e, se ci sono, i razionali e vincoli confermati che valgono per quell’attività.',
+      'Se hai selezionato la cartella, premi «Prepara scheda con AI»: l’AI legge un campione di sorgenti e scrive una proposta. Controlla soluzione, criteri e i «File e righe citati negli estratti». I riferimenti confermano dove si trovano nel campione, non che la soluzione sia corretta.',
+      'Se la proposta ti convince premi «Inserisci bozza nella scheda» (chiede conferma e sostituisce file, soluzione e criteri correnti). Poi completa a mano i dettagli.',
+      'Compila i quattro campi (tabella sotto), scegli lo «Stato di verifica» e salva con «Salva sviluppo».',
+    ], '«Pronta per sviluppo» richiede la scheda definita (file, soluzione e criteri). «Verificata» richiede le evidenze. Se modifichi una scheda verificata senza cambiare lo stato, torna a «Da verificare».', {
+      fields: { caption: 'I campi di una scheda', rows: [
+        ['File coinvolti (uno per riga, percorso relativo)', 'I file da toccare, ad esempio src/main/java/…/Servizio.java. Servono per dire che la scheda è definita.'],
+        ['Soluzione tecnica', 'Che cosa si modifica e come, in modo che un altro sviluppatore possa realizzarlo.'],
+        ['Criteri di accettazione', 'Come si capisce che il lavoro è finito e corretto.'],
+        ['Evidenze di verifica (test, comando, esito, commit)', 'Cosa hai eseguito e con quale esito. Obbligatorie per impostare «Verificata».'],
+        ['Stato di verifica', 'Da analizzare, Soluzione definita, Pronta per sviluppo, In sviluppo, Da verificare, Verificata. Alcune voci sono spente finché mancano i requisiti.'],
+      ] },
+      warnings: [
+        ['«Seleziona prima la cartella dei sorgenti».', 'La proposta AI legge il codice: scegli la cartella in Fonti o dal riquadro in cima alle schede.'],
+        ['«Nessun file sorgente leggibile».', 'La cartella non contiene file di estensioni supportate (java, sql, xml, js, ts, json, md, cs…) oppure sono tutti esclusi (.git, node_modules, target, bin, obj, vendor, dist).'],
+        ['«Risposta AI incompleta: la scheda corrente non è stata modificata».', 'L’AI non ha dato soluzione e criteri: riprova, la tua scheda non è stata toccata.'],
+        ['Errore 404 nella preparazione.', 'Il backend non espone ancora l’endpoint AI: va aggiornato; non dipende dall’Excel.'],
+      ],
+    }),
+    chapter('Schede: preparazione AI in blocco', 'Molte attività alla volta, senza perdere il lavoro fatto', [
       'Ogni riga di dettaglio ha una scheda: ad esempio un intervento con 29 righe produce 29 schede distinte. Filtra per stato con i pulsanti in alto, che mostrano anche quante schede hai in ciascuno. Ogni scheda mostra i cinque passaggi (Requisito, Proposta AI, Scheda definita, File generati, Verificata) e il prossimo passo da fare.',
       'Il sistema dell’iniziativa (ad esempio «BEP») viene confrontato con codice, nome e alias degli applicativi configurati nel Configuratore. Se non ne trova, la fase Fonti indica dove ha cercato e quali applicativi esistono: aggiungi il sistema come alias dell’applicativo corretto, oppure crealo, in Configuratore → Risorse e configurazione → Applicativi. Gli applicativi sono cercati sia nel catalogo scelto per la stima sia nell’ambiente attivo.',
       'Premi “Seleziona cartella sorgenti per questa sessione” e scegli la cartella del repository. Il browser non conserva il permesso: va riselezionata dopo un ricaricamento, solo per nuove analisi o generazioni. Proposte e schede salvate si consultano senza cartella.',
@@ -106,23 +140,90 @@ export const PAGE_MANUALS = {
       '“Inserisci bozza nella scheda” sostituisce file, soluzione e criteri correnti dopo conferma; non salva e non approva. Completa i dettagli, poi salva lo sviluppo: la proposta AI viene conservata anche se non la inserisci.',
       'Compila file coinvolti, soluzione e criteri prima di “Pronta per sviluppo”. Imposta “Verificata” solo con evidenze di test o verifica: l’app non esegue quei test.',
     ], 'Un errore 404 nella preparazione indica che il backend non espone ancora l’endpoint AI: non dipende dall’Excel.'),
-    chapter('Progetto di avvio', 'Struttura e decisioni da concordare', [
-      'In “Prepara progetto · Visual Studio Code” inserisci nome, tipo e obiettivo. Compila le decisioni su runtime, interfacce, mapping, errori, duplicati, accessi e test con scelta, fonte e referente. Le voci mancanti restano aperte: non scegliere una tecnologia senza conferma.',
-      '“Genera progetto di avvio ZIP” produce README, workspace VS Code, schede attività, architettura, registro decisioni e piano test, con cartelle src, contracts e fixtures da completare. Il piano test è una checklist non eseguita.',
-      'Lo ZIP non contiene i sorgenti locali né un workflow distribuibile. Salva lo sviluppo per conservare la configurazione.',
-    ]),
-    chapter('Generazione di file reali', 'Codice o workflow per un applicativo', [
-      'Nella scheda attività apri “Generazione codice / workflow · target applicativo”. Scegli l’applicativo, indica modulo, stack/runtime e DB/versione (o Non applicabile), quindi contratti e convenzioni. Un solo target alla volta.',
-      'Per modificare file esistenti elenca i percorsi relativi degli originali completi presenti nella cartella selezionata (massimo otto); lascia vuoto per soli file nuovi. La scheda deve avere soluzione e criteri.',
-      'Consulta ogni file e il relativo originale, poi “Conserva artefatti nella scheda” e scarica lo ZIP sorgenti (proposed/, original/, manifest e test suggeriti). Una nuova generazione sostituisce gli artefatti solo dopo conferma.',
-      'Confronta i file con il checkout effettivo prima di applicarli. L’AI può segnalare decisioni mancanti senza generare file.',
-    ], 'Generato non significa compilato, distribuibile o collaudato. L’app non scrive nel repository, non esegue SQL, build o deploy.'),
-    chapter('Consegna e verifica', 'Dalla richiesta al codice verificato', [
-      'In “Richiesta di modifica codice” scegli lo strumento (Visual Studio Code, Codex o altro), il branch, le note di approvazione e i test attesi. Collega la cartella sorgenti oppure usa il profilo tecnico di un applicativo.',
-      '“Genera ZIP richiesta modifica codice” include README_MODIFICA_CODICE.md, richiesta_modifica_codice.json, piano_sviluppo.md, SCHEDE_SVILUPPO.md, schede_sviluppo.json ed elenco_file_repository.txt. Lo ZIP riporta le schede mostrate nella pagina, anche non ancora salvate. “Esporta piano di sviluppo (MD)” e “Genera documento sviluppo (AI)” producono documenti Markdown.',
-      'Apri il progetto reale in Visual Studio Code sul branch concordato e lavora su un’attività alla volta, verificando i file citati sul checkout effettivo. Visual Studio Code è un editor: la modifica la scrive lo sviluppatore o un assistente con accesso ai sorgenti.',
-      'Esegui build e test del modulo con gli strumenti del progetto (per NPSO WLS, OSB, BPEL e microservizi possono differire). Riporta comandi, esiti e commit nella scheda, imposta “Verificata” solo con evidenze e salva lo sviluppo.',
-    ], 'Il worker automatico di compilazione e test non è ancora disponibile: la prontezza al rilascio si dimostra con le verifiche del repository e dell’ambiente destinatario.'),
+    chapter('Fase 3 · Progetto di avvio (facoltativa)', 'Preparare la struttura e le decisioni', [
+      'Usala soprattutto per un nuovo servizio o una Logic App. Apri «Prepara progetto · Visual Studio Code» e compila «Nome progetto» (ad esempio servizio-invio-prenotazione), «Tipo progetto» e «Obiettivo tecnico».',
+      'Apri «Decisioni da concordare con il team». Per ognuna delle 10 decisioni compila i tre campi «Scelta o ipotesi da discutere», «Fonte e versione» e «Referente»: è «Documentata» solo con tutti e tre, altrimenti resta «Aperta». Non scegliere una tecnologia senza conferma.',
+      'Premi «Genera progetto di avvio ZIP». Scarichi un archivio con README.md, il workspace .code-workspace, progetto.json, SCHEDE_SVILUPPO.md, docs/DECISIONI.md, docs/ARCHITETTURA.md, docs/TEST_PLAN.md, tests/piano-test.json e le cartelle contracts, fixtures e src da completare.',
+      'Salva lo sviluppo per conservare la configurazione del progetto: lo ZIP non la salva.',
+    ], 'Lo ZIP non contiene i sorgenti locali né un workflow distribuibile; il piano di test è una checklist non eseguita.', {
+      fields: { caption: 'Le 10 decisioni da documentare', rows: [
+        ['Tecnologia e runtime', 'Linguaggio, framework, versione, runtime di destinazione.'],
+        ['Contratto di ingresso', 'Cosa riceve il servizio e in che formato.'],
+        ['Contratto di uscita', 'Cosa restituisce o pubblica.'],
+        ['Regole dati e mapping', 'Come si trasformano e validano i dati.'],
+        ['Modalità di risposta', 'Sincrona o asincrona, tempi, codici di esito.'],
+        ['Idempotenza e duplicati', 'Cosa succede se la stessa richiesta arriva due volte.'],
+        ['Errori e ritentativi', 'Come si gestiscono i guasti e quante volte si riprova.'],
+        ['Accesso e ambienti', 'Credenziali, reti e ambienti coinvolti (senza scrivere segreti qui).'],
+        ['Repository e consegna', 'Dove va il codice, branch e modalità di consegna.'],
+        ['Build e test', 'Come si compila e quali test dimostrano il risultato.'],
+      ] },
+      warnings: [
+        ['«Compila GOTO e titolo prima di generare il progetto».', 'Il GOTO o il titolo dell’iniziativa mancano: completali nel Configuratore.'],
+        ['«Inserisci nome del progetto e obiettivo tecnico».', 'Entrambi i campi sono obbligatori per generare lo ZIP.'],
+        ['«Aggiungi o importa almeno un’attività».', 'Senza attività non c’è nulla da impacchettare.'],
+      ],
+    }),
+    chapter('Fase 4 · Codice (facoltativa)', 'Far generare file reali per un applicativo', [
+      'La generazione si fa dentro ogni scheda: apri «Generazione codice / workflow · target applicativo». Serve una scheda con soluzione e criteri compilati. La fase Codice mostra solo il riepilogo: per ogni attività «N file generati», «Pronta da generare» o «Scheda incompleta», con «Apri le schede».',
+      'Compila il target (tabella sotto) e premi «Genera codice / workflow per questa attività». Il pulsante resta spento finché applicativo, componente e stack non sono compilati.',
+      'Per modificare file esistenti elenca in «Originali da modificare» i percorsi relativi (massimo 8 file, ciascuno entro 120.000 byte e 60.000 caratteri). Lascia vuoto per soli file nuovi.',
+      'Leggi ogni file generato (marcato «Nuovo» o «Modificato») e il relativo originale. Se piace premi «Conserva artefatti nella scheda»: la scheda passa a «Da verificare». Se esisteva già un risultato, l’app chiede se sostituirlo.',
+      'Premi «Scarica file sorgenti generati ZIP»: ottieni codice-attivita-da-verificare.zip con proposed/ (i file nuovi), original/ (gli originali), manifest.json e un README che dichiara il codice non verificato.',
+      'Applica i file nel repository con Visual Studio Code, confrontandoli con il checkout reale prima di usarli. Un target alla volta per attività.',
+    ], 'Generato non significa compilato, distribuibile o collaudato. L’app non scrive nel repository, non esegue SQL, build o deploy. Se mancano decisioni, l’AI può rispondere «Decisioni necessarie prima di generare» senza produrre file.', {
+      fields: { caption: 'Il target della generazione', rows: [
+        ['Applicativo destinatario', 'Scegli tra gli applicativi associati al sistema («Seleziona applicativo»).'],
+        ['Componente / modulo', 'Il modulo da modificare o creare.'],
+        ['Stack e runtime (es. Java 8, Logic App Standard)', 'La tecnologia di destinazione: determina il tipo di file prodotti.'],
+        ['Database e versione (oppure Non applicabile)', 'Serve se l’intervento tocca la base dati.'],
+        ['Contratti, vincoli e convenzioni di implementazione', 'Regole che l’AI deve rispettare (naming, formati, standard del team).'],
+        ['Originali da modificare', 'Percorsi relativi dei file esistenti da cambiare, uno per riga.'],
+      ] },
+      warnings: [
+        ['«Seleziona al massimo 8 file originali».', 'Dividi l’intervento in più attività.'],
+        ['«non trovato o ambiguo» accanto al percorso di un originale.', 'Il percorso non esiste nella cartella scelta o ne esistono due uguali: correggi il percorso, oppure lascia vuoto per file nuovi.'],
+        ['«troppo grande» oppure «supera 60.000 caratteri» accanto a un originale.', 'Suddividi l’intervento in parti più piccole.'],
+      ],
+    }),
+    chapter('Fase 5 · Consegna', 'Preparare il pacchetto per chi scrive il codice', [
+      'Apri «Richiesta di modifica codice». Scegli lo «Strumento previsto» (Visual Studio Code, Codex o Altro), scrivi il «Branch suggerito» (ad esempio feature/<codice>), le «Note di approvazione» e i comandi in «Compilazione e test» (ad esempio npm run build, dotnet test).',
+      'Controlla la riga di stato: «Interventi approvati inclusi: N» e se il repository è collegato (cartella selezionata oppure profilo tecnico dell’applicativo).',
+      'Premi «Genera ZIP richiesta modifica codice». Scarichi Richiesta_Modifica_Codice_{GOTO}.zip con README_MODIFICA_CODICE.md, richiesta_modifica_codice.json, piano_sviluppo.md, RAZIONALI_E_VINCOLI.md (se ci sono), elenco_file_repository.txt, schede_sviluppo.json e SCHEDE_SVILUPPO.md. Lo ZIP riporta le schede mostrate in pagina, anche non ancora salvate.',
+      '«Esporta piano di sviluppo (MD)» scarica piano_sviluppo_{GOTO}.md; «Genera documento sviluppo (AI)» produce sviluppo_iniziativa_{GOTO}.md da verificare prima dell’uso.',
+      'Salva lo sviluppo: il primo controllo della Consegna è proprio «Sviluppo salvato».',
+    ], 'Le note di approvazione e lo strumento previsto non concorrono al completamento della fase: contano solo i quattro controlli.', {
+      fields: { caption: 'I quattro controlli della Consegna', rows: [
+        ['Sviluppo salvato', 'Non ci sono modifiche in sospeso e hai salvato almeno una volta.'],
+        ['Interventi approvati nell’offerta', 'Almeno un intervento approvato nel Configuratore.'],
+        ['Branch indicato', 'Il campo «Branch suggerito» non è vuoto.'],
+        ['Comandi di build e test indicati', 'Il campo «Compilazione e test» non è vuoto.'],
+      ] },
+      warnings: [
+        ['«Nessun intervento approvato: apri il Configuratore e approva almeno un intervento».', 'Seleziona e approva le voci nel Configuratore, salva la valutazione e riapri l’iniziativa.'],
+        ['«Seleziona la cartella dei sorgenti oppure scegli un applicativo con profilo tecnico».', 'Torna alla fase Fonti e collega il repository.'],
+      ],
+    }),
+    chapter('Fase 6 · Verifica', 'Registrare le evidenze', [
+      'Dopo aver scritto e provato il codice in Visual Studio Code, apri la scheda dell’attività dalla fase Schede (il pulsante «Apri la scheda» nella fase Verifica ti porta all’elenco delle schede).',
+      'Nel campo «Evidenze di verifica (test, comando, esito, commit)» scrivi cosa hai eseguito: il comando di build o di test, l’esito e il commit.',
+      'Imposta «Stato di verifica» su «Verificata»: la voce è disponibile solo se ci sono evidenze. Salva con «Salva sviluppo».',
+      'Torna alla fase Verifica: l’avanzamento mostra quante attività sono verificate su quante. Quando tutte sono verificate la pillola nell’elenco diventa «Verificato».',
+    ], 'L’app non esegue i test: «Verificata» è una dichiarazione tua, accompagnata dalle evidenze. Il worker automatico di compilazione e test non è ancora disponibile.'),
+    chapter('Colleghi, chat e salvataggio', 'Lavorare in più persone senza sovrascriversi', [
+      'Aprendo un’iniziativa compare il riquadro «Collaborazione sull’iniziativa»: i colleghi collegati, un avviso giallo se qualcuno lavora sulla stessa iniziativa e la chat. La presenza si aggiorna ogni 15 secondi e si spegne dopo 45 secondi senza segnali.',
+      'Nella chat Invio spedisce, Maiusc+Invio va a capo, massimo 2.000 caratteri. Il messaggio non inviato resta nella casella; i messaggi non si modificano né si cancellano; «Mostra messaggi precedenti» carica la cronologia. Non scrivere password o dati riservati.',
+      '«Salva sviluppo» scrive schede, proposte AI, progetto e consegna in un archivio dedicato e conferma solo dopo la risposta del server («Sviluppo salvato e confermato dal server (revisione N)»).',
+      'Se un collega ha salvato dopo la tua apertura ricevi un conflitto e la pagina resta aperta con le tue modifiche. Non ricaricare: copia ciò che serve, riapri l’iniziativa e riconcilia.',
+      'Se l’offerta è stata rivista nel Configuratore, in cima compare un avviso con le attività nuove, rimosse o con descrizione cambiata. Le schede restano legate alla riga e non si aggiornano da sole: controllale.',
+    ], 'La presenza e la chat avvisano ma non bloccano: due persone possono comunque salvare. Salvare lo sviluppo non modifica la valutazione e salvare l’offerta non modifica lo sviluppo.', {
+      warnings: [
+        ['«Un collega ha salvato lo sviluppo di questa iniziativa dopo la tua apertura».', 'Il tuo lavoro è ancora in pagina: copia o esporta ciò che serve, riapri l’iniziativa e riconcilia.'],
+        ['«Il server non ha confermato schede, progetto e consegna».', 'Non chiudere la pagina e riprova a salvare.'],
+        ['«Collegamento perso: i dati non sono aggiornati».', 'La presenza e la chat si riprovano da sole ogni 15 secondi.'],
+        ['«Chiudere senza salvare?».', 'Conferma solo se vuoi perdere le modifiche non salvate.'],
+      ],
+    }),
   ] },
   configuratore: { title: 'Configuratore Iniziative', summary: 'Trasforma requisiti, analisi e interventi in una proposta tecnica ed economica con storico e supporto AI.' },
 };

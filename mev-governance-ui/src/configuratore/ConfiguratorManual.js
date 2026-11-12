@@ -1,13 +1,82 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import './configuratorManual.css';
+import { Figure } from './manualFigures';
 
 const chapters = [
-  { title: 'Parti da qui', subtitle: 'Il percorso dall’iniziativa all’offerta', steps: [
-    'Apri una scheda dall’Archivio iniziative oppure premi “Nuova Iniziativa”. Compila Codice GOTO, titolo e sistema nel passaggio Iniziativa.',
-    'Controlla contratto e lotto in “Risorse e configurazione”. Il GOTO e il titolo rimangono visibili nell’intestazione fissa durante il lavoro.',
-    'Importa la Tabella di Offerta esistente oppure prepara l’analisi nel workspace. Prosegui attraverso Iniziativa → Interventi → Offerta → Revisione.',
-  ], note: 'Il GOTO collega storico, allegati e conversazione nell’ambiente attivo. Per mantenere separati lavori distinti usa GOTO distinti.' },
+  { title: 'Introduzione e percorso', subtitle: 'A cosa serve e in che ordine si lavora', intro: 'Il Configuratore Iniziative serve a trasformare una richiesta di Poste (un’iniziativa con il suo codice GOTO) in una valutazione completa: capisce cosa va fatto, lo motiva con razionali e vincoli, lo traduce in interventi a catalogo, calcola l’offerta economica e produce la Tabella di offerta in Excel. Al termine la valutazione passa all’applicazione Sviluppo iniziative, che la porta fino al codice. Si lavora in quattro passi: Iniziativa, Interventi, Offerta, Revisione.', figure: { id: 'configurator', title: 'Figura 1 — Il percorso.', caption: 'I quattro passi, ciò che alimenta il primo e i tre modi di salvare.', alt: 'Il percorso ha quattro passi in sequenza: 1 Iniziativa, 2 Interventi, 3 Offerta, 4 Revisione. Il passo 1 è alimentato dall’importazione della Tabella di Offerta in Excel, dal workspace documentale, dai razionali e vincoli con l’AI, dalla soluzione, dall’analisi condivisa e dallo storico. Dalla Revisione si salva in tre modi: «Salva valutazione» registra l’offerta e aggiorna lo storico dell’analisi, «Salva e Chiudi» salva e svuota la pagina solo se il salvataggio riesce, «Salva e vai a Sviluppo→» salva e apre Sviluppo iniziative sulla stessa iniziativa. Per salvare serve almeno il GOTO o il titolo; il salvataggio completo di offerta e storico richiede il Codice GOTO.' }, steps: [
+    'Accedi con un ruolo Developer o SuperAdmin: sono i soli che vedono il Configuratore nella Home. Controlla in alto il contratto e il lotto: sono mostrati nell’intestazione fissa insieme al Codice GOTO e al titolo.',
+    'Per riprendere un lavoro apri «Archivio iniziative» (nella card «Il tuo spazio di lavoro») e clicca una scheda; per cominciare da zero premi «+ Nuova Iniziativa». Se hai già dati nella pagina, l’app chiede conferma prima di sostituirli.',
+    'Passo 1 «Iniziativa»: compila i dati (Codice GOTO, Titolo, Sistema, Release, PM Poste) oppure importa la Tabella di Offerta. Quando hai almeno GOTO o titolo si sbloccano Workspace documentale, Razionali e vincoli, Soluzione e Analisi condivisa.',
+    'Passo 2 «Interventi»: scegli quali voci di catalogo servono, con tipo, complessità e quantità. Premi «Secondo parere AI» per avere proposte da valutare. Poi il pulsante «Vai all’offerta» (mostra tra parentesi quante voci hai selezionato).',
+    'Passo 3 «Offerta»: controlla prezzi, sconto, contingenza e le TOW automatiche e manuali. Passo 4 «Revisione»: verifica il riepilogo, genera l’Excel, salva con «Salva valutazione».',
+    'Quando la valutazione è pronta premi «Salva e vai a Sviluppo →» per proseguire con le schede per attività e il codice. La collaborazione e le revisioni sono spiegate più avanti in questo manuale, nei capitoli Analisi e conversazione e Revisioni e collaborazione.',
+  ], note: 'Il Codice GOTO collega storico, allegati, razionali e conversazione nell’ambiente attivo. Per mantenere separati lavori distinti usa GOTO distinti. Ogni passo ha un segno ✓ quando contiene dati; il passo 4 non lo mostra mai.' },
+  { title: 'Passo 1 · Dati dell’iniziativa', subtitle: 'Cosa compilare e in che ordine', intro: 'Il passo Iniziativa raccoglie tutto ciò che identifica e descrive la richiesta. Qui nasce il legame con il resto del lavoro: il Codice GOTO collega documenti, razionali, analisi, storico e sviluppo. Compila prima i dati essenziali, poi usa le altre sezioni per arricchirli.', steps: [
+    'Apri la sezione 1 «Dati iniziativa» (è la sola aperta all’avvio). Se mancano sia GOTO sia titolo la riga mostra «Da compilare».',
+    'Se hai già la Tabella di Offerta di Poste, premi «Importa Tabella di Offerta» (in alto a destra nella sezione) e scegli il file .xlsx con il foglio ID_INTERVENTO e il foglio DettaglioInterventi: compila da solo Codice GOTO, Titolo, Sistema, requisiti e descrizione, se presenti nel file.',
+    'Altrimenti compila a mano i campi della tabella qui sotto. Poi premi «Analizza e suggerisci»: l’app propone fino a 10 voci a partire da titolo, sistema e descrizione (le prime 4 sono già selezionate) e ti porta al passo 2. Con meno di 20 caratteri utili di descrizione ti chiede di scrivere di più.',
+    'Con interventi importati il pulsante cambia in «Analizza integrazioni (N interventi)» e cerca le voci mancanti rispetto al catalogo, invece di ripartire dal testo.',
+    '«Reset» azzera in un colpo iniziativa, interventi, offerta, proposte AI e applicativi scelti e ti riporta al passo 1: non chiede conferma, quindi usalo solo dopo aver salvato.',
+  ], fields: { caption: 'Campi della sezione «Dati iniziativa»', rows: [
+    ['Codice GOTO', 'Il codice dell’iniziativa. Non è obbligatorio per scrivere, ma serve per il salvataggio completo di offerta e storico.'],
+    ['Titolo', 'Il titolo dell’iniziativa. Insieme al GOTO compare nell’intestazione fissa.'],
+    ['Sistema / applicazione', 'Si compila dall’Excel importato o da «Apri nel Configuratore» dello Storico. Con «+ Aggiungi applicativo…» scegli uno o più applicativi come chip rimovibili (×): servono a trovare il profilo tecnico e le proposte AI.'],
+    ['Tipo contratto', 'Selezione tra le modalità disponibili (ad esempio BASE o QDO); «— nessuno —» se non applicabile.'],
+    ['Release', 'Scegli una release dall’elenco, «Da pianificare», «TBD (To Be Defined)» o «Altro (testo libero)…». Se l’elenco non è disponibile il campo diventa di testo.'],
+    ['PM Poste', 'Scegli il nome dall’elenco già usato in MEV e MEV-CAP, oppure «Altro (testo libero)…». Resta salvato con l’offerta e con le revisioni.'],
+    ['Requisiti', 'Testo libero: cosa chiede Poste.'],
+    ['Descrizione', 'Testo libero più ampio; «⤢ Espandi» lo apre in una finestra per scrivere con comodità.'],
+  ] }, warnings: [
+    ['Le sezioni 2–5 risultano «Bloccato».', 'Mancano sia GOTO sia titolo: inseriscine almeno uno.'],
+    ['«Inserisci una descrizione più dettagliata».', 'L’analisi dal testo richiede almeno 20 caratteri non vuoti tra titolo, sistema e descrizione.'],
+    ['«Il lotto del file non è disponibile nel contratto selezionato».', 'Il file Excel è di un lotto diverso: cambia contratto o lotto in «Risorse e configurazione» prima di importare.'],
+    ['«Excel importato, ma revisione non salvata».', 'I dati restano nella pagina: salva una revisione dal workspace dopo aver controllato lo storico.'],
+  ], note: 'L’importazione salva da sola una revisione e avvia in background la verifica AI delle righe. Il segno ✓ del passo 1 compare quando c’è (GOTO o titolo) e un sistema.' },
+  { title: 'Passo 2 · Interventi', subtitle: 'Scegliere le voci di catalogo e il parere AI', intro: 'Il passo Interventi decide cosa entra nell’offerta. L’app mette in fila le voci importate dall’Excel e le possibili integrazioni del catalogo; tu scegli, regoli tipo, complessità e quantità, e puoi chiedere un secondo parere all’AI. Nulla viene aggiunto all’offerta finché non premi «Vai all’offerta».', steps: [
+    'In alto il riquadro «Supporto AI alla valutazione» riassume quante valorizzazioni sono già previste nell’Excel e quante integrazioni si possono valutare, oppure quante componenti candidate ci sono nel Catalogo del lotto.',
+    'Premi «Secondo parere AI» (poi «Aggiorna parere AI») per ottenere proposte e un riepilogo. Può richiedere 1–2 minuti: non chiudere la pagina. Il riepilogo si legge in «Leggi il riepilogo AI».',
+    'Nelle «Proposte AI» premi «+ Aggiungi» sulle sole che sono pertinenti: la voce entra già selezionata, con nota «Proposta AI», e l’app salva in automatico. «Mostra snippet» compare se la proposta cita dei file.',
+    'Nelle «Possibili integrazioni», raggruppate per ID_INTERVENTO, spunta le voci che vuoi tenere e imposta Tipo (REALIZZAZIONE o MODIFICA), Complessità, Q.tà (intero, minimo 1) e note. Vedi accanto i prezzi Semplice, Medio e Complesso e l’importo proposto.',
+    'Se la voce che ti serve non è proposta usa «Aggiungi manualmente dal catalogo»: premi «Aggiungi» (diventa «Già aggiunta») e comparirà tra le «Voci aggiunte manualmente».',
+    'Premi «Vai all’offerta»: il pulsante è spento se non hai selezionato nulla. Se una riga importata non ha prezzo, l’app avvisa «Completa i prezzi mancanti prima di comporre l’offerta» e non prosegue.',
+  ], warnings: [
+    ['Il banner in alto mostra GOTO, titolo, sistema e release.', 'Premi «← Modifica» per tornare ai dati dell’iniziativa senza perdere le scelte.'],
+    ['«Vai all’offerta» è disattivato.', 'Seleziona almeno una voce, oppure importa una Tabella di Offerta con interventi.'],
+    ['L’analisi AI non risponde.', 'Il pulsante resta occupato mentre lavora; attendi, poi riprova. Le scelte già fatte non vanno perse.'],
+  ], note: 'Il passo 2 ha il ✓ quando c’è almeno un suggerimento selezionato o ci sono voci in offerta.' },
+  { title: 'Passo 3 · Offerta', subtitle: 'Prezzi, TOW, sconto e contingenza', intro: 'Qui le voci scelte diventano un’offerta economica. Il totale è la somma delle voci di catalogo più le TOW (le attività trasversali, ad esempio gestione e collaudo) calcolate in percentuale sul catalogo o inserite a mano.', steps: [
+    'In alto «Confronto Excel e Voci Catalogo» mostra come le righe importate si associano al catalogo, con la verifica AI e un totale originale a confronto con la base d’asta. Risolvi le associazioni incerte prima di fidarti dei prezzi.',
+    'Nelle «Voci di catalogo» ogni riga ha Tipo, Complessità, Q.tà, Prezzo unitario, Totale e una nota per razionali e vincoli. «Espandi tutti» e «Chiudi tutti» aprono o chiudono i dettagli, e «×» rimuove la riga.',
+    'Imposta «Sconto (%)» e «Contingenza (%)», se previsti. Sopra vedi la «Base TOW automatici», cioè catalogo × moltiplicatore della stima.',
+    'Nei «TOW automatici» (TOW .1, .3 e .4 del lotto) regola la «% impatto»: l’importo è base × percentuale e la quantità equivalente è importo diviso prezzo unitario. Se il contratto ha percentuali salvate, scegli «% da contratto»: il segno ★ indica un valore preso da Gestione Contratto.',
+    'Nei «TOW manuali» (TOW .2 e .6) inserisci Nome TOW, QTA e Valore unitario; il totale si calcola da solo.',
+    'In fondo leggi «Totale catalogo», «Altri TOW» e «Totale offerta». Con «Revisione →» passi al passo 4; «← Interventi» torna indietro.',
+  ], fields: { caption: 'Le tre sorgenti del totale', rows: [
+    ['Voci di catalogo', 'Quantità × prezzo unitario secondo tipo e complessità, dal listino del catalogo selezionato.'],
+    ['TOW automatici .1 .3 .4', 'Base TOW × % impatto. La % viene dal contratto (★) o la inserisci tu.'],
+    ['TOW manuali .2 .6', 'QTA × Valore unitario inseriti a mano.'],
+  ] }, warnings: [
+    ['«Listino TOW per la stima»: quale scegliere?', 'La select «Contratto di origine dei prezzi TOW» parte da «Usa il listino del catalogo selezionato»; cambiala solo se i prezzi TOW vengono da un altro contratto.'],
+    ['Quantità n.d.', 'Manca il prezzo unitario della TOW nel contratto: completalo in Gestione Contratto.'],
+    ['Contratto e lotto non modificabili.', 'Con voci già in offerta sono bloccati per non mescolare cataloghi: per cambiarli svuota prima l’offerta.'],
+  ], note: 'Il passo 3 ha il ✓ quando ci sono voci in offerta. I valori mostrati si aggiornano a ogni modifica, ma sono definitivi solo dopo «Salva valutazione».' },
+  { title: 'Passo 4 · Revisione e salvataggio', subtitle: 'Controllare, esportare e salvare', intro: 'La Revisione è il riepilogo finale. Qui verifichi i numeri, produci i documenti da consegnare e salvi la valutazione. Il passaggio a questo passo salva già in automatico, senza messaggio, per non perdere il lavoro.', steps: [
+    'Leggi la card «Revisione offerta»: lotto, voci di catalogo, sconto, contingenza, totale offerta e il dettaglio righe per intervento. Aggiungi le «Note economiche» se servono.',
+    'Per la Tabella di offerta Excel apri «Tabella di offerta · Excel HLD»: scegli il «Modello Excel originale» (.xlsx con i due fogli) e premi «Genera Tabella di offerta XLSX». Scarichi «Tabella Offerta - {GOTO}.xlsx»; il modello originale non viene modificato.',
+    '«Esporta JSON» ed «Esporta CSV» scaricano i dati dell’offerta (il CSV usa il punto e virgola e le colonne ID Catalogo, Tipo, Complessità, Quantità, Prezzo unitario, Importo, Intervento, Razionale). «Stampa» apre la stampa del browser.',
+    'Premi «Salva valutazione» per registrare l’offerta e aggiornare lo storico dell’analisi. L’esito arriva solo dopo la conferma del server: «Valutazione salvata e resa disponibile alle stime future», oppure «Valutazione aggiornata con successo» se stavi modificandone una esistente.',
+    '«Salva e Chiudi» (in alto a destra dello stepper) salva e svuota la pagina solo se il salvataggio riesce. «Salva e vai a Sviluppo →» salva e apre l’applicazione Sviluppo iniziative sulla stessa iniziativa.',
+    'Se riapri una valutazione già salvata compare «Modalità modifica»: «Salva valutazione» la sovrascrive, mentre «Salva come nuovo» conserva l’originale.',
+  ], warnings: [
+    ['«Genera Tabella di offerta XLSX» è spento.', 'Servono il modello Excel, almeno una voce in offerta e il Codice GOTO.'],
+    ['«Il template non contiene campi sconto/contingency».', 'Azzera sconto e contingenza oppure usa un modello che li rappresenti.'],
+    ['«Il modello contiene solo TOW .1–.5».', 'Una TOW .6 valorizzata non è rappresentabile da quel modello: serve un modello adeguato.'],
+    ['«Voce {id}: associazione o prezzo del contratto mancante».', 'Risolvi l’associazione nel «Confronto Excel e Voci Catalogo» del passo 3.'],
+    ['«Un collega ha aggiornato lo storico».', 'Aggiorna lo storico dell’analisi, confronta la bozza e riprova: il lavoro corrente è conservato.'],
+    ['«Offerta salvata, ma storico non aggiornato».', 'Il salvataggio è avvenuto a metà: la pagina resta aperta, conserva la bozza e riconcilia lo storico prima di chiudere.'],
+    ['«Salvataggio non riuscito».', 'La pagina non si chiude: non ricaricarla, correggi il motivo indicato e riprova.'],
+  ], note: 'Il salvataggio completo richiede il Codice GOTO. Controlla sempre l’Excel scaricato (totali, stampa, formattazione) prima della consegna.' },
   { title: 'Il passo Iniziativa: le sette sezioni', subtitle: 'Un percorso a righe apribili', steps: [
     'Il passo Iniziativa è composto da sette sezioni, sempre nello stesso ordine: 1 Dati iniziativa · 2 Workspace documentale · 3 Razionali e vincoli con l’AI · 4 Soluzione · 5 Analisi condivisa · 6 Codice sorgente · 7 Conoscenza dell’Iniziativa.',
     'Ogni sezione è una riga chiusa che mostra già il titolo e le informazioni principali (per esempio «5 documenti · 2 memorie iniziali», «3 confermate: 1 razionali · 2 vincoli», «2 di 5 interventi descritti»). Premi la riga per aprirla e rivederla per chiuderla. Puoi tenerne aperte più di una; all’apertura della pagina è aperta solo «Dati iniziativa».',
@@ -149,7 +218,7 @@ export function UserManual({ chapters, title, subtitle, triggerLabel = 'Manuale 
     {open && createPortal(<dialog ref={dialog} className="tow-manual" aria-labelledby={titleId} onCancel={() => setOpen(false)} onClose={() => setOpen(false)}>
       <header className="tow-manual-header"><div><span>GUIDA OPERATIVA</span><h2 id={titleId}>{title}</h2><p>{subtitle}</p></div><button type="button" autoFocus aria-label="Chiudi manuale" onClick={() => setOpen(false)}>✕</button></header>
       <div className="tow-manual-layout"><nav aria-label="Indice del manuale">{chapters.map((entry, index) => <button type="button" key={entry.title} aria-current={chapter === index ? 'page' : undefined} onClick={() => { setChapter(index); content.current?.scrollTo({ top: 0 }); }}><span>{String(index + 1).padStart(2, '0')}</span>{entry.title}</button>)}</nav>
-        <article ref={content} className="tow-manual-content"><span className="tow-manual-section-number">Capitolo {chapter + 1} di {chapters.length}</span><h3>{current.title}</h3><p className="tow-manual-subtitle">{current.subtitle}</p>{current.highlights && <div className="tow-manual-highlights">{current.highlights.map(card => <section key={card.title}><strong>{card.title}</strong><p>{card.text}</p></section>)}</div>}<ol>{current.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>{current.note && <aside><strong>Da ricordare</strong><p>{current.note}</p></aside>}<footer><button type="button" disabled={chapter === 0} onClick={() => { setChapter(chapter - 1); content.current?.scrollTo({ top: 0 }); }}>← Precedente</button><button type="button" disabled={chapter === chapters.length - 1} onClick={() => { setChapter(chapter + 1); content.current?.scrollTo({ top: 0 }); }}>Successivo →</button></footer></article>
+        <article ref={content} className="tow-manual-content"><span className="tow-manual-section-number">Capitolo {chapter + 1} di {chapters.length}</span><h3>{current.title}</h3><p className="tow-manual-subtitle">{current.subtitle}</p>{current.intro && <p className="tow-manual-intro">{current.intro}</p>}<Figure figure={current.figure} />{current.highlights && <div className="tow-manual-highlights">{current.highlights.map(card => <section key={card.title}><strong>{card.title}</strong><p>{card.text}</p></section>)}</div>}<ol>{current.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>{current.fields && <div className="tow-manual-fields"><table><caption>{current.fields.caption}</caption><thead><tr><th scope="col">Voce</th><th scope="col">Cosa fare</th></tr></thead><tbody>{current.fields.rows.map(([name, text]) => <tr key={name}><th scope="row">{name}</th><td>{text}</td></tr>)}</tbody></table></div>}{current.warnings && <div className="tow-manual-warnings"><strong>Se qualcosa non va</strong><ul>{current.warnings.map(([problem, fix]) => <li key={problem}><b>{problem}</b> {fix}</li>)}</ul></div>}{current.note && <aside><strong>Da ricordare</strong><p>{current.note}</p></aside>}<footer><button type="button" disabled={chapter === 0} onClick={() => { setChapter(chapter - 1); content.current?.scrollTo({ top: 0 }); }}>← Precedente</button><button type="button" disabled={chapter === chapters.length - 1} onClick={() => { setChapter(chapter + 1); content.current?.scrollTo({ top: 0 }); }}>Successivo →</button></footer></article>
       </div>
     </dialog>, document.body)}
   </>;

@@ -35,3 +35,16 @@
 .tow-manual-content footer button:disabled { opacity: .4; cursor: default; }
 .tow-manual :focus-visible,.tow-manual-trigger:focus-visible { outline: 3px solid #8eb8f1; outline-offset: 2px; }
 @media(max-width:700px) { .tow-manual-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0,1fr); height: 70dvh; } .tow-manual-layout > nav { display: flex; overflow-x: auto; padding: 8px; border-right: 0; } .tow-manual-layout > nav button { width: auto; white-space: nowrap; margin: 0 4px; } .tow-manual-content { padding: 18px; } .tow-manual-header { padding: 18px; } }
+
+.tow-manual-intro { font-size: 14.5px; line-height: 1.75; color: #29415e; margin: 0 0 16px; padding: 14px 18px; background: #f6faff; border: 1px solid #d5e2f2; border-radius: 12px; }
+.tow-manual-figure { margin: 6px 0 22px; padding: 12px; border: 1px solid #d5e2f2; border-radius: 14px; background: #fff; }
+.tow-manual-figure-scroll { overflow-x: auto; }
+.tow-manual-svg { display: block; width: 100%; min-width: 780px; height: auto; font-family: inherit; }
+.tow-manual-figure figcaption { font-size: 12px; line-height: 1.6; color: #4a6483; margin-top: 8px; } .tow-manual-figure figcaption strong { color: #23496f; }
+.tow-manual-figure-text { font-size: 12px; margin-top: 6px; } .tow-manual-figure-text summary { cursor: pointer; color: #37689e; font-weight: 600; } .tow-manual-figure-text p { margin: 6px 0 0; line-height: 1.7; color: #29415e; }
+.tow-manual-fields { margin: 6px 0 20px; overflow-x: auto; }
+.tow-manual-fields table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.6; } .tow-manual-fields caption { text-align: left; font-weight: 700; color: #23496f; padding: 0 0 8px; font-size: 13.5px; }
+.tow-manual-fields th, .tow-manual-fields td { text-align: left; vertical-align: top; padding: 8px 12px; border: 1px solid #dce5f0; } .tow-manual-fields thead th { background: #f3f7fc; color: #37689e; font-size: 12px; } .tow-manual-fields tbody th { background: #fafcff; color: #23496f; width: 30%; font-weight: 700; }
+.tow-manual-warnings { margin: 6px 0 20px; padding: 14px 18px; background: #fff8e6; border-left: 3px solid #e5b84a; border-radius: 8px; font-size: 12.5px; line-height: 1.7; } .tow-manual-warnings strong { color: #6b4e08; } .tow-manual-warnings ul { margin: 6px 0 0; padding-left: 18px; } .tow-manual-warnings li { padding: 0 0 8px; } .tow-manual-warnings li::marker { color: #c98a12; }
+@media (max-width: 700px) { .tow-manual-fields tbody th { width: auto; } }
+@media print { .tow-manual-svg { min-width: 0; } }
