@@ -724,6 +724,20 @@ export const deleteConfiguratoreContract = async (contractId) => {
   return response.json();
 };
 
+// Moves what is useful from one Archivio contract into another and removes the first, in one step. The preview writes nothing.
+export const mergeConfiguratoreContracts = async (fromContractId, toContractId, { preview = false } = {}) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/contracts/merge${preview ? '/preview' : ''}`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify({ fromContractId, toContractId }),
+  });
+  if (response.status === 401 || response.status === 403) throw new Error(JSON.stringify({ status: response.status }));
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body.message || (response.status === 404 ? "Il backend non espone ancora l’unione dei contratti: aggiorna il backend DEV." : `Unione contratti: errore ${response.status}`));
+    error.status = response.status; error.details = body; throw error;
+  }
+  return body;
+};
+
 /**
  * Importa un contratto con parsing PDF/Excel lato backend.
  * @param {object} opts

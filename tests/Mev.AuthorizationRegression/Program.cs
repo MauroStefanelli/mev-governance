@@ -25,6 +25,8 @@ await RationaleRegression.Run(db, Check);
 await DocumentLibraryRegression.Run(db, Check);
 await InitiativeLedgerRegression.Run(db, Check);
 await HistoryImportRegression.Run(db, Check);
+ContractMergeRegression.Run(Check);
+await ContractMergeRegression.RunPermissions(db, config, Check);
 OfferWorkbookRegression.Run(Check);
 if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }
 var user = new AppUser { Username = "operator", Role = "Admin" };

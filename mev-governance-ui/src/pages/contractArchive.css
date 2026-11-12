@@ -91,3 +91,26 @@ dialog::backdrop{background:rgba(16,42,71,.5)}
 .ca-role-picker legend{font-size:12px;font-weight:600;color:#52657d;padding:0 4px}
 .ca-role-picker label{display:flex;gap:6px;align-items:center;font-size:12px;white-space:nowrap}
 .ca-role-picker input{width:16px;height:16px;min-height:0;accent-color:#174ea6;margin:0}
+
+.ca-merge { width: min(720px, 94vw); max-height: 90dvh; padding: 0; border: 1px solid #d0def0; border-radius: 16px; background: #fff; color: #29415e; box-shadow: 0 24px 80px #09233c50; overflow: hidden; }
+.ca-merge::backdrop { background: #0b203d99; backdrop-filter: blur(3px); }
+.ca-merge[open] { display: flex; flex-direction: column; }
+.ca-merge header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; background: linear-gradient(120deg, #7a1f2e, #a81832); color: #fff; }
+.ca-merge header h2 { margin: 0; font-size: 18px; overflow-wrap: anywhere; } .ca-merge header button { border: 1px solid #ffffff55; background: #ffffff1f; color: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; min-height: 34px; }
+.ca-merge-body { padding: 16px 20px; overflow: auto; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 1.6; } .ca-merge-body p { margin: 0; }
+.ca-merge-field { display: flex; flex-direction: column; gap: 6px; font-weight: 700; } .ca-merge-field select { font: inherit; font-weight: 400; min-height: 40px; padding: 8px 10px; border: 1px solid #c4d3e6; border-radius: 9px; }
+.ca-merge-warn { background: #fff8e6; border: 1px solid #f1d98f; color: #6b4e08; border-radius: 9px; padding: 10px 14px; font-size: 13px; }
+.ca-merge-ok { background: #e3f6ec; border: 1px solid #a8dcc2; color: #17653f; border-radius: 9px; padding: 10px 14px; font-size: 13px; }
+.ca-merge-error { background: #fff1ec; border: 1px solid #f4c4b6; color: #9c361b; border-radius: 9px; padding: 10px 14px; font-size: 13px; }
+.ca-merge-plan { border: 1px solid #dce5f0; border-radius: 12px; padding: 12px 14px; background: #f7faff; } .ca-merge-plan h3 { margin: 0 0 8px; font-size: 15px; color: #23496f; }
+.ca-merge-lines, .ca-merge-blockers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; } .ca-merge-lines li { padding: 8px 10px; background: #fff; border: 1px solid #e0e8f2; border-left: 4px solid #98a8bd; border-radius: 8px; } .ca-merge-lines li p { font-size: 13px; color: #4a6483; margin-top: 2px; }
+.ca-merge-lines li.is-aggiungi, .ca-merge-lines li.is-completa { border-left-color: #1b8a57; } .ca-merge-blockers li { color: #9c361b; background: #fff1ec; border: 1px solid #f4c4b6; border-radius: 8px; padding: 8px 10px; }
+.ca-merge-tag { display: inline-block; margin-left: 6px; background: #ece4fb; color: #43207a; border-radius: 20px; padding: 1px 10px; font-size: 11.5px; font-weight: 700; }
+.ca-merge-note { font-size: 12.5px; color: #4a6483; } .ca-merge-confirm { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; } .ca-merge-confirm input { margin-top: 4px; width: 18px; height: 18px; flex: 0 0 auto; }
+.ca-merge footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid #e7edf5; background: #fafcff; flex-wrap: wrap; }
+.ca-merge-btn { font: inherit; font-size: 13.5px; font-weight: 600; min-height: 40px; padding: 8px 16px; border-radius: 9px; border: 1px solid #c4d3e6; background: #fff; color: #23476f; cursor: pointer; } .ca-merge-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ca-merge-danger { background: #a81832; border-color: #a81832; color: #fff; } .ca-merge-danger:hover:not(:disabled) { background: #8a1228; }
+.ca-merge :focus-visible { outline: 3px solid #8eb8f1; outline-offset: 2px; }
+.ca-health { display: inline-block; margin-top: 6px; background: #fff8e6; border: 1px solid #f1d98f; color: #6b4e08; border-radius: 20px; padding: 2px 12px; font-size: 12px; font-weight: 700; }
+@media (max-width: 520px) { .ca-merge header, .ca-merge-body, .ca-merge footer { padding-left: 14px; padding-right: 14px; } .ca-merge footer > button { flex: 1 1 100%; } }
+.ca-health-block { display: block; border-radius: 10px; margin: 8px 0; line-height: 1.5; font-weight: 600; }

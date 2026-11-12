@@ -467,6 +467,54 @@ public class ConfiguratoreController : ControllerBase
     }
 
     // ============================================================
+    // Unione di due contratti dell'Archivio: i dati utili del contratto da eliminare passano a quello che resta,
+    // poi il primo viene rimosso. Le regole sono in ContractMerge (pure, testate); qui c'e' solo l'accesso al database.
+    //   POST contracts/merge/preview  { fromContractId, toContractId }  -> cosa succederebbe, senza scrivere nulla
+    //   POST contracts/merge          { fromContractId, toContractId }  -> sposta e rimuove in UNA transazione
+    // Se qualcosa non va la transazione torna indietro: o succede tutto o non cambia niente.
+    // ============================================================
+    public class MergeContractsRequest { public string? FromContractId { get; set; } public string? ToContractId { get; set; } }
+
+    private static object PlanView(MergePlan plan) => new
+    {
+        fromContractId = plan.FromId, toContractId = plan.ToId, fromName = plan.FromName, toName = plan.ToName, canRemove = plan.CanRemove,
+        lots = plan.Lots.Select(l => new { l.LotId, l.Action, l.Reason, l.FromPrices, l.ToPrices, l.FromCatalog, l.ToCatalog }),
+        sharedApplications = plan.SharedApps.Select(a => new { a.LotKey, a.Action, a.FromApps, a.ToApps, a.Added }),
+        references = plan.References.Select(r => new { r.RecordKey, r.EntityType, r.Title, r.Field }),
+        blockers = plan.Blockers, notes = plan.Notes,
+    };
+
+    [HttpPost("contracts/merge/preview")]
+    public async Task<IActionResult> MergeContractsPreview([FromBody] MergeContractsRequest req)
+    {
+        if (!CanAccess()) return Forbid();
+        var (sch, cs) = GetDbTarget();
+        try
+        {
+            await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
+            var rows = await ContractMergeStore.LoadAllRows(conn, null, sch);
+            return Ok(PlanView(ContractMerge.Plan((req.FromContractId ?? "").Trim(), (req.ToContractId ?? "").Trim(), rows)));
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Impossibile preparare l'anteprima dell'unione dei contratti.", error = ex.Message }); }
+    }
+
+    [HttpPost("contracts/merge")]
+    public async Task<IActionResult> MergeContracts([FromBody] MergeContractsRequest req)
+    {
+        if (!CanAccess()) return Forbid();
+        var from = (req.FromContractId ?? "").Trim(); var to = (req.ToContractId ?? "").Trim();
+        var (sch, cs) = GetDbTarget();
+        try
+        {
+            await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
+            var outcome = await ContractMergeStore.MergeAsync(conn, sch, from, to);
+            if (!outcome.Done) return Conflict(new { message = outcome.Message, plan = PlanView(outcome.Plan), references = outcome.Dangling });
+            return Ok(new { message = outcome.Message, fromContractId = from, toContractId = to, written = outcome.Written, removed = outcome.Removed, repointed = outcome.Plan.References.Count, lots = outcome.Plan.Lots.Select(l => new { l.LotId, l.Action }) });
+        }
+        catch (Exception ex) { return StatusCode(500, new { message = "Unione non riuscita: non è stato modificato nulla.", error = ex.Message }); }
+    }
+
+    // ============================================================
     // POST /api/configuratore/contracts/seed-builtin
     // Inserisce/aggiorna il contratto builtin poste-tet-2025 con
     // catalogo e prezzi TOW reali letti dal bundle dell'app standalone.

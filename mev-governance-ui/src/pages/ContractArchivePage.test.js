@@ -4,7 +4,7 @@ import ContractArchivePage from './ContractArchivePage';
 import * as service from '../services/mevService';
 
 jest.mock('../services/mevService', () => ({
-  getConfiguratoreContracts: jest.fn(), updateConfiguratoreLot: jest.fn(), deleteConfiguratoreContract: jest.fn(),
+  getConfiguratoreContracts: jest.fn(), updateConfiguratoreLot: jest.fn(), deleteConfiguratoreContract: jest.fn(), mergeConfiguratoreContracts: jest.fn(),
   importConfiguratoreContract: jest.fn(), uploadConfiguratoreContractLot: jest.fn(), getGare: jest.fn(), importaGaraComContratto: jest.fn(),
   getAmbientiUtenti: jest.fn(), addUtenteAmbiente: jest.fn(), removeUtenteAmbiente: jest.fn(), updateUtenteAmbienteRuolo: jest.fn(),
 }));
@@ -90,4 +90,43 @@ test('catalog displays separate saved Realizzazione and Modifica auction prices'
   expect(dialog.getByText(/Base d(?:'|&apos;|’)?asta REALIZZAZIONE/)).toBeInTheDocument();
   expect(dialog.getByText(/Base d(?:'|&apos;|’)?asta MODIFICA/)).toBeInTheDocument();
   [100, 200, 300, 10, 20, 30].forEach(value => expect(dialog.getByText(new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value).replace(/\s/g, ' '))).toBeInTheDocument());
+});
+
+describe('deleting a duplicate contract', () => {
+  const cat = n => Array.from({ length: n }, (_, i) => ({ id: i }));
+  const dup = [
+    { contractId: 'tet', name: 'Tracciatura e Logistica Integrata', lots: [{ lotId: '2', name: 'Lotto 2', active: true, towPrices: { a: 1, b: 2, c: 3, d: 4, e: 5 }, catalog: cat(27), priceFile: 'Listino.pdf', catalogFile: 'Catalogo.pdf' }] },
+    { contractId: 'aq', name: 'Accordo Quadro per la fornitura di Servizi Professionali', lots: [{ lotId: '2', name: 'Lotto 2', active: true, towPrices: {}, catalog: cat(27), priceFile: '(importato da gara x)', catalogFile: '(importato da gara x)' }] },
+    { contractId: 'poste-tet-2025', name: 'Poste TeT (built-in)', builtin: true, lots: [{ lotId: '1', name: 'Lotto 1', active: true, towPrices: { a: 1 }, catalog: cat(3) }] },
+  ];
+  const preview = { fromContractId: 'aq', toContractId: 'tet', canRemove: true, lots: [{ lotId: '2', action: 'nessuna', reason: 'Il lotto di destinazione ha già tutto: non cambia.' }], sharedApplications: [], references: [], blockers: [], notes: [] };
+  beforeEach(() => { HTMLDialogElement.prototype.showModal = jest.fn(function () { this.setAttribute('open', ''); }); HTMLDialogElement.prototype.close = jest.fn(function () { this.removeAttribute('open'); }); service.getConfiguratoreContracts.mockResolvedValue(dup); service.mergeConfiguratoreContracts.mockResolvedValue(preview); });
+  const openAq = async () => { render(<ContractArchivePage ambienti={ambienti} />); await screen.findByRole('heading', { name: 'Tracciatura e Logistica Integrata' }); fireEvent.click(await screen.findByRole('button', { name: /Accordo Quadro/ })); return screen.findByRole('heading', { name: /^Accordo Quadro per/ }); };
+
+  test('the page points out the probable duplicate and marks the incomplete contract', async () => {
+    await openAq();
+    expect(screen.getByRole('note')).toHaveTextContent(/Possibile duplicato: .*Tracciatura e Logistica Integrata.*Accordo Quadro/);
+    expect(screen.getByText('Dati incompleti')).toBeInTheDocument();
+  });
+  test('"Elimina contratto…" no longer deletes at once: it opens the dialog and nothing is sent to the old delete', async () => {
+    await openAq(); fireEvent.click(screen.getByRole('button', { name: 'Elimina contratto…' }));
+    expect(await screen.findByRole('dialog', { name: /Elimina «Accordo Quadro/ })).toBeInTheDocument(); expect(service.deleteConfiguratoreContract).not.toHaveBeenCalled(); expect(window.confirm).not.toHaveBeenCalled();
+    await waitFor(() => expect(service.mergeConfiguratoreContracts).toHaveBeenCalledWith('aq', 'tet', { preview: true }));
+  });
+  test('the complete contract is the one proposed to stay and the built-in one is not offered', async () => {
+    await openAq(); fireEvent.click(screen.getByRole('button', { name: 'Elimina contratto…' })); const dialog = await screen.findByRole('dialog', { name: /Elimina «Accordo Quadro/ });
+    const select = within(dialog).getByLabelText('Il contratto che resta'); expect(select).toHaveValue('tet'); expect([...select.options].map(o => o.value)).toEqual(['tet']);
+  });
+  test('after confirming, the list is reloaded from the server, the kept contract is selected and the result is announced', async () => {
+    service.mergeConfiguratoreContracts.mockImplementation(async (f, t, o) => (o?.preview ? preview : { message: 'Dati spostati ed eliminato il contratto.', fromContractId: 'aq', toContractId: 'tet', repointed: 2 }));
+    await openAq(); fireEvent.click(screen.getByRole('button', { name: 'Elimina contratto…' })); const dialog = await screen.findByRole('dialog', { name: /Elimina «Accordo Quadro/ });
+    await within(dialog).findByLabelText('Cosa succede'); service.getConfiguratoreContracts.mockResolvedValue([dup[0], dup[2]]);
+    fireEvent.click(within(dialog).getByLabelText(/Ho letto cosa succede/)); fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina il contratto' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/Dati spostati ed eliminato il contratto\. 2 valutazioni ricollegate/);
+    expect(await screen.findByRole('heading', { name: 'Tracciatura e Logistica Integrata' })).toBeInTheDocument(); expect(screen.queryByRole('button', { name: /^Accordo Quadro/ })).not.toBeInTheDocument();
+  });
+  test('the built-in contract has no delete button', async () => {
+    render(<ContractArchivePage ambienti={ambienti} />); await screen.findByRole('heading', { name: 'Tracciatura e Logistica Integrata' }); fireEvent.click(await screen.findByRole('button', { name: /Poste TeT \(built-in\)/ }));
+    await screen.findByRole('heading', { name: /Poste TeT/ }); expect(screen.queryByRole('button', { name: 'Elimina contratto…' })).not.toBeInTheDocument(); expect(screen.getByText('Contratto di sistema')).toBeInTheDocument();
+  });
 });

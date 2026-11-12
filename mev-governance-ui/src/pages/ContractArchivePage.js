@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import './contractArchive.css';
 import ContractMembers from '../components/contracts/ContractMembers';
+import ContractMergeDialog from '../components/contracts/ContractMergeDialog';
+import { contractHealth, likelyDuplicates } from '../configuratore/contractMergeModel';
 import {
   getConfiguratoreContracts,
   updateConfiguratoreLot,
-  deleteConfiguratoreContract,
   importConfiguratoreContract,
   uploadConfiguratoreContractLot,
   getGare,
@@ -516,6 +517,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
 
   // Lotti — toggle / codice MEV
   const [deleting, setDeleting] = useState(false);
+  const [mergeFor, setMergeFor] = useState(null);
   const [togglingLot, setToggling]    = useState({});
   const [lotCodes, setLotCodes]       = useState({});
   const [lotEnvSel, setLotEnvSel]     = useState({});
@@ -653,18 +655,6 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
       updateLotLocal(contractId, lotId, { deleted: true, active: false });
     } catch (e) {
       setMsg({ type: 'error', text: 'Errore eliminazione lotto: ' + (e.message || '') });
-    } finally { setDeleting(false); }
-  };
-
-  const handleDeleteContract = async (contractId) => {
-    if (!window.confirm('Eliminare questa configurazione contrattuale?')) return;
-    setDeleting(true);
-    try {
-      await deleteConfiguratoreContract(contractId);
-      setContracts(prev => prev.filter(c => c.contractId !== contractId));
-      setMsg({ type: 'ok', text: 'Contratto eliminato.' });
-    } catch (e) {
-      setMsg({ type: 'error', text: 'Errore eliminazione: ' + (e.message || '') });
     } finally { setDeleting(false); }
   };
 
@@ -1019,6 +1009,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
             <div className="ca-workspace">
               <aside className="ca-directory" aria-label="Elenco contratti">
                 <div className="ca-directory-head"><strong>Archivio</strong><span>{filteredContracts.length} contratti</span></div>
+                {likelyDuplicates(archContracts).map(group => <p key={group.map(c => c.contractId).join('|')} className="ca-health ca-health-block" role="note">Possibile duplicato: {group.map(c => c.name || c.contractId).join(' e ')} hanno gli stessi lotti e lo stesso catalogo. Apri quello da togliere e usa «Elimina contratto…»: i dati utili passano all’altro.</p>)}
                 <label className="ca-search">Cerca contratto<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Nome, lotto o codice MEV" /></label>
                 <label className="ca-search">Mostra<select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Tutti i contratti</option><option value="unlinked">Da collegare a MEV</option></select></label>
                 <p id="ca-order-hint" className="ca-order-hint">Trascina i contratti per riordinarli. Da tastiera: Alt + ↑ / ↓.</p>
@@ -1045,6 +1036,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                       <h2 style={{ ...S.h2, marginTop: 6, fontSize: 21, lineHeight: 1.3, letterSpacing: '-0.3px' }}>{c.name || c.contractId}</h2>
                       <p style={{ ...S.muted, fontSize: 12 }}>Capitolato · {c.rulesFile || 'Non indicato'}</p>
                       <p style={{ ...S.muted, marginTop: 10 }}>{visible.length} lotti · {active.length} attivi</p>
+                      {!c.builtin && !contractHealth(c).complete && <span className="ca-health" title={contractHealth(c).problems.join('; ')}>Dati incompleti</span>}
                     </div>
 
                     <nav className="ca-section-nav" aria-label="Sezioni del contratto">
@@ -1282,8 +1274,8 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                     {/* Azioni */}
                     <div style={S.cardActions}>
                       {!c.builtin && (
-                        <button style={{ ...S.btnGhost, color: '#a81832', borderColor: '#f1b9c0' }} disabled={deleting || Object.values(togglingLot).some(Boolean)} onClick={() => handleDeleteContract(c.contractId)}>
-                          Elimina contratto
+                        <button style={{ ...S.btnGhost, color: '#a81832', borderColor: '#f1b9c0' }} disabled={deleting || Object.values(togglingLot).some(Boolean)} onClick={() => setMergeFor(c.contractId)}>
+                          Elimina contratto…
                         </button>
                       )}
                     </div>
@@ -1297,6 +1289,8 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
       }
     </div>
     <LotDataModal modal={modal} onClose={() => setModal(null)} onSaveTowImpact={handleSaveTowImpact} />
+    {mergeFor && archContracts.find(c => c.contractId === mergeFor) && <ContractMergeDialog contract={archContracts.find(c => c.contractId === mergeFor)} contracts={archContracts} onClose={() => setMergeFor(null)}
+      onDone={async result => { setMergeFor(null); setMsg({ type: 'ok', text: `${result.message}${result.repointed ? ` ${result.repointed} valutazioni ricollegate al contratto che resta.` : ''}` }); setSelectedId(result.toContractId); await loadContracts(); }} />}
     </>
   );
 }
