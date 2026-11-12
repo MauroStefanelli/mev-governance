@@ -77,7 +77,7 @@ describe('structure', () => {
     expect(first.figure.alt.length).toBeGreaterThan(200); expect(first.figure.title).toBeTruthy(); expect(first.figure.caption).toBeTruthy();
   });
   test('the figures describe the same things the manual says: all four steps, all six phases and the three requirements of a defined card', () => {
-    const c = configuratorChapters[0].figure.alt; ['Iniziativa', 'Interventi', 'Offerta', 'Revisione', 'Salva valutazione', 'Salva e Chiudi', 'Sviluppo'].forEach(w => expect(c).toContain(w));
+    const c = configuratorChapters[0].figure.alt; ['Iniziativa', 'Interventi', 'Offerta', 'Revisione', 'Salva valutazione', 'Salva e Chiudi', 'Sviluppo', 'Tabella di Offerta', 'Secondo parere AI', 'Analizza e suggerisci', 'Tabella di offerta XLSX'].forEach(w => expect(c).toContain(w));
     const d = developmentChapters[0].figure.alt; ['Fonti', 'Schede', 'Progetto', 'Codice', 'Consegna', 'Verifica', 'file coinvolti', 'soluzione tecnica', 'criteri di accettazione', 'Verificata'].forEach(w => expect(d).toContain(w));
   });
   test('every phase of Sviluppo has a chapter and appears in the right order', () => {
@@ -106,7 +106,7 @@ describe('rendering', () => {
     render(<ConfiguratorManual />); fireEvent.click(screen.getByRole('button', { name: /Manuale d’uso/ }));
     const dialog = screen.getByRole('dialog', { name: 'Configuratore Iniziative' });
     expect(within(dialog).getByText('Capitolo 1 di ' + configuratorChapters.length)).toBeInTheDocument();
-    const figure = within(dialog).getByRole('figure'); expect(within(figure).getByRole('img')).toHaveAccessibleName(/quattro passi/); expect(figure).toHaveTextContent('Figura 1');
+    const figure = within(dialog).getByRole('figure'); expect(within(figure).getByRole('img')).toHaveAccessibleName(/tre fasce/); expect(figure).toHaveTextContent('Figura 1');
     fireEvent.click(within(figure).getByText('Descrizione della figura a parole')); expect(within(figure).getByText(/Per salvare serve almeno il GOTO/)).toBeVisible();
     expect(within(dialog).getByText(/Il Configuratore Iniziative serve a trasformare/)).toBeInTheDocument();
   });

@@ -6,19 +6,6 @@ import React from 'react';
 
 const COLORS = { blue: ['#e8f0fd', '#2f6bbd'], green: ['#e3f6ec', '#1b8a57'], amber: ['#fff4dd', '#c98a12'], violet: ['#efe6fb', '#6a35b6'], grey: ['#f1f4f8', '#7890a9'] };
 
-function Box({ x, y, w = 150, h = 62, n, title, sub, tone = 'blue', dashed = false }) {
-  const [fill, stroke] = COLORS[tone];
-  return <g>
-    <rect x={x} y={y} width={w} height={h} rx="12" fill={fill} stroke={stroke} strokeWidth="2" strokeDasharray={dashed ? '6 4' : undefined} />
-    {n != null && <><circle cx={x + 16} cy={y + 16} r="11" fill={stroke} /><text x={x + 16} y={y + 20.5} textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff">{n}</text></>}
-    <text x={x + (n != null ? 34 : 12)} y={y + 21} fontSize="14.5" fontWeight="700" fill="#1f3a5c">{title}</text>
-    {sub && sub.split('\n').map((line, i) => <text key={i} x={x + 12} y={y + 42 + i * 15} fontSize="12.5" fill="#4a6483">{line}</text>)}
-  </g>;
-}
-const Arrow = ({ x1, y1, x2, y2, label, dashed = false }) => <g>
-  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#7890a9" strokeWidth="2" strokeDasharray={dashed ? '5 4' : undefined} markerEnd="url(#arrowhead)" />
-  {label && <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 6} textAnchor="middle" fontSize="11.5" fill="#4a6483">{label}</text>}
-</g>;
 const Defs = () => <defs><marker id="arrowhead" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7890a9" /></marker></defs>;
 
 export function Figure({ figure }) {
@@ -32,64 +19,110 @@ export function Figure({ figure }) {
   </figure>;
 }
 
-// ---- Configuratore: the four steps, what feeds them, where it is saved and where it goes next ----
+// ---- Configuratore: what goes in, what each step does and produces, where it is saved, and where it goes next ----
+// Three lanes read top to bottom: the INPUTS the team brings, the FOUR STEPS that turn them into an offer (each with what you do and what you get),
+// and the OUTPUTS with the three ways to save. Colour is never the only carrier: every box has a number or a title.
+function Lane({ y, h, label }) {
+  return <g><rect x="8" y={y} width="1184" height={h} rx="16" fill="#f7faff" stroke="#d5e2f2" /><text x="26" y={y + 22} fontSize="14" fontWeight="700" fill="#5b7594" letterSpacing="1.2">{label}</text></g>;
+}
+function Step({ x, n, title, does, gets, tone }) {
+  const [fill, stroke] = COLORS[tone];
+  return <g>
+    <rect x={x} y={170} width="268" height="172" rx="16" fill="#fff" stroke={stroke} strokeWidth="2.5" />
+    <path d={`M${x} 186 a16 16 0 0 1 16 -16 h236 a16 16 0 0 1 16 16 v34 h-268 z`} fill={fill} />
+    <circle cx={x + 28} cy="196" r="15" fill={stroke} /><text x={x + 28} y="201.5" textAnchor="middle" fontSize="18" fontWeight="700" fill="#fff">{n}</text>
+    <text x={x + 52} y="202" fontSize="20.5" fontWeight="700" fill="#1f3a5c">{title}</text>
+    <text x={x + 16} y="244" fontSize="13" fontWeight="700" fill="#5b7594" letterSpacing="1">COSA FAI</text>
+    {does.map((line, i) => <text key={i} x={x + 16} y={262 + i * 16} fontSize="15" fill="#2b4666">{line}</text>)}
+    <line x1={x + 16} y1="306" x2={x + 252} y2="306" stroke="#dce5f0" />
+    <text x={x + 16} y="324" fontSize="13" fontWeight="700" fill="#5b7594" letterSpacing="1">COSA OTTIENI</text>
+    <text x={x + 16} y="338" fontSize="15" fontWeight="700" fill={stroke}>{gets}</text>
+  </g>;
+}
+function Chip({ x, y, w, title, sub, tone = 'violet' }) {
+  const [fill, stroke] = COLORS[tone];
+  return <g><rect x={x} y={y} width={w} height="50" rx="12" fill={fill} stroke={stroke} strokeWidth="1.8" />
+    <text x={x + 12} y={y + 21} fontSize="15.5" fontWeight="700" fill="#1f3a5c">{title}</text><text x={x + 12} y={y + 39} fontSize="13.5" fill="#4a6483">{sub}</text></g>;
+}
+function Save({ x, w, title, sub, tone }) {
+  const [fill, stroke] = COLORS[tone];
+  return <g><rect x={x} y="408" width={w} height="64" rx="14" fill={fill} stroke={stroke} strokeWidth="2" />
+    <text x={x + 14} y="432" fontSize="16.5" fontWeight="700" fill="#1f3a5c">{title}</text>
+    {sub.map((line, i) => <text key={i} x={x + 14} y={450 + i * 15} fontSize="13.5" fill="#3b5775">{line}</text>)}</g>;
+}
 function ConfiguratorFlow({ label }) {
-  return <svg viewBox="0 0 900 400" role="img" aria-label={label} className="tow-manual-svg">
+  return <svg viewBox="0 0 1200 560" role="img" aria-label={label} className="tow-manual-svg tow-manual-svg-wide">
     <Defs />
-    <text x="12" y="20" fontSize="13" fontWeight="700" fill="#4a6483">IL PERCORSO NEL CONFIGURATORE INIZIATIVE</text>
-    <Box x={14} y={34} w={196} h={78} n="1" title="Iniziativa" sub={'Dati, documenti, razionali,\nsoluzione, analisi condivisa'} />
-    <Box x={246} y={34} w={196} h={78} n="2" title="Interventi" sub={'Valuta le voci, secondo\nparere AI, integrazioni'} />
-    <Box x={478} y={34} w={196} h={78} n="3" title="Offerta" sub={'Prezzi, TOW automatici e\nmanuali, sconto, contingenza'} />
-    <Box x={710} y={34} w={176} h={78} n="4" title="Revisione" sub={'Riepilogo, export Excel\nJSON/CSV, salvataggio'} tone="green" />
-    <Arrow x1={210} y1={73} x2={246} y2={73} /><Arrow x1={442} y1={73} x2={478} y2={73} /><Arrow x1={674} y1={73} x2={710} y2={73} />
-    <text x="14" y="140" fontSize="13" fontWeight="700" fill="#4a6483">COSA ALIMENTA IL PASSO 1</text>
-    <Box x={14} y={150} w={140} h={54} title="Importa Tabella" sub={'di Offerta (.xlsx)'} tone="amber" />
-    <Box x={166} y={150} w={140} h={54} title="Workspace" sub={'documentale + OCR'} tone="violet" />
-    <Box x={318} y={150} w={140} h={54} title="Razionali" sub={'e vincoli con l’AI'} tone="violet" />
-    <Box x={470} y={150} w={140} h={54} title="Soluzione" sub={'per VS Code'} tone="violet" />
-    <Box x={622} y={150} w={140} h={54} title="Analisi condivisa" sub={'revisioni e decisioni'} tone="violet" />
-    <Box x={774} y={150} w={112} h={54} title="Storico" sub={'Conoscenza AI'} tone="grey" />
-    <Arrow x1={84} y1={150} x2={100} y2={116} dashed /><Arrow x1={400} y1={150} x2={150} y2={116} dashed />
-    <text x="14" y="236" fontSize="13" fontWeight="700" fill="#4a6483">SALVATAGGIO</text>
-    <Box x={14} y={246} w={250} h={64} title="Salva valutazione" sub={'registra l’offerta (record dell’iniziativa)\ne aggiorna lo storico dell’analisi'} tone="green" />
-    <Box x={290} y={246} w={250} h={64} title="Salva e Chiudi" sub={'salva e svuota la pagina\nsolo se il salvataggio riesce'} tone="green" />
-    <Box x={566} y={246} w={320} h={64} title="Salva e vai a Sviluppo →" sub={'salva in silenzio, poi apre l’applicazione\nSviluppo iniziative sulla stessa iniziativa'} tone="blue" />
-    <Arrow x1={798} y1={112} x2={726} y2={246} dashed />
-    <rect x="14" y="334" width="872" height="50" rx="10" fill="#fff8e6" stroke="#e5b84a" />
-    <text x="28" y="354" fontSize="12.5" fill="#6b4e08" fontWeight="700">Regola da ricordare</text>
-    <text x="28" y="372" fontSize="12.5" fill="#6b4e08">Per salvare serve almeno GOTO o titolo; il salvataggio completo di offerta e storico richiede il Codice GOTO.</text>
+    <Lane y={8} h={118} label="1 · COSA PORTI: LE FONTI DELL’INIZIATIVA" />
+    <Chip x={20} y={62} w={170} title="Tabella di Offerta" sub="file .xlsx di Poste" tone="amber" />
+    <Chip x={198} y={62} w={176} title="Dati a mano" sub="GOTO, titolo, sistema" tone="blue" />
+    <Chip x={382} y={62} w={222} title="Workspace documentale" sub="documenti, OCR, ricerca" tone="violet" />
+    <Chip x={612} y={62} w={206} title="Razionali e vincoli" sub="chat con l’AI, da confermare" tone="violet" />
+    <Chip x={826} y={62} w={168} title="Soluzione" sub="per VS Code" tone="violet" />
+    <Chip x={1002} y={62} w={178} title="Storico e Conoscenza" sub="lavoro già fatto" tone="grey" />
+    <path d="M600 128 v22" stroke="#7890a9" strokeWidth="2.5" markerEnd="url(#arrowhead)" fill="none" />
+    <Lane y={140} h={214} label="2 · COSA FAI: QUATTRO PASSI IN SEQUENZA" />
+    <Step x={24} n="1" title="Iniziativa" does={['Compili i dati e importi l’Excel', 'Apri le sezioni: documenti,', 'razionali, soluzione, analisi', 'Premi «Analizza e suggerisci»']} gets="Contesto + voci suggerite" tone="blue" />
+    <Step x={316} n="2" title="Interventi" does={['Scegli le voci di catalogo', 'Imposti tipo, complessità, quantità', 'Chiedi il «Secondo parere AI»', 'Aggiungi solo le proposte utili']} gets="Elenco interventi scelti" tone="blue" />
+    <Step x={608} n="3" title="Offerta" does={['Controlli prezzi e confronto Excel', 'Imposti sconto e contingenza', 'Regoli le TOW automatiche (%)', 'Inserisci le TOW manuali']} gets="Totale offerta" tone="blue" />
+    <Step x={900} n="4" title="Revisione" does={['Leggi il riepilogo finale', 'Generi la Tabella di offerta XLSX', 'Esporti JSON, CSV o stampi', 'Salvi la valutazione']} gets="File pronti + valutazione" tone="green" />
+    <path d="M292 256 h24" stroke="#7890a9" strokeWidth="3" markerEnd="url(#arrowhead)" fill="none" /><path d="M584 256 h24" stroke="#7890a9" strokeWidth="3" markerEnd="url(#arrowhead)" fill="none" />
+    <path d="M876 256 h24" stroke="#7890a9" strokeWidth="3" markerEnd="url(#arrowhead)" fill="none" />
+    <path d="M1034 342 v26 H600 v-6" stroke="#7890a9" strokeWidth="2.5" fill="none" strokeDasharray="6 4" markerEnd="url(#arrowhead)" />
+    <Lane y={366} h={116} label="3 · COME SALVI E COSA SUCCEDE DOPO" />
+    <Save x={24} w={376} title="Salva valutazione" sub={['Registra l’offerta e aggiorna lo storico', 'dell’analisi. L’esito arriva dal server.']} tone="green" />
+    <Save x={412} w={376} title="Salva e Chiudi" sub={['Salva e svuota la pagina,', 'ma solo se il salvataggio riesce.']} tone="green" />
+    <Save x={800} w={376} title="Salva e vai a Sviluppo →" sub={['Salva e apre Sviluppo iniziative', 'sulla stessa iniziativa: schede e codice.']} tone="blue" />
+    <rect x="8" y="496" width="1184" height="52" rx="12" fill="#fff8e6" stroke="#e5b84a" />
+    <text x="26" y="518" fontSize="15" fontWeight="700" fill="#6b4e08">Regola da ricordare</text>
+    <text x="26" y="537" fontSize="15" fill="#6b4e08">Per salvare serve almeno il GOTO o il titolo; il salvataggio completo di offerta e storico richiede il Codice GOTO. Salvare spesso: «Reset» non chiede conferma.</text>
   </svg>;
 }
 
-// ---- Sviluppo: six phases, which count towards progress, and how a card becomes "defined" ----
+// ---- Sviluppo: six phases, which count towards progress, how a card becomes "defined", and its states ----
+function PhaseBox({ x, n, title, lines, tone, optional }) {
+  const [fill, stroke] = COLORS[tone];
+  return <g>
+    <rect x={x} y="58" width="184" height="124" rx="14" fill="#fff" stroke={stroke} strokeWidth="2.5" strokeDasharray={optional ? '7 5' : undefined} />
+    <path d={`M${x} 74 a16 16 0 0 1 16 -16 h152 a16 16 0 0 1 16 16 v28 h-184 z`} fill={fill} />
+    <circle cx={x + 24} cy="80" r="13" fill={stroke} /><text x={x + 24} y="85" textAnchor="middle" fontSize="16" fontWeight="700" fill="#fff">{n}</text>
+    <text x={x + 46} y="86" fontSize="19.5" fontWeight="700" fill="#1f3a5c">{title}</text>
+    {lines.map((line, i) => <text key={i} x={x + 14} y={126 + i * 17} fontSize="15" fill="#2b4666">{line}</text>)}
+    {optional && <text x={x + 14} y="172" fontSize="13.5" fontWeight="700" fill="#a06a08">FACOLTATIVA</text>}
+  </g>;
+}
 function DevelopmentFlow({ label }) {
-  return <svg viewBox="0 0 900 436" role="img" aria-label={label} className="tow-manual-svg">
+  const phases = [
+    [8, 1, 'Fonti', ['Cartella dei sorgenti', 'Razionali confermati', 'Applicativi del sistema'], 'grey', false],
+    [208, 2, 'Schede', ['Una per attività:', 'file, soluzione e', 'criteri di accettazione'], 'blue', false],
+    [408, 3, 'Progetto', ['ZIP di avvio con', 'decisioni da concordare', 'e piano di test'], 'amber', true],
+    [608, 4, 'Codice', ['File generati dall’AI', 'per un applicativo', 'da verificare'], 'amber', true],
+    [808, 5, 'Consegna', ['4 controlli e ZIP della', 'richiesta di modifica', 'codice per lo sviluppo'], 'blue', false],
+    [1008, 6, 'Verifica', ['Evidenze dei test', 'e stato «Verificata»', 'per ogni attività'], 'green', false],
+  ];
+  return <svg viewBox="0 0 1200 560" role="img" aria-label={label} className="tow-manual-svg tow-manual-svg-wide">
     <Defs />
-    <text x="12" y="20" fontSize="13" fontWeight="700" fill="#4a6483">LE SEI FASI DELLO SVILUPPO INIZIATIVE</text>
-    <Box x={8} y={32} w={138} h={74} n="1" title="Fonti" sub={'Cartella sorgenti,\nrazionali confermati'} tone="grey" />
-    <Box x={156} y={32} w={138} h={74} n="2" title="Schede" sub={'Una per attività:\nfile, soluzione, criteri'} />
-    <Box x={304} y={32} w={138} h={74} n="3" title="Progetto" sub={'Facoltativa.\nZIP di avvio'} tone="amber" dashed />
-    <Box x={452} y={32} w={138} h={74} n="4" title="Codice" sub={'Facoltativa. File\ngenerati dall’AI'} tone="amber" dashed />
-    <Box x={600} y={32} w={138} h={74} n="5" title="Consegna" sub={'4 controlli, ZIP della\nrichiesta di modifica'} />
-    <Box x={748} y={32} w={144} h={74} n="6" title="Verifica" sub={'Evidenze e stato\n«Verificata»'} tone="green" />
-    {[146, 294, 442, 590, 738].map(x => <Arrow key={x} x1={x} y1={69} x2={x + 10} y2={69} />)}
-    <rect x="156" y="116" width="142" height="22" rx="6" fill="#e8f0fd" /><text x="227" y="131" textAnchor="middle" fontSize="11.5" fill="#2f6bbd" fontWeight="700">conta nell’avanzamento</text>
-    <rect x="600" y="116" width="142" height="22" rx="6" fill="#e8f0fd" /><text x="671" y="131" textAnchor="middle" fontSize="11.5" fill="#2f6bbd" fontWeight="700">conta nell’avanzamento</text>
-    <rect x="748" y="116" width="144" height="22" rx="6" fill="#e8f0fd" /><text x="820" y="131" textAnchor="middle" fontSize="11.5" fill="#2f6bbd" fontWeight="700">conta nell’avanzamento</text>
-    <text x="8" y="170" fontSize="13" fontWeight="700" fill="#4a6483">QUANDO UNA SCHEDA È «DEFINITA» (servono tutti e tre)</text>
-    <Box x={8} y={180} w={170} h={64} title="File coinvolti" sub={'uno per riga,\npercorso relativo'} tone="violet" />
-    <Box x={196} y={180} w={170} h={64} title="Soluzione tecnica" sub={'cosa e come\nsi modifica'} tone="violet" />
-    <Box x={384} y={180} w={170} h={64} title="Criteri di accettazione" sub={'come si capisce\nche è fatto'} tone="violet" />
-    <text x="570" y="216" fontSize="22" fontWeight="700" fill="#7890a9">=</text>
-    <Box x={596} y={176} w={296} h={72} title="Scheda definita" sub={'è la condizione per «Pronta per sviluppo»;\nuna proposta AI da sola non la rende definita'} tone="green" />
-    <text x="8" y="282" fontSize="13" fontWeight="700" fill="#4a6483">GLI STATI DI UNA SCHEDA</text>
-    {[['Da analizzare', 8], ['Soluzione definita', 156], ['Pronta per sviluppo', 304], ['In sviluppo', 452], ['Da verificare', 600], ['Verificata', 748]].map(([name, x], i) => <g key={name}>
-      <rect x={x} y={292} width={138} height={34} rx="17" fill={i === 5 ? '#e3f6ec' : '#f1f4f8'} stroke={i === 5 ? '#1b8a57' : '#7890a9'} strokeWidth="1.5" /><text x={x + 69} y={314} textAnchor="middle" fontSize="12.5" fontWeight="700" fill="#1f3a5c">{name}</text>
-      {i < 5 && <Arrow x1={x + 138} y1={309} x2={x + 148} y2={309} />}</g>)}
-    <text x="8" y="352" fontSize="12.5" fill="#4a6483">«Pronta per sviluppo» richiede la scheda definita · «Verificata» richiede le evidenze · modificare una scheda verificata la riporta a «Da verificare».</text>
-    <rect x="8" y="370" width="884" height="52" rx="10" fill="#fff8e6" stroke="#e5b84a" />
-    <text x="22" y="390" fontSize="12.5" fill="#6b4e08" fontWeight="700">Cosa l’app non fa</text>
-    <text x="22" y="408" fontSize="12.5" fill="#6b4e08">Non scrive nel repository, non compila, non esegue test né deploy: i file generati sono bozze da verificare in Visual Studio Code.</text>
+    <text x="12" y="30" fontSize="15" fontWeight="700" fill="#5b7594" letterSpacing="1.2">LE SEI FASI DELLO SVILUPPO INIZIATIVE</text>
+    {phases.map(([x, n, title, lines, tone, optional]) => <PhaseBox key={n} x={x} n={n} title={title} lines={lines} tone={tone} optional={optional} />)}
+    {[192, 392, 592, 792, 992].map(x => <path key={x} d={`M${x} 120 h14`} stroke="#7890a9" strokeWidth="3" markerEnd="url(#arrowhead)" fill="none" />)}
+    {[[208, 'Schede'], [808, 'Consegna'], [1008, 'Verifica']].map(([x, name]) => <g key={name}><rect x={x} y="190" width="184" height="26" rx="13" fill="#e8f0fd" stroke="#2f6bbd" /><text x={x + 92} y="208" textAnchor="middle" fontSize="14" fontWeight="700" fill="#2f6bbd">conta nell’avanzamento</text></g>)}
+    <rect x="8" y="240" width="1184" height="116" rx="16" fill="#f7faff" stroke="#d5e2f2" />
+    <text x="26" y="264" fontSize="15" fontWeight="700" fill="#5b7594" letterSpacing="1.2">QUANDO UNA SCHEDA È «DEFINITA»: SERVONO TUTTI E TRE</text>
+    <Chip x={26} y={282} w={300} title="File coinvolti" sub="uno per riga, percorso relativo" />
+    <Chip x={346} y={282} w={300} title="Soluzione tecnica" sub="cosa si modifica e come" />
+    <Chip x={666} y={282} w={300} title="Criteri di accettazione" sub="come si capisce che è fatto" />
+    <text x="984" y="314" fontSize="29.5" fontWeight="700" fill="#7890a9">=</text>
+    <rect x="1010" y="278" width="170" height="58" rx="14" fill="#e3f6ec" stroke="#1b8a57" strokeWidth="2.5" /><text x="1095" y="304" textAnchor="middle" fontSize="17" fontWeight="700" fill="#1f3a5c">Scheda definita</text><text x="1095" y="323" textAnchor="middle" fontSize="13.5" fill="#3b5775">pronta per sviluppo</text>
+    <rect x="8" y="368" width="1184" height="92" rx="16" fill="#f7faff" stroke="#d5e2f2" />
+    <text x="26" y="392" fontSize="15" fontWeight="700" fill="#5b7594" letterSpacing="1.2">GLI STATI DI UNA SCHEDA</text>
+    {['Da analizzare', 'Soluzione definita', 'Pronta per sviluppo', 'In sviluppo', 'Da verificare', 'Verificata'].map((name, i) => <g key={name}>
+      <rect x={26 + i * 194} y="404" width="170" height="40" rx="20" fill={i === 5 ? '#e3f6ec' : '#fff'} stroke={i === 5 ? '#1b8a57' : '#7890a9'} strokeWidth="2" />
+      <text x={26 + i * 194 + 85} y="429" textAnchor="middle" fontSize="15.5" fontWeight="700" fill="#1f3a5c">{name}</text>
+      {i < 5 && <path d={`M${26 + i * 194 + 170} 424 h24`} stroke="#7890a9" strokeWidth="2.5" markerEnd="url(#arrowhead)" fill="none" />}</g>)}
+    <rect x="8" y="474" width="1184" height="74" rx="12" fill="#fff8e6" stroke="#e5b84a" />
+    <text x="26" y="496" fontSize="15" fontWeight="700" fill="#6b4e08">Regole e limiti</text>
+    <text x="26" y="515" fontSize="15" fill="#6b4e08">«Pronta per sviluppo» richiede la scheda definita · «Verificata» richiede le evidenze · modificare una scheda verificata la riporta a «Da verificare».</text>
+    <text x="26" y="535" fontSize="15" fill="#6b4e08">L’app non scrive nel repository, non compila e non esegue test o deploy: i file generati sono bozze da verificare in Visual Studio Code.</text>
   </svg>;
 }
 
