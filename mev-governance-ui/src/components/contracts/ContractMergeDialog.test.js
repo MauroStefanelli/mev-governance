@@ -24,9 +24,16 @@ test('the dialog names the contract being deleted, says nothing changes until co
   expect(dialog).toHaveTextContent(/Questo contratto è incompleto: Lotto 2: nessun prezzo TOW/);
   await within(dialog).findByLabelText('Cosa succede');
 });
-test('the contract to keep defaults to the complete one, and the built-in contract is never offered', async () => {
+test('the contract to keep defaults to the complete one; the system contract is offered too, clearly marked, but never ahead of a complete contract', async () => {
   const { dialog } = open(); const select = within(dialog).getByLabelText('Il contratto che resta');
-  expect(select).toHaveValue('tet'); expect([...select.options].map(o => o.value)).toEqual(['tet']); await within(dialog).findByLabelText('Cosa succede');
+  expect(select).toHaveValue('tet'); expect([...select.options].map(o => o.textContent)).toEqual(['Tracciatura e Logistica Integrata', 'Poste TeT (built-in) (contratto di sistema)']); await within(dialog).findByLabelText('Cosa succede');
+});
+test('when the only other contract is the system one it is offered as destination instead of leaving the user stuck', async () => {
+  const completeSystem = { contractId: 'poste-tet-2025', name: 'Poste Italiane – Tracciatura e Logistica Integrata', builtin: true, lots: keep.lots };
+  const { dialog } = open({ contracts: [drop, completeSystem] });
+  const select = within(dialog).getByLabelText('Il contratto che resta'); expect(select).toHaveValue('poste-tet-2025'); expect(select.options[0].textContent).toMatch(/\(contratto di sistema\)/);
+  expect(within(dialog).queryByText(/Non c’è un altro contratto/)).not.toBeInTheDocument(); await within(dialog).findByLabelText('Cosa succede');
+  expect(mergeConfiguratoreContracts).toHaveBeenCalledWith('aq', 'poste-tet-2025', { preview: true });
 });
 test('the preview is asked for first, with the preview flag, and nothing is written', async () => {
   const { dialog } = open(); await within(dialog).findByLabelText('Cosa succede');
@@ -68,7 +75,7 @@ test('an error while preparing the preview is shown and leaves the delete button
   expect(within(dialog).getByRole('button', { name: /Elimina il contratto/ })).toBeDisabled();
 });
 test('with no other contract to receive the data, the dialog explains why it cannot delete', () => {
-  const { dialog } = open({ contracts: [drop, builtin] });
+  const { dialog } = open({ contracts: [drop] });
   expect(within(dialog).getByRole('alert')).toHaveTextContent('Non c’è un altro contratto in cui spostare i dati'); expect(within(dialog).queryByRole('button', { name: /Elimina il contratto|Sposta/ })).not.toBeInTheDocument();
   expect(mergeConfiguratoreContracts).not.toHaveBeenCalled();
 });

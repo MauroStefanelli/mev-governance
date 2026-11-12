@@ -6,7 +6,8 @@ import { ACTION_LABEL, contractHealth, suggestedKeeper, summarizePlan } from '..
 // Eliminates a contract after moving what is useful into the one that stays. The user picks which to keep, sees exactly what would move
 // (nothing is written yet), and only then confirms. The server does it in one transaction: all of it, or nothing.
 export default function ContractMergeDialog({ contract, contracts, onClose, onDone }) {
-  const others = contracts.filter(c => c.contractId !== contract.contractId && !c.builtin);
+  // The system contract can never be deleted, but it can RECEIVE data: it is often the complete one the duplicate should fold into.
+  const others = contracts.filter(c => c.contractId !== contract.contractId);
   const [target, setTarget] = useState(() => (others.length ? suggestedKeeper(contract, others[0]) === contract ? others[0].contractId : others.reduce((best, c) => suggestedKeeper(best, c) === best ? best : c, others[0]).contractId : ''));
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -50,7 +51,7 @@ export default function ContractMergeDialog({ contract, contracts, onClose, onDo
       {!others.length ? <p className="ca-merge-error" role="alert">Non c’è un altro contratto in cui spostare i dati. Puoi eliminare solo contratti quando ne resta almeno un altro.</p> : <>
         <label className="ca-merge-field">Il contratto che resta
           <select value={target} onChange={event => setTarget(event.target.value)} disabled={busy}>
-            {others.map(c => <option key={c.contractId} value={c.contractId}>{label(c)}</option>)}
+            {others.map(c => <option key={c.contractId} value={c.contractId}>{label(c)}{c.builtin ? ' (contratto di sistema)' : ''}</option>)}
           </select></label>
         {keeper && keeperHealth && <p className={keeperHealth.complete ? 'ca-merge-ok' : 'ca-merge-warn'} role="status">{keeperHealth.complete ? 'Il contratto che resta è completo.' : `Il contratto che resta è incompleto: ${keeperHealth.problems.join('; ')}.`}</p>}
         {busy && !plan && <p role="status">Controllo cosa verrebbe spostato…</p>}

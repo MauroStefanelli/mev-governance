@@ -113,9 +113,9 @@ describe('deleting a duplicate contract', () => {
     expect(await screen.findByRole('dialog', { name: /Elimina «Accordo Quadro/ })).toBeInTheDocument(); expect(service.deleteConfiguratoreContract).not.toHaveBeenCalled(); expect(window.confirm).not.toHaveBeenCalled();
     await waitFor(() => expect(service.mergeConfiguratoreContracts).toHaveBeenCalledWith('aq', 'tet', { preview: true }));
   });
-  test('the complete contract is the one proposed to stay and the built-in one is not offered', async () => {
+  test('the complete contract is the one proposed to stay; the system one is listed after it, marked', async () => {
     await openAq(); fireEvent.click(screen.getByRole('button', { name: 'Elimina contratto…' })); const dialog = await screen.findByRole('dialog', { name: /Elimina «Accordo Quadro/ });
-    const select = within(dialog).getByLabelText('Il contratto che resta'); expect(select).toHaveValue('tet'); expect([...select.options].map(o => o.value)).toEqual(['tet']);
+    const select = within(dialog).getByLabelText('Il contratto che resta'); expect(select).toHaveValue('tet'); expect([...select.options].map(o => o.value)).toEqual(['tet', 'poste-tet-2025']);
   });
   test('after confirming, the list is reloaded from the server, the kept contract is selected and the result is announced', async () => {
     service.mergeConfiguratoreContracts.mockImplementation(async (f, t, o) => (o?.preview ? preview : { message: 'Dati spostati ed eliminato il contratto.', fromContractId: 'aq', toContractId: 'tet', repointed: 2 }));

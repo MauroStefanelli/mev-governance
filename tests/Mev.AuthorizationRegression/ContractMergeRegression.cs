@@ -119,6 +119,16 @@ public static class ContractMergeRegression
         check(JsonNode.Parse(rf.Upserts.Single(u => u.RecordKey.EndsWith("|x")).PayloadJson)!["initiative"]!["code"]!.GetValue<string>() == "145480", "Merge: the rest of the evaluation is untouched");
         check(!rf.Upserts.Any(u => u.RecordKey.EndsWith("|y")), "Merge: evaluations that did not use the source are not rewritten");
 
+        // the system (built-in) contract may RECEIVE data, even though it can never be deleted
+        var intoBuiltin = new List<ContractRow> { Head("poste-tet-2025", "Poste Italiane – Tracciatura e Logistica Integrata"), LotRow("poste-tet-2025", "2", Lot(Prices(5), Cat(27), "Listino.pdf", "Catalogo.pdf", "4490015980")),
+            Head("accordo", "Accordo Quadro"), LotRow("accordo", "2", Lot(null, Cat(27), "(importato da gara x)", "(importato da gara x)")), Apps("accordo", "all", "ILP") };
+        var pb = ContractMerge.Plan("accordo", "poste-tet-2025", intoBuiltin);
+        check(pb.CanRemove && pb.Blockers.Count == 0, "Merge: a duplicate can be folded INTO the system contract");
+        var wb = ContractMerge.Apply(pb, intoBuiltin);
+        check(wb.DeleteKeys.All(k => k.StartsWith("accordo")) && !wb.DeleteKeys.Any(k => k.StartsWith("poste-tet-2025")), "Merge: folding into the system contract never deletes the system contract");
+        check(wb.Upserts.Any(u => u.RecordKey == "poste-tet-2025|all|shared_applications"), "Merge: the applications of the duplicate are carried into the system contract");
+        check(JsonNode.Parse(wb.Upserts.First(u => u.RecordKey.EndsWith("shared_applications")).PayloadJson)!["applications"]!.AsArray().Count == 1, "Merge: and arrive intact");
+
         // blockers
         check(!ContractMerge.Plan(Keep, Keep, rows).CanRemove, "Merge: a contract cannot be merged into itself");
         check(!ContractMerge.Plan("poste-tet-2025", Keep, rows.Append(Head("poste-tet-2025", "Built-in")).ToList()).CanRemove, "Merge: the built-in contract is never removed");
