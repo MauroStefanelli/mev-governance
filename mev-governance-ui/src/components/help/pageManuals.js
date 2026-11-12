@@ -60,12 +60,12 @@ export const PAGE_MANUALS = {
       'Per ogni lotto la finestra dice se viene «aggiunto» (non esiste nel contratto che resta), «completato» (si riempie solo ciò che manca: listino TOW, catalogo, percentuali di impatto, nome dei file, codice contratto) o «resta com’è» (il contratto che resta ha già tutto). I dati del contratto che resta non vengono mai sovrascritti né svuotati.',
       'Anche gli applicativi condivisi del contratto da eliminare passano all’altro, confrontati per codice e nome: quelli già presenti non si duplicano. Le valutazioni del Configuratore che avevano usato come catalogo il contratto da eliminare vengono ricollegate a quello che resta; il resto della valutazione non cambia.',
       'Spunta «Ho letto cosa succede e voglio procedere» e premi «Sposta i dati ed elimina il contratto» (oppure «Elimina il contratto» se non c’è nulla da spostare). L’operazione è unica: o riesce tutta oppure non cambia niente, anche in caso di errore.',
-    ], 'L’eliminazione non si può annullare. Il pulsante resta spento se il contratto non si può togliere: è il contratto di sistema «Poste TeT (built-in)» (quello si può solo ricevere dati, mai eliminare), non esiste un altro contratto che resti, oppure sotto il contratto sono salvati dati che l’unione non sa spostare (la finestra li nomina: spostali o eliminali prima).', {
-      fields: { caption: 'Il contratto «Poste TeT (built-in)»', rows: [
-        ['Che cos’è', 'Un contratto di esempio incluso nell’app, con un catalogo e prezzi TOW di fabbrica. Non è un dato inserito da te.'],
-        ['Quando compare', 'Nel Configuratore, quando non è selezionato un contratto vero o come alternativa agli altri contratti.'],
-        ['Posso eliminarlo?', 'No: nell’Archivio è marcato «Contratto di sistema» e non ha il pulsante di eliminazione.'],
-        ['Serve per le mie iniziative?', 'No. Per le iniziative reali scegli il contratto importato e collegato al codice MEV del tuo ambiente.'],
+    ], 'L’eliminazione non si può annullare. Il pulsante resta spento se il contratto non si può togliere: è il contratto di sistema (quello può solo ricevere dati, mai essere eliminato), non esiste un altro contratto che resti, oppure sotto il contratto sono salvati dati che l’unione non sa spostare (la finestra li nomina: spostali o eliminali prima).', {
+      fields: { caption: 'Il contratto di sistema', rows: [
+        ['Che cos’è', 'Il contratto «Poste Italiane – Tracciatura e Logistica Integrata» (identificativo poste-tet-2025). È un contratto come gli altri: sta nell’Archivio contrattuale, con i suoi lotti, prezzi TOW e catalogo, ed è marcato «Contratto di sistema».'],
+        ['Perché non si elimina', 'È il contratto da cui partono le iniziative e le revisioni più vecchie. Può però ricevere i dati di un duplicato.'],
+        ['Compare due volte?', 'No: nel Configuratore c’è una sola voce. Se l’Archivio non contiene il contratto di sistema, l’app mostra una «copia di riserva» chiaramente indicata, solo per poter aprire lavori vecchi.'],
+        ['Quale uso per le mie iniziative?', 'Quello collegato al codice contratto del tuo ambiente: l’app lo sceglie da sola. Se non è collegato nessun lotto, scegli tu il contratto e il lotto.'],
       ] },
     }),
     chapter('Ripara i collegamenti ai contratti', 'Quando una revisione non si apre perché il suo catalogo non c’è più', [

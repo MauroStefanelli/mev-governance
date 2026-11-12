@@ -7,6 +7,7 @@ import LedgerPanel from "../configuratore/LedgerPanel";
 import HistoryImportPanel from "../configuratore/HistoryImportPanel";
 import { initiativeFromLedger } from "../configuratore/ledgerModel";
 import { missingCatalogMessage } from "../configuratore/contractMergeModel";
+import { withSafetyNet, SYSTEM_CONTRACT_ID, catalogChoiceLabel, catalogLockMessage, safetyNetNotice } from "../configuratore/catalogSelection";
 import SolutionPanel from "../configuratore/SolutionPanel";
 import KnowledgeOverview from "../configuratore/KnowledgeOverview";
 import { loadPmPoste, pmOptions, pmSelectValue, pmFromSelect, showsFreeText, OTHER } from "../configuratore/pmPoste";
@@ -296,9 +297,10 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     const catalogo = (APP_DATA.cataloghi || {})["1"] || [];
     const b = {
       contractId: "poste-tet-2025",
-      name: "Poste TeT (built-in)",
+      name: "Poste TeT",
       rulesFile: "",
       builtin: true,
+      safetyNet: true,
       lots: [
         {
           lotId: "1",
@@ -345,16 +347,16 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   }
 
   const allContracts = useMemo(() => {
-    const list = contracts.map(contractToApp);
-    return [builtinContract, ...list.filter((c) => c.contractId !== "poste-tet-2025")];
+    // One list: the Archivio. The bundled "Poste TeT" copy appears only when the Archivio does not hold the system contract.
+    return withSafetyNet(contracts.map(contractToApp), builtinContract);
   }, [contracts, builtinContract]);
 
   useEffect(() => {
     if (!contracts.length || catalogSelectionInitialized.current) return;
     catalogSelectionInitialized.current = true;
     // Defaults apply only to a new estimate, not to a restored catalog choice.
-    if (items.length || selectedContractId !== "poste-tet-2025") return;
-    const selection = initialCatalogSelection(contracts, codiceContratto);
+    if (items.length || selectedContractId !== SYSTEM_CONTRACT_ID) return;
+    const selection = initialCatalogSelection(contracts.map(contractToApp), codiceContratto);
     if (selection) {
       setSelectedContractId(selection.contractId);
       setLot(selection.lotId);
@@ -1557,13 +1559,13 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       <details className="tow-resources">
       <summary>Risorse e configurazione <span>Catalogo contrattuale · applicativi · tecnologie</span></summary>
       <section aria-label="Catalogo contrattuale della stima" style={{ ...styles.card, marginBottom: 16 }}>
-        <label style={styles.label}>Catalogo del contratto di sistema
-          <select aria-label="Catalogo del contratto di sistema" style={styles.input} value={selectedContractId} disabled={items.length > 0} onChange={e => {
+        <label style={styles.label}>Contratto del catalogo
+          <select aria-label="Contratto del catalogo" style={styles.input} value={selectedContractId} disabled={items.length > 0} onChange={e => {
             setSelectedContractId(e.target.value);
             const lots = allContracts.find(c => c.contractId === e.target.value)?.lots || [];
             setLot(String((lots.find(l => l.codiceContratto === codiceContratto) || lots.find(l => l.active !== false))?.lotId || "1"));
           }}>
-            {allContracts.map(c => <option key={c.contractId} value={c.contractId}>{c.name}{c.contractId === "poste-tet-2025" ? " · catalogo incluso nell’app" : ""}</option>)}
+            {allContracts.map(c => <option key={c.contractId} value={c.contractId}>{catalogChoiceLabel(c)}</option>)}
           </select>
         </label>
         <label style={styles.label}>Lotto catalogo
@@ -1571,8 +1573,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             {(allContracts.find(c => c.contractId === selectedContractId)?.lots || []).filter(l => l.active !== false).map(l => <option key={l.lotId} value={l.lotId}>{l.name || l.lotId}</option>)}
           </select>
         </label>
-        {isBuiltin && <p role="status">Poste TeT è un catalogo incluso nell’app, distinto dai contratti dell’Archivio Contrattuale. Seleziona il contratto di sistema per applicare i suoi prezzi.</p>}
-        {items.length > 0 && <p role="status">Selezione contratto e lotto bloccata: questa stima contiene già delle voci. Per scegliere un altro catalogo avvia una nuova iniziativa. I prezzi Excel non vengono sostituiti automaticamente.</p>}
+        {safetyNetNotice(selectedContractId, contracts) && <p role="status">{safetyNetNotice(selectedContractId, contracts)}</p>}
+        {items.length > 0 && <p role="status">{catalogLockMessage(items.length, { importedCount: importedInterventions.length })}</p>}
       </section>
 
       {/* APPLICATIVI E TECNOLOGIE PER LOTTO */}

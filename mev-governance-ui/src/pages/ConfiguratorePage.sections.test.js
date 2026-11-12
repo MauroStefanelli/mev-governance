@@ -319,3 +319,52 @@ describe('Storico delle iniziative', () => {
     expect(knowledge.parentElement).toBe(history.parentElement); expect(knowledge.closest('.tow-heading-top')).not.toBeNull();
   });
 });
+
+describe('one list of contracts (the system contract lives in the Archivio)', () => {
+  const cat = n => Array.from({ length: n }, (_, i) => ({ id: `V${i}`, ambito: 'A', nome: `Voce ${i}`, prezzi: { REALIZZAZIONE: { Semplice: 100, Medio: 200, Complesso: 300 }, MODIFICA: { Semplice: 50, Medio: 100, Complesso: 150 } } }));
+  const system = { contractId: 'poste-tet-2025', name: 'Poste Italiane – Tracciatura e Logistica Integrata', builtin: true, lots: [
+    { lotId: '1', name: 'Lotto 1 – Postali', active: false, catalog: cat(3), towPrices: {} },
+    { lotId: '2', name: 'Lotto 2 – TOW', active: true, catalog: cat(27), towPrices: { 'TOW02.1': 1, 'TOW02.2': 2, 'TOW02.3': 3, 'TOW02.4': 4, 'TOW02.5': 5 }, codiceContratto: 'C1' }] };
+  const catalogSelect = () => screen.findByLabelText('Contratto del catalogo');
+  const openResources = async () => { mount(); const select = await catalogSelect(); return select; };
+
+  test('the contract is offered ONCE, with its real name, and no "built-in" or "incluso nell\'app" wording anywhere', async () => {
+    service.getConfiguratoreContracts.mockResolvedValue([system]);
+    const select = await openResources();
+    await waitFor(() => expect([...select.options].map(o => o.textContent)).toEqual(['Poste Italiane – Tracciatura e Logistica Integrata']));
+    expect(document.body.textContent).not.toMatch(/built-in|incluso nell’app|catalogo di sistema/i);
+  });
+  test('the environment code picks the right contract and the active Lotto 2 by itself', async () => {
+    service.getConfiguratoreContracts.mockResolvedValue([system]);
+    const select = await openResources(); await waitFor(() => expect(select).toHaveValue('poste-tet-2025'));
+    const lot = screen.getByLabelText('Lotto catalogo'); await waitFor(() => expect(lot).toHaveValue('2'));
+    expect([...lot.options].map(o => o.textContent)).toEqual(['Lotto 2 – TOW']);
+  });
+  test('with other contracts present the system one is still listed once and the others follow', async () => {
+    service.getConfiguratoreContracts.mockResolvedValue([system, { contractId: 'altro', name: 'Altro contratto', lots: [{ lotId: '1', name: 'L1', active: true, catalog: cat(2), towPrices: {} }] }]);
+    const select = await openResources();
+    await waitFor(() => expect([...select.options].map(o => o.value)).toEqual(['poste-tet-2025', 'altro']));
+  });
+  test('when the Archivio does not hold the system contract the bundled copy is a clearly marked safety net', async () => {
+    service.getConfiguratoreContracts.mockResolvedValue([{ contractId: 'altro', name: 'Altro contratto', lots: [{ lotId: '1', name: 'L1', active: true, catalog: cat(2), towPrices: {} }] }]);
+    const select = await openResources();
+    await waitFor(() => expect([...select.options].map(o => o.textContent)).toEqual(expect.arrayContaining([expect.stringMatching(/Poste TeT · copia di riserva/)])));
+    expect(document.body.textContent).not.toMatch(/built-in|incluso nell’app/i);
+  });
+
+  test('reopening a saved offer keeps the catalog locked, explains why and says how to unlock it', async () => {
+    const saved = { Id: 'r1', record_key: 'C1|2|initiative|145480', record_key_: 'x', title: '145480 · Add-on', lot_id: '2', payload: JSON.stringify({ version: 6, lot: '2', catalogSource: { contractId: 'poste-tet-2025', lot: '2' },
+      initiative: { code: '145480', title: 'Add-on', system: 'NPSO' }, items: [{ key: 'a', id: 'V1', type: 'REALIZZAZIONE', complexity: 'Medio', qty: 1, selected: true }, { key: 'b', id: 'V2', type: 'MODIFICA', complexity: 'Semplice', qty: 2, selected: true }] }) };
+    service.getConfiguratoreContracts.mockResolvedValue([system]);
+    service.getConfiguratoreRecords.mockImplementation(async params => (params?.entity_type === 'initiative_evaluation' ? { records: [saved] } : { records: [] }));
+    mount(); fireEvent.click(await screen.findByRole('button', { name: /Archivio iniziative/ })); fireEvent.click(await screen.findByRole('button', { name: /Seleziona iniziativa 145480/ }));
+    const select = await screen.findByLabelText('Contratto del catalogo'); await waitFor(() => expect(select).toBeDisabled()); expect(screen.getByLabelText('Lotto catalogo')).toBeDisabled();
+    const note = await screen.findByText(/Catalogo e lotto non si possono cambiare/);
+    expect(note).toHaveTextContent('2 voci aggiunte'); expect(note).toHaveTextContent('rimuovi tutte le voci dal passo Offerta'); expect(note).toHaveTextContent('+ Nuova Iniziativa'); expect(note).not.toHaveTextContent(/built-in|Poste TeT/);
+  });
+  test('with no rows the catalog choice is free and no lock message is shown', async () => {
+    service.getConfiguratoreContracts.mockResolvedValue([system]); mount();
+    const select = await screen.findByLabelText('Contratto del catalogo'); expect(select).toBeEnabled(); expect(screen.queryByText(/Catalogo e lotto non si possono cambiare/)).not.toBeInTheDocument();
+  });
+});
+

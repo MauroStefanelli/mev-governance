@@ -146,7 +146,7 @@ const chapters = [
     'Senza un GOTO chiaro nella nota, le voci sono legate al sistema (“Storico ILP”). Se la nota cita un solo GOTO più volte, la voce è legata a quell’iniziativa. Importare, confermare e scartare è riservato a chi può lavorare sulle iniziative; gli altri possono solo consultare. Per importare il lavoro di un collega, importa il suo zip con il suo elenco dal tuo computer: le voci riportano l’autore della cartella.',
   ] },
   { title: 'Contratto e listino', subtitle: 'Scegliere la fonte economica corretta', steps: [
-    'In “Risorse e configurazione” scegli il catalogo del contratto di sistema e il lotto. “Poste TeT” è un catalogo incluso nell’app: è distinto dal contratto dell’Archivio.',
+    'In “Risorse e configurazione” scegli il «Contratto del catalogo» e il «Lotto catalogo». C’è un solo elenco di contratti, quello dell’Archivio contrattuale: la prima volta l’app sceglie da sola il contratto e il lotto collegati al codice contratto del tuo ambiente.',
     'Quando la stima contiene righe, la selezione del catalogo è bloccata. Per un altro contratto avvia una nuova iniziativa.',
     'In Offerta o Revisione controlla il “Listino TOW per la stima”. Se il listino è su un diverso record contrattuale dell’Archivio, scegli esplicitamente il “Contratto di origine dei prezzi TOW”.',
     'Verifica che i prezzi unitari siano disponibili. Percentuali di impatto, pesi contrattuali e prezzi unitari sono dati diversi: non sono intercambiabili.',
