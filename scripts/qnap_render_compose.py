@@ -87,6 +87,10 @@ def main():
     for name in ('DATABASE_DIRECT_URL', 'JWT_KEY', 'ADMIN_PASSWORD'):
         pattern = re.compile(rf'^(\s+{name}: )(.*)$', re.M)
         rendered = pattern.sub(lambda m: m.group(1) + quote(env[name]), rendered)
+    # il file da incollare non deve contenere altro che il compose: si toglie l'intestazione di commento (spiega come usare il modello, non questo file)
+    lines = rendered.splitlines()
+    first = next((i for i, line in enumerate(lines) if line.startswith('services:')), 0)
+    rendered = '# MEV Governance - QNAP (generato da scripts/qnap_render_compose.py; contiene password: non condividere)\n' + '\n'.join(lines[first:]) + '\n'
     with open(OUTPUT, 'w', encoding='utf-8') as handle:
         handle.write(rendered)
     os.chmod(OUTPUT, 0o600)
