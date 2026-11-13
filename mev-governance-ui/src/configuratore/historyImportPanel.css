@@ -47,3 +47,4 @@
 .hi-states { display: flex; flex-wrap: wrap; gap: 6px; }
 .hi-search { font: inherit; font-size: 13.5px; width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid #cdbfe6; border-radius: 9px; background: #fff; color: inherit; } .hi-search:focus { border-color: #6a35b6; }
 @media (max-width: 640px) { .hi-tabs { margin: 0 14px; } .hi-tab { padding: 8px 10px; font-size: 13px; } }
+.hi-why ul { max-height: 260px; } .hi-why li { margin-bottom: 8px; line-height: 1.5; } .hi-why small { color: #5d4783; } .hi-names { overflow-wrap: anywhere; }

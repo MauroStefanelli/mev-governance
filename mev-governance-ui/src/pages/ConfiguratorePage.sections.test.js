@@ -306,11 +306,11 @@ describe('Storico delle iniziative', () => {
     const { unmount } = render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Client" roles={['Client']} />);
     fireEvent.click(await screen.findByRole('button', { name: /Conoscenza storica AI/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Conoscenza storica AI' });
-    expect(within(dialog).queryByLabelText('Zip della cartella')).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Archivio della cartella')).not.toBeInTheDocument();
     unmount();
     mount();
     fireEvent.click(await screen.findByRole('button', { name: /Conoscenza storica AI/ }));
-    expect(await screen.findByLabelText('Zip della cartella')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Archivio della cartella')).toBeInTheDocument();
   });
   test('the historical knowledge button sits in the page header next to the history', async () => {
     mount();

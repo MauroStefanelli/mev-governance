@@ -52,7 +52,7 @@ afterEach(() => jest.restoreAllMocks());
 const calls = name => server.calls.filter(([path]) => path === name);
 const trigger = () => screen.getAllByRole('button', { name: /Conoscenza storica AI/ })[0];
 const openPanel = async (props = {}) => { render(<HistoryImportPanel canEdit {...props} />); fireEvent.click(trigger()); return screen.findByRole('dialog', { name: 'Conoscenza storica AI' }); };
-const choose = (dialog, zip, manifest) => { fireEvent.change(within(dialog).getByLabelText('Zip della cartella'), { target: { files: [zip] } }); fireEvent.change(within(dialog).getByLabelText('Elenco dei file'), { target: { files: [manifest] } }); };
+const choose = (dialog, zip, manifest) => { fireEvent.change(within(dialog).getByLabelText('Archivio della cartella'), { target: { files: [zip] } }); fireEvent.change(within(dialog).getByLabelText('Elenco dei file'), { target: { files: [manifest] } }); };
 const preview = async (files, manifestLines) => { const dialog = await openPanel(); choose(dialog, await zipOf(files), textFile(manifestLines.join('\n'))); fireEvent.click(within(dialog).getByRole('button', { name: 'Controlla i file' })); await within(dialog).findByLabelText('Anteprima'); return dialog; };
 const OK = note('ilp-uno.md', 'Il servizio riprova tre volte prima di scartare.'); const OK2 = note('npso-due.md', 'Il consolidamento avviene a fine giornata.');
 
@@ -79,7 +79,9 @@ test('the zip is opened here, nothing is sent to the AI at the preview, and the 
 test('the preview says which notes were refused for credentials, with the rule and never the value', async () => {
   const dialog = await preview(Object.fromEntries([OK, note('ilp-segreto.md', 'riga\nIl token è ' + TOKEN)]), [OK[0], 'projects/-home-m/memory/ilp-segreto.md']);
   fireEvent.click(within(dialog).getByText(/note con credenziali/));
-  expect(within(dialog).getByText('ilp-segreto.md')).toBeInTheDocument(); expect(within(dialog).getByText(/token-github/)).toBeInTheDocument();
+  const details = within(dialog).getByText(/note con credenziali/).closest('details');
+  expect(within(details).getByText('ilp-segreto.md')).toBeInTheDocument(); expect(within(dialog).getByText(/token-github/)).toBeInTheDocument();
+  expect(within(dialog).getByText(/Contengono credenziali/)).toBeInTheDocument();                       // the new "why" box names the same note under its reason
   expect(document.body.textContent).not.toContain(TOKEN);
 });
 
@@ -166,7 +168,7 @@ test('the system chips filter the proposals on the server', async () => {
 
 test('a read-only user sees the proposals but cannot import, confirm or discard', async () => {
   const dialog = await openPanel({ canEdit: false }); const list = within(dialog).getByLabelText('Voci da confermare'); await within(list).findByText('Voce 1');
-  expect(within(dialog).queryByLabelText('Zip della cartella')).not.toBeInTheDocument(); expect(within(list).queryByRole('button', { name: /^Conferma/ })).not.toBeInTheDocument(); expect(within(list).queryByLabelText(/Seleziona tutte/)).not.toBeInTheDocument();
+  expect(within(dialog).queryByLabelText('Archivio della cartella')).not.toBeInTheDocument(); expect(within(list).queryByRole('button', { name: /^Conferma/ })).not.toBeInTheDocument(); expect(within(list).queryByLabelText(/Seleziona tutte/)).not.toBeInTheDocument();
 });
 
 test('if the backend is not updated the panel says so', async () => {
@@ -281,4 +283,25 @@ describe('looking at what was imported', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Scartate' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('errore 500');
   });
+});
+
+test('the preview of a list with TAB columns and an excluded note reads the notes, does not call them missing, and explains the one left out', async () => {
+  const dialog = await openPanel(); const text = ['NUOVO\t' + OK[0], 'NUOVO\tprojects/-home-m/memory/reference-riservata.md\tESCLUSO-RISERVATO'].join('\n');
+  choose(dialog, await zipOf(Object.fromEntries([OK, note('reference-riservata.md', 'riservata')])), textFile(text)); fireEvent.click(within(dialog).getByRole('button', { name: 'Controlla i file' }));
+  const plan = await within(dialog).findByLabelText('Anteprima'); expect(plan).toHaveTextContent(/1\s*note da leggere/);
+  expect(within(plan).getByText(/Escluse da chi ha preparato l’elenco/)).toBeInTheDocument(); expect(within(plan).queryByText(/assenti nell’archivio/)).not.toBeInTheDocument();
+});
+
+test('when nothing can be read the preview opens by itself on the reasons, instead of showing only zeros', async () => {
+  const dialog = await openPanel(); choose(dialog, await zipOf(Object.fromEntries([note('MEMORY.md', '# indice'), note('session-ilp.md', 'link')])), textFile(['projects/-home-m/memory/MEMORY.md', 'projects/-home-m/memory/session-ilp.md'].join('\n')));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Controlla i file' })); const plan = await within(dialog).findByLabelText('Anteprima');
+  expect(plan).toHaveTextContent(/0\s*note da leggere/); const why = within(plan).getByText(/Perché 2 note non vengono lette/).closest('details'); expect(why).toHaveAttribute('open'); expect(why).toHaveTextContent('Indice della memoria');
+});
+
+test('a tar.gz archive is accepted: the same notes are found as in a zip', async () => {
+  const zlib = require('zlib'); const { TextEncoder: TE, TextDecoder: TD } = require('util'); if (!globalThis.TextDecoder) globalThis.TextDecoder = TD; if (!globalThis.TextEncoder) globalThis.TextEncoder = TE;
+  const block = (name, data) => { const h = Buffer.alloc(512); h.write(name, 0); h.write('0000644\0', 100); h.write(Buffer.byteLength(data).toString(8).padStart(11, '0') + '\0', 124); h.write('        ', 148); h.write('0', 156); h.write('ustar\0', 257); let sum = 0; for (const b of h) sum += b; h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148); const d = Buffer.from(data); return Buffer.concat([h, d, Buffer.alloc(Math.ceil(d.length / 512) * 512 - d.length)]); };
+  const tarball = zlib.gzipSync(Buffer.concat([block(OK[0], OK[1]), block(OK2[0], OK2[1]), Buffer.alloc(1024)]));
+  const dialog = await openPanel(); choose(dialog, toFile(tarball, 'backup.tar.gz'), textFile([OK[0], OK2[0]].join('\n'))); fireEvent.click(within(dialog).getByRole('button', { name: 'Controlla i file' }));
+  const plan = await within(dialog).findByLabelText('Anteprima'); expect(plan).toHaveTextContent(/2\s*note da leggere/); expect(plan).toHaveTextContent('ILP · 1'); expect(plan).toHaveTextContent('NPSO · 1');
 });

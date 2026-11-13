@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { historyImportRequest } from '../services/mevService';
-import { parseManifest, readNotes, classifyNotes, bySystem, buildReport, filterAlreadyRead, runImport, pendingLabel, KIND_LABEL } from './historyImportModel';
+import { parseManifest, readNotes, classifyNotes, bySystem, buildReport, filterAlreadyRead, runImport, pendingLabel, KIND_LABEL, explainUnusable } from './historyImportModel';
 import { readFileText, downloadText } from './ledgerModel';
 import './historyImportPanel.css';
 
@@ -12,6 +12,13 @@ export function KnowledgeIcon({ size = 22 }) {
   </svg>;
 }
 
+// Why the notes that will NOT be read are left out: grouped by reason, with the first names, so "32 non utilizzabili" is never a mystery.
+function UnusableReasons({ plan }) {
+  const groups = explainUnusable(plan);
+  if (!groups.length) return null;
+  return <details className="hi-details hi-why" open={plan.fresh.length === 0}><summary>Perché {groups.reduce((n, g) => n + g.count, 0)} note non vengono lette</summary>
+    <ul>{groups.map(g => <li key={g.key}><b>{g.count}</b> — {g.title}{g.hint ? <small> {g.hint}</small> : null}<br /><small className="hi-names">{g.names.join(', ')}{g.count > g.names.length ? `, … (+${g.count - g.names.length})` : ''}</small></li>)}</ul></details>;
+}
 const stamp = value => value ? new Date(value).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 
 // Brings into the app the knowledge written in the past by AI assistants. The user picks the zipped folder and the list of paths;
@@ -127,9 +134,9 @@ export default function HistoryImportPanel({ canEdit = true }) {
 
         {canEdit && <section className="hi-card" aria-label="Importa">
           <h3>1. Scegli cosa importare</h3>
-          <p className="hi-hint">Comprimi in uno zip la cartella <code>projects</code> del backup e scegli anche l’elenco dei file (<code>.txt</code>, un percorso per riga). Lo zip viene aperto qui, nel browser: <b>non viene caricato</b>. Partono solo le note Markdown che superano i controlli.</p>
+          <p className="hi-hint">Scegli l’archivio della cartella <code>projects</code> del backup (<code>.zip</code>, <code>.tar.gz</code>, <code>.tgz</code> o <code>.tar</code>) e l’elenco dei file (<code>.txt</code>, un percorso per riga; sono accettate anche le liste con più colonne separate da tabulazione). L’archivio viene aperto qui, nel browser: <b>non viene caricato</b>. Partono solo le note Markdown che superano i controlli.</p>
           <div className="hi-files">
-            <label className="hi-file"><span>Zip della cartella</span><input type="file" accept=".zip,application/zip" aria-label="Zip della cartella" disabled={run?.busy || !!preparing} onChange={e => { setZipFile(e.target.files?.[0] || null); setPlan(null); setRun(null); }} /><small>{zipFile ? `${zipFile.name} · ${(zipFile.size / 1048576).toFixed(1)} MB` : 'Nessun file scelto'}</small></label>
+            <label className="hi-file"><span>Archivio della cartella (.zip, .tar.gz, .tgz, .tar)</span><input type="file" accept=".zip,.tar.gz,.tgz,.tar,application/zip,application/gzip,application/x-gzip,application/x-tar" aria-label="Archivio della cartella" disabled={run?.busy || !!preparing} onChange={e => { setZipFile(e.target.files?.[0] || null); setPlan(null); setRun(null); }} /><small>{zipFile ? `${zipFile.name} · ${(zipFile.size / 1048576).toFixed(1)} MB` : 'Nessun file scelto'}</small></label>
             <label className="hi-file"><span>Elenco dei file (.txt)</span><input type="file" accept=".txt,text/plain" aria-label="Elenco dei file" disabled={run?.busy || !!preparing} onChange={e => { setManifestFile(e.target.files?.[0] || null); setPlan(null); setRun(null); }} /><small>{manifestFile ? manifestFile.name : 'Nessun file scelto'}</small></label>
           </div>
           <button type="button" className="hi-btn hi-btn-primary" disabled={!zipFile || !manifestFile || !!preparing || run?.busy} onClick={prepare}>{preparing ? `Controllo… ${preparing.done}/${preparing.total || '…'}` : 'Controlla i file'}</button>
@@ -144,6 +151,7 @@ export default function HistoryImportPanel({ canEdit = true }) {
             <li className="hi-fact"><b>{plan.classified.noSystem.length + plan.classified.unusable.length + plan.read.missing.length}</b><span>non utilizzabili o assenti</span></li>
           </ul>
           {plan.systems.length > 0 && <p className="hi-systems">Per sistema: {plan.systems.map(s => <span className="hi-chip" key={s.system}>{s.system} · {s.count}</span>)}</p>}
+          <UnusableReasons plan={plan} />
           {plan.manifest.stuck.length > 0 && <p className="hi-warn" role="status">{plan.manifest.stuck.length} righe dell’elenco sono incollate tra loro e vengono ignorate.</p>}
           {plan.classified.secrets.length > 0 && <details className="hi-details"><summary>Le {plan.classified.secrets.length} note con credenziali (restano sul tuo computer)</summary>
             <ul>{plan.classified.secrets.map(n => <li key={n.path}><code>{n.fileName}</code> — {[...new Set(n.hits.map(h => h.rule))].join(', ')}</li>)}</ul></details>}

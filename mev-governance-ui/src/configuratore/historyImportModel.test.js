@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { parseManifest, readNotes, classifyNotes, bySystem, buildReport, systemOf, gotoOf, skipReason, authorOf, folderOf, baseName } from './historyImportModel';
+import { parseManifest, readNotes, classifyNotes, bySystem, buildReport, systemOf, gotoOf, skipReason, authorOf, folderOf, baseName, explainUnusable } from './historyImportModel';
 import { scanForSecrets, RULE_LABELS } from './secretScan';
 
 import { webcrypto } from 'crypto';
@@ -107,7 +107,8 @@ test('without a hash function no note is wrongly treated as a duplicate of anoth
 describe('on the real backup', () => {
   withReal('the manifest and the zip agree, the secrets are caught, and what is left to read is only technical knowledge', async () => {
     const manifest = parseManifest(fs.readFileSync(MANIFEST, 'utf8'));
-    expect(manifest.paths).toHaveLength(507); expect(manifest.markdown).toHaveLength(384); expect(manifest.skippedByType).toBe(123); expect(manifest.stuck).toHaveLength(0);
+    // 507 lines: 505 paths under projects/ (384 notes, 121 transcripts) and 2 settings files that sit outside projects/ and are not part of the import
+    expect(manifest.paths).toHaveLength(505); expect(manifest.markdown).toHaveLength(384); expect(manifest.skippedByType).toBe(121); expect(manifest.stuck).toHaveLength(0); expect(manifest.excluded).toHaveLength(0);
     const { found, missing, notInManifest } = await readNotes(asFile(ZIP), manifest);
     expect(found).toHaveLength(384); expect(missing).toEqual([]); expect(notInManifest).toEqual([]);
     const c = await classifyNotes(found);
@@ -144,11 +145,12 @@ describe('reading the zip', () => {
     const r = await readNotes(await zipFile({ 'claude-backup/projects/-h/memory/a.md': 'testo' }), parseManifest('projects/-h/memory/a.md'));
     expect(r.found).toHaveLength(1); expect(r.missing).toEqual([]);
   });
-  test('a zip too big or not a zip is refused with a reason', async () => {
-    await expect(readNotes(null, parseManifest('projects/a.md'))).rejects.toThrow('Scegli lo zip');
+  test('an archive that is missing, too big, not readable or of an unknown format is refused with a reason', async () => {
+    await expect(readNotes(null, parseManifest('projects/a.md'))).rejects.toThrow('Scegli l’archivio');
     await expect(readNotes(Object.assign(new File(['x'], 'b.zip'), {}), parseManifest('projects/a.md'))).rejects.toThrow('non è uno zip leggibile');
     const big = new File(['x'], 'b.zip'); Object.defineProperty(big, 'size', { value: 700 * 1024 * 1024 });
     await expect(readNotes(big, parseManifest('projects/a.md'))).rejects.toThrow('supera');
+    await expect(readNotes(new File(['x'], 'b.rar'), parseManifest('projects/a.md'))).rejects.toThrow('.zip, .tar.gz, .tgz o .tar');
   });
 });
 
@@ -197,5 +199,57 @@ describe('the reading queue', () => {
     const request = async (path, { body }) => { asked.push(body.hashes.length); return { known: [all[1].sha, all[3].sha] }; };
     const { fresh, already } = await filterAlreadyRead(all, request, 2);
     expect(asked).toEqual([2, 2, 1]); expect(fresh.map(n => n.fileName)).toEqual(['0.md', '2.md', '4.md']); expect(already).toHaveLength(2);
+  });
+});
+
+describe('lists with more than one column (the case that showed "0 notes to read, 32 not usable")', () => {
+  const tab = (...cells) => cells.join('\t');
+  test('"STATUS<TAB>path" is read as the path, not as a name that matches nothing in the archive', () => {
+    const m = parseManifest([tab('NUOVO', 'projects/-home-m/memory/ilp-a.md'), tab('MODIFICATO', 'projects/-home-m/memory/npso-b.md')].join('\n'));
+    expect(m.markdown).toEqual(['projects/-home-m/memory/ilp-a.md', 'projects/-home-m/memory/npso-b.md']); expect(m.statusOf['projects/-home-m/memory/ilp-a.md']).toBe('NUOVO'); expect(m.stuck).toEqual([]);
+  });
+  test('a note the author marked ESCLUSO-RISERVATO is kept apart: never read and never counted as missing', () => {
+    const m = parseManifest([tab('NUOVO', 'projects/x/memory/ilp-ok.md'), tab('NUOVO', 'projects/x/memory/reference-ghe-pat-current.md', 'ESCLUSO-RISERVATO')].join('\n'));
+    expect(m.markdown).toEqual(['projects/x/memory/ilp-ok.md']); expect(m.excluded).toEqual([{ path: 'projects/x/memory/reference-ghe-pat-current.md', remark: 'ESCLUSO-RISERVATO', status: 'NUOVO' }]);
+  });
+  test('the plain one-path-per-line list still works, with Windows line endings and a BOM', () => {
+    const m = parseManifest('\uFEFFprojects/a/ilp-a.md\r\nprojects/a/ilp-b.md\r\n'); expect(m.markdown).toEqual(['projects/a/ilp-a.md', 'projects/a/ilp-b.md']);
+  });
+  test('two paths glued by a bad paste are still reported, in both formats', () => {
+    expect(parseManifest('projects/a/ilp-a.mdprojects/a/ilp-b.md').stuck).toHaveLength(1);
+    expect(parseManifest(tab('NUOVO', 'projects/a/x.mdprojects/a/y.md')).stuck.length + parseManifest(tab('NUOVO', 'projects/a/x.mdprojects/a/y.md')).markdown.length).toBeGreaterThan(0);
+  });
+  test('a line without any path is ignored, and a path appearing twice is read once', () => {
+    const m = parseManifest(['# commento', '', tab('NUOVO', 'projects/a/ilp-a.md'), tab('MODIFICATO', 'projects/a/ilp-a.md')].join('\n')); expect(m.markdown).toEqual(['projects/a/ilp-a.md']);
+  });
+  test('the notes that are excluded on purpose are not reported as "in the archive but not in the list"', async () => {
+    const JSZip = require('jszip'); const zip = new JSZip(); zip.file('projects/a/memory/ilp-ok.md', 'ok'); zip.file('projects/a/memory/reference-riservata.md', 'riservata');
+    const buffer = await zip.generateAsync({ type: 'nodebuffer' }); const f = new File([buffer], 'b.zip'); Object.defineProperty(f, 'arrayBuffer', { value: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) });
+    const m = parseManifest([tab('NUOVO', 'projects/a/memory/ilp-ok.md'), tab('NUOVO', 'projects/a/memory/reference-riservata.md', 'ESCLUSO-RISERVATO')].join('\n'));
+    const r = await readNotes(f, m); expect(r.found.map(n => n.fileName)).toEqual(['ilp-ok.md']); expect(r.notInManifest).toEqual([]); expect(r.excludedOnPurpose).toEqual(['projects/a/memory/reference-riservata.md']);
+  });
+});
+
+describe('the preview says WHY notes are not read', () => {
+  const note = (fileName, text = 'testo') => ({ path: 'projects/x/' + fileName, fileName, author: 'm', text });
+  test('every group has a reason, a count and the first names; nothing is a bare number', async () => {
+    const classified = await classifyNotes([note('MEV.md'), note('MEMORY.md'), note('session-ilp.md'), note('feedback-x.md'), note('zzz-nota.md'), note('ilp-segreto.md', 'token ' + TOKEN), note('ilp-ok.md', 'Una nota vera.')]);
+    const groups = explainUnusable({ classified, read: { missing: ['projects/x/manca.md'], excludedOnPurpose: ['projects/x/riservata.md'] }, already: [note('ilp-gia.md')], fresh: classified.toRead });
+    const titles = groups.map(g => g.title);
+    expect(titles).toEqual(expect.arrayContaining(['Indicate nell’elenco ma assenti nell’archivio', 'Escluse da chi ha preparato l’elenco (riservate)', 'Contengono credenziali', 'Già lette da un collega o da te', 'Il nome non indica un sistema noto']));
+    expect(groups.every(g => g.count > 0 && g.names.length > 0 && g.names.length <= 4)).toBe(true);
+    expect(groups.find(g => g.key === 'secrets').names).toEqual(['ilp-segreto.md']); expect(groups.find(g => g.key === 'nosystem').names).toContain('zzz-nota.md');
+  });
+  test('the reasons for notes skipped on purpose are listed separately, with their own wording', async () => {
+    const classified = await classifyNotes([note('MEMORY.md'), note('session-ilp.md'), note('feedback-x.md'), note('user-ferie.md')]);
+    const groups = explainUnusable({ classified, read: {}, already: [], fresh: [] }); expect(groups.length).toBeGreaterThanOrEqual(3);
+    expect(groups.map(g => g.title).join(' ')).toMatch(/Indice della memoria/); expect(groups.map(g => g.title).join(' ')).toMatch(/Nota di sessione/);
+  });
+  test('a note identical to another one says which one', async () => {
+    const classified = await classifyNotes([note('ilp-a.md', 'Stesso testo.'), note('ilp-b.md', 'Stesso testo.')]);
+    expect(explainUnusable({ classified, read: {}, already: [], fresh: classified.toRead }).map(g => g.title)).toContain('Stesso contenuto di un’altra nota');
+  });
+  test('with nothing to explain it returns nothing', async () => {
+    const classified = await classifyNotes([note('ilp-ok.md', 'Una nota vera.')]); expect(explainUnusable({ classified, read: { missing: [] }, already: [], fresh: classified.toRead })).toEqual([]);
   });
 });

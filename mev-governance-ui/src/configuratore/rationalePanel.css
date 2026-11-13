@@ -11,15 +11,16 @@
 .rat-counts { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; } .rat-counts li { display: flex; flex-direction: column; align-items: center; min-width: 84px; padding: 8px 12px; border-radius: 12px; background: #f2f6fb; border: 1px solid #d9e3ef; font-size: 11.5px; color: #3d5878; } .rat-counts b { font-size: 22px; line-height: 1.1; color: #1f5fbf; }
 .rat-flow { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; } .rat-flow li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; background: #f4f8ff; border: 1px solid #c6daf6; border-radius: 30px; padding: 5px 14px 5px 5px; } .rat-flow b { width: 22px; height: 22px; border-radius: 50%; background: #1f5fbf; color: #fff; display: grid; place-items: center; font-size: 11px; }
 .rat-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.rat-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .rat-chat, .rat-know { display: flex; flex-direction: column; gap: 10px; min-width: 0; } .rat-chat h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .9px; color: #5d718a; }
-.rat-desk { display: flex; flex-direction: column; height: 380px; background: #f2f6fb; border: 1px solid #d9e3ef; border-radius: 12px; overflow: hidden; cursor: text; }
+.rat-desk { display: flex; flex-direction: column; height: clamp(520px, 72vh, 860px); background: #f2f6fb; border: 1px solid #d9e3ef; border-radius: 12px; overflow: hidden; cursor: text; }
 .rat-desk:focus-within { border-color: #75a7f7; box-shadow: 0 0 0 3px #75a7f733; }
 .rat-messages { list-style: none; margin: 0; padding: 12px 12px 4px; display: none; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1 1 auto; min-height: 0; cursor: default; }
 .rat-desk.has-messages .rat-messages { display: flex; }
 .rat-loading { align-self: center; color: #4d6179; font-size: 13px; padding: 8px; }
-.rat-msg { display: flex; flex-direction: column; gap: 3px; max-width: 86%; padding: 8px 13px; border-radius: 12px 12px 12px 3px; background: #fff; border: 1px solid #d9e3ef; align-self: flex-start; }
+.rat-msg { display: flex; flex-direction: column; gap: 3px; max-width: min(86%, 980px); padding: 8px 13px; border-radius: 12px 12px 12px 3px; background: #fff; border: 1px solid #d9e3ef; align-self: flex-start; }
 .rat-msg.is-mine { align-self: flex-end; background: #e8f0fd; border-color: #c6daf6; border-radius: 12px 12px 3px 12px; } .rat-msg.is-ai { background: #f6f5fe; border-color: #d9d5f2; }
-.rat-msg-meta { display: flex; gap: 10px; align-items: baseline; font-size: 11.5px; color: #5d718a; } .rat-msg-meta b { color: #17314f; } .rat-msg-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; line-height: 1.55; }
+.rat-msg-meta { display: flex; gap: 10px; align-items: baseline; font-size: 11.5px; color: #5d718a; } .rat-msg-meta b { color: #17314f; } .rat-msg-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14.5px; line-height: 1.6; }
 .rat-typing .rat-msg-text { color: #5d718a; font-style: italic; }
 .rat-empty { margin: auto; padding: 14px; text-align: center; color: #4d6179; font-size: 13px; display: flex; flex-direction: column; gap: 10px; align-items: center; } .rat-more { align-self: center; }
 .rat-questions { background: #fff4dc; border: 1px solid #f0cf8d; color: #7a4700; border-radius: 10px; padding: 8px 14px; font-size: 13px; } .rat-questions ul { margin: 4px 0 0; padding-left: 18px; }
@@ -41,5 +42,28 @@
 .rat-text { margin: 0; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; } .rat-meta { font-size: 11.5px; color: #4d6179; } .rat-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .rat-notice { margin: 0; background: #e8f0fd; border: 1px solid #c6daf6; color: #1e416b; border-radius: 9px; padding: 8px 12px; font-size: 13px; } .rat-error { margin: 0; background: #fff1ec; border: 1px solid #f4c4b6; color: #9c361b; border-radius: 9px; padding: 10px 14px; font-size: 13px; }
 .rat-add { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed #b3c6de; border-radius: 12px; background: #fafcff; } .rat-add label { font-size: 12px; font-weight: 600; color: #496078; display: flex; flex-direction: column; gap: 4px; } .rat-add-btn { align-self: flex-start; }
-@media (max-width: 980px) { .rat-grid { grid-template-columns: 1fr; } .rat-desk { height: 320px; } .rat-msg { max-width: 94%; } }
+@media (max-width: 980px) { .rat-grid { grid-template-columns: 1fr; } .rat-desk { height: clamp(420px, 70vh, 640px); } .rat-msg { max-width: 94%; } }
 @media (prefers-reduced-motion: reduce) { .rat * { transition: none !important; } }
+
+/* ---- attachments bar, paste box and connection notes, between the messages and the writing box ---- */
+.rat-attach { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid #d9e3ef; background: #f8fbff; }
+.rat-attach > button { font-size: 12.5px; padding: 6px 12px; min-height: 34px; }
+.rat-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 6px 4px 11px; border-radius: 20px; background: #e8f0fd; border: 1px solid #c6daf6; color: #1e416b; font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.rat .rat-chip button { min-height: 26px; width: 26px; padding: 0; border-radius: 50%; border: 0; background: #c6daf6; line-height: 1; font-size: 15px; }
+.rat-attach-hint { margin: 0; padding: 6px 14px 0; color: #4d6179; font-size: 12px; background: #f8fbff; }
+.rat-paste, .rat-connection { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0 12px 8px; border: 1px dashed #b3c6de; border-radius: 12px; background: #fff; }
+.rat-paste label, .rat-connection label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #496078; }
+.rat-paste input, .rat-paste textarea, .rat-connection input { width: 100%; padding: 8px 10px; border: 1px solid #bacbdf; border-radius: 9px; font: inherit; font-size: 13.5px; font-weight: 400; background: #fff; color: #17314f; }
+.rat-paste textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.rat-connection p { margin: 0; font-size: 13px; line-height: 1.55; color: #3d5878; } .rat-connection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+
+/* ---- the four lists live in ONE row below the conversation; click to open ---- */
+.rat-know { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rat .rat-know-toggle { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; width: 100%; text-align: left; padding: 10px 14px; min-height: 48px; border-radius: 12px; background: #f2f6fb; border: 1px solid #d9e3ef; }
+.rat .rat-know-toggle[aria-expanded="true"] { background: #e8f0fd; border-color: #8fb0dc; }
+.rat-know-title { font-size: 14px; font-weight: 700; color: #17314f; }
+.rat-know-counts { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 auto; } .rat-know-counts > span { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; font-weight: 600; color: #3d5878; background: #fff; border: 1px solid #d9e3ef; border-radius: 20px; padding: 3px 10px; }
+.rat-know-counts b { font-size: 12px; background: #e9eef5; border-radius: 12px; padding: 0 7px; } .rat-know-counts .is-attention { border-color: #e0a030; background: #fff8e6; color: #7a4700; } .rat-know-counts .is-attention b { background: #f6d68a; }
+.rat-know-chevron { margin-left: auto; font-size: 12px; color: #5d718a; }
+.rat-know-body { display: flex; flex-direction: column; gap: 10px; }
+.rat-know-body .rat-list { max-height: 460px; }

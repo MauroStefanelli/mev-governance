@@ -101,3 +101,40 @@ public static class SecretScanner
         _ => rule,
     };
 }
+
+// What the rationale chat accepts from the browser besides the question: excerpts of the user's own source code and pasted data.
+// The browser already filters them, but the server never trusts the browser: every item is checked again, and an item with a secret is DROPPED
+// (never sent to the model, never stored) while the others go on. The answer to the user says how many were dropped and why, never the secret.
+public record AttachmentIn(string? Kind, string? Name, string? Text, int? StartLine, int? EndLine);
+public record AttachmentKept(string Kind, string Name, string Text, int? StartLine, int? EndLine);
+public record AttachmentDropped(string Name, string Reason, int Line);
+public record AttachmentResult(List<AttachmentKept> Kept, List<AttachmentDropped> Dropped, List<string> Notes);
+
+public static class Attachments
+{
+    public const int MaxItems = 8;
+    public const int MaxCharsEach = 4000;
+    public const int MaxCharsTotal = 20000;
+    public static readonly string[] Kinds = { "sorgente", "dati" };
+
+    public static AttachmentResult Check(IEnumerable<AttachmentIn>? input)
+    {
+        var kept = new List<AttachmentKept>(); var dropped = new List<AttachmentDropped>(); var notes = new List<string>(); var total = 0;
+        var list = (input ?? Array.Empty<AttachmentIn>()).ToList();
+        if (list.Count > MaxItems) notes.Add($"Sono stati considerati solo i primi {MaxItems} allegati su {list.Count}.");
+        foreach (var item in list.Take(MaxItems))
+        {
+            var kind = (item.Kind ?? "").Trim().ToLowerInvariant();
+            var name = (item.Name ?? "").Trim(); var text = (item.Text ?? "").Replace("\r\n", "\n");
+            if (!Kinds.Contains(kind)) { dropped.Add(new AttachmentDropped(name.Length == 0 ? "(senza nome)" : name, "tipo non valido", 0)); continue; }
+            if (name.Length == 0 || name.Length > 260 || name.Contains("..") || name.StartsWith('/') || name.Contains('\\')) { dropped.Add(new AttachmentDropped(name.Length == 0 ? "(senza nome)" : name, "nome o percorso non valido", 0)); continue; }
+            if (text.Trim().Length == 0) { dropped.Add(new AttachmentDropped(name, "vuoto", 0)); continue; }
+            if (text.Length > MaxCharsEach) { text = text[..MaxCharsEach]; notes.Add($"«{name}» è stato accorciato a {MaxCharsEach} caratteri."); }
+            if (total + text.Length > MaxCharsTotal) { dropped.Add(new AttachmentDropped(name, "oltre il limite totale degli allegati", 0)); continue; }
+            var hits = SecretScanner.Scan(name, text);
+            if (hits.Count > 0) { dropped.Add(new AttachmentDropped(name, SecretScanner.Describe(hits[0].Rule), hits[0].Line)); continue; }
+            total += text.Length; kept.Add(new AttachmentKept(kind, name, text, item.StartLine, item.EndLine));
+        }
+        return new AttachmentResult(kept, dropped, notes);
+    }
+}

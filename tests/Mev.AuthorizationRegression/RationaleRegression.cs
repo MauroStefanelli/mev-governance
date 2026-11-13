@@ -99,6 +99,34 @@ public static class RationaleRegression
         // Only confirmed knowledge feeds the next AI question and the shared endpoints.
         await anna.Ask(new("G1", "Altro dubbio", null, "NPSO", null, null));
         check(fake.Seen.Last().Context.Contains("due volte la stessa prenotazione"), "Confirmed knowledge is given to the AI");
+        // ---- attachments: excerpts of the user's own source code and pasted data, checked again on the server ----
+        fake.Reply = _ => new AssistantResult(new RationaleReply("Ho letto gli estratti.", new(), new()), "m");
+        var good = new AttachmentIn("sorgente", "src/main/java/Servizio.java", "public class Servizio { void invia() { retry(3); } }", 10, 12);
+        var data = new AttachmentIn("dati", "Risultato query (incollato)", "ID;STATO\n1;OK\n2;KO", null, null);
+        var withSecret = new AttachmentIn("sorgente", "config/Db.java", "String url = \"jdbc:postgresql://u:SuperSegreta99@host/db\";", 1, 1);
+        var sent = Ok(await anna.Ask(new("G1", "Come funziona l'invio?", "Invio", "NPSO", "", null, new() { good, data, withSecret })));
+        var seenContext = fake.Seen.Last().Context;
+        check(seenContext.Contains("retry(3)") && seenContext.Contains("1;OK"), "Source excerpts and pasted data reach the AI as attachments");
+        check(!seenContext.Contains("SuperSegreta99") && !seenContext.Contains("jdbc:postgresql"), "An attachment with a secret is NEVER sent to the AI");
+        var att = sent.GetProperty("attachments");
+        check(att.GetProperty("sent").GetArrayLength() == 2 && att.GetProperty("dropped").GetArrayLength() == 1, "The answer says what was sent and what was dropped");
+        check(att.GetProperty("dropped")[0].GetProperty("name").GetString() == "config/Db.java" && att.GetProperty("dropped")[0].GetProperty("line").GetInt32() == 1, "The dropped item is named with the line, never with its content");
+        check(!att.ToString().Contains("SuperSegreta99"), "The reply never repeats the secret");
+        check(!db.RationaleMessages.Any(m => m.Text.Contains("retry(3)") || m.Text.Contains("SuperSegreta99")), "Attachments are not stored in the conversation");
+        Ok(await anna.Ask(new("G1", "Senza allegati", null, null, null, null)));
+        check(!fake.Seen.Last().Context.Contains("retry(3)"), "A question without attachments carries none: they are not remembered from the previous one");
+        var manyFiles = Enumerable.Range(0, 12).Select(i => new AttachmentIn("sorgente", $"a{i}.java", "class A {}", null, null)).ToList();
+        var capped = Ok(await anna.Ask(new("G1", "Troppi", null, null, null, null, manyFiles))).GetProperty("attachments");
+        check(capped.GetProperty("sent").GetArrayLength() == Attachments.MaxItems && capped.GetProperty("notes").GetArrayLength() >= 1, "Only the first 8 attachments are used, and the user is told");
+        var bad = Ok(await anna.Ask(new("G1", "Allegati sbagliati", null, null, null, null, new() { new("script", "x.js", "a", null, null), new("sorgente", "../../etc/passwd", "root", null, null), new("sorgente", "/abs/x.java", "a", null, null), new("sorgente", "ok.java", "   ", null, null) }))).GetProperty("attachments");
+        check(bad.GetProperty("sent").GetArrayLength() == 0 && bad.GetProperty("dropped").GetArrayLength() == 4, "Invalid kind, path traversal, absolute path and empty text are all refused");
+        var big = Ok(await anna.Ask(new("G1", "Grande", null, null, null, null, new() { new("sorgente", "Grande.java", new string('x', 9000), null, null) }))).GetProperty("attachments");
+        check(big.GetProperty("sent").GetArrayLength() == 1 && fake.Seen.Last().Context.Length < 9000 && big.GetProperty("notes").GetArrayLength() == 1, "An oversized excerpt is shortened and the user is told");
+        var total = Enumerable.Range(0, 8).Select(i => new AttachmentIn("sorgente", $"f{i}.java", new string('y', 3900), null, null)).ToList();
+        var capTotal = Ok(await anna.Ask(new("G1", "Totale", null, null, null, null, total))).GetProperty("attachments");
+        check(capTotal.GetProperty("sent").GetArrayLength() == 5 && capTotal.GetProperty("dropped").GetArrayLength() == 3, "The total size of the attachments is capped (20.000 characters)");
+        check(await As(user, "Bid Manager").Ask(new("G1", "ciao", null, null, null, null, new() { good })) is ForbidResult, "A supervisor still cannot ask, with or without attachments");
+
         check(!fake.Seen.Last().Context.Contains("Nessuna modifica allo schema SAPLES"), "Discarded or proposed entries are not given to the AI");
         check(Ok(await anna.Confirmed("g1")).GetArrayLength() == 1, "Confirmed endpoint returns only confirmed entries");
         check(Ok(await As(user, "Developer", 2).Confirmed("G1")).GetArrayLength() == 0, "Confirmed knowledge is isolated by environment");

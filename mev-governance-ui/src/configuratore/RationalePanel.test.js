@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import RationalePanel from './RationalePanel';
 import { rationaleRequest } from '../services/mevService';
@@ -28,6 +28,7 @@ beforeEach(() => {
     return {};
   });
 });
+const openLists = async () => { const toggle = await screen.findByRole('button', { name: /Conoscenza dell’iniziativa/ }); if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle); return toggle; };
 const reply = (proposals = [], questions = []) => ({ question: { id: 10, role: 'user', mine: true, text: 'q', createdAt: new Date().toISOString(), author: 'io', authorFullName: 'Io' },
   answer: { id: 11, role: 'assistant', text: 'Serve l’idempotenza', createdAt: new Date().toISOString(), author: 'ai' }, proposals, questions });
 
@@ -37,6 +38,7 @@ test('shows the stored conversation and groups the entries by status', async () 
   render(<Harness />);
   expect(await screen.findByText('Il chiamante ritenta')).toBeInTheDocument();
   expect(screen.getByText('Lucia Bianchi')).toBeInTheDocument();
+  await openLists();
   expect(screen.getByRole('tab', { name: /Da confermare/ })).toHaveTextContent('1');
   expect(screen.getByRole('tab', { name: /Confermate/ })).toHaveTextContent('1');
   await waitFor(() => expect(known).toHaveLength(2));
@@ -77,6 +79,7 @@ test('a failed AI request keeps the user message that the server stored and expl
 test('confirming a proposal makes it available as knowledge, with the text the user refined', async () => {
   server.entries = [entry(1, 'razionale', 'proposta', 'Evita duplicati')];
   render(<Harness />);
+  await openLists();
   const text = await screen.findByLabelText('Testo della voce 1');
   fireEvent.change(text, { target: { value: 'Evita duplicati della prenotazione' } });
   fireEvent.click(screen.getByRole('button', { name: 'Conferma' }));
@@ -89,6 +92,7 @@ test('confirming a proposal makes it available as knowledge, with the text the u
 test('discarding keeps the entry as history and removes it from the knowledge', async () => {
   server.entries = [entry(1, 'razionale', 'proposta', 'Non vale')];
   render(<Harness />);
+  await openLists();
   fireEvent.click(await screen.findByRole('button', { name: 'Scarta' }));
   await waitFor(() => expect(known.find(e => e.id === 1).status).toBe('scartata'));
   fireEvent.click(screen.getByRole('tab', { name: /Scartate/ }));
@@ -99,6 +103,7 @@ test('revoking a confirmed entry asks for confirmation first', async () => {
   server.entries = [entry(2, 'vincolo', 'confermata', 'Solo TEST', { decidedAt: new Date().toISOString(), decidedBy: 'x' })];
   window.confirm = jest.fn(() => false);
   render(<Harness />);
+  await openLists();
   fireEvent.click(await screen.findByRole('button', { name: 'Revoca' }));
   expect(window.confirm).toHaveBeenCalled();
   expect(server.calls.some(([path]) => path.endsWith('/decision'))).toBe(false);
@@ -109,6 +114,7 @@ test('revoking a confirmed entry asks for confirmation first', async () => {
 
 test('a manual entry is validated and added as confirmed knowledge', async () => {
   render(<Harness />);
+  await openLists();
   fireEvent.click(await screen.findByRole('button', { name: /Aggiungi una voce a mano/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Aggiungi come confermata' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Il testo è obbligatorio');
@@ -123,6 +129,7 @@ test('a manual entry is validated and added as confirmed knowledge', async () =>
 test('knowledge confirmed on other initiatives of the same system can be taken as a proposal', async () => {
   server.related = [entry(30, 'vincolo', 'confermata', 'Timeout massimo 5 secondi', { goto: 'goto-9', gotoLabel: 'GOTO-9' })];
   render(<Harness />);
+  await openLists();
   fireEvent.click(await screen.findByRole('tab', { name: /Da altre iniziative/ }));
   expect(await screen.findByText('Timeout massimo 5 secondi')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Riprendi in questa iniziativa' }));
@@ -168,4 +175,123 @@ test('clicking the empty part of the desk puts the cursor in the writing box', a
   const box = await screen.findByLabelText('Messaggio per l’AI');
   fireEvent.click(container.querySelector('.rat-desk'));
   expect(box).toHaveFocus();
+});
+
+describe('the lists in one row, the conversation as the protagonist', () => {
+  test('the four lists are collapsed in ONE row at first; the row shows how many items each holds and opens on click', async () => {
+    server.entries = [entry(1, 'razionale', 'proposta', 'Evita duplicati'), entry(2, 'vincolo', 'confermata', 'Solo TEST', { decidedAt: new Date().toISOString(), decidedBy: 'x' }), entry(3, 'razionale', 'scartata', 'Non vale')];
+    server.related = [entry(30, 'vincolo', 'confermata', 'Timeout 5 secondi', { goto: 'goto-9', gotoLabel: 'GOTO-9' })];
+    render(<Harness />);
+    const row = await screen.findByRole('button', { name: /Conoscenza dell’iniziativa/ });
+    await waitFor(() => expect(row).toHaveTextContent(/Da altre iniziative\s*1/)); expect(row).toHaveTextContent(/Da confermare\s*1/); expect(row).toHaveTextContent(/Confermate\s*1/); expect(row).toHaveTextContent(/Scartate\s*1/);
+    expect(row).toHaveAttribute('aria-expanded', 'false'); expect(screen.queryByRole('tab')).not.toBeInTheDocument(); expect(screen.queryByText('Evita duplicati')).not.toBeInTheDocument();
+    fireEvent.click(row); expect(row).toHaveAttribute('aria-expanded', 'true'); expect(screen.getAllByRole('tab')).toHaveLength(4); expect(await screen.findByText('Evita duplicati')).toBeInTheDocument();
+    fireEvent.click(row); expect(row).toHaveAttribute('aria-expanded', 'false'); expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+  test('the conversation comes first and the row of lists comes after it in the page', async () => {
+    render(<Harness />); const row = await screen.findByRole('button', { name: /Conoscenza dell’iniziativa/ }); const desk = screen.getByLabelText('Cronologia della conversazione');
+    expect(desk.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  test('when the AI proposes something the row opens by itself: there is something to decide', async () => {
+    server.answer = reply([entry(5, 'vincolo', 'proposta', 'Nessuna modifica allo schema')]);
+    render(<Harness />); await screen.findByRole('button', { name: /Conoscenza dell’iniziativa/ });
+    fireEvent.change(await screen.findByLabelText('Messaggio per l’AI'), { target: { value: 'Quali vincoli?' } }); fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' }));
+    expect(await screen.findByText('Nessuna modifica allo schema')).toBeInTheDocument(); expect(screen.getByRole('button', { name: /Conoscenza dell’iniziativa/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+  test('when the AI proposes nothing the row stays as the user left it', async () => {
+    server.answer = reply([]); render(<Harness />); const row = await screen.findByRole('button', { name: /Conoscenza dell’iniziativa/ });
+    fireEvent.change(await screen.findByLabelText('Messaggio per l’AI'), { target: { value: 'Ciao' } }); fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' }));
+    await screen.findByText('Serve l’idempotenza'); expect(row).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('attachments to a question: source code and pasted data', () => {
+  const TOKEN = 'ghp_' + '0123456789abcdefghijABCDEFGHIJ0123';
+  const asked = () => server.calls.filter(([path]) => path === 'messages');
+  const ask = async text => { fireEvent.change(await screen.findByLabelText('Messaggio per l’AI'), { target: { value: text } }); fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' })); };
+  const paste = async (name, text) => { fireEvent.click(await screen.findByRole('button', { name: /Incolla dati/ })); const form = screen.getByRole('form', { name: 'Incolla dati' }); fireEvent.change(within(form).getByLabelText(/Cos’è/), { target: { value: name } }); fireEvent.change(within(form).getByLabelText('Testo'), { target: { value } }); fireEvent.click(within(form).getByRole('button', { name: 'Allega alla prossima domanda' })); };
+  let value; const setValue = v => { value = v; };
+  beforeEach(() => { value = ''; });
+  const pasteData = async (name, text) => { fireEvent.click(await screen.findByRole('button', { name: /Incolla dati/ })); const form = screen.getByRole('form', { name: 'Incolla dati' }); fireEvent.change(within(form).getByLabelText(/Cos’è/), { target: { value: name } }); fireEvent.change(within(form).getByLabelText('Testo'), { target: { value: text } }); fireEvent.click(within(form).getByRole('button', { name: 'Allega alla prossima domanda' })); };
+
+  test('pasted data becomes a visible chip, goes with the NEXT question only, and the AI is told what was sent', async () => {
+    server.answer = { ...reply(), attachments: { sent: [{ kind: 'dati', name: 'Query di ieri' }], dropped: [], notes: [] } };
+    render(<Harness />); await pasteData('Query di ieri', 'ID;STATO\n1;OK\n2;KO');
+    expect(screen.getByText(/Query di ieri/)).toBeInTheDocument(); await ask('Cosa vedi nei dati?');
+    await waitFor(() => expect(asked()).toHaveLength(1)); expect(asked()[0][1].attachments).toEqual([expect.objectContaining({ kind: 'dati', name: 'Query di ieri', text: 'ID;STATO\n1;OK\n2;KO' })]);
+    expect(await screen.findByText(/1 allegato inviato all’AI/)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: /Rimuovi l’allegato Query di ieri/ })).not.toBeInTheDocument();
+    server.answer = reply(); await ask('Altra domanda'); await waitFor(() => expect(asked()).toHaveLength(2)); expect(asked()[1][1].attachments).toEqual([]);
+  });
+  test('data with a credential is refused at the moment of pasting, naming the line, and nothing is attached', async () => {
+    render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Incolla dati/ })); const form = screen.getByRole('form', { name: 'Incolla dati' });
+    fireEvent.change(within(form).getByLabelText('Testo'), { target: { value: 'riga uno\nconnessione: ' + TOKEN } }); fireEvent.click(within(form).getByRole('button', { name: 'Allega alla prossima domanda' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/token GitHub alla riga 2/); expect(document.body.textContent).not.toContain(TOKEN);
+    fireEvent.click(within(form).getByRole('button', { name: 'Annulla' })); await ask('domanda'); await waitFor(() => expect(asked()).toHaveLength(1)); expect(asked()[0][1].attachments).toEqual([]);
+  });
+  test('an attachment can be removed before sending', async () => {
+    render(<Harness />); await pasteData('Da togliere', 'dato'); fireEvent.click(screen.getByRole('button', { name: /Rimuovi l’allegato Da togliere/ }));
+    expect(screen.queryByText(/Da togliere/)).not.toBeInTheDocument(); await ask('ciao'); await waitFor(() => expect(asked()).toHaveLength(1)); expect(asked()[0][1].attachments).toEqual([]);
+  });
+  test('text longer than the limit is refused with a clear message', async () => {
+    render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Incolla dati/ })); const form = screen.getByRole('form', { name: 'Incolla dati' });
+    fireEvent.change(within(form).getByLabelText('Testo'), { target: { value: 'x'.repeat(4001) } }); fireEvent.click(within(form).getByRole('button', { name: 'Allega alla prossima domanda' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('supera 4000 caratteri');
+  });
+  test('the server reporting a dropped attachment is shown to the user, with the reason and without the content', async () => {
+    server.answer = { ...reply(), attachments: { sent: [], dropped: [{ name: 'Db.java', reason: 'password scritta in chiaro', line: 4 }], notes: [] } };
+    render(<Harness />); await pasteData('Db.java', 'class A {}'); await ask('guarda'); expect(await screen.findByText(/non inviato: «Db.java» \(password scritta in chiaro, riga 4\)/)).toBeInTheDocument();
+  });
+  test('without a folder the panel explains what to do; with a folder a chip shows it and it can be disconnected', async () => {
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const input = { files: [file('mio-progetto/src/Invio.java', 'class Invio {}'), file('mio-progetto/src/Altro.java', 'class Altro {}')], setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' ? input : original(tag)));
+    render(<Harness />); expect(await screen.findByText(/Vuoi che l’AI guardi il codice/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona cartella sorgenti' })); expect(input.setAttribute).toHaveBeenCalledWith('webkitdirectory', ''); act(() => input.onchange());
+    expect(await screen.findByText(/mio-progetto · 2 file/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Cambia cartella sorgenti' })).toBeInTheDocument(); expect(screen.queryByText(/Vuoi che l’AI guardi il codice/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Scollega la cartella sorgenti' })); expect(screen.queryByText(/mio-progetto/)).not.toBeInTheDocument(); document.createElement.mockRestore();
+  });
+  test('the question is accompanied by the excerpts of the files that match it, with path and lines, and the sampling limit is declared', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const input = { files: [file('p/src/InvioService.java', 'class InvioService {\n  void ritenta() { retry(3); }\n}'), file('p/src/Altro.java', 'class Altro {}')], setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' ? input : original(tag)));
+    server.answer = { ...reply(), attachments: { sent: [{ kind: 'sorgente', name: 'p/src/InvioService.java' }], dropped: [], notes: [] } };
+    render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 2 file/);
+    await ask('Dove si ritenta nell invio?'); await waitFor(() => expect(asked()).toHaveLength(1));
+    const sentItems = asked()[0][1].attachments; expect(sentItems[0]).toMatchObject({ kind: 'sorgente', name: 'p/src/InvioService.java', startLine: 1 }); expect(sentItems[0].text).toContain('retry(3)');
+    expect(await screen.findByText(/Campione limitato: massimo 60 file letti e 8 estratti inviati, non analisi completa/)).toBeInTheDocument(); document.createElement.mockRestore();
+  });
+  test('a source file containing a credential is never sent: the user is told which one and where', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const input = { files: [file('p/src/Config.java', 'class Config {\n  String token = "' + TOKEN + '";\n}'), file('p/src/Config2.java', 'class Config2 {}')], setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' ? input : original(tag)));
+    server.answer = reply(); render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 2 file/);
+    await ask('Guarda config'); await waitFor(() => expect(asked()).toHaveLength(1));
+    expect(JSON.stringify(asked()[0][1])).not.toContain(TOKEN); expect(asked()[0][1].attachments.map(a => a.name)).toEqual(['p/src/Config2.java']);
+    expect(await screen.findByText(/non inviato: «p\/src\/Config.java» \(token GitHub, riga 2\)/)).toBeInTheDocument(); document.createElement.mockRestore();
+  });
+});
+
+describe('connection to a Poste environment', () => {
+  beforeEach(() => localStorage.clear());
+  test('the box explains that the app cannot open the VPN, and that the result of a query is pasted instead', async () => {
+    render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Collegamento a un ambiente Poste/ }));
+    const box = screen.getByRole('region', { name: 'Collegamento a un ambiente Poste' }); expect(box).toHaveTextContent('non può aprire la tua VPN'); expect(box).toHaveTextContent('incolli qui il risultato'); expect(box).toHaveTextContent('restano solo nel tuo browser');
+  });
+  test('the notes are saved in this browser as they are typed and found again next time', async () => {
+    const first = render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Collegamento a un ambiente Poste/ }));
+    fireEvent.change(screen.getByLabelText('Ambiente'), { target: { value: 'Collaudo NPSO' } }); fireEvent.change(screen.getByLabelText('VPN'), { target: { value: 'VPN Poste, profilo Sviluppo' } });
+    expect(JSON.parse(localStorage.getItem('mev-rationale-connection-notes'))).toMatchObject({ environment: 'Collaudo NPSO', vpn: 'VPN Poste, profilo Sviluppo' }); first.unmount();
+    render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Collegamento a un ambiente Poste/ })); expect(screen.getByLabelText('Ambiente')).toHaveValue('Collaudo NPSO');
+  });
+  test('the notes never reach the server, not even with the question', async () => {
+    server.answer = reply(); render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Collegamento a un ambiente Poste/ })); fireEvent.change(screen.getByLabelText('Ambiente'), { target: { value: 'Collaudo NPSO' } });
+    fireEvent.change(await screen.findByLabelText('Messaggio per l’AI'), { target: { value: 'ciao' } }); fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' })); await waitFor(() => expect(server.calls.some(([p]) => p === 'messages')).toBe(true));
+    expect(JSON.stringify(server.calls)).not.toContain('Collaudo NPSO');
+  });
+  test('a credential typed in the notes is flagged without repeating it', async () => {
+    render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Collegamento a un ambiente Poste/ })); fireEvent.change(screen.getByLabelText('Database o servizio'), { target: { value: 'oracle://utente:Segreta99@db/NPSO' } });
+    const alert = await screen.findByRole('alert'); expect(alert).toHaveTextContent('non scrivere credenziali'); expect(alert).not.toHaveTextContent('Segreta99');
+  });
 });

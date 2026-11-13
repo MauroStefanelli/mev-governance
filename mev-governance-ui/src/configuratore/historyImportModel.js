@@ -1,10 +1,10 @@
-import JSZip from 'jszip';
+import { openArchive } from './archiveReader';
 import { scanForSecrets, RULE_LABELS, isCertain } from './secretScan';
 import { sha256Hex } from './ledgerModel';
 
 // Which notes to read, from the folder zipped by the user and the manifest of the paths. All of this runs in the browser:
 // the zip (hundreds of MB of session transcripts) is never uploaded, only the notes that pass every check.
-export const MAX_ZIP_BYTES = 600 * 1024 * 1024;
+export const MAX_ZIP_BYTES = 600 * 1024 * 1024;   // (kept for the tests: the real limit now lives in archiveReader)
 export const MAX_NOTE_CHARS = 60000;
 export const MAX_NOTES = 1000;
 
@@ -24,11 +24,26 @@ export const DEFAULT_SYSTEMS = [
   { prefix: 'ptype13', system: 'BEP' }, { prefix: 'wipi', system: 'WIPI' },
 ];
 
+// One line of the list is one path. Lists produced by a comparison tool carry more columns separated by a TAB:
+//   NUOVO<TAB>projects/…/nota.md<TAB>ESCLUSO-RISERVATO
+// The path is the column that contains "projects/"; the status before it and the remark after it are kept apart, because a remark such as
+// ESCLUSO-RISERVATO means the author left that note out ON PURPOSE and it must never be read or reported as "missing".
 export function parseManifest(text) {
   const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const stuck = lines.filter(line => (line.match(/projects\//g) || []).length > 1);
-  const paths = lines.filter(line => !stuck.includes(line));
-  return { paths: [...new Set(paths)], stuck, markdown: [...new Set(paths)].filter(p => /\.md$/i.test(p)), skippedByType: paths.filter(p => !/\.md$/i.test(p)).length };
+  const stuck = []; const entries = []; const excluded = [];
+  for (const line of lines) {
+    const cells = line.split('\t').map(cell => cell.trim());
+    const holders = cells.filter(cell => cell.includes('projects/'));
+    if ((line.match(/projects\//g) || []).length > 1 && holders.length < 2 && cells.length === 1) { stuck.push(line); continue; }   // two paths glued together by a bad paste
+    if (holders.length !== 1) { if (holders.length > 1) stuck.push(line); continue; }
+    const path = holders[0]; const index = cells.indexOf(path);
+    const remark = cells.slice(index + 1).filter(Boolean).join(' ');
+    const status = index > 0 ? cells.slice(0, index).filter(Boolean).join(' ') : '';
+    if (/ESCLUSO|RISERVAT/i.test(remark)) excluded.push({ path, remark, status }); else entries.push({ path, status });
+  }
+  const paths = [...new Set(entries.map(entry => entry.path))];
+  return { paths, stuck, excluded, markdown: paths.filter(p => /\.md$/i.test(p)), skippedByType: paths.filter(p => !/\.md$/i.test(p)).length,
+    statusOf: Object.fromEntries(entries.map(entry => [entry.path, entry.status])) };
 }
 
 export const baseName = path => String(path || '').split('/').pop();
@@ -57,29 +72,21 @@ export function skipReason(fileName) {
   return '';
 }
 
-// Opens the zip and reads, for each path in the manifest, the note. Nothing is sent to the server here.
-export async function readNotes(zipFile, manifest, { onProgress } = {}) {
-  if (!zipFile) throw new Error('Scegli lo zip della cartella.');
-  if (zipFile.size > MAX_ZIP_BYTES) throw new Error(`Lo zip supera ${Math.round(MAX_ZIP_BYTES / 1048576)} MB: comprimi solo la cartella projects.`);
-  let zip;
-  try { zip = await JSZip.loadAsync(zipFile); } catch { throw new Error('Il file non è uno zip leggibile.'); }
-  const index = new Map(); const duplicatesInZip = new Set();
-  zip.forEach((path, entry) => {
-    if (entry.dir) return;
-    const key = path.replace(/^[^/]+\/(?=projects\/)/, '');             // tolerate an extra top folder ("claude-backup/projects/…")
-    if (index.has(key)) duplicatesInZip.add(key); else index.set(key, entry);
-  });
-  const found = []; const missing = [];
+// Opens the archive (zip, tar.gz, tgz or tar) and reads, for each path in the manifest, the note. Nothing is sent to the server here.
+export async function readNotes(archiveFile, manifest, { onProgress } = {}) {
+  const { files, duplicates, format } = await openArchive(archiveFile);
+  const found = []; const missing = []; const excludedOnPurpose = new Set((manifest.excluded || []).map(entry => entry.path));
   const wanted = manifest.markdown.slice(0, MAX_NOTES);
   for (let i = 0; i < wanted.length; i++) {
-    const path = wanted[i]; const entry = index.get(path);
-    if (!entry) { missing.push(path); continue; }
-    const text = (await entry.async('string')).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+    const path = wanted[i]; const read = files.get(path);
+    if (!read) { missing.push(path); continue; }
+    const text = (await read()).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
     found.push({ path, fileName: baseName(path), author: authorOf(path), text });
     if (onProgress && (i % 25 === 0 || i === wanted.length - 1)) onProgress(i + 1, wanted.length);
   }
-  const notInManifest = [...index.keys()].filter(p => /\.md$/i.test(p) && !manifest.markdown.includes(p));
-  return { found, missing, notInManifest, truncatedList: manifest.markdown.length > MAX_NOTES, duplicatesInZip: [...duplicatesInZip] };
+  // a note the list deliberately leaves out (ESCLUSO-RISERVATO) is not "in the archive but not in the list": the author excluded it, so it is never read
+  const notInManifest = [...files.keys()].filter(p => /\.md$/i.test(p) && !manifest.markdown.includes(p) && !excludedOnPurpose.has(p));
+  return { found, missing, notInManifest, truncatedList: manifest.markdown.length > MAX_NOTES, duplicatesInZip: duplicates, format, excludedOnPurpose: [...excludedOnPurpose] };
 }
 
 // Sorts every note: to read, skipped (with the reason), refused for secrets (with rule and line), or too big/empty.
@@ -178,3 +185,21 @@ export async function runImport({ notes, request, concurrency = 3, shouldCancel 
 
 export function pendingLabel(count) { return count === 0 ? 'Nessuna voce da confermare' : count === 1 ? '1 voce da confermare' : `${count} voci da confermare`; }
 export const KIND_LABEL = { razionale: 'Razionale', vincolo: 'Vincolo', decisione: 'Decisione' };
+
+
+// Every note that is NOT going to be read, grouped by the reason. The preview shows this, so a count like "32 not usable" always comes with its why.
+export function explainUnusable(plan) {
+  const groups = [];
+  const add = (key, title, hint, names) => { if (names.length) groups.push({ key, title, hint, count: names.length, names: names.slice(0, 4) }); };
+  const c = plan.classified, r = plan.read;
+  add('missing', 'Indicate nell’elenco ma assenti nell’archivio', 'Controlla che l’elenco e l’archivio siano dello stesso backup e che i percorsi comincino con «projects/».', (r.missing || []).map(baseName));
+  add('excluded', 'Escluse da chi ha preparato l’elenco (riservate)', 'Non vengono lette né segnalate come mancanti.', (r.excludedOnPurpose || []).map(baseName));
+  add('secrets', 'Contengono credenziali', 'Restano sul tuo computer: il rapporto dice quale riga.', c.secrets.map(n => n.fileName));
+  const byReason = new Map();
+  c.skipped.forEach(n => { const key = n.reason.replace(/\s+di\s+.*$/, m => (m.startsWith(' di ') && /Stesso contenuto/.test(n.reason) ? '' : m)); byReason.set(key, [...(byReason.get(key) || []), n.fileName]); });
+  [...byReason.entries()].forEach(([reason, names], i) => add('skip' + i, /Stesso contenuto/.test(reason) ? 'Stesso contenuto di un’altra nota' : reason.replace(/\.$/, ''), '', names));
+  add('already', 'Già lette da un collega o da te', 'Non vengono rilette.', (plan.already || []).map(n => n.fileName));
+  add('nosystem', 'Il nome non indica un sistema noto', 'Il sistema si ricava dal prefisso del nome (ilp-, npso-, bep-, iper-, ipersuite-, is-, sc-…).', c.noSystem.map(n => n.fileName));
+  add('unusable', 'Vuote o troppo lunghe', '', c.unusable.map(n => n.fileName));
+  return groups;
+}
