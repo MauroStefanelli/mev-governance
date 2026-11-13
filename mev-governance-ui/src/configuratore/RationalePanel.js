@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { rationaleRequest } from '../services/mevService';
 import { KINDS, KIND_ORDER, MAX_QUESTION, MAX_ENTRY, kindLabel, validateText, initiativeCode, mergeById, groupEntries, countByKind, notYetTaken } from './rationaleKnowledge';
 import { displayName, relativeTime } from './developmentCollaboration';
-import { sourceExcerptsFor, pasteItem, checkAttachments, attachmentSummary, createSourceCache, formatSize, MAX_PASTE, CONNECTION_FIELDS, loadConnection, saveConnection, connectionWarnings } from './rationaleAttachments';
+import { sourceExcerptsFor, chosenFilesSummary, pasteItem, checkAttachments, attachmentSummary, createSourceCache, formatSize, MAX_PASTE, CONNECTION_FIELDS, loadConnection, saveConnection, connectionWarnings } from './rationaleAttachments';
 import './rationalePanel.css';
 
 // Chat with the AI about why interventions are needed + the confirmed knowledge distilled from it.
@@ -28,6 +28,8 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [pasted, setPasted] = useState([]);
   const [pasting, setPasting] = useState(null);
   const [attachNotice, setAttachNotice] = useState('');
+  const [codeTerms, setCodeTerms] = useState('');
+  const [chosen, setChosen] = useState(null);
   const [connection, setConnection] = useState(() => loadConnection());
   const [connectionOpen, setConnectionOpen] = useState(false);
   const sourceCache = useRef(createSourceCache());
@@ -62,7 +64,8 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     setBusy(true); setError(''); setNotice(''); stick.current = true;
     try {
       setAttachNotice('');
-      const excerpts = sourceFiles.length ? await sourceExcerptsFor(check.value, sourceFiles, sourceCache.current) : { items: [], coverage: null };
+      const excerpts = sourceFiles.length ? await sourceExcerptsFor(check.value, sourceFiles, sourceCache.current, { extraTerms: codeTerms }) : { items: [], coverage: null, terms: [] };
+      setChosen(sourceFiles.length ? chosenFilesSummary(excerpts.items, excerpts.terms) : null);
       const { kept, dropped } = checkAttachments([...excerpts.items, ...pasted]);
       const result = await rationaleRequest('messages', { goto: code, question: check.value, title: initiative.title, system: initiative.system, description: initiative.description,
         interventions: interventions.slice(0, 40).map(item => ({ id: item.id, title: item.titolo || item.title || '' })), attachments: kept });
@@ -117,7 +120,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     input.onchange = () => { const files = [...input.files]; if (!files.length) return; sourceCache.current = createSourceCache(); setSourceFiles(files); setSourceName((files[0].webkitRelativePath || '').split('/')[0] || 'cartella'); };
     input.click();
   };
-  const clearFolder = () => { setSourceFiles([]); setSourceName(''); sourceCache.current = createSourceCache(); };
+  const clearFolder = () => { setSourceFiles([]); setSourceName(''); setChosen(null); sourceCache.current = createSourceCache(); };
   const addPasted = event => {
     event.preventDefault();
     const text = String(pasting?.text || '').trim(); if (!text) return;
@@ -168,6 +171,11 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
             {sourceFiles.length > 0 && <span className="rat-chip" title="La cartella resta sul tuo computer: all’AI arrivano solo gli estratti pertinenti alla domanda.">📁 {sourceName} · {sourceFiles.length} file <button type="button" aria-label="Scollega la cartella sorgenti" onClick={clearFolder}>×</button></span>}
             {pasted.map((item, index) => <span className="rat-chip" key={index}>📋 {item.name} · {formatSize(item.text.length)} <button type="button" aria-label={`Rimuovi l’allegato ${item.name}`} onClick={() => setPasted(previous => previous.filter((_, i) => i !== index))}>×</button></span>)}
           </div>
+          {sourceFiles.length > 0 && <label className="rat-codeterms">Cerca nel codice <small>(facoltativo: sigle, nomi di classe o di file da guardare, separati da spazio)</small>
+            <input value={codeTerms} maxLength={200} placeholder="es. H7 PrintRules LdvIta" onChange={event => setCodeTerms(event.target.value)} /></label>}
+          {chosen && chosen.rows.length > 0 && <details className="rat-chosen"><summary>File inviati all’AI nell’ultima domanda ({chosen.rows.length})</summary>
+            <ul>{chosen.rows.map(row => <li key={row.path}><code>{row.path}</code> <small>{row.lines}{row.because.length ? ` · contiene o ha nel nome: ${row.because.join(', ')}` : ' · mostrato per dare la struttura'}</small></li>)}</ul>
+            <small>Parole cercate: {chosen.terms.join(', ') || '—'}. Se la regola che ti serve non c’è, aggiungi una sigla o il nome di una classe in «Cerca nel codice» e rifai la domanda.</small></details>}
           {sourceFiles.length === 0 && pasted.length === 0 && <p className="rat-attach-hint">Vuoi che l’AI guardi il codice? Seleziona la cartella dei sorgenti: per ogni domanda l’app sceglie i file pertinenti e ne invia solo alcuni estratti. La cartella va riselezionata a ogni sessione.</p>}
           {pasting && <form className="rat-paste" onSubmit={addPasted} aria-label="Incolla dati">
             <label>Cos’è <input value={pasting.name} maxLength={80} placeholder="es. SELECT sulle prenotazioni di ieri" onChange={event => setPasting({ ...pasting, name: event.target.value })} /></label>

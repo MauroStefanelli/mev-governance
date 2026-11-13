@@ -12,10 +12,17 @@ export const MAX_PASTE = 4000;
 export const formatSize = bytes => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 // Words of the question that tell which part of the code matters ("retry", "invio", "NPSO"): the same idea as in Sviluppo, on the whole chat question.
-export async function sourceExcerptsFor(question, files, cache) {
-  if (!files?.length) return { items: [], coverage: null };
-  const context = await activitySourceContext(files, question, cache);
-  return { items: context.files.map(file => ({ kind: 'sorgente', name: file.path, text: file.text, startLine: file.startLine, endLine: file.endLine })), coverage: context.coverage };
+export async function sourceExcerptsFor(question, files, cache, { extraTerms = '' } = {}) {
+  if (!files?.length) return { items: [], coverage: null, terms: [] };
+  const context = await activitySourceContext(files, question, cache, { extraTerms });
+  return { items: context.files.map(file => ({ kind: 'sorgente', name: file.path, text: file.text, startLine: file.startLine, endLine: file.endLine, why: file.why })), coverage: context.coverage, terms: context.terms || [] };
+}
+
+// For the user: which files were chosen and why, so that "the AI did not see the rule" is never a mystery. Only paths and the words that matched.
+export function chosenFilesSummary(items, terms = []) {
+  const rows = (items || []).filter(item => item.kind === 'sorgente').map(item => ({ path: item.name, lines: item.startLine ? `righe ${item.startLine}-${item.endLine}` : '',
+    because: [...new Set([...(item.why?.inPath || []), ...(item.why?.inText || [])])] }));
+  return { rows, terms };
 }
 
 export function pasteItem(name, text) {
@@ -34,7 +41,7 @@ export function checkAttachments(items) {
     const clipped = text.length > MAX_CHARS_EACH ? text.slice(0, MAX_CHARS_EACH) : text;
     if (kept.length >= MAX_ITEMS) { dropped.push({ name: item.name, reason: `oltre il limite di ${MAX_ITEMS} allegati`, line: 0 }); continue; }
     if (total + clipped.length > MAX_CHARS_TOTAL) { dropped.push({ name: item.name, reason: 'oltre il limite totale degli allegati', line: 0 }); continue; }
-    total += clipped.length; kept.push({ ...item, text: clipped });
+    total += clipped.length; const { why: _why, ...toSend } = item; kept.push({ ...toSend, text: clipped });
   }
   return { kept, dropped };
 }

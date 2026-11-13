@@ -177,6 +177,8 @@ test('clicking the empty part of the desk puts the cursor in the writing box', a
   expect(box).toHaveFocus();
 });
 
+afterEach(() => jest.restoreAllMocks());
+
 describe('the lists in one row, the conversation as the protagonist', () => {
   test('the four lists are collapsed in ONE row at first; the row shows how many items each holds and opens on click', async () => {
     server.entries = [entry(1, 'razionale', 'proposta', 'Evita duplicati'), entry(2, 'vincolo', 'confermata', 'Solo TEST', { decidedAt: new Date().toISOString(), decidedBy: 'x' }), entry(3, 'razionale', 'scartata', 'Non vale')];
@@ -244,7 +246,7 @@ describe('attachments to a question: source code and pasted data', () => {
   test('without a folder the panel explains what to do; with a folder a chip shows it and it can be disconnected', async () => {
     const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
     const input = { files: [file('mio-progetto/src/Invio.java', 'class Invio {}'), file('mio-progetto/src/Altro.java', 'class Altro {}')], setAttribute: jest.fn(), click: jest.fn() };
-    const original = document.createElement.bind(document); jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' ? input : original(tag)));
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
     render(<Harness />); expect(await screen.findByText(/Vuoi che l’AI guardi il codice/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Seleziona cartella sorgenti' })); expect(input.setAttribute).toHaveBeenCalledWith('webkitdirectory', ''); act(() => input.onchange());
     expect(await screen.findByText(/mio-progetto · 2 file/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Cambia cartella sorgenti' })).toBeInTheDocument(); expect(screen.queryByText(/Vuoi che l’AI guardi il codice/)).not.toBeInTheDocument();
@@ -254,18 +256,35 @@ describe('attachments to a question: source code and pasted data', () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
     const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
     const input = { files: [file('p/src/InvioService.java', 'class InvioService {\n  void ritenta() { retry(3); }\n}'), file('p/src/Altro.java', 'class Altro {}')], setAttribute: jest.fn(), click: jest.fn() };
-    const original = document.createElement.bind(document); jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' ? input : original(tag)));
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
     server.answer = { ...reply(), attachments: { sent: [{ kind: 'sorgente', name: 'p/src/InvioService.java' }], dropped: [], notes: [] } };
     render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 2 file/);
     await ask('Dove si ritenta nell invio?'); await waitFor(() => expect(asked()).toHaveLength(1));
     const sentItems = asked()[0][1].attachments; expect(sentItems[0]).toMatchObject({ kind: 'sorgente', name: 'p/src/InvioService.java', startLine: 1 }); expect(sentItems[0].text).toContain('retry(3)');
-    expect(await screen.findByText(/Campione limitato: massimo 60 file letti e 8 estratti inviati, non analisi completa/)).toBeInTheDocument(); document.createElement.mockRestore();
+    expect(await screen.findByText(/Campione limitato: 2 file aperti su 2, 1 estratti inviati scelti per le parole della domanda, non analisi completa/)).toBeInTheDocument(); document.createElement.mockRestore();
+  });
+  test('the user can say where to look, and sees which files went to the AI and why', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const input = { files: [file('p/src/PrintRulesH7.java', 'class PrintRulesH7 {\n  // H7: stampa solo con esito doganale\n}'), file('p/src/Altro.java', 'class Altro {}')], setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
+    server.answer = reply(); render(<Harness />);
+    expect(screen.queryByLabelText(/Cerca nel codice/)).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 2 file/);
+    fireEvent.change(screen.getByLabelText(/Cerca nel codice/), { target: { value: 'PrintRules' } });
+    await ask('Cosa succede alla stampa?'); await waitFor(() => expect(asked()).toHaveLength(1));
+    const sent = asked()[0][1].attachments; expect(sent.map(a => a.name)).toEqual(['p/src/PrintRulesH7.java']);
+    expect(Object.keys(sent[0])).not.toContain('why');
+    fireEvent.click(await screen.findByText(/File inviati all’AI nell’ultima domanda \(1\)/));
+    expect(await screen.findByText('p/src/PrintRulesH7.java')).toBeInTheDocument(); expect(screen.getByText(/contiene o ha nel nome:.*print/)).toBeInTheDocument();
+    expect(screen.getByText(/Parole cercate:.*printrules/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Scollega la cartella sorgenti' })); expect(screen.queryByText(/File inviati all’AI/)).not.toBeInTheDocument(); expect(screen.queryByLabelText(/Cerca nel codice/)).not.toBeInTheDocument();
   });
   test('a source file containing a credential is never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
     const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
     const input = { files: [file('p/src/Config.java', 'class Config {\n  String token = "' + TOKEN + '";\n}'), file('p/src/Config2.java', 'class Config2 {}')], setAttribute: jest.fn(), click: jest.fn() };
-    const original = document.createElement.bind(document); jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' ? input : original(tag)));
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
     server.answer = reply(); render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 2 file/);
     await ask('Guarda config'); await waitFor(() => expect(asked()).toHaveLength(1));
     expect(JSON.stringify(asked()[0][1])).not.toContain(TOKEN); expect(asked()[0][1].attachments.map(a => a.name)).toEqual(['p/src/Config2.java']);

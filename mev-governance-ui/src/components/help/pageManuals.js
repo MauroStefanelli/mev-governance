@@ -130,7 +130,7 @@ export const PAGE_MANUALS = {
       'Apri la fase Schede. Ogni attività è un riquadro apribile, uno alla volta, con cinque tappe: Requisito → Proposta AI → Scheda definita → File generati → Verificata. Sotto, «Prossimo passo» dice cosa fare.',
       'Filtra con i pulsanti degli stati (Tutte, Da analizzare, Soluzione definita, Pronta per sviluppo, In sviluppo, Da verificare, Verificata): accanto a ciascuno c’è il numero di schede.',
       'Leggi il «Requisito» (sola lettura) e, se ci sono, i razionali e vincoli confermati che valgono per quell’attività.',
-      'Se hai selezionato la cartella, premi «Prepara scheda con AI»: l’AI legge un campione di sorgenti e scrive una proposta. Controlla soluzione, criteri e i «File e righe citati negli estratti». I riferimenti confermano dove si trovano nel campione, non che la soluzione sia corretta.',
+      'Se hai selezionato la cartella, premi «Prepara scheda con AI»: l’AI legge un campione di sorgenti, scelti per le parole della descrizione dell’attività (anche le sigle corte), e scrive una proposta. Controlla soluzione, criteri e i «File e righe citati negli estratti». I riferimenti confermano dove si trovano nel campione, non che la soluzione sia corretta.',
       'Se la proposta ti convince premi «Inserisci bozza nella scheda» (chiede conferma e sostituisce file, soluzione e criteri correnti). Poi completa a mano i dettagli.',
       'Compila i quattro campi (tabella sotto), scegli lo «Stato di verifica» e salva con «Salva sviluppo».',
     ], '«Pronta per sviluppo» richiede la scheda definita (file, soluzione e criteri). «Verificata» richiede le evidenze. Se modifichi una scheda verificata senza cambiare lo stato, torna a «Da verificare».', {

@@ -49,7 +49,7 @@ describe('source excerpts chosen for a question', () => {
     expect(items[0]).toMatchObject({ kind: 'sorgente', name: 'app/src/InvioService.java' }); expect(items[0].text).toContain('retry(3)'); expect(items[0].startLine).toBe(1);
     expect(coverage.notice).toMatch(/Campione limitato/);
   });
-  test('no folder, no excerpts and no coverage note', async () => { expect(await sourceExcerptsFor('qualsiasi', [], new Map())).toEqual({ items: [], coverage: null }); });
+  test('no folder, no excerpts and no coverage note', async () => { expect(await sourceExcerptsFor('qualsiasi', [], new Map())).toEqual({ items: [], coverage: null, terms: [] }); });
   test('folders that never hold the code (node_modules, .git, target) and other file types are not read', async () => {
     const files = [file('app/node_modules/x/index.js', 'secret thing'), file('app/.git/config', 'x'), file('app/immagine.png', 'binary'), file('app/src/Ok.java', 'class Ok {}')];
     const { items } = await sourceExcerptsFor('class Ok', files, new Map()); expect(items.map(i => i.name)).toEqual(['app/src/Ok.java']);
