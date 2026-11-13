@@ -29,6 +29,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [pasting, setPasting] = useState(null);
   const [attachNotice, setAttachNotice] = useState('');
   const [codeTerms, setCodeTerms] = useState('');
+  const [reading, setReading] = useState('');
   const [chosen, setChosen] = useState(null);
   const [connection, setConnection] = useState(() => loadConnection());
   const [connectionOpen, setConnectionOpen] = useState(false);
@@ -64,7 +65,8 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     setBusy(true); setError(''); setNotice(''); stick.current = true;
     try {
       setAttachNotice('');
-      const excerpts = sourceFiles.length ? await sourceExcerptsFor(check.value, sourceFiles, sourceCache.current, { extraTerms: codeTerms }) : { items: [], coverage: null, terms: [] };
+      const excerpts = sourceFiles.length ? await sourceExcerptsFor(check.value, sourceFiles, sourceCache.current, { extraTerms: codeTerms, onProgress: (done, total) => setReading(total > 200 ? `Leggo la cartella: ${done} file su ${total}…` : '') }) : { items: [], coverage: null, terms: [] };
+      setReading('');
       setChosen(sourceFiles.length ? chosenFilesSummary(excerpts.items, excerpts.terms) : null);
       const { kept, dropped } = checkAttachments([...excerpts.items, ...pasted]);
       const result = await rationaleRequest('messages', { goto: code, question: check.value, title: initiative.title, system: initiative.system, description: initiative.description,
@@ -78,7 +80,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     } catch (e) {
       if (e.saved) { setMessages(previous => mergeById(previous, [e.saved])); setText(''); }
       setError(e.message);
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setReading(''); }
   };
 
   const decide = async (entry, decision) => {
@@ -162,7 +164,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
               <span className="rat-msg-meta"><b>{message.role === 'assistant' ? 'Assistente AI' : message.mine ? 'Tu' : displayName({ fullName: message.authorFullName, username: message.author })}</b>
                 <time dateTime={message.createdAt} title={new Date(message.createdAt).toLocaleString('it-IT')}>{relativeTime(message.createdAt)}</time></span>
               <span className="rat-msg-text">{message.text}</span></li>)}
-            {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">L’AI sta ragionando…</span></li>}
+            {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">{reading || 'L’AI sta ragionando…'}</span></li>}
           </ol>
           <div className="rat-attach" aria-label="Allegati alla domanda">
             <button type="button" onClick={pickFolder}>{sourceFiles.length ? 'Cambia cartella sorgenti' : 'Seleziona cartella sorgenti'}</button>

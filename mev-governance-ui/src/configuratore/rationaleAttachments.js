@@ -12,9 +12,9 @@ export const MAX_PASTE = 4000;
 export const formatSize = bytes => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 // Words of the question that tell which part of the code matters ("retry", "invio", "NPSO"): the same idea as in Sviluppo, on the whole chat question.
-export async function sourceExcerptsFor(question, files, cache, { extraTerms = '' } = {}) {
+export async function sourceExcerptsFor(question, files, cache, { extraTerms = '', onProgress } = {}) {
   if (!files?.length) return { items: [], coverage: null, terms: [] };
-  const context = await activitySourceContext(files, question, cache, { extraTerms });
+  const context = await activitySourceContext(files, question, cache, { extraTerms, onProgress });
   return { items: context.files.map(file => ({ kind: 'sorgente', name: file.path, text: file.text, startLine: file.startLine, endLine: file.endLine, why: file.why })), coverage: context.coverage, terms: context.terms || [] };
 }
 

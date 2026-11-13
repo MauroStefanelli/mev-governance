@@ -62,11 +62,11 @@ describe('a question about rules named by short codes, on a folder with many fil
   test('files that share nothing with the question are not sent to fill the sample', async () => {
     setup(); const { files, coverage } = await activitySourceContext(folder(), 'dove sono le regole di H7?', new Map());
     expect(files.length).toBeLessThan(8); expect(files.every(item => item.why.inPath.length + item.why.inText.length > 0)).toBe(true);
-    expect(coverage.notice).toContain('scelti per le parole della domanda');
+    expect(coverage.notice).toMatch(/con le parole della domanda/);
   });
   test('a question with no usable word still shows a little structure and says so, so the AI knows it has not seen the rule', async () => {
     setup(); const { files, coverage } = await activitySourceContext(folder(), 'qual è il senso di tutto?', new Map());
-    expect(files).toHaveLength(3); expect(coverage.notice).toContain('Nessun file contiene le parole della domanda'); expect(coverage.notice).toContain('Cerca nel codice');
+    expect(files).toHaveLength(3); expect(coverage.notice).toContain('Nessun file della cartella contiene le parole della domanda'); expect(coverage.notice).toContain('Cerca nel codice');
   });
   test('the pom comes after the code, unless the question is about dependencies', async () => {
     setup();
@@ -75,11 +75,29 @@ describe('a question about rules named by short codes, on a folder with many fil
     const deps = await activitySourceContext(folder(), 'quale dipendenza item-core e quale versione camel nel pom?', new Map());
     expect(deps.files[0].path).toContain('pom.xml');
   });
-  test('a very large folder is not opened file by file: the files with a term in the path are opened first and the rest is reported', async () => {
-    setup(); const many = Array.from({ length: 900 }, (_, i) => file(`big/src/Cls${i}.java`, `class Cls${i} {}`)); many.push(file('big/src/PrintRulesH7.java', 'class PrintRulesH7 { /* h7 */ }'));
-    const { files, coverage } = await activitySourceContext(many, 'stampa H7', new Map());
-    expect(files[0].path).toContain('PrintRulesH7'); expect(coverage.sampledFiles).toBe(400); expect(coverage.notOpened).toBe(501);
+  test('every file is read, also those with a neutral name: the rule is often in helpers.ts or validators.ts', async () => {
+    setup(); const many = Array.from({ length: 3000 }, (_, i) => file(`ilp/src/app/mod${i % 40}/comp${i}.component.ts`, `export class Comp${i} { x = ${i}; }`));
+    many.push(file('ilp/src/app/shared/utils/helpers.ts', 'export function canPrint(i) {\n  // condizione di stampa H7: solo con esito doganale\n  return i.type === "H7" && i.customsOutcome;\n}'));
+    many.push(file('ilp/src/app/zzz/last.service.ts', 'export class X { excludeChaForPddp(i) { return i.cha && i.pddp; } }'));
+    const { files, coverage } = await activitySourceContext(many, 'condizioni di stampa H7 e esclusione CHA per PDDP', new Map());
+    expect(files.map(item => item.path.split('/').pop())).toEqual(expect.arrayContaining(['helpers.ts', 'last.service.ts']));
+    expect(coverage.sampledFiles).toBe(3002); expect(coverage.notOpened).toBe(0); expect(coverage.matchingFiles).toBe(2);
   });
+  test('beyond the limit of files to read the rest is reported, and the files with a term in the path are read first', async () => {
+    setup(); const many = Array.from({ length: 900 }, (_, i) => file(`big/src/Cls${i}.java`, `class Cls${i} {}`)); many.push(file('big/src/PrintRulesH7.java', 'class PrintRulesH7 { /* h7 */ }'));
+    const { files, coverage } = await activitySourceContext(many, 'stampa H7', new Map(), { maxScan: 100 });
+    expect(files[0].path).toContain('PrintRulesH7'); expect(coverage.sampledFiles).toBe(100); expect(coverage.notOpened).toBe(801); expect(coverage.notice).toContain('801 file non letti');
+  });
+  test('the number of files with the words is the real one, not the number kept', async () => {
+    setup(); const many = Array.from({ length: 120 }, (_, i) => file(`svc/src/P${i}.java`, `class P${i} { /* stampa H7 */ }`));
+    const { coverage } = await activitySourceContext(many, 'stampa H7', new Map()); expect(coverage.matchingFiles).toBe(120); expect(coverage.notice).toContain('120 con le parole della domanda');
+  });
+  test('progress is reported while a large folder is read', async () => {
+    setup(); const many = Array.from({ length: 100 }, (_, i) => file(`svc/src/P${i}.java`, `class P${i} {}`)); const seen = [];
+    await activitySourceContext(many, 'stampa H7', new Map(), { onProgress: (done, total) => seen.push([done, total]) });
+    expect(seen.at(-1)).toEqual([100, 100]); expect(seen.length).toBeGreaterThan(1);
+  });
+
 
   test('a build file that mentions many terms still comes after the code that mentions fewer, unless the question is about the build', async () => {
     setup(); const files = [file('svc/pom.xml', '<p>h7 stampa cha pddp ldv hu</p>'), file('svc/src/PrintRulesH7.java', 'class PrintRulesH7 { /* stampa */ }'), file('svc/src/Altra.java', 'class Altra {}')];
@@ -95,5 +113,11 @@ describe('a question about rules named by short codes, on a folder with many fil
     setup(); const files = Array.from({ length: 30 }, (_, i) => file(`svc/src/Print${i}.java`, `class Print${i} { /* stampa H7 */ }`));
     const { files: sent, coverage } = await activitySourceContext(files, 'stampa H7', new Map());
     expect(sent).toHaveLength(8); expect(coverage.matchingFiles).toBe(30); expect(coverage.sentFiles).toBe(8);
+  });
+  test('among many files with the words the best ones are kept, not the first ones met', async () => {
+    setup(); const weak = Array.from({ length: 100 }, (_, i) => file(`svc/src/A${String(i).padStart(3, '0')}.java`, 'class A { /* h7 */ }'));
+    const strong = file('svc/src/ZStrong.java', 'class ZStrong { /* h7 stampa cha pddp */ }');
+    const { files } = await activitySourceContext([...weak, strong], 'h7 stampa cha pddp', new Map());
+    expect(files[0].path).toContain('ZStrong');
   });
 });

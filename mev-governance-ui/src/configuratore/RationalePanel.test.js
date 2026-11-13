@@ -261,7 +261,7 @@ describe('attachments to a question: source code and pasted data', () => {
     render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 2 file/);
     await ask('Dove si ritenta nell invio?'); await waitFor(() => expect(asked()).toHaveLength(1));
     const sentItems = asked()[0][1].attachments; expect(sentItems[0]).toMatchObject({ kind: 'sorgente', name: 'p/src/InvioService.java', startLine: 1 }); expect(sentItems[0].text).toContain('retry(3)');
-    expect(await screen.findByText(/Campione limitato: 2 file aperti su 2, 1 estratti inviati scelti per le parole della domanda, non analisi completa/)).toBeInTheDocument(); document.createElement.mockRestore();
+    expect(await screen.findByText(/Campione limitato: letti 2 file su 2, 1 con le parole della domanda, 1 estratti inviati, non analisi completa/)).toBeInTheDocument(); document.createElement.mockRestore();
   });
   test('the user can say where to look, and sees which files went to the AI and why', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
@@ -279,6 +279,27 @@ describe('attachments to a question: source code and pasted data', () => {
     expect(await screen.findByText('p/src/PrintRulesH7.java')).toBeInTheDocument(); expect(screen.getByText(/contiene o ha nel nome:.*print/)).toBeInTheDocument();
     expect(screen.getByText(/Parole cercate:.*printrules/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Scollega la cartella sorgenti' })); expect(screen.queryByText(/File inviati all’AI/)).not.toBeInTheDocument(); expect(screen.queryByLabelText(/Cerca nel codice/)).not.toBeInTheDocument();
+  });
+  test('on a folder of hundreds of files the file with the rule is found and the reading message is gone afterwards', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const many = Array.from({ length: 300 }, (_, i) => file(`p/src/C${i}.java`, `class C${i} {}`)); many.push(file('p/src/PrintRulesH7.java', 'class PrintRulesH7 { /* h7 */ }'));
+    const input = { files: many, setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
+    server.answer = reply(); render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 301 file/);
+    await ask('stampa H7'); await waitFor(() => expect(asked()).toHaveLength(1));
+    expect(asked()[0][1].attachments.map(a => a.name)).toEqual(['p/src/PrintRulesH7.java']);
+    expect(screen.queryByText(/Leggo la cartella/)).not.toBeInTheDocument();
+  });
+  test('if reading the folder fails midway, the reading message does not stay on screen and the error is shown', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => { if (path.endsWith('Zboom.java')) throw new Error('lettura fallita'); return text; } }); return f; };
+    const many = Array.from({ length: 300 }, (_, i) => file(`p/src/C${i}.java`, `class C${i} {}`)); many.push(file('p/src/Zboom.java', 'x'));
+    const input = { files: many, setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
+    server.answer = reply(); render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 301 file/);
+    await ask('stampa H7');
+    expect(await screen.findByText(/lettura fallita/)).toBeInTheDocument(); expect(screen.queryByText(/Leggo la cartella/)).not.toBeInTheDocument(); expect(asked()).toHaveLength(0);
   });
   test('a source file containing a credential is never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
