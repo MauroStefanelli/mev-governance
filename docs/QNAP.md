@@ -88,7 +88,7 @@ Da Container Station: apri l'applicazione e usa l'azione di ricreazione (*Recrea
 - Il backend ha endpoint di emergenza (`/api/auth/emergency-*`) senza autenticazione, e questo vale anche su Render. Non esporre le porte del NAS su Internet finche' non sono stati chiusi.
 
 ## Memoria
-Il backend limita la memoria a 400 MB (impostazione pensata per Render). Sul NAS si puo' alzare con `DOTNET_GCHeapHardLimit` in `.env` (valore in byte, es. `1073741824` per 1 GB), se il NAS ha RAM sufficiente. Controlla quanta ne ha e quanta ne usa Container Station.
+Il TS-433 ha **4 GB di RAM non espandibili**, condivisi con QTS e con le altre app del NAS. Qui girano backend .NET, lettore PDF (Python) e frontend (nginx). Il backend e' limitato a 400 MB (`DOTNET_GCHeapHardLimit`, pensato per Render): **lascialo cosi'**, non alzarlo se non vedi errori di memoria. Se il NAS rallenta o un container viene riavviato da solo, controlla l'uso della RAM in Container Station e ferma le app QNAP che non usi. Non ho misurato quanta RAM consumano i tre container: e' la prima cosa da guardare dopo l'avvio.
 
 ## Se qualcosa non va
 | Sintomo | Causa probabile |
