@@ -102,7 +102,7 @@ export async function classifyNotes(found, { systems = DEFAULT_SYSTEMS } = {}) {
     if (hits.length) { secrets.push({ ...note, hits }); continue; }
     const system = systemOf(note.fileName, systems);
     if (!system) { noSystem.push({ ...note, reason: 'Il nome della nota non indica un sistema noto.' }); continue; }
-    // Without a hash (a page not served over HTTPS has no crypto.subtle) nothing can be called "identical": the server compares by content anyway.
+    // The hash is computed on every page (natively on HTTPS, in JavaScript on plain HTTP); if it were ever empty nothing could be called "identical" and the server would compare by content anyway.
     const sha = await sha256Hex(note.text);
     if (sha && seen.has(sha)) { skipped.push({ ...note, reason: `Stesso contenuto di ${seen.get(sha)}.` }); continue; }
     if (sha) seen.set(sha, note.fileName);

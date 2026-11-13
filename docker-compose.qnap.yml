@@ -1,0 +1,63 @@
+# MEV Governance su NAS QNAP (Container Station) — ambiente DEV, stessi dati di Render.
+#
+# Come si usa: vedi docs/QNAP.md. In breve: copiare .env.qnap.example in ".env" (stessa cartella di questo file), compilarlo, poi
+#   docker compose -f docker-compose.qnap.yml up -d
+#
+# Il database NON e' su questo NAS: e' lo stesso Postgres (Supabase) che usa Render, quindi i dati sono gli stessi. Il NAS ospita solo le tre parti dell'app.
+# Nessuna password e' scritta qui: tutte vengono dal file ".env", che non va mai messo nel repository.
+
+services:
+
+  pdf-parser:
+    image: ghcr.io/maurostefanelli/mev-pdf-parser:${IMAGE_TAG:-dev}
+    container_name: mev-pdf-parser
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+    # nessuna porta pubblicata: lo usa solo il backend, dentro la rete del compose
+
+  backend:
+    image: ghcr.io/maurostefanelli/mev-governance-backend:${IMAGE_TAG:-dev}
+    container_name: mev-backend
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      DB_SCHEMA: ${DB_SCHEMA:-dev}
+      DATABASE_DIRECT_URL: ${DATABASE_DIRECT_URL:?compilare DATABASE_DIRECT_URL nel file .env}
+      JWT_KEY: ${JWT_KEY:?compilare JWT_KEY nel file .env}
+      JWT_ISSUER: ${JWT_ISSUER:-mev-governance-dev}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-mev-governance-ui-dev}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?compilare ADMIN_PASSWORD nel file .env}
+      PDF_PARSER_URL: http://pdf-parser:8000
+      SKIP_PARSER_WARMUP: "true"
+      # Con il proxy del frontend il browser parla sempre con lo stesso indirizzo della pagina, quindi il CORS non entra in gioco;
+      # restano elencati per chi apre direttamente il backend (es. per un controllo).
+      CORS_ORIGINS: http://${NAS_HOST:-192.168.1.144}:${HTTP_PORT:-3001},https://${NAS_HOST:-192.168.1.144}:${HTTPS_PORT:-3443}
+      # Il limite di memoria del .NET e' pensato per Render free (400 MB). Sul NAS si puo' alzare: vedi docs/QNAP.md.
+      DOTNET_GCHeapHardLimit: ${DOTNET_GCHeapHardLimit:-419430400}
+    volumes:
+      - ${DATA_DIR:-./mev-data}:/data
+    # il backend NON e' pubblicato sulla rete: ci arriva solo il frontend. Per provarlo a mano, togliere il commento alla riga seguente.
+    # ports: ["${BACKEND_PORT:-4001}:5000"]
+    depends_on:
+      - pdf-parser
+
+  frontend:
+    image: ghcr.io/maurostefanelli/mev-governance-frontend:${IMAGE_TAG:-dev}
+    container_name: mev-frontend
+    restart: unless-stopped
+    environment:
+      # BACKEND_URL attiva il proxy: la pagina chiama /api sullo stesso indirizzo (HTTP e HTTPS), nginx inoltra al backend.
+      BACKEND_URL: http://backend:5000
+      PUBLIC_HOST: ${NAS_HOST:-192.168.1.144}
+      HTTP_PORT: "80"
+      HTTPS_PORT: "8443"
+      MAX_BODY: 60m
+    volumes:
+      # Facoltativo: un certificato HTTPS vero (server.crt e server.key). Senza, il frontend ne genera uno autofirmato per PUBLIC_HOST.
+      - ${CERTS_DIR:-./mev-certs}:/certs:ro
+    ports:
+      - "${HTTP_PORT:-3001}:80"
+      - "${HTTPS_PORT:-3443}:8443"
+    depends_on:
+      - backend

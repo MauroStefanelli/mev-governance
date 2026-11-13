@@ -11,13 +11,7 @@ export function toImportRows(parsedRows) {
     amounts: (row.amounts || []).map(a => ({ text: a.text, value: a.value })) }));
 }
 
-export async function sha256Hex(text) {
-  try {
-    const bytes = new TextEncoder().encode(String(text ?? ''));
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch { return ''; }
-}
+export { sha256Hex } from './cryptoCompat';
 
 // A file is read as UTF-8 text; anything else (a spreadsheet, a PDF…) is refused with a reason before reading it.
 export const MAX_LEDGER_FILE = 1024 * 1024;

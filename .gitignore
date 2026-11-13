@@ -24,3 +24,8 @@ bcrypt-test/obj/
 Contratti/
 Tool Offerte/
 ToolOfferte/
+
+# ── Segreti per il deploy su NAS ─────────────────
+.env
+mev-data/
+mev-certs/

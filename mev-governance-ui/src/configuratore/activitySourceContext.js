@@ -1,3 +1,4 @@
+import { sha256Hex } from './cryptoCompat';
 import { termsOf, informativeTerms, matches, partsOf, scoreFile, bestLine } from './sourceSearch';
 const CONFIG_WORDS = new Set(['pom', 'gradle', 'dependency', 'dependencies', 'dipendenza', 'dipendenze', 'versione', 'version', 'build', 'maven', 'package', 'application', 'config', 'configurazione', 'properties', 'yaml', 'yml']);
 const allowed = /\.(java|sql|xml|xsd|wsdl|bpel|jca|proxy|biz|pipeline|xq|xqy|xsl|xslt|js|ts|json|md|cs)$/i;
@@ -7,8 +8,7 @@ async function readOnce(file, cache) {
   if (cache?.has(file)) return cache.get(file);
   const pending = (async () => {
     const text = await file.text();
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return { text, lines: text.split(/\r?\n/), sha256: [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('') };
+    return { text, lines: text.split(/\r?\n/), sha256: await sha256Hex(text) };
   })();
   cache?.set(file, pending);
   return pending;
@@ -54,7 +54,7 @@ export async function activitySourceContext(files, activity, cache, options = {}
   // the structure fallback: nothing matched, so look at a few files (in path order) only to show how the folder is made
   const pool = scored.length ? scored : queue.slice(0, 3).map(file => ({ file, path: file.webkitRelativePath || file.name, score: 0, inPath: [], inText: [], config: false }));
   const read = [];
-  const sha = async lines => { const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(lines.join('\n'))); return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join(''); };
+  const sha = lines => sha256Hex(lines.join('\n'));
   for (const item of pool) {
     // the fingerprint is that of the whole text as read (through the cache when there is one, so it is the same for every question), never of the excerpt
     const { lines, sha256 } = item.lines && !useCache ? { lines: item.lines, sha256: await sha(item.lines) } : await readOnce(item.file, cache);

@@ -1,3 +1,4 @@
+import { randomId } from './cryptoCompat';
 import React, { useEffect, useState } from 'react';
 import { workspaceRequest } from '../services/mevService';
 import InitiativeDocuments from './InitiativeDocuments';
@@ -110,7 +111,7 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
             <label>Fonte<input style={input} disabled={!!d.approvedAt} value={d.source} onChange={e => edit('decisions', draft.decisions.map((x, j) => j === i ? { ...x, source: e.target.value } : x))} /></label>
             {d.approvedAt ? <p>Approvata da {d.approvedBy} · {d.approvedAt}</p> : <label><input type="checkbox" checked={!!d.approve} onChange={e => edit('decisions', draft.decisions.map((x, j) => j === i ? { ...x, approve: e.target.checked } : x))} />Approvo questa decisione al salvataggio</label>}
           </div>)}
-          <button type="button" onClick={() => edit('decisions', [...(draft.decisions || []), { id: crypto.randomUUID(), text: '', source: '' }])}>Aggiungi decisione</button>
+          <button type="button" onClick={() => edit('decisions', [...(draft.decisions || []), { id: randomId(), text: '', source: '' }])}>Aggiungi decisione</button>
         </fieldset>
       </details>
       <div className="workspace-save-bar"><label style={{ display: 'block', margin: '12px 0' }}>Modifiche e motivazione della revisione<input style={input} placeholder="Es. Integrati gli impatti sulle API" value={reason} onChange={e => setReason(e.target.value)} /></label>
@@ -119,7 +120,7 @@ export default function InitiativeWorkspace({ initiative, estimate, roles = [], 
       <button type="button" onClick={exportAnalysis}>Esporta ANALISI Markdown</button>
       </div>
       <InitiativeConversation key={`conversation:${code}`} code={code} version={base} dirty={dirty} canEdit={canEdit} onDecision={proposal => {
-        edit('decisions', [...(draft.decisions || []), { id: crypto.randomUUID(), text: proposal.text, source: proposal.source }]);
+        edit('decisions', [...(draft.decisions || []), { id: randomId(), text: proposal.text, source: proposal.source }]);
       }} />
       <details><summary>Storico e confronto versioni ({revisions.length})</summary>
         {revisions.map(r => <p key={r.version}>v{r.version} · {r.author} · {new Date(r.createdAt).toLocaleString('it-IT')} · {r.reason} <button disabled={busy || !canEdit} onClick={() => {
