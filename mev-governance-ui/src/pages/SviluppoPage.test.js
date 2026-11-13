@@ -1,7 +1,9 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import SviluppoPage from './SviluppoPage';
+import { IDBFactory } from 'fake-indexeddb';
+import { resetSourceLibrary } from '../configuratore/sourceLibrary';
 import * as service from '../services/mevService';
 
 jest.mock('../services/mevService', () => ({
@@ -15,6 +17,7 @@ let store; let server;
 const me = { username: 'io', fullName: 'Io Stesso', isMe: true };
 const colleague = { username: 'lucia', fullName: 'Lucia Bianchi', isMe: false };
 beforeEach(() => {
+  global.indexedDB = new IDBFactory(); resetSourceLibrary(); localStorage.setItem('XUSER', 'io');
   store = [];
   server = { summary: [], users: [me], messages: [], lastWorked: null, calls: [] };
   Object.values(service).forEach(fn => fn.mockReset?.());
@@ -166,4 +169,19 @@ test('saving records the user as the last worker only when the save is confirmed
   fireEvent.click(screen.getByText('Salva sviluppo'));
   await waitFor(() => expect(server.calls.filter(([path]) => path === 'worked')).toHaveLength(1));
   expect(server.calls.find(([path]) => path === 'worked')[1]).toEqual({ goto: 'GOTO1' });
+});
+
+test('a source folder chosen once is still there when Sviluppo is opened again: no new selection is asked for', async () => {
+  const { act } = require('@testing-library/react');
+  const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+  const input = { files: [file('npso/src/Invio.java', 'class Invio {}'), file('npso/src/Altro.java', 'class Altro {}')], setAttribute: jest.fn(), click: jest.fn() };
+  await openFirst();
+  const original = document.createElement.bind(document); let taken = false;     // armed only now: React also creates inputs while rendering
+  jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
+  fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); await act(async () => { input.onchange(); });
+  expect(await screen.findByText(/2 file selezionati/)).toBeInTheDocument();
+  document.createElement.mockRestore(); cleanup(); resetSourceLibrary();      // the page is closed and opened again; the browser keeps its storage
+  await openFirst();
+  expect(await screen.findByText(/2 file selezionati/)).toBeInTheDocument(); expect(screen.getByRole('checkbox', { name: /npso/ })).toBeChecked();
+  expect(screen.getByRole('button', { name: 'Aggiungi o aggiorna una cartella' })).toBeInTheDocument();
 });

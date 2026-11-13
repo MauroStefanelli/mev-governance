@@ -1,13 +1,14 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { developmentActivities } from './developmentActivityModel';
 import { activitySourceContext, createSourceCache } from './activitySourceContext';
+import SourceLibraryPanel from './SourceLibraryPanel';
 import { prepareActivityDevelopment } from '../services/mevService';
 import ActivityCodeGenerator from './ActivityCodeGenerator';
 import { knowledgeForAi, entriesForIntervention } from './rationaleKnowledge';
 import { planInsertion, applyInsertion, undoInsertion, draftPatch } from './draftInsertion';
 import { ACTIVITY_STATES, stateAllowed, isDefined, hasProposal, hasCode, isVerified, activityNextStep } from './developmentJourney';
 
-export default function DevelopmentActivities({ items, plans, onChange, applications, onSelectFiles, sourceFiles = [], embedded = false, knowledge = [] }) {
+export default function DevelopmentActivities({ items, plans, onChange, applications, onSelectFiles, library = null, sourceFiles = [], embedded = false, knowledge = [] }) {
   const [filter, setFilter] = useState('Tutte');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +24,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
   const buildProposal = async item => {
     const description = item.detail?.detailDescription || item.reason || '';
     const source = await activitySourceContext(sourceFiles, description, cache);
-    if (!source.files.length) throw new Error('Nessun file sorgente leggibile: seleziona la cartella dei sorgenti per questa sessione.');
+    if (!source.files.length) throw new Error('Nessun file sorgente leggibile: seleziona la cartella dei sorgenti.');
     const result = await prepareActivityDevelopment({ activity: { interventionId: item.interventionId, description, technology: item.detail?.technology }, source,
       confirmedRationale: knowledgeForAi(entriesForIntervention(knowledge, item.interventionId)) });
     if (typeof result.analysis?.solution !== 'string' || typeof result.analysis?.acceptance !== 'string') throw new Error('Risposta AI incompleta: la scheda corrente non è stata modificata.');
@@ -96,9 +97,9 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
     {embedded && <h3 className="dev-sr-only">Schede di sviluppo · {activities.length} attività</h3>}
     <div className="development-repositories"><strong>Applicativi collegati al sistema dell’iniziativa</strong>
       {applications.length ? applications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b> · <code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>) : <p>Nessun applicativo corrispondente trovato: verificare Sistema e Applicativi e tecnologie.</p>}
-      <p>Il percorso configurato non conserva il permesso del browser di leggere i file locali. Riseleziona la cartella solo per nuove analisi o modifiche ai sorgenti. Proposte AI, estratti già usati e schede salvate restano consultabili senza riselezionarla.</p>
-      <button type="button" onClick={onSelectFiles}>Seleziona cartella sorgenti per questa sessione</button>
-      <span className="dev-files-count">{sourceFiles.length} file selezionati nella sessione</span>
+      <p>Il percorso configurato non può essere letto dal browser. Le cartelle che scegli qui restano salvate in questo browser e non vanno riselezionate a ogni visita. Proposte AI, estratti già usati e schede salvate restano consultabili senza riselezionarla.</p>
+      {library ? <SourceLibraryPanel library={library} compact /> : <><button type="button" onClick={onSelectFiles}>Seleziona cartella sorgenti per questa sessione</button>
+      <span className="dev-files-count">{sourceFiles.length} file selezionati nella sessione</span></>}
     </div>
     <p className="dev-hint">Una scheda per ogni riga di dettaglio. “Prepara scheda con AI” aggiunge la proposta ai dati da salvare; “Inserisci bozza” ne copia i contenuti nei campi modificabili. Salva lo sviluppo per conservare entrambi.</p>
     <div className="dev-filter" role="group" aria-label="Stato attività">

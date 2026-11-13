@@ -24,9 +24,9 @@ export function activityNextStep(plan) {
 export const PHASES = [
   { id: 'fonti', label: 'Fonti', required: true, session: true,
     purpose: 'Collega il sistema da modificare ai suoi sorgenti, così AI e generazione di file lavorano sul codice giusto.',
-    needs: ['Un applicativo associato al sistema dell’iniziativa', 'La cartella del repository, riselezionata a ogni sessione'],
+    needs: ['Un applicativo associato al sistema dell’iniziativa', 'La cartella del repository, scelta una volta e conservata in questo browser'],
     produces: ['Il contesto di sorgenti per le proposte AI e per i file generati'],
-    rules: ['Il browser non conserva il permesso di leggere la cartella: serve riselezionarla solo per nuove analisi.', 'Puoi compilare le schede anche senza cartella, ma senza proposte AI.'] },
+    rules: ['La cartella scelta resta salvata in questo browser (una copia dei file di codice, senza credenziali): riselezionala solo per aggiornarla o integrarla.', 'Puoi compilare le schede anche senza cartella, ma senza proposte AI.'] },
   { id: 'schede', label: 'Schede', required: true,
     purpose: 'Una scheda tecnica per ogni riga di dettaglio dell’offerta: dove intervenire, come e come si accetta il risultato.',
     needs: ['Le attività importate dal Configuratore', 'Idealmente la cartella dei sorgenti (per le proposte AI)'],
@@ -80,7 +80,7 @@ export function computeJourney({ activities, plans, preparation = {}, delivery =
   const data = {
     fonti: { done: sourcesDone, total: 2, status: statusOf(sourcesDone, 2),
       summary: repository ? 'Repository collegato' : applications.length ? 'Cartella da selezionare' : 'Nessun applicativo',
-      missing: [!applications.length && 'Nessun applicativo associato al sistema dell’iniziativa', !repository && 'Cartella dei sorgenti non selezionata in questa sessione'].filter(Boolean) },
+      missing: [!applications.length && 'Nessun applicativo associato al sistema dell’iniziativa', !repository && 'Cartella dei sorgenti non ancora salvata in questo browser'].filter(Boolean) },
     schede: { done: defined.length, total, status: statusOf(defined.length, total), extra: `${proposals.length} con proposta AI`,
       summary: total ? `${defined.length}/${total} definite` : 'Nessuna attività',
       missing: list.filter(a => !isDefined(a.plan)).map(a => a.number) },

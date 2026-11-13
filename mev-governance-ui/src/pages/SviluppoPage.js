@@ -13,17 +13,11 @@ import { saveAndClose } from '../configuratore/saveAndClose';
 import { KINDS, KIND_ORDER, countByKind, confirmedEntries } from '../configuratore/rationaleKnowledge';
 import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi, developmentRequest } from '../services/mevService';
 import { APP_DATA, appNorm, sourceFileAllowed, ignoredSourcePath } from '../configuratore/configuratoreCore';
+import useSourceLibrary from '../configuratore/useSourceLibrary';
+import SourceLibraryPanel from '../configuratore/SourceLibraryPanel';
 import '../configuratore/initiativeWorkspace.css';
 import '../configuratore/developmentPage.css';
 
-const pick = () => new Promise(resolve => {
-  const input = document.createElement('input');
-  input.type = 'file'; input.multiple = true;
-  input.setAttribute('webkitdirectory', ''); input.setAttribute('directory', '');
-  input.onchange = () => resolve(input.files.length ? [...input.files] : []);
-  input.oncancel = () => resolve([]);
-  input.click();
-});
 const stamp = value => value ? new Date(value).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 const unauthorized = error => { try { const status = JSON.parse(error.message).status; return status === 401 || status === 403; } catch { return false; } };
 
@@ -40,7 +34,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
   const [delivery, setDelivery] = useState(DEFAULT_DELIVERY);
   const [applications, setApplications] = useState([]);
   const [knowledge, setKnowledge] = useState({ entries: [], error: '' });
-  const [files, setFiles] = useState([]);
+  const library = useSourceLibrary(); const files = library.files;
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -83,7 +77,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
       const known = await loadConfirmedKnowledge(state.evaluation.initiative?.code || state.evaluation.initiative?.title);
       if (token !== opening.current) return;
       setLoaded(state); setPlans(state.plans); setPreparation(state.preparation); setDelivery(state.delivery);
-      setApplications(apps); setKnowledge(known); setFiles([]); setDirty(false); setPhase(state.source === 'new' ? 'fonti' : 'schede');
+      setApplications(apps); setKnowledge(known); setDirty(false); setPhase(state.source === 'new' ? 'fonti' : 'schede');
       if (state.source === 'legacy') setMessage('Le schede erano salvate nella valutazione del Configuratore. Sono state caricate qui come punto di partenza: salvale in Sviluppo per renderle definitive.');
     } catch (e) { if (token === opening.current) setError(e.message); } finally { if (token === opening.current) setBusy(''); }
   };
@@ -112,7 +106,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     } catch (e) { setError(`Salvataggio non riuscito: ${e.message}`); return false; } finally { setBusy(''); }
   };
   const close = () => { setLoaded(null); setDirty(false); refresh(); };
-  const selectFolder = async () => { const chosen = await pick(); if (chosen.length) { setFiles(chosen); setMessage(`Repository collegato per questa sessione: ${chosen.length} file.`); } };
+  const selectFolder = () => library.add();
 
   const run = (name, action) => async () => { setBusy(name); setError(''); setMessage(''); try { await action(); } catch (e) { setError(e.message); } finally { setBusy(''); } };
   const contractName = contracts.find(c => c.contractId === loaded?.evaluation.catalogSource?.contractId)?.name;
@@ -192,13 +186,13 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
         <div className="dev-source"><span className="dev-source-label">Applicativi associati al sistema «{heading.system || '—'}»</span>
           {linkedApplications.length ? linkedApplications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b><code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>)
             : <p className="dev-warn">Nessun applicativo corrisponde al sistema dell’iniziativa. {applicationDiagnosis(heading.system, applications, applicationScope(loaded.evaluation, { contractId: loaded.contractId, lot: loaded.lot }))} Per collegarlo, nel Configuratore apri «Risorse e configurazione → Applicativi».</p>}</div>
-        <div className="dev-source"><span className="dev-source-label">Cartella dei sorgenti (questa sessione)</span>
+        <div className="dev-source"><span className="dev-source-label">Cartelle dei sorgenti (salvate su questo computer)</span>
           {files.length ? <p><b>{files.length} file selezionati</b> · {sourceCount} sorgenti presi in considerazione</p> : techProfile ? <p>Nessuna cartella: uso il profilo tecnico dell’applicativo ({techProfile.totalFiles || 0} file, {techProfile.readFiles || 0} analizzati).</p> : <p className="dev-warn">Nessuna cartella selezionata: le proposte AI e la generazione dei file non sono disponibili.</p>}
-          <button type="button" className="dev-btn dev-btn-primary" onClick={selectFolder}>{files.length ? 'Cambia cartella' : 'Seleziona cartella sorgenti'}</button>
-          <small>Il browser non conserva il permesso di leggere la cartella: va riselezionata dopo un ricaricamento, solo per nuove analisi.</small></div>
+          <SourceLibraryPanel library={library} compact />
+          <small>La cartella scelta resta salvata in questo browser: non va riselezionata a ogni visita. Per aggiornarla o integrarla sceglila di nuovo.</small></div>
       </div>
     </section>,
-    schede: <DevelopmentActivities key={`${loaded.key}:activities`} embedded items={loaded.evaluation.items || []} plans={plans} onChange={editPlans} applications={linkedApplications} onSelectFiles={selectFolder} sourceFiles={files} knowledge={knowledge.entries} />,
+    schede: <DevelopmentActivities key={`${loaded.key}:activities`} embedded items={loaded.evaluation.items || []} plans={plans} onChange={editPlans} applications={linkedApplications} onSelectFiles={selectFolder} library={library} sourceFiles={files} knowledge={knowledge.entries} />,
     progetto: <ProjectPreparationPanel key={`${loaded.key}:project`} initiative={heading} preparation={preparation} onChange={editPreparation} items={loaded.evaluation.items || []} plans={plans} applications={linkedApplications} workspaceContext={null} branch={delivery.branch} knowledge={knowledge.entries} />,
     codice: <section className="dev-card dev-phase-card" aria-label="Generazione di file">
       <h3>Generazione di codice e workflow</h3>

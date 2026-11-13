@@ -123,5 +123,12 @@
     
   ]
   
+  },
+  
+  "devDependencies": {
+  
+    
+  "fake-indexeddb": "^6.2.8"
+  
   }
 }

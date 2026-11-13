@@ -53,7 +53,7 @@ describe.each([['Configuratore', configuratorChapters], ['Sviluppo', development
 // so renaming the button would otherwise go unnoticed.
 const BUTTONS = {
   Configuratore: ['Salva valutazione', 'Salva e Chiudi', 'Salva e vai a Sviluppo →', 'Importa Tabella di Offerta', 'Analizza e suggerisci', 'Reset', 'Secondo parere AI', 'Genera Tabella di offerta XLSX', 'Esporta JSON', 'Esporta CSV', 'Stampa', 'Salva come nuovo', '+ Nuova Iniziativa', 'Revisione →', '← Interventi', '← Modifica'],
-  Sviluppo: ['Salva sviluppo', 'Salva e chiudi', 'Chiudi senza salvare', 'Prepara scheda con AI', 'Inserisci bozza nella scheda', 'Genera progetto di avvio ZIP', 'Genera codice / workflow per questa attività', 'Conserva artefatti nella scheda', 'Scarica file sorgenti generati ZIP', 'Genera ZIP richiesta modifica codice', 'Esporta piano di sviluppo (MD)', 'Genera documento sviluppo (AI)', 'Seleziona cartella sorgenti', 'Cambia cartella', '↻ Aggiorna'],
+  Sviluppo: ['Salva sviluppo', 'Salva e chiudi', 'Chiudi senza salvare', 'Prepara scheda con AI', 'Inserisci bozza nella scheda', 'Genera progetto di avvio ZIP', 'Genera codice / workflow per questa attività', 'Conserva artefatti nella scheda', 'Scarica file sorgenti generati ZIP', 'Genera ZIP richiesta modifica codice', 'Esporta piano di sviluppo (MD)', 'Genera documento sviluppo (AI)', 'Seleziona cartella sorgenti', 'Aggiungi o aggiorna una cartella', '↻ Aggiorna'],
 };
 const SOURCES = walk(SRC).map(f => norm(fs.readFileSync(f, 'utf8')));
 const asButtonText = label => { const needle = norm(label); const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); return SOURCES.some(src => new RegExp('<button[^>]*>[^<]*' + esc + '|>\\s*' + esc + '\\s*</button>|' + "'" + esc + "'|`" + esc).test(src)); };

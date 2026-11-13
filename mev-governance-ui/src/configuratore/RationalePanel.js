@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { rationaleRequest } from '../services/mevService';
 import { KINDS, KIND_ORDER, MAX_QUESTION, MAX_ENTRY, kindLabel, validateText, initiativeCode, mergeById, groupEntries, countByKind, notYetTaken } from './rationaleKnowledge';
 import { displayName, relativeTime } from './developmentCollaboration';
-import { sourceExcerptsFor, chosenFilesSummary, pasteItem, checkAttachments, attachmentSummary, createSourceCache, formatSize, MAX_PASTE, CONNECTION_FIELDS, loadConnection, saveConnection, connectionWarnings } from './rationaleAttachments';
+import useSourceLibrary from './useSourceLibrary';
+import SourceLibraryPanel from './SourceLibraryPanel';
+import { sourceExcerptsFor, chosenFilesSummary, pasteItem, checkAttachments, attachmentSummary, formatSize, MAX_PASTE, CONNECTION_FIELDS, loadConnection, saveConnection, connectionWarnings } from './rationaleAttachments';
 import './rationalePanel.css';
 
 // Chat with the AI about why interventions are needed + the confirmed knowledge distilled from it.
@@ -25,8 +27,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [editing, setEditing] = useState({});
   const [tab, setTab] = useState('proposals');
   const [open, setOpen] = useState(false);
-  const [sourceFiles, setSourceFiles] = useState([]);
-  const [sourceName, setSourceName] = useState('');
+  const library = useSourceLibrary(); const sourceFiles = library.files;
   const [pasted, setPasted] = useState([]);
   const [pasting, setPasting] = useState(null);
   const [attachNotice, setAttachNotice] = useState('');
@@ -35,7 +36,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [chosen, setChosen] = useState(null);
   const [connection, setConnection] = useState(() => loadConnection());
   const [connectionOpen, setConnectionOpen] = useState(false);
-  const sourceCache = useRef(createSourceCache());
+  const sourceCache = useRef(null); sourceCache.current = library.cache;
   const listRef = useRef(null); const inputRef = useRef(null); const stick = useRef(true);
 
   const report = useCallback(list => onKnowledge?.(list), [onKnowledge]);
@@ -119,12 +120,6 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     } catch (e) { setError(e.message); }
   };
 
-  const pickFolder = () => {
-    const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.setAttribute('webkitdirectory', ''); input.setAttribute('directory', '');
-    input.onchange = () => { const files = [...input.files]; if (!files.length) return; sourceCache.current = createSourceCache(); setSourceFiles(files); setSourceName((files[0].webkitRelativePath || '').split('/')[0] || 'cartella'); };
-    input.click();
-  };
-  const clearFolder = () => { setSourceFiles([]); setSourceName(''); setChosen(null); sourceCache.current = createSourceCache(); };
   const addPasted = event => {
     event.preventDefault();
     const text = String(pasting?.text || '').trim(); if (!text) return;
@@ -169,21 +164,19 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
             {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">{reading || 'L’AI sta ragionando…'}</span></li>}
           </ol>
           <div className="rat-attach" aria-label="Allegati alla domanda">
-            <button type="button" onClick={pickFolder}>{sourceFiles.length ? 'Cambia cartella sorgenti' : 'Seleziona cartella sorgenti'}</button>
             <button type="button" onClick={() => setPasting({ name: '', text: '' })}>Incolla dati (es. risultato di una query)</button>
             <button type="button" aria-expanded={connectionOpen} onClick={() => setConnectionOpen(value => !value)}>Collegamento a un ambiente Poste</button>
-            {sourceFiles.length > 0 && <span className="rat-chip" title="La cartella resta sul tuo computer: all’AI arrivano solo gli estratti pertinenti alla domanda.">📁 {sourceName} · {sourceFiles.length} file <button type="button" aria-label="Scollega la cartella sorgenti" onClick={clearFolder}>×</button></span>}
             {pasted.map((item, index) => <span className="rat-chip" key={index}>📋 {item.name} · {formatSize(item.text.length)} <button type="button" aria-label={`Rimuovi l’allegato ${item.name}`} onClick={() => setPasted(previous => previous.filter((_, i) => i !== index))}>×</button></span>)}
           </div>
+          <SourceLibraryPanel library={library} compact />
           {sourceFiles.length > 0 && <label className="rat-codeterms">Cerca nel codice <small>(facoltativo: sigle, nomi di classe o di file da guardare, separati da spazio)</small>
             <input value={codeTerms} maxLength={200} placeholder="es. H7 PrintRules LdvIta" onChange={event => setCodeTerms(event.target.value)} /></label>}
           {sourceFiles.length > 0 && <div className="rat-howto"><b>Cosa chiedere.</b> Una domanda sola e precisa su una regola del codice, con i nomi che il codice usa. Esempi (premi per metterlo nella casella, poi modificalo):
             <span className="rat-examples">{CODE_QUESTION_EXAMPLES.map(example => <button type="button" key={example} onClick={() => { setText(example); inputRef.current?.focus(); }}>{example}</button>)}</span>
             <small>La domanda va nella casella grande in basso; «Cerca nel codice» serve solo per aggiungere sigle o nomi di classe che il codice usa e la domanda non contiene.</small></div>}
-          {chosen && chosen.rows.length > 0 && <details className="rat-chosen"><summary>File inviati all’AI nell’ultima domanda ({chosen.rows.length})</summary>
+          {sourceFiles.length > 0 && chosen && chosen.rows.length > 0 && <details className="rat-chosen"><summary>File inviati all’AI nell’ultima domanda ({chosen.rows.length})</summary>
             <ul>{chosen.rows.map(row => <li key={row.path}><code>{row.path}</code> <small>{row.lines}{row.because.length ? ` · contiene o ha nel nome: ${row.because.join(', ')}` : ' · mostrato per dare la struttura'}</small></li>)}</ul>
             <small>Parole cercate: {chosen.terms.join(', ') || '—'}. Se la regola che ti serve non c’è, aggiungi una sigla o il nome di una classe in «Cerca nel codice» e rifai la domanda.</small></details>}
-          {sourceFiles.length === 0 && pasted.length === 0 && <p className="rat-attach-hint">Vuoi che l’AI guardi il codice? Seleziona la cartella dei sorgenti: per ogni domanda l’app sceglie i file pertinenti e ne invia solo alcuni estratti. La cartella va riselezionata a ogni sessione.</p>}
           {pasting && <form className="rat-paste" onSubmit={addPasted} aria-label="Incolla dati">
             <label>Cos’è <input value={pasting.name} maxLength={80} placeholder="es. SELECT sulle prenotazioni di ieri" onChange={event => setPasting({ ...pasting, name: event.target.value })} /></label>
             <label>Testo<textarea rows={5} value={pasting.text} maxLength={MAX_PASTE + 200} placeholder="Incolla qui le righe che servono. Non incollare password, token o chiavi." onChange={event => setPasting({ ...pasting, text: event.target.value })} /></label>
