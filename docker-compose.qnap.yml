@@ -1,10 +1,12 @@
 # MEV Governance su NAS QNAP (Container Station) — ambiente DEV, stessi dati di Render.
 #
-# Come si usa: vedi docs/QNAP.md. In breve: copiare .env.qnap.example in ".env" (stessa cartella di questo file), compilarlo, poi
-#   docker compose -f docker-compose.qnap.yml up -d
+# Come si usa: vedi docs/QNAP.md.
+#  - Da SSH sul NAS:  copiare .env.qnap.example in ".env" (stessa cartella), compilarlo, poi  docker compose -f docker-compose.qnap.yml up -d
+#  - Da Container Station (Applications -> Create Application): il YAML va incollato e le variabili ${...} NON e' documentato che vengano sostituite.
+#    Per questo, sul computer:  python3 scripts/qnap_render_compose.py  produce docker-compose.qnap.rendered.yml con tutti i valori gia' scritti.
 #
 # Il database NON e' su questo NAS: e' lo stesso Postgres (Supabase) che usa Render, quindi i dati sono gli stessi. Il NAS ospita solo le tre parti dell'app.
-# Nessuna password e' scritta qui: tutte vengono dal file ".env", che non va mai messo nel repository.
+# Nessuna password e' scritta in questo file: tutte vengono dal file ".env", che non va mai messo nel repository.
 
 services:
 

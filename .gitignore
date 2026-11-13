@@ -29,3 +29,4 @@ ToolOfferte/
 .env
 mev-data/
 mev-certs/
+docker-compose.qnap.rendered.yml
