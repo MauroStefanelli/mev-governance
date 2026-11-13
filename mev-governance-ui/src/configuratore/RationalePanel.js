@@ -32,11 +32,19 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [pasting, setPasting] = useState(null);
   const [attachNotice, setAttachNotice] = useState('');
   const [codeTerms, setCodeTerms] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(null);   // null: open on first use (no folder saved yet), closed afterwards, until the user decides
   const [reading, setReading] = useState('');
   const [chosen, setChosen] = useState(null);
   const [connection, setConnection] = useState(() => loadConnection());
   const [connectionOpen, setConnectionOpen] = useState(false);
   const sourceCache = useRef(null); sourceCache.current = library.cache;
+  // Folded by default once a folder is saved, so that the conversation has the room. It stays open on its own while there is something to read or decide:
+  // no folder yet, a save in progress or just finished (what was added, what was left out for a credential), a choice to make, an error. The user can always fold it.
+  const attention = library.ready && (library.folders.length === 0 || Boolean(library.busy || library.pending || library.report || library.error || !library.persistent));
+  const toolsIsOpen = toolsOpen === null ? attention : toolsOpen;
+  const toolsSummary = [library.folders.length ? `${library.folders.filter(f => f.active !== false).length} di ${library.folders.length} ${library.folders.length === 1 ? 'cartella' : 'cartelle'} attive, ${sourceFiles.length} file` : 'nessuna cartella salvata',
+    pasted.length ? `${pasted.length} ${pasted.length === 1 ? 'dato incollato' : 'dati incollati'}` : ''].filter(Boolean).join(' · ');
   const listRef = useRef(null); const inputRef = useRef(null); const stick = useRef(true);
 
   const report = useCallback(list => onKnowledge?.(list), [onKnowledge]);
@@ -153,8 +161,10 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     {!code && <p className="rat-empty">Compila il codice GOTO o il titolo dell’iniziativa per aprire la conversazione.</p>}
     {code && <div className="rat-stack">
       <div className="rat-chat">
-        <div className={`rat-desk${messages.length || loading || busy ? ' has-messages' : ''}`} onClick={event => { if (!event.target.closest('button, input, textarea, select, label, summary, details, a, time')) inputRef.current?.focus(); }}>
-          <ol className="rat-messages" ref={listRef} onScroll={onScroll} aria-label="Cronologia della conversazione" aria-live="polite">
+        <div className={`rat-desk${messages.length || loading || busy ? ' has-messages' : ''}${historyOpen ? '' : ' is-history-closed'}`} onClick={event => { if (!event.target.closest('button, input, textarea, select, label, summary, details, a, time')) inputRef.current?.focus(); }}>
+          {(messages.length > 0 || loading) && <div className="rat-history-bar"><b>Cronologia della conversazione</b><small>{messages.length} {messages.length === 1 ? 'messaggio' : 'messaggi'}{hasMore ? ' (ce ne sono di precedenti)' : ''}</small>
+            <button type="button" aria-expanded={historyOpen} aria-controls="rat-history" onClick={() => setHistoryOpen(value => !value)}>{historyOpen ? 'Nascondi la cronologia' : 'Mostra la cronologia'}</button></div>}
+          <ol className="rat-messages" id="rat-history" ref={listRef} onScroll={onScroll} aria-label="Cronologia della conversazione" aria-live="polite">
             {hasMore && <li className="rat-more"><button type="button" onClick={loadOlder}>Mostra messaggi precedenti</button></li>}
             {loading && <li className="rat-loading" role="status">Caricamento…</li>}
             {messages.map(message => <li key={message.id} className={`rat-msg ${message.role === 'assistant' ? 'is-ai' : message.mine ? 'is-mine' : ''}`}>
@@ -163,7 +173,20 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
               <span className="rat-msg-text">{message.text}</span></li>)}
             {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">{reading || 'L’AI sta ragionando…'}</span></li>}
           </ol>
-          <div className="rat-attach" aria-label="Allegati alla domanda">
+          <form className="rat-form rat-compose" onSubmit={event => { event.preventDefault(); ask(text); }}>
+            <label className="rat-sr" htmlFor="rat-input">Messaggio per l’AI</label>
+            <textarea id="rat-input" ref={inputRef} value={text} disabled={busy} maxLength={MAX_QUESTION + 200} placeholder="Scrivi qui il tuo messaggio per l’AI…"
+              onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} />
+            <span className="rat-compose-bar"><small>Invio per inviare · Maiusc+Invio per andare a capo</small>
+              <button type="submit" className="rat-primary" disabled={busy || !text.trim()}>{busy ? 'Invio…' : 'Invia all’AI'}</button></span>
+          </form>
+        </div>
+        <section className="rat-tools" aria-label="Sorgenti e dati per la domanda">
+          <button type="button" className="rat-tools-toggle" aria-expanded={toolsIsOpen} aria-controls="rat-tools-body" onClick={() => setToolsOpen(!toolsIsOpen)}>
+            <span className="rat-tools-title">Sorgenti e dati per la domanda</span>
+            <span className="rat-tools-summary">{toolsSummary}</span><span className="rat-know-chevron" aria-hidden="true">{toolsIsOpen ? '▲' : '▼'}</span></button>
+          {toolsIsOpen && <div className="rat-tools-body" id="rat-tools-body">
+            <div className="rat-attach" aria-label="Allegati alla domanda">
             <button type="button" onClick={() => setPasting({ name: '', text: '' })}>Incolla dati (es. risultato di una query)</button>
             <button type="button" aria-expanded={connectionOpen} onClick={() => setConnectionOpen(value => !value)}>Collegamento a un ambiente Poste</button>
             {pasted.map((item, index) => <span className="rat-chip" key={index}>📋 {item.name} · {formatSize(item.text.length)} <button type="button" aria-label={`Rimuovi l’allegato ${item.name}`} onClick={() => setPasted(previous => previous.filter((_, i) => i !== index))}>×</button></span>)}
@@ -187,14 +210,8 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
             <div className="rat-connection-grid">{CONNECTION_FIELDS.map(field => <label key={field.id}>{field.label}<input value={connection[field.id] || ''} maxLength={200} placeholder={field.placeholder} onChange={event => changeConnection(field.id, event.target.value)} /></label>)}</div>
             {connectionWarnings(connection).length > 0 && <p className="rat-error" role="alert">Negli appunti sembra esserci {connectionWarnings(connection).map(w => `${w.rule} (${w.field})`).join(', ')}: non scrivere credenziali, qui servono solo indicazioni su come arrivare all’ambiente.</p>}
           </section>}
-          <form className="rat-form rat-compose" onSubmit={event => { event.preventDefault(); ask(text); }}>
-            <label className="rat-sr" htmlFor="rat-input">Messaggio per l’AI</label>
-            <textarea id="rat-input" ref={inputRef} value={text} disabled={busy} maxLength={MAX_QUESTION + 200} placeholder="Scrivi qui il tuo messaggio per l’AI…"
-              onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} />
-            <span className="rat-compose-bar"><small>Invio per inviare · Maiusc+Invio per andare a capo</small>
-              <button type="submit" className="rat-primary" disabled={busy || !text.trim()}>{busy ? 'Invio…' : 'Invia all’AI'}</button></span>
-          </form>
-        </div>
+          </div>}
+        </section>
         {attachNotice && <p className="rat-notice" role="status">{attachNotice}</p>}
         {questions.length > 0 && <div className="rat-questions"><b>L’AI chiede di chiarire:</b><ul>{questions.map(question => <li key={question}>{question}</li>)}</ul></div>}
         <small className="rat-hint">Le risposte dell’AI sono proposte da verificare. La conversazione è conservata e visibile ai colleghi dello stesso ambiente: non scrivere password o dati riservati. Gli allegati non vengono salvati.</small>

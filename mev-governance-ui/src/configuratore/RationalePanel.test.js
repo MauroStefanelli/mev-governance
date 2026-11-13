@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import RationalePanel from './RationalePanel';
 import { IDBFactory } from 'fake-indexeddb';
@@ -328,6 +328,26 @@ describe('attachments to a question: source code and pasted data', () => {
     expect(screen.getByText(/Cosa chiedere/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Quali condizioni impediscono la stampa dell’etichetta H7/ }));
     expect(screen.getByLabelText('Messaggio per l’AI')).toHaveValue('Quali condizioni impediscono la stampa dell’etichetta H7?'); expect(asked()).toHaveLength(0);
+  });
+  test('layout: the tools sit OUTSIDE the tall conversation area, so they can never squeeze it; the history can be folded and opened again', async () => {
+    server.messages = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, goto: 'goto-1', role: i % 2 ? 'assistant' : 'user', text: `messaggio ${i + 1}`, createdAt: new Date().toISOString(), author: 'io', authorFullName: 'Io', mine: !(i % 2) }));
+    render(<Harness />); const history = await screen.findByRole('list', { name: 'Cronologia della conversazione' }); const desk = history.closest('.rat-desk');
+    expect(desk.contains(screen.getByRole('region', { name: 'Sorgenti e dati per la domanda' }))).toBe(false);
+    expect(desk.contains(screen.getByRole('button', { name: /Incolla dati/ }))).toBe(false); expect(desk.contains(screen.getByRole('button', { name: 'Seleziona cartella sorgenti' }))).toBe(false);
+    expect([...desk.children].map(child => child.className.split(' ')[0])).toEqual(['rat-history-bar', 'rat-messages', 'rat-form']);
+    expect(screen.getByText('6 messaggi')).toBeInTheDocument(); expect(desk).not.toHaveClass('is-history-closed');
+    fireEvent.click(screen.getByRole('button', { name: 'Nascondi la cronologia' })); expect(desk).toHaveClass('is-history-closed'); expect(screen.getByRole('button', { name: 'Mostra la cronologia' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByLabelText('Messaggio per l’AI')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mostra la cronologia' })); expect(desk).not.toHaveClass('is-history-closed'); expect(screen.getByText('messaggio 1')).toBeInTheDocument();
+  });
+  test('layout: with a folder already saved the tools are folded and summarised, with none they are open to guide the first use; the user can always change it', async () => {
+    const { saveSelection, inspectSelection } = require('./sourceLibrary'); const f = (path, text) => ({ name: path.split('/').pop(), size: text.length, lastModified: 1, webkitRelativePath: path, text: async () => text });
+    render(<Harness />); const toggle = await screen.findByRole('button', { name: /Sorgenti e dati per la domanda/ }); expect(toggle).toHaveAttribute('aria-expanded', 'true'); expect(toggle).toHaveTextContent('nessuna cartella salvata');
+    cleanup(); await saveSelection({ selection: inspectSelection([f('item/A.java', 'a'), f('item/B.java', 'b')]) }); resetSourceLibrary();
+    render(<Harness />); const folded = await screen.findByRole('button', { name: /Sorgenti e dati per la domanda/ });
+    await waitFor(() => expect(folded).toHaveTextContent('1 di 1 cartella attive, 2 file')); expect(folded).toHaveAttribute('aria-expanded', 'false'); expect(screen.queryByRole('button', { name: /Incolla dati/ })).not.toBeInTheDocument();
+    fireEvent.click(folded); expect(screen.getByRole('button', { name: /Incolla dati/ })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Aggiungi o aggiorna una cartella' })).toBeInTheDocument();
+    fireEvent.click(folded); expect(screen.queryByRole('button', { name: /Incolla dati/ })).not.toBeInTheDocument();
   });
   test('a source file containing a credential is kept out of the copy and never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });

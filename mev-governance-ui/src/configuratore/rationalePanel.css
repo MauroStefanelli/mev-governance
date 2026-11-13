@@ -13,7 +13,7 @@
 .rat-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
 .rat-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .rat-chat, .rat-know { display: flex; flex-direction: column; gap: 10px; min-width: 0; } .rat-chat h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .9px; color: #5d718a; }
-.rat-desk { display: flex; flex-direction: column; height: clamp(520px, 72vh, 860px); background: #f2f6fb; border: 1px solid #d9e3ef; border-radius: 12px; overflow: hidden; cursor: text; }
+.rat-desk { display: flex; flex-direction: column; height: clamp(600px, 84vh, 1000px); background: #f2f6fb; border: 1px solid #d9e3ef; border-radius: 12px; overflow: hidden; cursor: text; }
 .rat-desk:focus-within { border-color: #75a7f7; box-shadow: 0 0 0 3px #75a7f733; }
 .rat-messages { list-style: none; margin: 0; padding: 12px 12px 4px; display: none; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1 1 auto; min-height: 0; cursor: default; }
 .rat-desk.has-messages .rat-messages { display: flex; }
@@ -75,3 +75,18 @@
 .rat-examples { display: flex; flex-direction: column; gap: 4px; }
 .rat-examples button { text-align: left; font-size: 12.5px; padding: 6px 10px; min-height: 34px; border: 1px solid #bacbdf; border-radius: 8px; background: #f8fbff; color: #17314f; cursor: pointer; }
 .rat-examples button:hover { background: #eaf2fd; } .rat-howto small { color: #5d718a; }
+
+/* ---- the conversation owns the tall area; tools sit outside it and fold away ---- */
+.rat-history-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid #d9e3ef; background: #f8fbff; flex: 0 0 auto; }
+.rat-history-bar b { font-size: 13px; color: #17314f; } .rat-history-bar small { color: #5d718a; font-size: 12px; } .rat .rat-history-bar button { margin-left: auto; min-height: 32px; padding: 5px 12px; font-size: 12.5px; }
+.rat-desk.is-history-closed .rat-messages { display: none; }
+.rat-desk.is-history-closed { height: auto; min-height: 0; }
+.rat-desk.is-history-closed .rat-compose textarea { height: 96px; }
+.rat-tools { background: #fff; border: 1px solid #d9e3ef; border-radius: 12px; overflow: hidden; }
+.rat .rat-tools-toggle { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; width: 100%; text-align: left; padding: 10px 14px; min-height: 46px; border: 0; border-radius: 0; background: #f2f6fb; }
+.rat .rat-tools-toggle[aria-expanded="true"] { background: #e8f0fd; }
+.rat-tools-title { font-size: 14px; font-weight: 700; color: #17314f; } .rat-tools-summary { flex: 1 1 auto; font-size: 12.5px; font-weight: 500; color: #4d6179; }
+.rat-tools-body { display: flex; flex-direction: column; gap: 10px; padding: 10px 0 12px; max-height: none; }
+.rat-tools-body .srclib, .rat-tools-body .rat-codeterms, .rat-tools-body .rat-howto, .rat-tools-body .rat-chosen { margin-left: 12px; margin-right: 12px; }
+.rat-tools-body .rat-attach { border-top: 0; background: transparent; padding-top: 0; }
+.rat-tools-body .rat-paste, .rat-tools-body .rat-connection { margin: 0 12px; }
