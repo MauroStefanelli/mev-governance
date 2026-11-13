@@ -7,6 +7,8 @@ import './rationalePanel.css';
 
 // Chat with the AI about why interventions are needed + the confirmed knowledge distilled from it.
 // The AI only proposes: a person confirms. Confirmed entries feed the offer review and Sviluppo.
+const CODE_QUESTION_EXAMPLES = ['In quale punto del codice viene emesso il codice di errore ITEM_V_28 e con quale condizione?', 'Quali condizioni impediscono la stampa dell’etichetta H7?', 'Dove si decide se una LDV può essere inserita in una HU?'];
+
 export default function RationalePanel({ initiative, interventions = [], onKnowledge }) {
   const code = initiativeCode(initiative);
   const [messages, setMessages] = useState([]);
@@ -156,7 +158,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     {!code && <p className="rat-empty">Compila il codice GOTO o il titolo dell’iniziativa per aprire la conversazione.</p>}
     {code && <div className="rat-stack">
       <div className="rat-chat">
-        <div className={`rat-desk${messages.length || loading || busy ? ' has-messages' : ''}`} onClick={event => { if (!event.target.closest('button, textarea, time')) inputRef.current?.focus(); }}>
+        <div className={`rat-desk${messages.length || loading || busy ? ' has-messages' : ''}`} onClick={event => { if (!event.target.closest('button, input, textarea, select, label, summary, details, a, time')) inputRef.current?.focus(); }}>
           <ol className="rat-messages" ref={listRef} onScroll={onScroll} aria-label="Cronologia della conversazione" aria-live="polite">
             {hasMore && <li className="rat-more"><button type="button" onClick={loadOlder}>Mostra messaggi precedenti</button></li>}
             {loading && <li className="rat-loading" role="status">Caricamento…</li>}
@@ -175,6 +177,9 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
           </div>
           {sourceFiles.length > 0 && <label className="rat-codeterms">Cerca nel codice <small>(facoltativo: sigle, nomi di classe o di file da guardare, separati da spazio)</small>
             <input value={codeTerms} maxLength={200} placeholder="es. H7 PrintRules LdvIta" onChange={event => setCodeTerms(event.target.value)} /></label>}
+          {sourceFiles.length > 0 && <div className="rat-howto"><b>Cosa chiedere.</b> Una domanda sola e precisa su una regola del codice, con i nomi che il codice usa. Esempi (premi per metterlo nella casella, poi modificalo):
+            <span className="rat-examples">{CODE_QUESTION_EXAMPLES.map(example => <button type="button" key={example} onClick={() => { setText(example); inputRef.current?.focus(); }}>{example}</button>)}</span>
+            <small>La domanda va nella casella grande in basso; «Cerca nel codice» serve solo per aggiungere sigle o nomi di classe che il codice usa e la domanda non contiene.</small></div>}
           {chosen && chosen.rows.length > 0 && <details className="rat-chosen"><summary>File inviati all’AI nell’ultima domanda ({chosen.rows.length})</summary>
             <ul>{chosen.rows.map(row => <li key={row.path}><code>{row.path}</code> <small>{row.lines}{row.because.length ? ` · contiene o ha nel nome: ${row.because.join(', ')}` : ' · mostrato per dare la struttura'}</small></li>)}</ul>
             <small>Parole cercate: {chosen.terms.join(', ') || '—'}. Se la regola che ti serve non c’è, aggiungi una sigla o il nome di una classe in «Cerca nel codice» e rifai la domanda.</small></details>}

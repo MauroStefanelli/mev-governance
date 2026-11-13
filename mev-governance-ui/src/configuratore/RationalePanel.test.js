@@ -301,6 +301,29 @@ describe('attachments to a question: source code and pasted data', () => {
     await ask('stampa H7');
     expect(await screen.findByText(/lettura fallita/)).toBeInTheDocument(); expect(screen.queryByText(/Leggo la cartella/)).not.toBeInTheDocument(); expect(asked()).toHaveLength(0);
   });
+  test('clicking or typing in "Cerca nel codice" keeps the cursor there: the desk does not pull the focus back to the question box', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const input = { files: [file('p/src/A.java', 'class A {}')], setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
+    server.answer = reply(); render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 1 file/);
+    const terms = screen.getByLabelText(/Cerca nel codice/); terms.focus(); fireEvent.click(terms); expect(terms).toHaveFocus();
+    fireEvent.click(screen.getByText(/Cerca nel codice/, { selector: 'label' })); expect(document.activeElement).not.toBe(screen.getByLabelText('Messaggio per l’AI'));
+    fireEvent.change(terms, { target: { value: 'H7 PrintRules' } }); expect(terms).toHaveValue('H7 PrintRules');
+    fireEvent.click(screen.getByRole('list', { name: 'Cronologia della conversazione' })); expect(screen.getByLabelText('Messaggio per l’AI')).toHaveFocus();
+  });
+  test('with a folder, the panel says what to ask and offers examples that fill the question box without sending it', async () => {
+    const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+    const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
+    const input = { files: [file('p/src/A.java', 'class A {}')], setAttribute: jest.fn(), click: jest.fn() };
+    const original = document.createElement.bind(document); let taken = false; jest.spyOn(document, 'createElement').mockImplementation(tag => (tag === 'input' && !taken ? ((taken = true), input) : original(tag)));
+    server.answer = reply(); render(<Harness />); await screen.findByRole('button', { name: 'Seleziona cartella sorgenti' });
+    expect(screen.queryByText(/Cosa chiedere/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona cartella sorgenti' })); act(() => input.onchange()); await screen.findByText(/p · 1 file/);
+    expect(screen.getByText(/Cosa chiedere/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Quali condizioni impediscono la stampa dell’etichetta H7/ }));
+    expect(screen.getByLabelText('Messaggio per l’AI')).toHaveValue('Quali condizioni impediscono la stampa dell’etichetta H7?'); expect(asked()).toHaveLength(0);
+  });
   test('a source file containing a credential is never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
     const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };
