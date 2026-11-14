@@ -17,7 +17,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE = os.path.join(ROOT, 'docker-compose.qnap.yml')
 OUTPUT = os.path.join(ROOT, 'docker-compose.qnap.rendered.yml')
-PATH_VARIABLES = ('DATA_DIR', 'CERTS_DIR')   # percorsi sul NAS: devono essere assoluti, un percorso relativo non ha senso incollando il YAML nella pagina
+PATH_VARIABLES = ('DATA_DIR', 'CERTS_DIR', 'PG_DIR')   # percorsi sul NAS: devono essere assoluti, un percorso relativo non ha senso incollando il YAML nella pagina
 
 
 def read_env(path):
@@ -67,6 +67,36 @@ def quote(value):
     return '"' + compose_escape(value).replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
+SECRET_KEYS = ('DATABASE_DIRECT_URL', 'SOURCE_DATABASE_URL', 'JWT_KEY', 'ADMIN_PASSWORD', 'POSTGRES_PASSWORD', 'PGPASSWORD')
+
+
+def quote_expanded(text):
+    """Mette tra apici doppi un valore YAML gia' espanso (con i $ gia' raddoppiati da compose_escape). Se e' gia' tra apici non fa nulla."""
+    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+        return text
+    return '"' + text.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+IMPORT_SCRIPT = os.path.join(ROOT, 'scripts', 'qnap-db-import.sh')
+
+
+def embed_import_script(rendered):
+    """Nel YAML incollato in Container Station non c'e' nessuna cartella `scripts/` da montare: lo script di copia del database viaggia dentro il YAML.
+    Si sostituisce il montaggio del file con il comando inline. Ogni `$` dello script diventa `$$` (altrimenti Compose lo leggerebbe come variabile)."""
+    script = open(IMPORT_SCRIPT, encoding='utf-8').read()
+    mount = re.compile(r"^\s+volumes:\n\s+- \./scripts/qnap-db-import\.sh:/import\.sh:ro\n", re.M)
+    command = re.compile(r'^(\s+)command: \["sh", "/import\.sh"\]$', re.M)
+    if not mount.search(rendered) or not command.search(rendered):
+        raise SystemExit('Nel compose non trovo il servizio db-import come me lo aspetto: non so dove inserire lo script di copia.')
+    rendered = mount.sub('', rendered, count=1)
+    def inline(match):
+        indent = match.group(1)
+        body = script.replace('$', '$$').rstrip('\n')
+        block = '\n'.join((indent + '    ' + line) if line else '' for line in body.split('\n'))
+        return f'{indent}command:\n{indent}  - sh\n{indent}  - -c\n{indent}  - |\n{block}'
+    return command.sub(inline, rendered, count=1)
+
+
 def main():
     env_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, '.env')
     if not os.path.exists(env_path):
@@ -79,14 +109,17 @@ def main():
     # i percorsi hanno un valore assoluto di riserva, cosi' il YAML incollato funziona anche se non sono stati compilati
     env.setdefault('DATA_DIR', '/share/Container/mev/data')
     env.setdefault('CERTS_DIR', '/share/Container/mev/certs')
+    env.setdefault('PG_DIR', '/share/Container/mev/pgdata')
     template = open(TEMPLATE, encoding='utf-8').read()
     rendered, problems = expand(template, env)
     if problems:
         raise SystemExit('Mancano dei valori nel file .env:\n  - ' + '\n  - '.join(problems))
     # protegge i valori delicati: riscrive "CHIAVE: valore" con il valore tra apici per le variabili che possono contenere caratteri speciali
-    for name in ('DATABASE_DIRECT_URL', 'JWT_KEY', 'ADMIN_PASSWORD'):
-        pattern = re.compile(rf'^(\s+{name}: )(.*)$', re.M)
-        rendered = pattern.sub(lambda m: m.group(1) + quote(env[name]), rendered)
+    rendered = embed_import_script(rendered)
+    # Ogni valore delicato (password, chiavi, indirizzi con password) va tra apici: una password con ":" o "#" romperebbe il YAML.
+    # Qui il valore e' GIA' espanso (nel template e' composto, per es. "postgresql://utente:${POSTGRES_PASSWORD}@postgres:5432/db"), quindi si quota quello che c'e' scritto.
+    for name in SECRET_KEYS:
+        rendered = re.sub(rf'^(\s+{name}: )(.*)$', lambda m: m.group(1) + quote_expanded(m.group(2)), rendered, flags=re.M)
     # il file da incollare non deve contenere altro che il compose: si toglie l'intestazione di commento (spiega come usare il modello, non questo file)
     lines = rendered.splitlines()
     first = next((i for i, line in enumerate(lines) if line.startswith('services:')), 0)
@@ -96,7 +129,7 @@ def main():
     os.chmod(OUTPUT, 0o600)
     print(f'Scritto {os.path.relpath(OUTPUT, ROOT)} ({len(rendered.splitlines())} righe).')
     print('Incollalo in Container Station: Applications -> Create Application. Poi cancellalo dal computer: contiene le password.')
-    print(f'Cartelle sul NAS da creare prima: {env["DATA_DIR"]}   (e, solo se hai un certificato vero, {env["CERTS_DIR"]})')
+    print(f'Cartelle sul NAS da creare prima (File Station): {env["DATA_DIR"]}  e  {env["PG_DIR"]}   (e, solo se hai un certificato vero, {env["CERTS_DIR"]})')
 
 
 if __name__ == '__main__':

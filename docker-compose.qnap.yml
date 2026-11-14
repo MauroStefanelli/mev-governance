@@ -5,10 +5,50 @@
 #  - Da Container Station (Applications -> Create Application): il YAML va incollato e le variabili ${...} NON e' documentato che vengano sostituite.
 #    Per questo, sul computer:  python3 scripts/qnap_render_compose.py  produce docker-compose.qnap.rendered.yml con tutti i valori gia' scritti.
 #
-# Il database NON e' su questo NAS: e' lo stesso Postgres (Supabase) che usa Render, quindi i dati sono gli stessi. Il NAS ospita solo le tre parti dell'app.
+# Il database e' su questo NAS: un Postgres (servizio "postgres") il cui contenuto viene COPIATO UNA VOLTA dal database di Render/Supabase dal servizio "db-import".
+# Dopo la copia i due database sono indipendenti: quello del NAS non si aggiorna da solo e le modifiche fatte qui non tornano su Render.
 # Nessuna password e' scritta in questo file: tutte vengono dal file ".env", che non va mai messo nel repository.
 
 services:
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: mev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mev}
+      POSTGRES_DB: ${POSTGRES_DB:-mev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?compilare POSTGRES_PASSWORD nel file .env}
+    volumes:
+      - ${PG_DIR:-./mev-pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mev} -d ${POSTGRES_DB:-mev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # nessuna porta pubblicata: il database e' raggiungibile solo dai container dell'app
+
+  # Copia lo schema dall'origine al database del NAS e poi TERMINA (non e' un servizio che resta acceso). Il backend parte solo se la copia e' riuscita.
+  # Idempotente: se i dati ci sono gia' non fa niente (IMPORT_MODE=once). Vedi scripts/qnap-db-import.sh.
+  db-import:
+    image: postgres:17-alpine
+    container_name: mev-db-import
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      IMPORT_MODE: ${IMPORT_MODE:-once}
+      SOURCE_DATABASE_URL: ${SOURCE_DATABASE_URL:-}
+      DB_SCHEMA: ${DB_SCHEMA:-dev}
+      TARGET_HOST: postgres
+      TARGET_PORT: "5432"
+      TARGET_DB: ${POSTGRES_DB:-mev}
+      TARGET_USER: ${POSTGRES_USER:-mev}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./scripts/qnap-db-import.sh:/import.sh:ro
+    command: ["sh", "/import.sh"]
 
   pdf-parser:
     image: ghcr.io/maurostefanelli/mev-pdf-parser:${IMAGE_TAG:-dev}
@@ -25,7 +65,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       DB_SCHEMA: ${DB_SCHEMA:-dev}
-      DATABASE_DIRECT_URL: ${DATABASE_DIRECT_URL:?compilare DATABASE_DIRECT_URL nel file .env}
+      # Il Postgres del NAS: rete interna, senza SSL. L'app aggiunge da sola il search path dello schema.
+      DATABASE_DIRECT_URL: postgresql://${POSTGRES_USER:-mev}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mev}
       JWT_KEY: ${JWT_KEY:?compilare JWT_KEY nel file .env}
       JWT_ISSUER: ${JWT_ISSUER:-mev-governance-dev}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-mev-governance-ui-dev}
@@ -35,14 +76,19 @@ services:
       # Con il proxy del frontend il browser parla sempre con lo stesso indirizzo della pagina, quindi il CORS non entra in gioco;
       # restano elencati per chi apre direttamente il backend (es. per un controllo).
       CORS_ORIGINS: http://${NAS_HOST:-192.168.1.144}:${HTTP_PORT:-3001},https://${NAS_HOST:-192.168.1.144}:${HTTPS_PORT:-3443}
-      # Il limite di memoria del .NET e' pensato per Render free (400 MB). Sul NAS si puo' alzare: vedi docs/QNAP.md.
+      # Il limite di memoria del .NET e' pensato per Render free (400 MB). Il TS-433 ha 4 GB in tutto: lasciarlo cosi'.
       DOTNET_GCHeapHardLimit: ${DOTNET_GCHeapHardLimit:-419430400}
     volumes:
       - ${DATA_DIR:-./mev-data}:/data
     # il backend NON e' pubblicato sulla rete: ci arriva solo il frontend. Per provarlo a mano, togliere il commento alla riga seguente.
     # ports: ["${BACKEND_PORT:-4001}:5000"]
     depends_on:
-      - pdf-parser
+      postgres:
+        condition: service_healthy
+      db-import:
+        condition: service_completed_successfully
+      pdf-parser:
+        condition: service_started
 
   frontend:
     image: ghcr.io/maurostefanelli/mev-governance-frontend:${IMAGE_TAG:-dev}
