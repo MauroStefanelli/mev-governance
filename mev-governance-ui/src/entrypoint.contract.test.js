@@ -38,10 +38,13 @@ describe('the NAS compose: no secret in the repository, only the frontend on the
     ['Admin2025', 'Mev2025', 'SuperSecret', 'supabase.co'].forEach(secret => expect(compose).not.toContain(secret));
     expect(compose).not.toMatch(/postgresql:\/\/[^$\s]+:[^$\s]+@/);
   });
-  test('only the frontend publishes ports: the database, the importer, the backend and the parser stay on the internal network', () => {
-    const published = compose.split('\n').filter(line => /^\s+ports:/.test(line) && !line.trim().startsWith('#')); expect(published).toHaveLength(1);
+  test('the web app is the only thing open to the network by default; the database port is bound to the NAS itself unless the user opens it', () => {
+    expect(compose).toContain('"${PG_BIND:-127.0.0.1}:${PG_PORT:-5433}:5432"');
+    const published = compose.split('\n').filter(line => /^\s+- "[^"]*:[^"]*:\d+"$/.test(line) && !line.includes('/') && !line.trim().startsWith('#')); expect(published).toHaveLength(3);
     expect(compose).toMatch(/BACKEND_URL: http:\/\/backend:5000/);
+    ['pdf-parser', 'backend', 'db-import'].forEach(name => expect(compose.slice(compose.indexOf(`  ${name}:`), compose.indexOf('\n\n', compose.indexOf(`  ${name}:`)) + 1)).not.toMatch(/^\s+ports:/m));
   });
+  test('the example file closes the database port by default (127.0.0.1) and explains how to open it', () => { expect(example).toMatch(/^PG_BIND=127\.0\.0\.1$/m); expect(example).toMatch(/^PG_PORT=5433$/m); });
   test('it uses the develop images (the ones with the recent functions)', () => { expect(compose.match(/:\$\{IMAGE_TAG:-dev\}/g)).toHaveLength(3); });
   test('the example file has every variable the compose needs, empty for the secrets, and .env itself is git-ignored', () => {
     ['NAS_HOST', 'HTTP_PORT', 'HTTPS_PORT', 'POSTGRES_PASSWORD', 'PG_DIR', 'SOURCE_DATABASE_URL', 'IMPORT_MODE', 'DB_SCHEMA', 'JWT_KEY', 'ADMIN_PASSWORD'].forEach(name => expect(example).toMatch(new RegExp(`^${name}=`, 'm')));

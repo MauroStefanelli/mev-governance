@@ -26,7 +26,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
-    # nessuna porta pubblicata: il database e' raggiungibile solo dai container dell'app
+    # Per collegare un client (DBeaver) dal tuo computer. PG_BIND decide CHI puo' arrivarci:
+    #   127.0.0.1 (default)  solo il NAS stesso: chiuso alla rete (si puo' usare con un tunnel SSH)
+    #   192.168.1.144        l'indirizzo del NAS: raggiungibile da chiunque sia nella tua rete locale, con utente e password
+    ports:
+      - "${PG_BIND:-127.0.0.1}:${PG_PORT:-5433}:5432"
 
   # Copia lo schema dall'origine al database del NAS e poi TERMINA (non e' un servizio che resta acceso). Il backend parte solo se la copia e' riuscita.
   # Idempotente: se i dati ci sono gia' non fa niente (IMPORT_MODE=once). Vedi scripts/qnap-db-import.sh.

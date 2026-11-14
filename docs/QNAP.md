@@ -94,10 +94,40 @@ Da Container Station: apri l'applicazione e usa l'azione di ricreazione (*Recrea
 - **Backup del database del NAS.** I dati stanno in `PG_DIR`. Per una copia di sicurezza: `docker exec mev-postgres pg_dump -U mev -d mev --schema=dev -Fc > mev-backup.dump`. Il NAS non fa copie automatiche per te: includi `PG_DIR` nei backup del NAS (ma copiare i file di un database acceso puo' dare una copia inutilizzabile: meglio il comando sopra).
 - **Versione di Postgres.** `postgres:17-alpine`, la stessa versione di Supabase. La cartella dei dati e' legata alla versione: **non cambiarla** nel compose senza una migrazione.
 
+## Collegare DBeaver al database del NAS
+
+Il database ascolta sulla porta **5433** del NAS. Per default (`PG_BIND=127.0.0.1` nel `.env`) e' chiuso alla rete: ci si arriva solo dal NAS stesso. Nel tuo `.env` l'ho gia' aperto sulla rete locale (`PG_BIND=192.168.1.144`), quindi da un computer nella stessa rete funziona cosi':
+
+1. In DBeaver: **Database → Nuova connessione → PostgreSQL**.
+2. Compila:
+   - **Host**: `192.168.1.144`
+   - **Porta**: `5433`
+   - **Database**: `mev`
+   - **Nome utente**: `mev`
+   - **Password**: il valore di `POSTGRES_PASSWORD` nel tuo `.env`
+3. Scheda **PostgreSQL** (nella stessa finestra): attiva **"Mostra tutti i database"** solo se ti serve; non serve per l'app.
+4. **Test connessione**. Alla prima volta DBeaver scarica il driver: accetta.
+5. Le tabelle sono sotto **mev → Schemas → dev → Tables**. Lo schema `public` e' quasi vuoto: i dati dell'app stanno in `dev`.
+
+**Se non riesci a collegarti:**
+| Messaggio | Causa |
+|---|---|
+| "Connection refused" o "timeout" | Il container `mev-postgres` non e' acceso, o `PG_BIND` e' `127.0.0.1` (la porta e' chiusa alla rete), o un firewall del NAS blocca la porta 5433 |
+| "password authentication failed" | La password non e' quella di `POSTGRES_PASSWORD`. Attenzione: dopo il primo avvio cambiare la password nel `.env` non cambia quella dentro il database |
+| "database mev does not exist" | Il nome del database e' `mev`, non `postgres` |
+| Vedi poche tabelle | Apri lo schema `dev`, non `public` |
+
+**Avvisi di sicurezza**
+- Con `PG_BIND=192.168.1.144` **chiunque nella tua rete locale** che conosca la password puo' leggere e **modificare** tutti i dati, aggirando l'app e i suoi controlli di accesso. L'utente `mev` e' amministratore del database.
+- **Non** aprire la porta 5433 su Internet (non inoltrarla dal router).
+- Quando non ti serve, richiudila: metti `PG_BIND=127.0.0.1` nel `.env`, rigenera il file con `python3 scripts/qnap_render_compose.py` e ricrea l'applicazione.
+- **Modifiche dirette.** Se cambi i dati con DBeaver, l'app le vede subito, ma e' facile rovinare qualcosa. Per sola lettura crea un utente che puo' solo leggere: da DBeaver, nello schema `dev`, `CREATE ROLE lettore LOGIN PASSWORD '...'; GRANT USAGE ON SCHEMA dev TO lettore; GRANT SELECT ON ALL TABLES IN SCHEMA dev TO lettore;`, e collegati con quello.
+- Alternativa senza aprire la porta alla rete: `PG_BIND=127.0.0.1` e un **tunnel SSH** (in DBeaver, scheda *SSH*: host `192.168.1.144`, utente del NAS; poi come Host del database usa `127.0.0.1` e porta `5433`). Richiede SSH attivo sul NAS.
+
 ## Rete e sicurezza
 
 - **Solo il frontend e' raggiungibile dalla rete** (porte `3001` e `3443`). Il backend e il lettore PDF stanno nella rete interna dei container.
-- **Il database e' sul NAS e non e' raggiungibile dalla rete**: nessuna porta e' pubblicata. Proteggi `.env` e il file generato: contengono le password. Sono esclusi da git.
+- **La porta del database (5433) e' aperta solo se lo decidi** con `PG_BIND` (vedi sopra). Il backend e il lettore PDF non hanno porte pubblicate. Proteggi `.env` e il file generato: contengono le password. Sono esclusi da git.
 - Le password non sono scritte nel compose.
 - Il backend ha endpoint di emergenza (`/api/auth/emergency-*`) senza autenticazione, e questo vale anche su Render. Non esporre le porte del NAS su Internet finche' non sono stati chiusi.
 
