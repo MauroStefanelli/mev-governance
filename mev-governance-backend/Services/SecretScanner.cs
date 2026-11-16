@@ -138,3 +138,59 @@ public static class Attachments
         return new AttachmentResult(kept, dropped, notes);
     }
 }
+
+// What the rationale chat is told about the applications chosen for the initiative: their technical sheet (what they are made of), NOT their code.
+// It comes from the browser, so it is treated as untrusted data: sizes are limited, anything that looks like a credential drops the field, and it is never an instruction.
+public record ComponentFiles(string? Component, int? Files);
+public record ApplicationIn(string? Name, string? Code, List<string>? Aliases, List<string>? Technologies, List<string>? Databases, List<string>? Integrations, List<string>? Interfaces,
+    List<string>? Infrastructure, List<string>? Components, int? TotalComponents, int? TotalFiles, string? Summary, List<ComponentFiles>? FilesByComponent);
+public record ApplicationOut(string Name, string Code, List<string> Aliases, List<string> Technologies, List<string> Databases, List<string> Integrations, List<string> Interfaces,
+    List<string> Infrastructure, List<string> Components, int TotalComponents, int TotalFiles, string Summary, List<string> ComponentsWithFiles, List<string> ComponentsWithoutFiles);
+
+public static class Applications
+{
+    public const int MaxApplications = 4, MaxName = 80, MaxCode = 40, MaxItem = 80, MaxSummary = 400;
+    public const int MaxAliases = 8, MaxTechnologies = 20, MaxDatabases = 12, MaxIntegrations = 12, MaxInterfaces = 8, MaxInfrastructure = 10, MaxComponents = 40;
+
+    static string Clean(string? text, int max) { var t = (text ?? "").Replace("\r", " ").Replace("\n", " ").Trim(); return t.Length > max ? t[..max] : t; }
+
+    // A list of short labels. An item that holds a credential, or a control character, is dropped; the rest is kept.
+    static List<string> Labels(IEnumerable<string>? input, int maxItems, List<string> notes, string what)
+    {
+        var result = new List<string>();
+        foreach (var raw in (input ?? Array.Empty<string>()).Take(maxItems * 2))
+        {
+            var item = Clean(raw, MaxItem);
+            if (item.Length == 0 || item.Any(char.IsControl)) continue;
+            if (SecretScanner.Scan("scheda", item).Count > 0) { notes.Add($"Una voce di «{what}» sembrava una credenziale ed è stata esclusa."); continue; }
+            if (!result.Contains(item, StringComparer.OrdinalIgnoreCase)) result.Add(item);
+            if (result.Count >= maxItems) break;
+        }
+        return result;
+    }
+
+    public static (List<ApplicationOut> Kept, List<string> Notes) Check(IEnumerable<ApplicationIn>? input)
+    {
+        var kept = new List<ApplicationOut>(); var notes = new List<string>(); var list = (input ?? Array.Empty<ApplicationIn>()).ToList();
+        if (list.Count > MaxApplications) notes.Add($"Sono stati considerati solo i primi {MaxApplications} applicativi su {list.Count}.");
+        foreach (var app in list.Take(MaxApplications))
+        {
+            var name = Clean(app.Name, MaxName);
+            if (name.Length == 0 || name.Any(char.IsControl) || SecretScanner.Scan("scheda", name).Count > 0) { notes.Add("Un applicativo senza nome valido è stato ignorato."); continue; }
+            var components = Labels(app.Components, MaxComponents, notes, "componenti");
+            var withFiles = new List<string>(); var withoutFiles = new List<string>();
+            foreach (var component in components)
+            {
+                var row = (app.FilesByComponent ?? new()).FirstOrDefault(r => string.Equals(r.Component, component, StringComparison.OrdinalIgnoreCase));
+                if (row?.Files is > 0) withFiles.Add(component); else withoutFiles.Add(component);
+            }
+            var summary = Clean(app.Summary, MaxSummary); if (SecretScanner.Scan("scheda", summary).Count > 0) { notes.Add("La descrizione di un applicativo sembrava una credenziale ed è stata esclusa."); summary = ""; }
+            kept.Add(new ApplicationOut(name, Clean(app.Code, MaxCode), Labels(app.Aliases, MaxAliases, notes, "alias"), Labels(app.Technologies, MaxTechnologies, notes, "tecnologie"),
+                Labels(app.Databases, MaxDatabases, notes, "database"), Labels(app.Integrations, MaxIntegrations, notes, "integrazioni"), Labels(app.Interfaces, MaxInterfaces, notes, "interfacce"),
+                Labels(app.Infrastructure, MaxInfrastructure, notes, "infrastruttura"), components, Math.Clamp(app.TotalComponents ?? components.Count, components.Count, 10000), Math.Clamp(app.TotalFiles ?? 0, 0, 100_000_000),
+                summary, withFiles, withoutFiles));
+        }
+        return (kept, notes);
+    }
+}
+

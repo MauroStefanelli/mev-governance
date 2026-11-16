@@ -368,3 +368,36 @@ describe('one list of contracts (the system contract lives in the Archivio)', ()
   });
 });
 
+
+// ---- the application chosen for the initiative is the system the AI is told about ----
+const ILP_APP = { id: 'application-1', name: 'ILP', code: 'ILP', systemAliases: ['ILP'], languages: ['Java'], databases: ['PostgreSQL'], extraTechnologies: [], notes: 'NOTA RISERVATA', codeUrl: '/Users/x/ILP',
+  techProfile: { components: ['ILP_frontend', 'ILP_BACKEND_item-service', 'ILP_BACKEND_hu-transport-app'], technologies: ['Java'], frameworks: ['Angular'], integrations: ['Kafka'], totalFiles: 5447 } };
+const chooseApplication = async name => {
+  const select = await screen.findByDisplayValue('+ Aggiungi applicativo…');
+  const option = [...select.querySelectorAll('option')].find(o => o.textContent.startsWith(name)); fireEvent.change(select, { target: { value: option.value } });
+};
+
+test('choosing an application fills the Sistema field, so the AI is told which system the initiative is about', async () => {
+  service.getSharedApplications.mockImplementation(async () => [ILP_APP]);
+  service.rationaleRequest.mockImplementation(async path => (String(path).startsWith('related') ? [] : path === 'messages' ? { question: { id: 1, role: 'user', text: 'q', createdAt: new Date().toISOString(), mine: true }, answer: { id: 2, role: 'assistant', text: 'ok', createdAt: new Date().toISOString() }, proposals: [], questions: [] } : { messages: [], hasMore: false, entries: [] }));
+  mount(); await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+  fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '145480' } });
+  expect(screen.queryByTitle('Valorizzato dal file Excel importato')).not.toBeInTheDocument();       // Sistema vuoto prima della scelta
+  await chooseApplication('ILP');
+  expect(await screen.findByTitle('Valorizzato dal file Excel importato')).toHaveValue('ILP');         // ora e' compilato
+  fireEvent.click(row('Razionali e vincoli con l’AI')); await screen.findByLabelText('Messaggio per l’AI');
+  fireEvent.change(screen.getByLabelText('Messaggio per l’AI'), { target: { value: 'Dove si stampa H7?' } }); fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' }));
+  await waitFor(() => expect(service.rationaleRequest.mock.calls.some(([path]) => path === 'messages')).toBe(true));
+  const body = service.rationaleRequest.mock.calls.find(([path]) => path === 'messages')[1];
+  expect(body.system).toBe('ILP'); expect(body.applications).toHaveLength(1); expect(body.applications[0]).toMatchObject({ name: 'ILP', totalComponents: 3, technologies: expect.arrayContaining(['Java', 'Angular']) });
+  expect(body.applications[0].filesByComponent.every(row => row.files === 0)).toBe(true);
+  expect(JSON.stringify(body)).not.toContain('NOTA RISERVATA'); expect(JSON.stringify(body)).not.toContain('/Users/x/ILP');
+});
+
+test('removing the application clears the Sistema field it had filled and stops sending it', async () => {
+  service.getSharedApplications.mockImplementation(async () => [ILP_APP]);
+  mount(); await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+  fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '145480' } }); await chooseApplication('ILP');
+  await screen.findByTitle('Valorizzato dal file Excel importato'); fireEvent.click(screen.getByRole('button', { name: '×' }));
+  await waitFor(() => expect(screen.queryByTitle('Valorizzato dal file Excel importato')).not.toBeInTheDocument());
+});

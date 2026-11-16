@@ -125,6 +125,38 @@ public static class RationaleRegression
         var total = Enumerable.Range(0, 8).Select(i => new AttachmentIn("sorgente", $"f{i}.java", new string('y', 3900), null, null)).ToList();
         var capTotal = Ok(await anna.Ask(new("G1", "Totale", null, null, null, null, total))).GetProperty("attachments");
         check(capTotal.GetProperty("sent").GetArrayLength() == 5 && capTotal.GetProperty("dropped").GetArrayLength() == 3, "The total size of the attachments is capped (20.000 characters)");
+        // ---- the applications chosen for the initiative: their technical sheet reaches the AI, never their code, and is checked like everything that comes from the browser ----
+        var components = new List<string> { "ILP_frontend", "ILP_BACKEND_item-service", "ILP_BACKEND_hu-transport-app", "ILP_BACKEND_print-app" };
+        var ilp = new ApplicationIn("ILP", "ILP", new() { "ILP" }, new() { "Java", "TypeScript" }, new() { "PostgreSQL" }, new() { "REST HTTP", "Kafka" }, new() { "Web UI" }, new() { "Docker" }, components, 12, 5447, "ILP è un applicativo basato su Java.",
+            new() { new("ILP_frontend", 1), new("ILP_BACKEND_item-service", 2), new("ILP_BACKEND_hu-transport-app", 0) });
+        Ok(await anna.Ask(new("G1", "Dove si decide la stampa H7?", "Stampa", "ILP", "", null, null, new() { ilp })));
+        var appContext = JsonDocument.Parse(fake.Seen.Last().Context).RootElement;
+        var apps = appContext.GetProperty("applications");
+        check(apps.GetArrayLength() == 1 && apps[0].GetProperty("name").GetString() == "ILP", "The applications chosen for the initiative reach the AI (so it knows WHICH system is being analysed)");
+        check(apps[0].GetProperty("technologies").GetArrayLength() == 2 && apps[0].GetProperty("integrations").GetArrayLength() == 2 && apps[0].GetProperty("totalComponents").GetInt32() == 12 && apps[0].GetProperty("totalFiles").GetInt32() == 5447, "The technical sheet reaches the AI: technologies, integrations, real number of components and files");
+        var withHere = apps[0].GetProperty("componentsWithFilesHere").EnumerateArray().Select(e => e.GetString()).ToList(); var withoutHere = apps[0].GetProperty("componentsWithoutFilesHere").EnumerateArray().Select(e => e.GetString()).ToList();
+        check(withHere.SequenceEqual(new[] { "ILP_frontend", "ILP_BACKEND_item-service" }), "The AI is told which components have files here");
+        check(withoutHere.SequenceEqual(new[] { "ILP_BACKEND_hu-transport-app", "ILP_BACKEND_print-app" }), "The AI is told which components have NO file here (listed with zero files, or not listed at all)");
+        check(appContext.GetProperty("notice").GetString()!.Contains("NON contengono codice"), "The AI is told that the applications carry no code");
+        check(AiRationaleAssistant.Instructions.Contains("'applications'") && AiRationaleAssistant.Instructions.Contains("componentsWithoutFilesHere") && AiRationaleAssistant.Instructions.Contains("ipotesi"), "The instructions tell the AI to use the applications, to say what it has not verified and to ask for the missing component");
+        check(AiRationaleAssistant.Instructions.Contains("non dire che il sistema non ti è stato indicato"), "The instructions tell the AI not to claim that the system was not given when applications are present");
+        check(AiRationaleAssistant.Instructions.Contains("se non c'è un estratto che la mostri, la regola non è verificata e va presentata come ipotesi"), "The instructions tell the AI that a code rule with no excerpt showing it is unverified and must be presented as a hypothesis");
+        check(AiRationaleAssistant.Instructions.Contains("chiedi di caricarne la cartella"), "The instructions tell the AI to ask for the folder of a component it has no files for");
+        Ok(await anna.Ask(new("G1", "Senza applicativi", null, null, null, null)));
+        check(JsonDocument.Parse(fake.Seen.Last().Context).RootElement.GetProperty("applications").GetArrayLength() == 0, "A question without applications carries none");
+        var notesApp = Applications.Check(new[] { new ApplicationIn("Secret", "S", null, new() { "Java", "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8", "Spring" }, null, null, null, null, new() { "C1" }, 1, 0, "token ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8", null) });
+        check(notesApp.Kept.Count == 1 && notesApp.Kept[0].Technologies.SequenceEqual(new[] { "Java", "Spring" }) && notesApp.Kept[0].Summary == "" && notesApp.Notes.Count == 2, "A credential in an application sheet is dropped (the item, or the description) and the rest is kept");
+        check(!JsonSerializer.Serialize(notesApp.Kept).Contains("ghp_"), "A credential in an application sheet never reaches the AI");
+        var manyApps = Applications.Check(Enumerable.Range(0, 7).Select(i => new ApplicationIn("A" + i, null, null, null, null, null, null, null, null, null, null, null, null)).ToList());
+        check(manyApps.Kept.Count == Applications.MaxApplications && manyApps.Notes.Count == 1, "At most four applications are used, and the user is told");
+        var huge = Applications.Check(new[] { new ApplicationIn(new string('N', 500), new string('C', 500), Enumerable.Range(0, 50).Select(i => "alias" + i).ToList(), Enumerable.Range(0, 100).Select(i => "t" + i).ToList(), null, null, null, null,
+            Enumerable.Range(0, 300).Select(i => "comp" + i).ToList(), 9_999_999, -5, new string('s', 5000), null) });
+        check(huge.Kept[0].Name.Length == 80 && huge.Kept[0].Code.Length == 40 && huge.Kept[0].Aliases.Count == 8 && huge.Kept[0].Technologies.Count == 20 && huge.Kept[0].Components.Count == 40 && huge.Kept[0].Summary.Length == 400, "Sizes are limited, so a huge sheet cannot flood the question");
+        check(huge.Kept[0].TotalComponents == 10000 && huge.Kept[0].TotalFiles == 0, "The counts are clamped to sensible values");
+        check(Applications.Check(new[] { new ApplicationIn("   ", null, null, null, null, null, null, null, null, null, null, null, null), new ApplicationIn("Bad\u0007Name", null, null, null, null, null, null, null, null, null, null, null, null) }).Kept.Count == 0, "An application with a blank name or a control character in it is ignored");
+        check(Applications.Check(null).Kept.Count == 0, "No applications at all is fine");
+        var dup = Applications.Check(new[] { new ApplicationIn("X", null, null, new() { "Java", "java", "JAVA", "Go" }, null, null, null, null, null, null, null, null, null) });
+        check(dup.Kept[0].Technologies.SequenceEqual(new[] { "Java", "Go" }), "The same label is not repeated whatever the case");
         check(await As(user, "Bid Manager").Ask(new("G1", "ciao", null, null, null, null, new() { good })) is ForbidResult, "A supervisor still cannot ask, with or without attachments");
 
         check(!fake.Seen.Last().Context.Contains("Nessuna modifica allo schema SAPLES"), "Discarded or proposed entries are not given to the AI");

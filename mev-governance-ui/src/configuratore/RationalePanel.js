@@ -3,6 +3,8 @@ import { rationaleRequest } from '../services/mevService';
 import { KINDS, KIND_ORDER, MAX_QUESTION, MAX_ENTRY, kindLabel, validateText, initiativeCode, mergeById, groupEntries, countByKind, notYetTaken } from './rationaleKnowledge';
 import { displayName, relativeTime } from './developmentCollaboration';
 import useSourceLibrary from './useSourceLibrary';
+import { componentCoverage } from './applicationContext';
+import { fmtItIT } from '../utils';
 import SourceLibraryPanel from './SourceLibraryPanel';
 import { sourceExcerptsFor, chosenFilesSummary, pasteItem, checkAttachments, attachmentSummary, formatSize, MAX_PASTE, CONNECTION_FIELDS, loadConnection, saveConnection, connectionWarnings } from './rationaleAttachments';
 import './rationalePanel.css';
@@ -11,7 +13,7 @@ import './rationalePanel.css';
 // The AI only proposes: a person confirms. Confirmed entries feed the offer review and Sviluppo.
 const CODE_QUESTION_EXAMPLES = ['In quale punto del codice viene emesso il codice di errore ITEM_V_28 e con quale condizione?', 'Quali condizioni impediscono la stampa dell’etichetta H7?', 'Dove si decide se una LDV può essere inserita in una HU?'];
 
-export default function RationalePanel({ initiative, interventions = [], onKnowledge }) {
+export default function RationalePanel({ initiative, interventions = [], onKnowledge, applications = [] }) {
   const code = initiativeCode(initiative);
   const [messages, setMessages] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -42,6 +44,9 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   // Folded by default once a folder is saved, so that the conversation has the room. It stays open on its own while there is something to read or decide:
   // no folder yet, a save in progress or just finished (what was added, what was left out for a credential), a choice to make, an error. The user can always fold it.
   const attention = library.ready && (library.folders.length === 0 || Boolean(library.busy || library.pending || library.report || library.error || !library.persistent));
+  // Per ogni applicativo scelto: quali dei suoi componenti hanno file nelle cartelle salvate (i percorsi, non il contenuto).
+  const savedPaths = sourceFiles.map(file => file.webkitRelativePath || file.name);
+  const coverageOf = app => componentCoverage(app, savedPaths);
   const toolsIsOpen = toolsOpen === null ? attention : toolsOpen;
   const toolsSummary = [library.folders.length ? `${library.folders.filter(f => f.active !== false).length} di ${library.folders.length} ${library.folders.length === 1 ? 'cartella' : 'cartelle'} attive, ${sourceFiles.length} file` : 'nessuna cartella salvata',
     pasted.length ? `${pasted.length} ${pasted.length === 1 ? 'dato incollato' : 'dati incollati'}` : ''].filter(Boolean).join(' · ');
@@ -81,7 +86,8 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
       setChosen(sourceFiles.length ? chosenFilesSummary(excerpts.items, excerpts.terms) : null);
       const { kept, dropped } = checkAttachments([...excerpts.items, ...pasted]);
       const result = await rationaleRequest('messages', { goto: code, question: check.value, title: initiative.title, system: initiative.system, description: initiative.description,
-        interventions: interventions.slice(0, 40).map(item => ({ id: item.id, title: item.titolo || item.title || '' })), attachments: kept });
+        interventions: interventions.slice(0, 40).map(item => ({ id: item.id, title: item.titolo || item.title || '' })), attachments: kept,
+        applications: applications.map(app => ({ ...app, filesByComponent: coverageOf(app).rows.map(row => ({ component: row.component, files: row.files })) })) });
       const serverSide = result.attachments || { sent: kept.map(a => ({ kind: a.kind, name: a.name })), dropped: [], notes: [] };
       const summary = attachmentSummary({ sent: serverSide.sent, dropped: [...dropped, ...serverSide.dropped], notes: serverSide.notes });
       setAttachNotice([summary.text, excerpts.coverage ? excerpts.coverage.notice : '', ...summary.notes].filter(Boolean).join(' · '));
@@ -181,6 +187,17 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
               <button type="submit" className="rat-primary" disabled={busy || !text.trim()}>{busy ? 'Invio…' : 'Invia all’AI'}</button></span>
           </form>
         </div>
+      {applications.length > 0 && <div className="rat-apps" aria-label="Applicativi dell’iniziativa">
+        {applications.map(app => { const cov = coverageOf(app); const name = app.name || 'Applicativo'; return <details key={`${app.code}${app.name}`} className="rat-app" open={cov.total > 0 && cov.read.length < cov.total}>
+          <summary><b>{name}</b>{app.code && app.code !== app.name ? ` (${app.code})` : ''} · {cov.total ? `${cov.read.length} di ${cov.total} componenti con file` : 'nessun componente nella scheda tecnica'}{app.totalFiles ? ` · ${fmtItIT(app.totalFiles, 0)} file nella scheda` : ''}</summary>
+          {cov.total > 0 ? <>
+            <p className="rat-app-note">L’AI sa che l’applicativo ha questi componenti, ma legge solo i file delle cartelle che hai salvato. «Nessun file» vuol dire che nessun file è in una cartella con quel nome: se hai salvato il componente con un altro nome di cartella, qui risulta mancante pur essendoci.</p>
+            <ul className="rat-app-components">{cov.rows.map(row => <li key={row.component} className={row.files ? 'is-read' : 'is-missing'}><code>{row.component}</code> <small>{row.files ? `${row.files} ${row.files === 1 ? 'file' : 'file'} salvati` : 'nessun file'}</small></li>)}</ul>
+            {cov.total > cov.shown && <small>Mostrati i primi {cov.shown} componenti su {cov.total}.</small>}
+            {cov.missing.length > 0 && <small className="rat-app-hint">Se la regola che cerchi può stare in uno dei componenti senza file, salva anche la sua cartella con «Aggiungi o aggiorna una cartella» e rifai la domanda.</small>}
+          </> : <p className="rat-app-note">La scheda tecnica di questo applicativo non elenca i componenti (si crea da Risorse e configurazione, analizzando il codice). L’AI conosce comunque il nome e le tecnologie indicate.</p>}
+        </details>; })}
+      </div>}
         <section className="rat-tools" aria-label="Sorgenti e dati per la domanda">
           <button type="button" className="rat-tools-toggle" aria-expanded={toolsIsOpen} aria-controls="rat-tools-body" onClick={() => setToolsOpen(!toolsIsOpen)}>
             <span className="rat-tools-title">Sorgenti e dati per la domanda</span>

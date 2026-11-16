@@ -90,3 +90,13 @@
 .rat-tools-body .srclib, .rat-tools-body .rat-codeterms, .rat-tools-body .rat-howto, .rat-tools-body .rat-chosen { margin-left: 12px; margin-right: 12px; }
 .rat-tools-body .rat-attach { border-top: 0; background: transparent; padding-top: 0; }
 .rat-tools-body .rat-paste, .rat-tools-body .rat-connection { margin: 0 12px; }
+
+/* ---- applicativi dell'iniziativa: quali componenti hanno file salvati ---- */
+.rat-apps { display: flex; flex-direction: column; gap: 6px; margin: 0 12px; }
+.rat-app { background: #fff; border: 1px solid #d9e3ef; border-radius: 10px; padding: 8px 12px; font-size: 12.5px; color: #34506e; }
+.rat-app summary { cursor: pointer; } .rat-app summary b { color: #17314f; }
+.rat-app-note { margin: 6px 0; color: #4d6179; }
+.rat-app-components { list-style: none; margin: 6px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 12px; }
+.rat-app-components li { display: flex; gap: 8px; align-items: baseline; overflow-wrap: anywhere; padding: 2px 0; } .rat-app-components code { background: #f0f4fa; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.rat-app-components li.is-read::before { content: '✓'; color: #1a7f4b; font-weight: 700; } .rat-app-components li.is-missing::before { content: '○'; color: #a15c00; font-weight: 700; } .rat-app-components li.is-missing small { color: #8a5200; }
+.rat-app-hint { display: block; color: #5d718a; }

@@ -349,6 +349,35 @@ describe('attachments to a question: source code and pasted data', () => {
     fireEvent.click(folded); expect(screen.getByRole('button', { name: /Incolla dati/ })).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Aggiungi o aggiorna una cartella' })).toBeInTheDocument();
     fireEvent.click(folded); expect(screen.queryByRole('button', { name: /Incolla dati/ })).not.toBeInTheDocument();
   });
+  test('the applications chosen for the initiative are shown with their components, and the ones with no file here are marked', async () => {
+    const { saveSelection, inspectSelection } = require('./sourceLibrary'); const f = (path, text) => ({ name: path.split('/').pop(), size: text.length, lastModified: 1, webkitRelativePath: path, text: async () => text });
+    await saveSelection({ selection: inspectSelection([f('ILP/ILP_frontend/src/a.ts', 'a'), f('ILP/item-service/pom.xml', 'b')]) }); resetSourceLibrary();
+    const apps = [{ name: 'ILP', code: 'ILP', components: ['ILP_frontend', 'ILP_BACKEND_item-service', 'ILP_BACKEND_hu-transport-app'], totalComponents: 3, totalFiles: 5447, technologies: ['Java'] }];
+    render(<RationalePanel initiative={initiative} interventions={[]} applications={apps} />);
+    await screen.findByRole('button', { name: /Sorgenti e dati per la domanda/ });
+    const summary = await screen.findByText(/2 di 3 componenti con file/); expect(summary).toHaveTextContent('5.447 file nella scheda');
+    const box = summary.closest('details'); expect(box).toHaveAttribute('open');
+    expect(within(box).getByText('ILP_BACKEND_hu-transport-app').closest('li')).toHaveClass('is-missing'); expect(within(box).getByText('ILP_BACKEND_item-service').closest('li')).toHaveClass('is-read'); expect(within(box).getByText('ILP_frontend').closest('li')).toHaveClass('is-read');
+    expect(within(box).getByText(/senza file, salva anche la sua cartella|componenti senza file/i, { exact: false })).toBeInTheDocument();
+  });
+  test('the question carries the chosen applications with how many files each component has here, and never their content', async () => {
+    const { saveSelection, inspectSelection } = require('./sourceLibrary'); const f = (path, text) => ({ name: path.split('/').pop(), size: text.length, lastModified: 1, webkitRelativePath: path, text: async () => text });
+    await saveSelection({ selection: inspectSelection([f('ILP/item-service/Servizio.java', 'class Servizio { void h7() {} }')]) }); resetSourceLibrary();
+    const apps = [{ name: 'ILP', code: 'ILP', components: ['ILP_BACKEND_item-service', 'ILP_BACKEND_print-app'], totalComponents: 2, technologies: ['Java'] }];
+    server.answer = reply(); render(<RationalePanel initiative={initiative} interventions={[]} applications={apps} />);
+    await screen.findByText(/1 di 2 componenti con file/); await ask('Dove si stampa H7?'); await waitFor(() => expect(asked()).toHaveLength(1));
+    const sentApps = asked()[0][1].applications; expect(sentApps).toHaveLength(1); expect(sentApps[0]).toMatchObject({ name: 'ILP', components: ['ILP_BACKEND_item-service', 'ILP_BACKEND_print-app'], totalComponents: 2 });
+    expect(sentApps[0].filesByComponent).toEqual([{ component: 'ILP_BACKEND_item-service', files: 1 }, { component: 'ILP_BACKEND_print-app', files: 0 }]);
+    expect(JSON.stringify(sentApps)).not.toContain('class Servizio');
+  });
+  test('without applications the panel shows nothing about them and sends none', async () => {
+    server.answer = reply(); render(<Harness />); await screen.findByRole('button', { name: /Sorgenti e dati per la domanda/ }); expect(screen.queryByLabelText('Applicativi dell’iniziativa')).not.toBeInTheDocument();
+    await ask('ciao'); await waitFor(() => expect(asked()).toHaveLength(1)); expect(asked()[0][1].applications).toEqual([]);
+  });
+  test('an application whose technical sheet lists no components says so instead of showing an empty list', async () => {
+    render(<RationalePanel initiative={initiative} interventions={[]} applications={[{ name: 'BEP', code: '', components: [], totalComponents: 0, technologies: ['Java'] }]} />);
+    expect(await screen.findByText(/nessun componente nella scheda tecnica/)).toBeInTheDocument();
+  });
   test('a source file containing a credential is kept out of the copy and never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
     const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };

@@ -1,3 +1,4 @@
+import { addAppToSystem, removeAppFromSystem, applicationBriefs } from "../configuratore/applicationContext";
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import RationalePanel from "../configuratore/RationalePanel";
@@ -2029,6 +2030,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                                 onClick={() => {
                                   const next = selectedAppIds.filter(id => id !== aid);
                                   setSelectedAppIds(next);
+                                  setInitiative((i) => ({ ...i, system: removeAppFromSystem(i.system, app.name, next.map(id => applications.find(a => String(a.id) === id)?.name)) }));
                                   if (next.length === 0) { setTechProfile(null); setSelectedAppId(""); }
                                   else {
                                     setSelectedAppId(next[0]);
@@ -2053,6 +2055,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                         if (!app) return;
                         const next = [...selectedAppIds, appId];
                         setSelectedAppIds(next);
+                        // Il sistema dell'iniziativa e' quello degli applicativi scelti: senza questo il campo restava vuoto e l'AI non sapeva su quale sistema si lavora.
+                        setInitiative((i) => ({ ...i, system: addAppToSystem(i.system, app.name) }));
                         setSelectedAppId(appId);
                         if (app.techProfile) setTechProfile(app.techProfile);
                         setImplementationFiles([]);
@@ -2194,7 +2198,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           {/* 3 · Razionali e vincoli con l'AI */}
           <SectionRow number="3" id="sezione-razionali" title="Razionali e vincoli con l’AI" open={isOpen('razionali')} onToggle={() => toggleSection('razionali')} keepMounted={hasInitiative}
             facts={hasInitiative ? rationaleFacts(rationale) : ['Apri o crea un’iniziativa per usarlo']} status={hasInitiative ? undefined : 'Bloccato'} tone={hasInitiative ? 'neutral' : 'lock'}>
-            <RationalePanel initiative={initiative} interventions={importedInterventions} onKnowledge={setRationale} />
+            <RationalePanel initiative={initiative} interventions={importedInterventions} onKnowledge={setRationale} applications={applicationBriefs(applications, selectedAppIds)} />
           </SectionRow>
 
           {/* 4 · Soluzione */}
