@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { developmentActivities, developmentMarkdown } from './developmentActivityModel';
 import { knowledgeMarkdown, knowledgeForAi } from './rationaleKnowledge';
 import { applicationsForInitiative } from './developmentRecord';
-import { appNorm, codeChangePrompt, implementationDocument, sourceFileAllowed, ignoredSourcePath, evaluationSystems, evaluationApplicationCodes, applicationContextFor } from './configuratoreCore';
+import { appNorm, codeChangePrompt, implementationDocument, sourceFileAllowed, ignoredSourcePath, evaluationSystems, evaluationApplicationCodes } from './configuratoreCore';
 
 export const downloadBlob = (name, blob) => {
   const url = URL.createObjectURL(blob);
