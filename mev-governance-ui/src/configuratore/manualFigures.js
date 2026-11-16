@@ -54,12 +54,12 @@ function ConfiguratorFlow({ label }) {
   return <svg viewBox="0 0 1200 560" role="img" aria-label={label} className="tow-manual-svg tow-manual-svg-wide">
     <Defs />
     <Lane y={8} h={118} label="1 · COSA PORTI: LE FONTI DELL’INIZIATIVA" />
-    <Chip x={20} y={62} w={170} title="Tabella di Offerta" sub="file .xlsx di Poste" tone="amber" />
-    <Chip x={198} y={62} w={176} title="Dati a mano" sub="GOTO, titolo, sistema" tone="blue" />
-    <Chip x={382} y={62} w={222} title="Workspace documentale" sub="documenti, OCR, ricerca" tone="violet" />
-    <Chip x={612} y={62} w={206} title="Razionali e vincoli" sub="chat con l’AI, da confermare" tone="violet" />
-    <Chip x={826} y={62} w={168} title="Soluzione" sub="per VS Code" tone="violet" />
-    <Chip x={1002} y={62} w={178} title="Storico e Conoscenza" sub="lavoro già fatto" tone="grey" />
+    <Chip x={20} y={62} w={174} title="Tabella di Offerta" sub="facoltativa (.xlsx)" tone="amber" />
+    <Chip x={202} y={62} w={176} title="Dati e applicativo" sub="GOTO, titolo, sistema" tone="blue" />
+    <Chip x={386} y={62} w={214} title="Workspace documentale" sub="documenti, OCR, ricerca" tone="violet" />
+    <Chip x={608} y={62} w={200} title="Razionali e vincoli" sub="chat con l’AI, confermati" tone="violet" />
+    <Chip x={816} y={62} w={192} title="Interventi e Soluzione" sub="dall’AI o dall’Excel" tone="violet" />
+    <Chip x={1016} y={62} w={168} title="Storico e AI" sub="lavoro già fatto" tone="grey" />
     <path d="M600 128 v22" stroke="#7890a9" strokeWidth="2.5" markerEnd="url(#arrowhead)" fill="none" />
     <Lane y={140} h={214} label="2 · COSA FAI: QUATTRO PASSI IN SEQUENZA" />
     <Step x={24} n="1" title="Iniziativa" does={['Compili i dati e importi l’Excel', 'Apri le sezioni: documenti,', 'razionali, soluzione, analisi', 'Premi «Analizza e suggerisci»']} gets="Contesto + voci suggerite" tone="blue" />

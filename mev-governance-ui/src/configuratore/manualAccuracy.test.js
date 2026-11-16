@@ -66,6 +66,51 @@ describe.each(Object.entries(BUTTONS))('%s: the buttons named in the manual are 
   });
 });
 
+// A manual is for people, not for a search: one step is one idea. A step of thousands of characters mixes many subjects and nobody reads it.
+// (It happened: one step of the rationale chapter held eight subjects in 4.300 characters.)
+const MAX_STEP = 1100;
+describe('readability', () => {
+  test.each([['Configuratore', configuratorChapters], ['Sviluppo', developmentChapters]])('%s: no step is a wall of text', (name, chapters) => {
+    const tooLong = []; chapters.forEach(c => c.steps.forEach((step, index) => { if (step.length > MAX_STEP) tooLong.push(`${c.title} · passo ${index + 1}: ${step.length} caratteri`); }));
+    expect(tooLong).toEqual([]);
+  });
+  test.each([['Configuratore', configuratorChapters], ['Sviluppo', developmentChapters]])('%s: no chapter has more than 14 steps (split it)', (name, chapters) => {
+    chapters.forEach(c => expect(c.steps.length).toBeLessThanOrEqual(14));
+  });
+  test('the chapters about the recent functions say what the user does and what can go wrong: an introduction and a «Se qualcosa non va» box', () => {
+    ['Razionali e vincoli con l’AI', 'Chattare bene con l’AI', 'Sorgenti, cartelle e applicativi', 'Soluzione: interventi e file per Visual Studio Code', 'Aggiornare l’app: Render e NAS'].forEach(title => {
+      const chapter = configuratorChapters.find(c => c.title === title); expect(chapter).toBeTruthy(); expect(chapter.intro.length).toBeGreaterThan(200); expect(chapter.warnings.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+  // Each recent function must be explained in the chapter that is about it, not just named somewhere: a user who opens the chapter must find it.
+  const WHERE = {
+    'Chattare bene con l’AI': ['Continua dal punto in cui si è fermata', 'Questa richiesta chiede più cose insieme', 'As-is (come funziona oggi)', 'To-be / desiderata (come deve funzionare)', 'Un nome per ciascun punto', 'Analisi di impatto'],
+    'Sorgenti, cartelle e applicativi': ['Sorgenti e dati per la domanda', 'Aggiungi o aggiorna una cartella', 'Tieni entrambe', 'Cerca nel codice', 'Cosa chiedere', 'File inviati all’AI nell’ultima domanda', 'Sistema / applicazione', 'Incolla dati (es. risultato di una query)'],
+    'Soluzione: interventi e file per Visual Studio Code': ['Proponi gli interventi con l’AI', 'Su cosa concentrarsi', 'Conferma l’intervento', 'Aggiungi una voce del catalogo', 'Mostra gli scartati', 'Prima di cominciare', 'Checklist per chi sviluppa', 'Scarica MD per Visual Studio Code', 'Salva soluzione'],
+    'Razionali e vincoli con l’AI': ['Nascondi la cronologia', 'Mostra la cronologia', 'Conoscenza dell’iniziativa', 'Riprendi in questa iniziativa', 'Aggiungi una voce a mano'],
+    'Aggiornare l’app: Render e NAS': ['Ricrea', 'Aggiorna', 'Manual Deploy', 'Applications', 'Images'],
+  };
+  test.each(Object.entries(WHERE))('«%s» explains each function it is about, in its own text', (title, labels) => {
+    const chapter = configuratorChapters.find(c => c.title === title); const own = norm(texts(chapter).join(' '));
+    const missing = labels.filter(label => !own.includes(norm(label))); expect(missing).toEqual([]);
+  });
+  test('every «vedi il capitolo …» points to a chapter that exists, under that very name', () => {
+    const titles = configuratorChapters.map(c => c.title); const all = configuratorChapters.flatMap(texts).join(' ');
+    const refs = [...all.matchAll(/vedi il capitolo ([^.;)]+?)(?:[.;)]|$)/gi)].map(m => m[1].trim());
+    expect(refs.length).toBeGreaterThan(0);
+    refs.forEach(ref => expect(titles.some(title => title === ref || title.startsWith(ref))).toBe(true));
+  });
+  test('the chapters are in the order a person works: the steps, then the sections, then the chat, the folders, the solution, and the administration last', () => {
+    const order = configuratorChapters.map(c => c.title); const at = title => order.indexOf(title);
+    expect(at('Il passo Iniziativa: le sette sezioni')).toBeLessThan(at('Razionali e vincoli con l’AI')); expect(at('Razionali e vincoli con l’AI')).toBeLessThan(at('Chattare bene con l’AI'));
+    expect(at('Chattare bene con l’AI')).toBeLessThan(at('Sorgenti, cartelle e applicativi')); expect(at('Soluzione: interventi e file per Visual Studio Code')).toBeLessThan(at('Workspace documentale'));
+  });
+  test('the functions of the chat are explained in the chapter about the chat, not left to a generic page', () => {
+    const chat = configuratorChapters.find(c => c.title === 'Chattare bene con l’AI'); const rows = chat.fields.rows.map(([name]) => name);
+    expect(rows).toEqual(expect.arrayContaining(['«Questa richiesta chiede più cose insieme»', '«Continua dal punto in cui si è fermata»']));
+  });
+});
+
 describe('structure', () => {
   test.each([['Configuratore', configuratorChapters], ['Sviluppo', developmentChapters]])('%s: every chapter has title, subtitle and at least one step', (name, chapters) => {
     chapters.forEach(c => { expect(c.title).toBeTruthy(); expect(c.subtitle).toBeTruthy(); expect(c.steps.length).toBeGreaterThan(0); c.steps.forEach(s => expect(s.length).toBeGreaterThan(20)); });
