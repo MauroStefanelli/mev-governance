@@ -12,21 +12,36 @@ Il push su `develop` avvia GitHub Actions, che in circa 15 minuti pubblica le im
 | 1. Aspetta che finisca la build | GitHub → Actions, esecuzione verde | sempre |
 | 2. Manual Deploy del **backend** | Render → `mev-governance-backend-dev` → *Manual Deploy → Deploy latest commit* | solo se e' cambiato il backend (`mev-governance-backend/`) |
 | 3. Manual Deploy del **frontend** | Render → `mev-governance-frontend-dev` → *Manual Deploy* | solo se e' cambiato il frontend (`mev-governance-ui/`) |
-| 4. Aggiorna il **NAS** | Container Station → Applications → `mev` → *Recreate* (stesso YAML) | sempre, dopo i passi 1-3 se vuoi gli stessi numeri di versione |
+| 4. Aggiorna il **NAS** | Container Station → Applications → `mev` → *Ricrea* (vedi "Aggiornare il NAS" qui sotto) | sempre, dopo i passi 1-3 se vuoi gli stessi numeri di versione |
 | 5. Controlla la versione | in alto nell'app, `DEV_REL_nnn`, su Render e sul NAS | sempre |
 
 Il **backend va aggiornato prima del frontend** quando cambiano entrambi.
 
-## Aggiornare il NAS
-Le immagini hanno `pull_policy: always`: a ogni *Recreate* Docker riscarica `:dev`. Senza, resterebbe la versione gia' scaricata, perche' il nome `:dev` non cambia mai.
+## Aggiornare il NAS (passi precisi)
 
-- **Da Container Station:** Applications → `mev` → *Recreate* con lo **stesso YAML** gia' incollato. Non serve rigenerarlo, se non sono cambiati i valori del `.env`.
-- **Da SSH:** `docker compose -f docker-compose.qnap.yml pull && docker compose -f docker-compose.qnap.yml up -d`
+**Cosa vuol dire "Recreate".** In Container Station un'applicazione e' definita da un testo (il YAML) che hai incollato la prima volta. *Ricrea* (Recreate) significa: "ferma i container di questa applicazione, riscaricane le immagini e riaccendili". I **dati restano**: il database sta nella cartella `PG_DIR` e i file caricati in `DATA_DIR`, fuori dai container. Si ricreano solo i container.
 
-**I dati non si toccano.** Il database sta in `PG_DIR` e `mev-db-import` con `IMPORT_MODE=once` non copia mai se i dati ci sono: un aggiornamento non cancella niente.
+**Prima di cominciare**
+1. Aspetta che su GitHub → Actions la build dell'ultimo rilascio sia **verde** (circa 15 minuti dal push). Prima di allora il NAS scaricherebbe ancora la versione vecchia.
+2. Genera il file da incollare, sul tuo computer, nella cartella del progetto: `python3 scripts/qnap_render_compose.py`. Crea `docker-compose.qnap.rendered.yml`. Serve **sempre la prima volta dopo il rilascio `DEV_REL_070` e ogni volta che e' cambiato il compose o il `.env`**; negli altri casi puoi riusare il testo gia' incollato, ma rigenerarlo e' innocuo e ti evita di non sapere quale versione hai sul NAS.
 
-### Quando serve rigenerare il file da incollare
-Solo se cambi un valore nel `.env` o se **cambia il compose** (`docker-compose.qnap.yml` o `scripts/qnap-db-import.sh`). Rigenera con `python3 scripts/qnap_render_compose.py`, incolla il nuovo file in *Recreate*, poi cancellalo dal computer. Quando cambia il compose lo dico io esplicitamente alla fine del rilascio.
+**Passi in Container Station** (le voci sono quelle della documentazione QNAP: *Applications*, *Ricrea*, *Aggiorna*)
+1. Menu a sinistra: **Applications**.
+2. Nell'elenco clicca sull'applicazione **`mev`** per aprirla.
+3. In alto nel pannello clicca **Ricrea** (accanto a *Modifica*). Si apre la finestra **Ricrea applicazione**.
+4. Nel campo YAML **cancella tutto** e incolla il contenuto di `docker-compose.qnap.rendered.yml` (aprilo con un editor di testo, seleziona tutto, copia).
+5. Premi la verifica del YAML, poi **Aggiorna**.
+6. Aspetta qualche minuto: Container Station scarica le immagini nuove (`pull_policy: always`) e riavvia i container, uno dopo l'altro.
+7. Controlla: nella scheda dell'applicazione i container `mev-postgres`, `mev-backend`, `mev-pdf-parser`, `mev-frontend` sono **in esecuzione** (`mev-db-import` risulta "Exited (0)": e' normale). Apri l'app e guarda in alto il numero `DEV_REL_...`: deve essere quello nuovo.
+8. **Cancella `docker-compose.qnap.rendered.yml` dal computer**: contiene le password.
+
+**Se dopo il passo 7 la versione e' ancora quella vecchia**
+- In Container Station apri **Images**, elimina le immagini `ghcr.io/maurostefanelli/mev-governance-backend`, `...mev-governance-frontend` e `...mev-pdf-parser` (solo queste tre, **non** `postgres`), poi ripeti i passi 2-6.
+- Se la scheda dell'applicazione non mostra *Ricrea*, in alternativa **rimuovi** l'applicazione `mev` (i dati restano nelle cartelle del NAS) e **creala di nuovo** con *Create Application* incollando lo stesso file. Non ho verificato che le due strade diano esattamente lo stesso risultato.
+
+**Cosa NON fare:** non eliminare le cartelle `PG_DIR` e `DATA_DIR`; non cambiare `POSTGRES_PASSWORD` nel `.env` (e' scritta dentro il database); non usare `IMPORT_MODE=replace` salvo che tu voglia ricopiare i dati da Render cancellando quelli del NAS.
+
+**Da SSH (alternativa)**, nella cartella con `docker-compose.qnap.yml` e `.env`: `docker compose -f docker-compose.qnap.yml pull && docker compose -f docker-compose.qnap.yml up -d`.
 
 ## I due database sono separati
 - **Render DEV** usa Supabase, schema `dev`.

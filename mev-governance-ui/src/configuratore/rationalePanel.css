@@ -101,3 +101,27 @@
 .rat-app-components li.is-read::before { content: '✓'; color: #1a7f4b; font-weight: 700; } .rat-app-components li.is-missing::before { content: '○'; color: #a15c00; font-weight: 700; } .rat-app-components li.is-missing small { color: #8a5200; }
 .rat-app-hint { display: block; color: #5d718a; }
 .rat-msg-warn { display: block; margin-top: 6px; padding: 7px 10px; border-radius: 8px; background: #fff4dc; border: 1px solid #f0cf8d; color: #7a4700; font-size: 12.5px; line-height: 1.5; }
+
+/* ---- consigli mentre si scrive e pulsante "Continua" sulla risposta interrotta ---- */
+.rat-hint-box { display: flex; flex-direction: column; gap: 6px; margin: 0 12px 6px; padding: 8px 12px; border-radius: 10px; background: #eef5ff; border: 1px solid #b9d0f2; color: #1e416b; font-size: 12.5px; line-height: 1.5; flex: 0 0 auto; }
+.rat-hint-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .rat-hint-head b { font-size: 13px; }
+.rat .rat-hint-close { min-height: 26px; width: 26px; padding: 0; border-radius: 50%; border: 0; background: #d3e2f7; line-height: 1; font-size: 15px; }
+.rat-hint-parts { display: flex; flex-wrap: wrap; gap: 6px; } .rat .rat-hint-parts button { min-height: 34px; padding: 6px 12px; font-size: 12.5px; background: #fff; border-color: #8fb0dc; }
+.rat-hint-box small { color: #4d6179; }
+.rat-continue { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 12px 6px; padding: 8px 12px; border-radius: 10px; background: #fff4dc; border: 1px solid #f0cf8d; color: #7a4700; font-size: 12.5px; flex: 0 0 auto; }
+.rat .rat-continue button { min-height: 34px; padding: 6px 12px; font-size: 12.5px; }
+
+/* Il consiglio e il pulsante "Continua" stanno DENTRO l'area della conversazione, che ha altezza fissa: non devono mai schiacciarla.
+   1) La cronologia ha un'altezza MINIMA che nessun altro blocco puo' mangiare (flex-shrink: 0 sugli altri, min-height sulla cronologia).
+   2) Il consiglio non supera una frazione dell'area e scorre da solo; su schermi stretti perde il testo lungo e restano il titolo e le parti. */
+.rat-desk.has-messages .rat-messages { min-height: 120px; }
+.rat-hint-box, .rat-continue, .rat-compose, .rat-history-bar { flex-shrink: 0; }
+.rat-hint-box { max-height: 34%; overflow-y: auto; }
+.rat-hint-parts { flex: 0 0 auto; }
+@media (max-width: 700px), (max-height: 700px) {
+  .rat-hint-box { max-height: 26%; padding: 6px 10px; gap: 4px; }
+  .rat-hint-box > span:not(.rat-hint-parts), .rat-hint-box > small { display: none; }
+  .rat .rat-hint-parts button { min-height: 32px; padding: 4px 10px; }
+  .rat-continue { padding: 6px 10px; gap: 6px; } .rat-continue > span { flex: 1 1 100%; }
+  .rat-desk { height: clamp(520px, 86vh, 760px); }
+}

@@ -396,6 +396,54 @@ describe('attachments to a question: source code and pasted data', () => {
     const middle = 'Prima.\n\n⚠ Risposta interrotta: citata\n\nPoi continua il testo.'; expect(splitNotice(middle)).toEqual({ body: middle, notice: '' });
     expect(splitNotice('Nessun avviso')).toEqual({ body: 'Nessun avviso', notice: '' }); expect(splitNotice(null)).toEqual({ body: null, notice: '' }); expect(splitNotice('')).toEqual({ body: '', notice: '' });
   });
+  const REAL_REQUEST = "Vorrei un'analisi approfondita di impatto e una descrizione funzionale dell'as-is e del desiderata chiara per il PUNTO1 e che dessi un nome a ciascuno dei punti";
+  const typeInBox = value => fireEvent.change(screen.getByLabelText('Messaggio per l’AI'), { target: { value } });
+  test('while the user writes a request that asks for many things at once, an advice appears with the parts to choose from', async () => {
+    render(<Harness />); await screen.findByLabelText('Messaggio per l’AI');
+    expect(screen.queryByRole('note', { name: 'Consiglio per questa richiesta' })).not.toBeInTheDocument();
+    typeInBox('Dove si decide la stampa H7?'); expect(screen.queryByRole('note', { name: 'Consiglio per questa richiesta' })).not.toBeInTheDocument();
+    typeInBox(REAL_REQUEST); const advice = await screen.findByRole('note', { name: 'Consiglio per questa richiesta' });
+    expect(advice).toHaveTextContent('Questa richiesta chiede più cose insieme'); expect(advice).toHaveTextContent('poco spazio');
+    ['Un nome per ciascun punto', 'As-is (come funziona oggi)', 'To-be / desiderata (come deve funzionare)', 'Analisi di impatto'].forEach(label => expect(within(advice).getByRole('button', { name: label })).toBeInTheDocument());
+    typeInBox('Dove si decide la stampa H7?'); expect(screen.queryByRole('note', { name: 'Consiglio per questa richiesta' })).not.toBeInTheDocument();   // si scrive una cosa sola: il consiglio sparisce
+  });
+  test('choosing a part replaces the request with that part alone, does NOT send it, and the question then goes out as that one part', async () => {
+    server.answer = reply(); render(<Harness />); await screen.findByLabelText('Messaggio per l’AI'); typeInBox(REAL_REQUEST);
+    fireEvent.click(await within(await screen.findByRole('note', { name: 'Consiglio per questa richiesta' })).findByRole('button', { name: 'As-is (come funziona oggi)' }));
+    expect(screen.getByLabelText('Messaggio per l’AI').value).toMatch(/funzionamento attuale \(as-is\) del PUNTO 1/); expect(asked()).toHaveLength(0);
+    expect(screen.queryByRole('note', { name: 'Consiglio per questa richiesta' })).not.toBeInTheDocument();            // la richiesta ora e' di una parte sola
+    fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' })); await waitFor(() => expect(asked()).toHaveLength(1)); expect(asked()[0][1].question).toMatch(/\(as-is\) del PUNTO 1/); expect(asked()[0][1].question).not.toMatch(/to-be|impatto/i);
+  });
+  test('the advice can be closed, and the wide request can still be sent as it is', async () => {
+    server.answer = reply(); render(<Harness />); await screen.findByLabelText('Messaggio per l’AI'); typeInBox(REAL_REQUEST);
+    fireEvent.click(await screen.findByRole('button', { name: 'Chiudi il consiglio' })); expect(screen.queryByRole('note', { name: 'Consiglio per questa richiesta' })).not.toBeInTheDocument(); expect(screen.getByLabelText('Messaggio per l’AI')).toHaveValue(REAL_REQUEST);
+    fireEvent.click(screen.getByRole('button', { name: 'Invia all’AI' })); await waitFor(() => expect(asked()).toHaveLength(1)); expect(asked()[0][1].question).toBe(REAL_REQUEST);
+  });
+  test('a closed advice comes back if the request changes into another wide one', async () => {
+    render(<Harness />); await screen.findByLabelText('Messaggio per l’AI'); typeInBox(REAL_REQUEST); fireEvent.click(await screen.findByRole('button', { name: 'Chiudi il consiglio' }));
+    typeInBox(REAL_REQUEST + ' e anche i rischi'); expect(await screen.findByRole('note', { name: 'Consiglio per questa richiesta' })).toBeInTheDocument();
+  });
+  test('the advice never blocks sending: the send button works with it on screen', async () => {
+    server.answer = reply(); render(<Harness />); await screen.findByLabelText('Messaggio per l’AI'); typeInBox(REAL_REQUEST); await screen.findByRole('note', { name: 'Consiglio per questa richiesta' });
+    expect(screen.getByRole('button', { name: 'Invia all’AI' })).toBeEnabled();
+  });
+  test('after a cut answer a button offers to continue, and pressing it sends the continuation request', async () => {
+    server.messages = [{ id: 1, goto: 'goto-1', role: 'assistant', text: 'Impatto sul processo.\n\n⚠ Risposta interrotta: il servizio AI ha raggiunto il limite di lunghezza.', createdAt: new Date().toISOString(), author: 'ai', authorFullName: 'Assistente AI', mine: false }];
+    server.answer = reply(); render(<Harness />); const group = await screen.findByRole('group', { name: 'La risposta dell’AI si è interrotta' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Continua dal punto in cui si è fermata' })); await waitFor(() => expect(asked()).toHaveLength(1));
+    expect(asked()[0][1].question).toMatch(/Continua dal punto esatto in cui ti sei fermato, senza ripetere/);
+  });
+  test('the continue button is NOT there after a normal answer, or after a long answer that was shortened by the server', async () => {
+    server.messages = [{ id: 1, goto: 'goto-1', role: 'assistant', text: 'Risposta normale e completa.', createdAt: new Date().toISOString(), author: 'ai', authorFullName: 'Assistente AI', mine: false }];
+    const first = render(<Harness />); await screen.findByText('Risposta normale e completa.'); expect(screen.queryByRole('group', { name: 'La risposta dell’AI si è interrotta' })).not.toBeInTheDocument(); first.unmount();
+    server.messages = [{ id: 1, goto: 'goto-1', role: 'assistant', text: 'Lunga.\n\n⚠ Risposta accorciata: superava 20.000 caratteri.', createdAt: new Date().toISOString(), author: 'ai', authorFullName: 'Assistente AI', mine: false }];
+    render(<Harness />); await screen.findByText('Lunga.'); expect(screen.queryByRole('group', { name: 'La risposta dell’AI si è interrotta' })).not.toBeInTheDocument();
+  });
+  test('the continue button is only for the LAST message: once the conversation moved on it is gone', async () => {
+    server.messages = [{ id: 1, goto: 'goto-1', role: 'assistant', text: 'Taglio.\n\n⚠ Risposta interrotta: x', createdAt: new Date().toISOString(), author: 'ai', authorFullName: 'Assistente AI', mine: false },
+      { id: 2, goto: 'goto-1', role: 'user', text: 'ok', createdAt: new Date().toISOString(), author: 'io', authorFullName: 'Io', mine: true }];
+    render(<Harness />); await screen.findByText('ok'); expect(screen.queryByRole('group', { name: 'La risposta dell’AI si è interrotta' })).not.toBeInTheDocument();
+  });
   test('a source file containing a credential is kept out of the copy and never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
     const file = (path, text) => { const f = new File([text], path.split('/').pop()); Object.defineProperty(f, 'webkitRelativePath', { value: path }); Object.defineProperty(f, 'text', { value: async () => text }); return f; };

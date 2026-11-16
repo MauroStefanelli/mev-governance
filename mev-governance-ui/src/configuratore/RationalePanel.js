@@ -4,6 +4,7 @@ import { KINDS, KIND_ORDER, MAX_QUESTION, MAX_ENTRY, kindLabel, validateText, in
 import { displayName, relativeTime } from './developmentCollaboration';
 import useSourceLibrary from './useSourceLibrary';
 import { componentCoverage } from './applicationContext';
+import { composeHint, isInterrupted, CONTINUE_REQUEST } from './chatHints';
 import { fmtItIT } from '../utils';
 import SourceLibraryPanel from './SourceLibraryPanel';
 import { sourceExcerptsFor, chosenFilesSummary, pasteItem, checkAttachments, attachmentSummary, formatSize, MAX_PASTE, CONNECTION_FIELDS, loadConnection, saveConnection, connectionWarnings } from './rationaleAttachments';
@@ -40,6 +41,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const [attachNotice, setAttachNotice] = useState('');
   const [codeTerms, setCodeTerms] = useState('');
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [hintDismissedFor, setHintDismissedFor] = useState('');   // il testo per cui l'utente ha chiuso il consiglio: se poi scrive altro, il consiglio puo' tornare
   const [toolsOpen, setToolsOpen] = useState(null);   // null: open on first use (no folder saved yet), closed afterwards, until the user decides
   const [reading, setReading] = useState('');
   const [chosen, setChosen] = useState(null);
@@ -55,6 +57,10 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
   const toolsIsOpen = toolsOpen === null ? attention : toolsOpen;
   const toolsSummary = [library.folders.length ? `${library.folders.filter(f => f.active !== false).length} di ${library.folders.length} ${library.folders.length === 1 ? 'cartella' : 'cartelle'} attive, ${sourceFiles.length} file` : 'nessuna cartella salvata',
     pasted.length ? `${pasted.length} ${pasted.length === 1 ? 'dato incollato' : 'dati incollati'}` : ''].filter(Boolean).join(' · ');
+  const hint = composeHint(text, { busy });
+  const hintVisible = hint && hintDismissedFor !== text;
+  const lastMessage = messages[messages.length - 1];
+  const canContinue = !busy && lastMessage && lastMessage.role === 'assistant' && isInterrupted(lastMessage.text);
   const listRef = useRef(null); const inputRef = useRef(null); const stick = useRef(true);
 
   const report = useCallback(list => onKnowledge?.(list), [onKnowledge]);
@@ -184,6 +190,13 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
               {(() => { const { body, notice } = splitNotice(message.text); return <><span className="rat-msg-text">{body}</span>{notice && <span className="rat-msg-warn" role="note">{notice}</span>}</>; })()}</li>)}
             {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">{reading || 'L’AI sta ragionando…'}</span></li>}
           </ol>
+          {canContinue && <div className="rat-continue" role="group" aria-label="La risposta dell’AI si è interrotta"><span>La risposta dell’AI si è fermata per il limite di lunghezza.</span>
+            <button type="button" className="rat-primary" onClick={() => ask(CONTINUE_REQUEST)}>Continua dal punto in cui si è fermata</button></div>}
+          {hintVisible && <div className="rat-hint-box" role="note" aria-label="Consiglio per questa richiesta"><div className="rat-hint-head"><b>{hint.title}</b>
+            <button type="button" className="rat-hint-close" aria-label="Chiudi il consiglio" onClick={() => setHintDismissedFor(text)}>×</button></div>
+            <span>{hint.body}</span>
+            <span className="rat-hint-parts">{hint.proposals.map(part => <button type="button" key={part.id} onClick={() => { setText(part.request); setHintDismissedFor(''); inputRef.current?.focus(); }}>{part.label}</button>)}</span>
+            <small>Premendo una parte, la richiesta qui sotto viene sostituita da quella parte sola: poi la invii e passi alla successiva. Puoi anche inviare la richiesta così com’è.</small></div>}
           <form className="rat-form rat-compose" onSubmit={event => { event.preventDefault(); ask(text); }}>
             <label className="rat-sr" htmlFor="rat-input">Messaggio per l’AI</label>
             <textarea id="rat-input" ref={inputRef} value={text} disabled={busy} maxLength={MAX_QUESTION + 200} placeholder="Scrivi qui il tuo messaggio per l’AI…"
