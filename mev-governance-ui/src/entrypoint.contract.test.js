@@ -81,3 +81,17 @@ describe('the database on the NAS: copied once from Render, never lost by a rest
   test('every secret is quoted in the pasted file, including the new database password', () => { ['POSTGRES_PASSWORD', 'SOURCE_DATABASE_URL', 'PGPASSWORD', 'DATABASE_DIRECT_URL'].forEach(name => expect(renderScript).toContain(`'${name}'`)); });
 });
 
+describe('updating the NAS: the :dev tag moves at every release, so it must be pulled again', () => {
+  test('the three app images are always pulled; without it Docker keeps the old image that has the same tag', () => {
+    ['mev-pdf-parser', 'mev-governance-backend', 'mev-governance-frontend'].forEach(image => {
+      const start = compose.indexOf(`image: ghcr.io/maurostefanelli/${image}:`); expect(start).toBeGreaterThan(-1);
+      expect(compose.slice(start, compose.indexOf('\n\n', start))).toMatch(/pull_policy: always/);
+    });
+  });
+  test('the database image is NEVER re-pulled on its own: its version is tied to the data folder', () => {
+    const start = compose.indexOf('image: postgres:17-alpine'); expect(start).toBeGreaterThan(-1);
+    expect(compose.slice(start, compose.indexOf('\n\n', start))).not.toMatch(/pull_policy/);
+    expect(compose.match(/image: postgres:17-alpine/g)).toHaveLength(2);
+  });
+});
+

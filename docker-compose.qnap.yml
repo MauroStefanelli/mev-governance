@@ -56,6 +56,8 @@ services:
 
   pdf-parser:
     image: ghcr.io/maurostefanelli/mev-pdf-parser:${IMAGE_TAG:-dev}
+    # Il tag :dev cambia a ogni rilascio. Senza questa riga Docker, trovando gia' un'immagine con lo stesso nome, NON scarica quella nuova e l'app resta alla versione vecchia.
+    pull_policy: always
     container_name: mev-pdf-parser
     restart: unless-stopped
     environment:
@@ -64,6 +66,8 @@ services:
 
   backend:
     image: ghcr.io/maurostefanelli/mev-governance-backend:${IMAGE_TAG:-dev}
+    # Il tag :dev cambia a ogni rilascio. Senza questa riga Docker, trovando gia' un'immagine con lo stesso nome, NON scarica quella nuova e l'app resta alla versione vecchia.
+    pull_policy: always
     container_name: mev-backend
     restart: unless-stopped
     environment:
@@ -96,6 +100,8 @@ services:
 
   frontend:
     image: ghcr.io/maurostefanelli/mev-governance-frontend:${IMAGE_TAG:-dev}
+    # Il tag :dev cambia a ogni rilascio. Senza questa riga Docker, trovando gia' un'immagine con lo stesso nome, NON scarica quella nuova e l'app resta alla versione vecchia.
+    pull_policy: always
     container_name: mev-frontend
     restart: unless-stopped
     environment:

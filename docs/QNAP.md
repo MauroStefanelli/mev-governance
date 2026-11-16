@@ -75,14 +75,12 @@ Su **HTTP** alcune funzioni del browser non esistono (`crypto.subtle`, `crypto.r
 **Certificato HTTPS vero** (senza l'avviso del browser): metti `server.crt` e `server.key` in `CERTS_DIR` (di default `./mev-certs`). In QTS puoi esportare un certificato da *Pannello di controllo → Sicurezza → Certificato e chiave privata*. Il certificato deve includere l'indirizzo o il nome con cui apri l'app.
 
 ## Aggiornare
-Ogni push sul ramo `develop` pubblica automaticamente le nuove immagini (circa 15 minuti). Per aggiornare il NAS, da SSH nella cartella del compose:
+Ogni push sul ramo `develop` pubblica le nuove immagini in circa 15 minuti, ma il NAS **non si aggiorna da solo**. La procedura completa, per Render e per il NAS insieme, e' in `RELEASE.md`. Per il solo NAS:
 
-```
-docker compose -f docker-compose.qnap.yml pull
-docker compose -f docker-compose.qnap.yml up -d
-```
+- **Container Station:** Applications → `mev` → *Recreate* con lo stesso YAML. Le immagini dell'app hanno `pull_policy: always`, quindi vengono riscaricate.
+- **SSH:** `docker compose -f docker-compose.qnap.yml pull && docker compose -f docker-compose.qnap.yml up -d`
 
-Da Container Station: apri l'applicazione e usa l'azione di ricreazione (*Recreate*) con lo stesso YAML: scarica le immagini nuove se la modalita' di aggiornamento lo prevede. Non ho verificato come Container Station tratti le immagini gia' presenti con lo stesso tag; se dopo l'aggiornamento il numero di versione non cambia, elimina le immagini `ghcr.io/maurostefanelli/mev-*` dalla scheda *Images* e ricrea l'applicazione.
+I dati del database non cambiano con un aggiornamento. Controlla che in alto nell'app compaia il nuovo `DEV_REL_...`.
 
 ## Il database sul NAS
 
