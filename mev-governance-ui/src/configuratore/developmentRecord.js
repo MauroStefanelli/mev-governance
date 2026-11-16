@@ -93,7 +93,13 @@ export const catalogFor = (contracts, appData, source) => {
   return source.contractId === 'poste-tet-2025' ? (appData?.cataloghi || {})[String(source.lot)] || [] : [];
 };
 
-export const applicationsForInitiative = (evaluation, applications, lot) => applicationContextFor(evaluation.initiative?.system, applications, lot);
+// Gli applicativi dell'iniziativa sono quelli SCELTI dall'utente nel Configuratore (menu «+ Aggiungi applicativo…») piu' quelli che il campo Sistema nomina:
+// una iniziativa con Sistema vuoto ma applicativo scelto (es. ILP) ha comunque il suo applicativo. Prima si guardava solo il campo Sistema.
+export function applicationsForInitiative(evaluation, applications, lot) {
+  const chosen = (evaluation?.selectedAppIds || []).map(id => (applications || []).find(app => String(app.id) === String(id))).filter(Boolean);
+  const named = applicationContextFor(evaluation?.initiative?.system, applications, lot);
+  return [...chosen, ...named.filter(app => !chosen.includes(app))];
+}
 
 export const activitySignature = activities => activities.map(({ key, item }) => ({ key, interventionId: item.interventionId || '',
   description: String(item.detail?.detailDescription || item.reason || '').slice(0, 300) }));
@@ -107,10 +113,14 @@ export function activityChanges(saved, current) {
 }
 
 // Short explanation shown when no application matches the system of the initiative.
-export function applicationDiagnosis(system, applications, scope) {
-  const where = `contratto «${scope.contractId}», lotto «${scope.lot}»`;
+export function applicationDiagnosis(system, applications, scope, contractName = '') {
+  const contract = contractName ? `«${contractName}»` : `«${scope.contractId}»`;
+  const where = `contratto ${contract}, lotto «${scope.lot}»`;
   if (!applications.length) return `Nel ${where} non risulta nessun applicativo configurato.`;
-  return `Nel ${where} ci sono ${applications.length} applicativi (${applications.slice(0, 6).map(app => app.name).join(', ')}${applications.length > 6 ? '…' : ''}) ma nessuno corrisponde al sistema «${system || '—'}». Aggiungi il nome «${system || ''}» come alias dell’applicativo corretto, oppure crealo.`;
+  const list = `${applications.length} applicativi (${applications.slice(0, 6).map(app => app.name).join(', ')}${applications.length > 6 ? '…' : ''})`;
+  const name = String(system || '').trim();
+  if (!name) return `Nel ${where} ci sono ${list}, ma l’iniziativa non ha un Sistema e non ne ha scelto nessuno. Nel Configuratore, nella sezione Iniziativa, scegli l’applicativo con «+ Aggiungi applicativo…».`;
+  return `Nel ${where} ci sono ${list} ma nessuno corrisponde al sistema «${name}». Aggiungi il nome «${name}» come alias dell’applicativo corretto, oppure crealo.`;
 }
 
 // Confirmed rationale and constraints of the initiative. Never blocks Sviluppo: if unavailable it says so.

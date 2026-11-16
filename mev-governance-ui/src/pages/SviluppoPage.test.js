@@ -45,6 +45,28 @@ test('lists evaluated initiatives with their progress and explains the six phase
   expect(within(screen.getByLabelText('Le fasi del percorso')).getAllByRole('listitem')).toHaveLength(6);
 });
 
+describe('applications of an initiative with an empty System (the real «TBD · cr post uat» case)', () => {
+  const tbd = { ...offer, record_key: 'C1|2|initiative|tbd', title: 'TBD', payload: JSON.stringify({ ...evaluation, initiative: { code: '', title: 'TBD · cr post uat', system: '' }, selectedAppIds: ['ilp'],
+    catalogSource: { contractId: 'poste-tet-2025', lot: '2' } }) };
+  const apps = [{ id: 'npso', name: 'NPSO', codeUrl: '/src/npso' }, { id: 'ilp', name: 'ILP', codeUrl: '/src/ilp' }, { id: 'iper', name: 'IPER' }];
+  const open = async () => { render(<SviluppoPage ambienteId={1} codiceContratto="C1" />); fireEvent.click(await screen.findByText('TBD · cr post uat')); await screen.findByLabelText('Percorso di sviluppo'); };
+  beforeEach(() => {
+    service.getConfiguratoreContracts.mockResolvedValue([{ contractId: 'poste-tet-2025', name: 'Poste Italiane – Tracciatura e Logistica Integrata', lots: [] }]);
+    service.getConfiguratoreRecords.mockImplementation(async params => ({ records: params.entity_type === 'initiative_evaluation' ? [tbd] : store.filter(r => r.entity_type === params.entity_type) }));
+  });
+  test('the chosen application is shown as the application of the initiative, not a warning', async () => {
+    service.getSharedApplications.mockResolvedValue(apps); await open();
+    expect(await screen.findByText('ILP')).toBeInTheDocument(); expect(screen.getByText('/src/ilp')).toBeInTheDocument();
+    expect(screen.queryByText(/Nessun applicativo corrisponde/)).not.toBeInTheDocument();
+  });
+  test('with nothing chosen the warning names the contract by its name, not its identifier, and says what to do', async () => {
+    service.getSharedApplications.mockResolvedValue([{ id: 'npso', name: 'NPSO' }, { id: 'iper', name: 'IPER' }]); await open();
+    const warning = await screen.findByText(/Nessun applicativo corrisponde/);
+    expect(warning.textContent).toContain('«Poste Italiane – Tracciatura e Logistica Integrata»'); expect(warning.textContent).not.toContain('poste-tet-2025');
+    expect(warning.textContent).toContain('non ha un Sistema'); expect(warning.textContent).not.toContain('«»');
+  });
+});
+
 test('opens on the sources phase for a new development and points to the next step', async () => {
   await openFirst();
   expect(screen.getByRole('region', { name: 'Fase: Fonti' })).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { developmentActivities, developmentMarkdown } from './developmentActivityModel';
 import { knowledgeMarkdown, knowledgeForAi } from './rationaleKnowledge';
+import { applicationsForInitiative } from './developmentRecord';
 import { appNorm, codeChangePrompt, implementationDocument, sourceFileAllowed, ignoredSourcePath, evaluationSystems, evaluationApplicationCodes, applicationContextFor } from './configuratoreCore';
 
 export const downloadBlob = (name, blob) => {
@@ -46,7 +47,7 @@ export function buildCodeChangeRequest({ loaded, plans, delivery, applications, 
   if (!files.length && !techProfile) throw new Error('Seleziona la cartella dei sorgenti oppure scegli un applicativo con profilo tecnico.');
   const items = evaluation.items || [];
   const systems = evaluationSystems({ initiative, systems: [initiative.system], importedInterventions: evaluation.importedInterventions || [] });
-  const context = applicationContextFor(initiative.system, applications, loaded.lot);
+  const context = applicationsForInitiative(evaluation, applications, loaded.lot);
   const applicationCodes = evaluationApplicationCodes({ applicationContext: context });
   const repo = repositorySummary(files, techProfile, initiative.system);
   const request = { formatVersion: 4, developmentActivities: planRows(items, plans), generatedAt: new Date().toISOString(), source: 'Sviluppo MEV Governance',

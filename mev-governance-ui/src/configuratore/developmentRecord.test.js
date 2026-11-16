@@ -100,6 +100,43 @@ describe('applications of an initiative', () => {
     expect(applicationScope({}, { contractId: 'C', lot: 3 })).toEqual({ contractId: 'C', lot: '3' });
   });
 
+  describe('which applications belong to an initiative (real case: TBD · cr post uat, empty System, ILP chosen)', () => {
+    const { applicationsForInitiative } = require('./developmentRecord');
+    const { applicationContextFor } = require('./configuratoreCore');
+    const APPS = ['NPSO', 'ILP', 'IPER', 'IPERSUITE', 'SAP LES'].map((name, i) => ({ id: `application-${i}`, name, code: '', systemAliases: [name] }));
+    const names = list => list.map(app => app.name);
+    test('an initiative with an empty System but a chosen application has that application', () => {
+      expect(names(applicationsForInitiative({ initiative: { system: '' }, selectedAppIds: ['application-1'] }, APPS, '2'))).toEqual(['ILP']);
+    });
+    test('chosen applications and the ones named in System are both kept, once each', () => {
+      expect(names(applicationsForInitiative({ initiative: { system: 'ILP, NPSO' }, selectedAppIds: ['application-1'] }, APPS, '2'))).toEqual(['ILP', 'NPSO']);
+    });
+    test('a chosen application that no longer exists is ignored, not an error', () => {
+      expect(applicationsForInitiative({ initiative: { system: '' }, selectedAppIds: ['gone'] }, APPS, '2')).toEqual([]);
+      expect(applicationsForInitiative({}, APPS, '2')).toEqual([]);
+    });
+    test('IPER finds IPER and not IPERSUITE, and every name of the System field is read on its own', () => {
+      expect(names(applicationContextFor('IPER', APPS))).toEqual(['IPER']);
+      expect(names(applicationContextFor('IPERSUITE', APPS))).toEqual(['IPERSUITE']);
+      expect(names(applicationContextFor('IPER, IPERSUITE', APPS))).toEqual(['IPER', 'IPERSUITE']);
+      expect(names(applicationContextFor('NPSO; ILP', APPS))).toEqual(['NPSO', 'ILP']);
+      expect(names(applicationContextFor('SAP LES', APPS))).toEqual(['SAP LES']);
+    });
+    test('a looser name still finds its application when no exact name exists', () => {
+      expect(names(applicationContextFor('SAP', APPS))).toEqual(['SAP LES']);
+      expect(applicationContextFor('', APPS)).toEqual([]);
+    });
+  });
+
+  test('the diagnosis names the contract, and says what is missing when the System is empty', () => {
+    const apps = [{ name: 'NPSO' }, { name: 'ILP' }];
+    const named = applicationDiagnosis('BEP', apps, { contractId: 'poste-tet-2025', lot: '2' }, 'Poste Italiane – Tracciatura e Logistica Integrata');
+    expect(named).toContain('«Poste Italiane – Tracciatura e Logistica Integrata»'); expect(named).not.toContain('poste-tet-2025');
+    expect(applicationDiagnosis('BEP', apps, { contractId: 'poste-tet-2025', lot: '2' })).toContain('«poste-tet-2025»');
+    const empty = applicationDiagnosis('', apps, { contractId: 'C', lot: '2' }, 'Contratto C');
+    expect(empty).toContain('non ha un Sistema'); expect(empty).toContain('+ Aggiungi applicativo…'); expect(empty).not.toContain('alias'); expect(empty).not.toContain('«»');
+  });
+
   test('the diagnosis says where it looked and what it found', () => {
     expect(applicationDiagnosis('BEP', [], { contractId: 'C', lot: '2' })).toContain('nessun applicativo configurato');
     const text = applicationDiagnosis('BEP', [{ name: 'NPSO' }, { name: 'IPER' }], { contractId: 'C', lot: '2' });

@@ -79,3 +79,11 @@ describe('AI preparation of an activity sheet', () => {
     expect(box).not.toHaveTextContent('PROPOSTA-NON-CONFERMATA');
   });
 });
+
+test('the code-change ZIP names the applications chosen in the Configuratore even when the System field is empty', async () => {
+  const chosen = { ...loaded, evaluation: { ...evaluation, initiative: { ...evaluation.initiative, system: '' }, selectedAppIds: ['ilp'] } };
+  const applications = [{ id: 'npso', name: 'NPSO', code: 'AP-1' }, { id: 'ilp', name: 'ILP', code: 'AP-ILP' }];
+  const { zip } = buildCodeChangeRequest({ loaded: chosen, plans: {}, delivery: { tool: 'vscode', branch: '', notes: '', tests: '' }, applications, approved: [{ id: 1, name: 'x' }], files: [{ name: 'A.java', webkitRelativePath: 'R/A.java' }], techProfile: null, knowledge: [] });
+  const verification = await text(zip, 'VERIFICA_SELEZIONE.txt');
+  expect(verification).toContain('AP-ILP'); expect(verification).not.toContain('AP-1');
+});

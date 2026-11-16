@@ -521,17 +521,22 @@ export function applicationContextFor(system, lotApplications, _lot) {
   const apps = lotApplications ?? [];
   const sys = String(system || "").trim();
   if (!sys) return [];
-  const norm = appNorm(sys);
-  const direct = apps.filter((a) => {
-    const aliases = [a.code, a.name, ...(a.systemAliases || []), ...(a.aliases || [])]
-      .filter(Boolean)
-      .map(appNorm);
-    return aliases.some((x) => x === norm) || aliases.some((x) => norm.startsWith(x)) || aliases.some((x) => x.includes(norm));
+  const aliasesOf = (a) => [a.code, a.name, ...(a.systemAliases || []), ...(a.aliases || [])].filter(Boolean).map(appNorm);
+  // Ogni nome del campo Sistema ("IPERSUITE, IPER") si confronta da solo. Prima si cerca il nome ESATTO (IPER trova IPER, non IPERSUITE);
+  // solo se nessun applicativo ha quel nome si prova il confronto largo (uno contiene l'altro) di prima.
+  const names = sys.split(/[,;\n]+/).map((n) => n.trim()).filter(Boolean);
+  const found = [];
+  const add = (list) => list.forEach((a) => { if (!found.includes(a)) found.push(a); });
+  names.forEach((name) => {
+    const norm = appNorm(name);
+    if (!norm) return;
+    const exact = apps.filter((a) => aliasesOf(a).some((x) => x === norm));
+    if (exact.length) return add(exact);
+    add(apps.filter((a) => aliasesOf(a).some((x) => norm.startsWith(x) || x.includes(norm))));
   });
-  if (direct.length) return direct;
+  if (found.length) return found;
   const words = sys.split(/[\s,;]+/).filter((w) => w.length >= 3);
-  const matched = apps.filter((a) => words.some((w) => appNorm(a.name).includes(appNorm(w))));
-  return matched.length ? matched : [];
+  return apps.filter((a) => words.some((w) => appNorm(a.name).includes(appNorm(w))));
 }
 
 // ============================================================
