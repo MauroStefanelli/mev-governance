@@ -279,6 +279,9 @@ using (var scope = app.Services.CreateScope())
         try
         {
 #pragma warning disable EF1002
+            // ATTENZIONE alle parentesi graffe in questo testo: C# (stringa $@) le legge una volta e Entity Framework (ExecuteSqlRaw) le rilegge come segnaposto {0}.
+            // Una graffa letterale per il database si scrive QUATTRO volte per lato ({{{{ }}}}), come qui sotto per il valore JSON vuoto. Con {{ }} il blocco falliva
+            // con "Input string was not in a correct format" e NESSUNA delle istruzioni successive veniva eseguita.
             db.Database.ExecuteSqlRaw($@"
                 CREATE TABLE IF NOT EXISTS ""{sch}"".""Ambienti"" (
                     ""Id""              SERIAL PRIMARY KEY,
@@ -376,7 +379,7 @@ using (var scope = app.Services.CreateScope())
                     ""contract_id"" TEXT NOT NULL DEFAULT '',
                     ""lot_id""      TEXT NOT NULL DEFAULT '',
                     ""title""       TEXT NOT NULL,
-                    ""payload""     JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                    ""payload""     JSONB NOT NULL DEFAULT '{{{{}}}}'::jsonb,
                     ""created_at""  TIMESTAMPTZ NOT NULL DEFAULT now(),
                     ""updated_at""  TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
