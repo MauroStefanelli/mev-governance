@@ -100,3 +100,4 @@
 .rat-app-components li { display: flex; gap: 8px; align-items: baseline; overflow-wrap: anywhere; padding: 2px 0; } .rat-app-components code { background: #f0f4fa; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .rat-app-components li.is-read::before { content: '✓'; color: #1a7f4b; font-weight: 700; } .rat-app-components li.is-missing::before { content: '○'; color: #a15c00; font-weight: 700; } .rat-app-components li.is-missing small { color: #8a5200; }
 .rat-app-hint { display: block; color: #5d718a; }
+.rat-msg-warn { display: block; margin-top: 6px; padding: 7px 10px; border-radius: 8px; background: #fff4dc; border: 1px solid #f0cf8d; color: #7a4700; font-size: 12.5px; line-height: 1.5; }

@@ -13,6 +13,11 @@ import './rationalePanel.css';
 // The AI only proposes: a person confirms. Confirmed entries feed the offer review and Sviluppo.
 const CODE_QUESTION_EXAMPLES = ['In quale punto del codice viene emesso il codice di errore ITEM_V_28 e con quale condizione?', 'Quali condizioni impediscono la stampa dell’etichetta H7?', 'Dove si decide se una LDV può essere inserita in una HU?'];
 
+// The server ends an answer that was cut (by the model's own limit, or by ours) with a line that starts with this sign. It is shown apart, so that a text that stops in the middle
+// is never taken for a complete answer. Only the LAST such line counts, and only at the start of a line.
+const NOTICE = /\n\n(⚠ Risposta (?:interrotta|accorciata)[^\n]*)$/;
+export const splitNotice = text => { const match = NOTICE.exec(String(text || '')); return match ? { body: text.slice(0, match.index), notice: match[1] } : { body: text, notice: '' }; };
+
 export default function RationalePanel({ initiative, interventions = [], onKnowledge, applications = [] }) {
   const code = initiativeCode(initiative);
   const [messages, setMessages] = useState([]);
@@ -176,7 +181,7 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
             {messages.map(message => <li key={message.id} className={`rat-msg ${message.role === 'assistant' ? 'is-ai' : message.mine ? 'is-mine' : ''}`}>
               <span className="rat-msg-meta"><b>{message.role === 'assistant' ? 'Assistente AI' : message.mine ? 'Tu' : displayName({ fullName: message.authorFullName, username: message.author })}</b>
                 <time dateTime={message.createdAt} title={new Date(message.createdAt).toLocaleString('it-IT')}>{relativeTime(message.createdAt)}</time></span>
-              <span className="rat-msg-text">{message.text}</span></li>)}
+              {(() => { const { body, notice } = splitNotice(message.text); return <><span className="rat-msg-text">{body}</span>{notice && <span className="rat-msg-warn" role="note">{notice}</span>}</>; })()}</li>)}
             {busy && <li className="rat-msg is-ai rat-typing" role="status"><span className="rat-msg-text">{reading || 'L’AI sta ragionando…'}</span></li>}
           </ol>
           <form className="rat-form rat-compose" onSubmit={event => { event.preventDefault(); ask(text); }}>

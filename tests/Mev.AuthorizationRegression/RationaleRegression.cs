@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -8,6 +9,20 @@ using MevGovernanceBackend.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+
+// A gateway that answers with a fixed body, and remembers what it was asked.
+public class GatewayFactory : IHttpClientFactory
+{
+    readonly string body; readonly Action<string> seen;
+    public GatewayFactory(string body, Action<string> seen) { this.body = body; this.seen = seen; }
+    sealed class Handler : HttpMessageHandler
+    {
+        readonly string body; readonly Action<string> seen; public Handler(string body, Action<string> seen) { this.body = body; this.seen = seen; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        { seen(request.Content == null ? "" : await request.Content.ReadAsStringAsync(token)); return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") }; }
+    }
+    public HttpClient CreateClient(string name) => new(new Handler(body, seen));
+}
 
 public class FakeAssistant : IRationaleAssistant
 {
@@ -157,6 +172,57 @@ public static class RationaleRegression
         check(Applications.Check(null).Kept.Count == 0, "No applications at all is fine");
         var dup = Applications.Check(new[] { new ApplicationIn("X", null, null, new() { "Java", "java", "JAVA", "Go" }, null, null, null, null, null, null, null, null, null) });
         check(dup.Kept[0].Technologies.SequenceEqual(new[] { "Java", "Go" }), "The same label is not repeated whatever the case");
+        // ---- long answers: never cut in the middle of a word without saying so ----
+        string Sentence(int n) => $"Frase numero {n} della risposta lunga con impatto sul processo e sui dati. ";
+        var long12k = string.Concat(Enumerable.Range(1, 160).Select(Sentence));
+        check(long12k.Length > 10000 && long12k.Length < RationaleResponse.MaxAnswerLength, "the test answer is longer than the old 6.000 limit and shorter than the new one");
+        var kept = RationaleResponse.Normalize(Obj("{\"answer\":" + JsonSerializer.Serialize(long12k) + "}"))!;
+        check(kept.Answer == long12k.Trim(), "An answer longer than 6.000 characters is kept WHOLE (it used to be cut at exactly 6.000, in the middle of a word)");
+        var veryLong = string.Concat(Enumerable.Range(1, 400).Select(Sentence));
+        var clipped = RationaleResponse.Normalize(Obj("{\"answer\":" + JsonSerializer.Serialize(veryLong) + "}"))!.Answer;
+        check(clipped.Length < veryLong.Length && clipped.Contains("Risposta accorciata") && clipped.TrimEnd().EndsWith("caratteri."), "Beyond the limit the answer is shortened AND says so, never silently");
+        check(clipped.Split("\n\n⚠")[0].TrimEnd().EndsWith("."), "The shortened answer ends at the end of a sentence, not in the middle of a word");
+        check(RationaleResponse.Normalize(Obj("{\"answer\":\"Breve.\"}"))!.Answer == "Breve.", "A short answer is untouched");
+        // the model itself stopped (finish_reason length): the gateway shapes
+        check(AiService.WasCutByTokenLimit(Obj("{\"choices\":[{\"finish_reason\":\"length\"}]}")), "finish_reason 'length' is recognised as an interrupted answer");
+        check(AiService.WasCutByTokenLimit(Obj("{\"choices\":[{\"finish_reason\":\"max_tokens\"}]}")), "finish_reason 'max_tokens' is recognised too");
+        check(AiService.WasCutByTokenLimit(Obj("{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}")), "A 'responses' style incomplete answer is recognised");
+        check(!AiService.WasCutByTokenLimit(Obj("{\"choices\":[{\"finish_reason\":\"stop\"}]}")) && !AiService.WasCutByTokenLimit(Obj("{}")) && !AiService.WasCutByTokenLimit(Obj("{\"choices\":[]}")) && !AiService.WasCutByTokenLimit(Obj("{\"status\":\"completed\"}")), "A normal ending, or a shape that is not known, is never taken for an interruption");
+        // the JSON itself was left half-written: what was already written is kept
+        var halfJson = "{\"answer\":\"Impatto sul processo.\\nLe modifiche toccano la stampa \\\"H7\\\" e la partenza HU. Rischi principali: una deroga troppo ampia potrebbe autorizzare operazioni non previste; una diversa risolu";
+        var rec = RationaleResponse.Recover(Obj("{\"error\":\"x\",\"rawText\":" + JsonSerializer.Serialize(halfJson) + "}"));
+        check(rec != null && rec.Answer.StartsWith("Impatto sul processo.\nLe modifiche toccano la stampa \"H7\" e la partenza HU.") && rec.Answer.EndsWith("una diversa risolu"), "A half-written JSON gives back the text already written, with its line breaks and quotes decoded");
+        check(rec!.Proposals.Count == 0, "Recovering a half-written answer never invents proposals");
+        check(RationaleResponse.Recover(Obj("{\"rawText\":\"testo senza json\"}")) == null && RationaleResponse.Recover(Obj("{}")) == null, "Nothing to recover gives nothing");
+        // the whole path with the assistant: the notice reaches the user
+        var cutOk = new JsonObject { ["answer"] = "Prima parte.", ["proposals"] = new JsonArray(), ["questions"] = new JsonArray(), [AiService.CutFlag] = true };
+        check(RationaleResponse.CutNotice.Contains("Risposta interrotta") && RationaleResponse.CutNotice.Contains("continua"), "The interruption notice tells what happened and what to do");
+        check(AiRationaleAssistant.Instructions.Contains("9.000 caratteri") && AiRationaleAssistant.Instructions.Contains("è meglio una risposta completa su una parte che una risposta tagliata su tutte"), "The instructions tell the AI its space is limited and to prefer a complete part to a cut whole");
+        check(cutOk[AiService.CutFlag]!.GetValue<bool>(), "the flag the assistant reads is the one the service writes");
+        // ---- the whole path with the REAL assistant and a simulated gateway: an answer cut by the model reaches the user whole up to the cut, with a notice ----
+        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["AI_ENDPOINT"] = "https://api.openai.com/v1/chat/completions", ["AI_MODEL"] = "m", ["AI_API_KEY"] = "k" }).Build();
+        string? lastPayload = null;
+        AiRationaleAssistant Real(string gatewayBody) => new(new AiService(cfg, new GatewayFactory(gatewayBody, p => lastPayload = p)));
+        static string Quote(string text) => JsonSerializer.Serialize(text);
+        AssistantRequest req = new("G1", "analizza", "{}");
+        var s = new AppUserAiSettings("k", "https://api.openai.com/v1/chat/completions", "m", "chat_completions", "bearer");
+        var cutHalf = JsonSerializer.Serialize(new { choices = new[] { new { finish_reason = "length", message = new { content = "{" + Quote("answer") + ":" + Quote("Impatto sul processo. Rischi principali: una diversa risolu") } } }, model = "m" });
+        var r1 = await Real(cutHalf).AskAsync(req, s);
+        check(r1 != null && r1.Reply.Answer.StartsWith("Impatto sul processo. Rischi principali: una diversa risolu") && r1.Reply.Answer.Contains("Risposta interrotta"), "REAL PATH: a model stopped in the middle of the JSON still gives the user what it had written, followed by a notice (it used to give an error)");
+        check(r1!.Reply.Proposals.Count == 0 && r1.Reply.Questions.Count == 0, "REAL PATH: an interrupted answer carries no proposals");
+        var cutWhole = JsonSerializer.Serialize(new { choices = new[] { new { finish_reason = "length", message = new { content = "{" + Quote("answer") + ":" + Quote("Risposta completa nel JSON ma il modello si e' fermato.") + ",\"proposals\":[],\"questions\":[]}" } } }, model = "m" });
+        var r2 = await Real(cutWhole).AskAsync(req, s);
+        check(r2 != null && r2.Reply.Answer.StartsWith("Risposta completa nel JSON") && r2.Reply.Answer.Contains("Risposta interrotta"), "REAL PATH: a model that hit its limit is reported even when the JSON closed correctly");
+        var fine = JsonSerializer.Serialize(new { choices = new[] { new { finish_reason = "stop", message = new { content = "{" + Quote("answer") + ":" + Quote("Tutto a posto.") + ",\"proposals\":[],\"questions\":[]}" } } }, model = "m" });
+        var r3 = await Real(fine).AskAsync(req, s);
+        check(r3 != null && r3.Reply.Answer == "Tutto a posto." && !r3.Reply.Answer.Contains("interrotta"), "REAL PATH: a normal answer is delivered as it is, with no notice");
+        var garbage = JsonSerializer.Serialize(new { choices = new[] { new { finish_reason = "stop", message = new { content = "non e' json" } } }, model = "m" });
+        check(await Real(garbage).AskAsync(req, s) == null, "REAL PATH: text that is not an answer and was NOT cut by the limit is still an error (it is not passed off as an answer)");
+        var brokenNotCut = JsonSerializer.Serialize(new { choices = new[] { new { finish_reason = "stop", message = new { content = "{" + Quote("answer") + ":" + Quote("Mi fermo qui senza chiudere il json") } } }, model = "m" });
+        check(await Real(brokenNotCut).AskAsync(req, s) == null, "REAL PATH: a half-written JSON from a model that says it FINISHED (finish_reason stop) is an error, not a recovered answer: only a declared interruption is trusted");
+        var oneLong = "{\"answer\":" + JsonSerializer.Serialize(string.Concat(Enumerable.Range(1, 160).Select(Sentence))) + ",\"proposals\":[],\"questions\":[]}";
+        var r4 = await Real(JsonSerializer.Serialize(new { choices = new[] { new { finish_reason = "stop", message = new { content = oneLong } } }, model = "m" })).AskAsync(req, s);
+        check(r4 != null && r4.Reply.Answer.Length > 10000 && !r4.Reply.Answer.Contains("accorciata"), "REAL PATH: a 12.000 character answer arrives whole");
         check(await As(user, "Bid Manager").Ask(new("G1", "ciao", null, null, null, null, new() { good })) is ForbidResult, "A supervisor still cannot ask, with or without attachments");
 
         check(!fake.Seen.Last().Context.Contains("Nessuna modifica allo schema SAPLES"), "Discarded or proposed entries are not given to the AI");

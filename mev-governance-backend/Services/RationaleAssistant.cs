@@ -29,7 +29,10 @@ public class AiRationaleAssistant : IRationaleAssistant
         "Rispondi in italiano con JSON puro: {\"answer\":\"risposta chiara e breve\"," +
         "\"proposals\":[{\"kind\":\"razionale|vincolo|decisione\",\"text\":\"una frase autonoma, comprensibile da chi non ha letto la chat\",\"interventionId\":\"opzionale\"}]," +
         "\"questions\":[\"punti da chiarire\"]}. " +
-        "Proponi una voce solo se è emersa dalla conversazione; massimo 6 voci, ciascuna di una sola frase. Se non ci sono voci nuove usa un elenco vuoto.";
+        "Proponi una voce solo se è emersa dalla conversazione; massimo 6 voci, ciascuna di una sola frase. Se non ci sono voci nuove usa un elenco vuoto. " +
+        "LUNGHEZZA: la risposta ha uno spazio limitato (circa 9.000 caratteri) e se lo supera viene interrotta a metà frase. Per richieste ampie (analisi di impatto, as-is e to-be, più punti) " +
+        "scrivi in modo compatto, senza ripetere la domanda né i requisiti già dati, e se non basta lo spazio chiudi con una frase che dice quali parti restano da svolgere e invita a chiederle nel messaggio successivo: " +
+        "è meglio una risposta completa su una parte che una risposta tagliata su tutte.";
 
     public async Task<AssistantResult?> AskAsync(AssistantRequest request, AppUserAiSettings s)
     {
@@ -39,7 +42,12 @@ public class AiRationaleAssistant : IRationaleAssistant
             var result = await ai.AnalyzeWithInstructionsAsync(attempt == 0 ? Instructions : Instructions +
                 " Il tentativo precedente non rispettava lo schema: restituisci un solo oggetto JSON con le chiavi answer, proposals, questions, senza wrapper né Markdown.",
                 message, s.Key, s.Endpoint, s.Model, s.Style, s.AuthMode);
-            if (RationaleResponse.Normalize(result.Analysis) is { } reply) return new AssistantResult(reply, result.Model);
+            var cut = result.Analysis[AiService.CutFlag]?.GetValue<bool>() == true;
+            if (RationaleResponse.Normalize(result.Analysis) is { } reply)
+                return new AssistantResult(cut ? reply with { Answer = reply.Answer + RationaleResponse.CutNotice } : reply, result.Model);
+            // The model was stopped by its own limit in the middle of the JSON: what it had already written is the useful part, so it is kept and the user is told it stops there.
+            // No second attempt: it would produce the same long answer and be cut again.
+            if (cut && RationaleResponse.Recover(result.Analysis) is { } partial) return new AssistantResult(partial with { Answer = partial.Answer + RationaleResponse.CutNotice }, result.Model);
         }
         return null;
     }

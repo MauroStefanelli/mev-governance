@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { render, screen, fireEvent, waitFor, within, act, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import RationalePanel from './RationalePanel';
+import RationalePanel, { splitNotice } from './RationalePanel';
 import { IDBFactory } from 'fake-indexeddb';
 import { resetSourceLibrary, removeAll } from './sourceLibrary';
 import { rationaleRequest } from '../services/mevService';
@@ -377,6 +377,24 @@ describe('attachments to a question: source code and pasted data', () => {
   test('an application whose technical sheet lists no components says so instead of showing an empty list', async () => {
     render(<RationalePanel initiative={initiative} interventions={[]} applications={[{ name: 'BEP', code: '', components: [], totalComponents: 0, technologies: ['Java'] }]} />);
     expect(await screen.findByText(/nessun componente nella scheda tecnica/)).toBeInTheDocument();
+  });
+  test('an answer cut by the AI service is shown whole up to the cut, with the notice apart and visible', async () => {
+    const cutText = 'Impatto sul processo. Rischi principali: una diversa risolu';
+    server.messages = [{ id: 1, goto: 'goto-1', role: 'assistant', text: cutText + '\n\n⚠ Risposta interrotta: il servizio AI ha raggiunto il limite di lunghezza. Chiedi di continuare.', createdAt: new Date().toISOString(), author: 'ai', authorFullName: 'Assistente AI', mine: false }];
+    render(<Harness />); const list = await screen.findByRole('list', { name: 'Cronologia della conversazione' });
+    expect(await within(list).findByText(cutText)).toBeInTheDocument(); const warn = within(list).getByRole('note'); expect(warn).toHaveTextContent('Risposta interrotta'); expect(warn).not.toHaveTextContent('Impatto sul processo');
+  });
+  test('a long answer is shown in full: nothing is cut by the screen', async () => {
+    const long = Array.from({ length: 200 }, (_, i) => `Frase ${i} dell'analisi di impatto.`).join(' ');
+    server.messages = [{ id: 1, goto: 'goto-1', role: 'assistant', text: long, createdAt: new Date().toISOString(), author: 'ai', authorFullName: 'Assistente AI', mine: false }];
+    render(<Harness />); const list = await screen.findByRole('list', { name: 'Cronologia della conversazione' });
+    await waitFor(() => expect(list.textContent).toContain('Frase 199 dell\'analisi di impatto.')); expect(within(list).queryByRole('note')).not.toBeInTheDocument();
+  });
+  test('only a notice at the very end of the message is a notice: the same words in the middle of an answer are just text', () => {
+    expect(splitNotice('Testo.\n\n⚠ Risposta interrotta: x')).toEqual({ body: 'Testo.', notice: '⚠ Risposta interrotta: x' });
+    expect(splitNotice('Testo.\n\n⚠ Risposta accorciata: superava 20.000 caratteri.')).toEqual({ body: 'Testo.', notice: '⚠ Risposta accorciata: superava 20.000 caratteri.' });
+    const middle = 'Prima.\n\n⚠ Risposta interrotta: citata\n\nPoi continua il testo.'; expect(splitNotice(middle)).toEqual({ body: middle, notice: '' });
+    expect(splitNotice('Nessun avviso')).toEqual({ body: 'Nessun avviso', notice: '' }); expect(splitNotice(null)).toEqual({ body: null, notice: '' }); expect(splitNotice('')).toEqual({ body: '', notice: '' });
   });
   test('a source file containing a credential is kept out of the copy and never sent: the user is told which one and where', async () => {
     const { webcrypto } = require('crypto'); const { TextEncoder: TE } = require('util'); if (!globalThis.TextEncoder) globalThis.TextEncoder = TE; Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });

@@ -137,6 +137,27 @@ public class AiService
         }
     }
 
+    // Il modello si e' fermato perche' ha esaurito lo spazio concesso alla risposta (non perche' ha finito): il testo e' tagliato a meta'.
+    // chat completions: choices[0].finish_reason == "length" (alcuni gateway: "max_tokens"); responses: status "incomplete" con motivo max_output_tokens.
+    public static bool WasCutByTokenLimit(JsonObject response)
+    {
+        try
+        {
+            if (response["choices"] is JsonArray choices && choices.Count > 0 && choices[0] is JsonObject choice
+                && choice["finish_reason"] is JsonValue reason && reason.TryGetValue<string>(out var text)
+                && (string.Equals(text, "length", StringComparison.OrdinalIgnoreCase) || string.Equals(text, "max_tokens", StringComparison.OrdinalIgnoreCase)))
+                return true;
+            if (string.Equals(response["status"]?.GetValue<string>(), "incomplete", StringComparison.OrdinalIgnoreCase)
+                && (response["incomplete_details"]?["reason"]?.GetValue<string>() ?? "").Contains("max", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        catch (Exception) { /* a shape we do not know: not a reason to fail */ }
+        return false;
+    }
+
+    // Nome del campo che AnalyzeWithInstructionsAsync aggiunge all'analisi quando il modello e' stato interrotto dal suo limite.
+    public const string CutFlag = "_truncatedByTokenLimit";
+
     private string ExtractResponseText(JsonObject response)
     {
         if (response.TryGetPropertyValue("choices", out var choices) && choices is JsonArray arr && arr.Count > 0)
@@ -630,6 +651,7 @@ public class AiService
         var payload = BuildPayload(s, s.Endpoint, messages, structured: false);
         var response = await PostAsync(s, payload);
         var responseText = ExtractResponseText(response);
+        var cut = WasCutByTokenLimit(response);
 
         JsonObject analysis;
         try { analysis = ParseAnalysisJson(responseText); }
@@ -637,10 +659,11 @@ public class AiService
         {
             analysis = new JsonObject
             {
-                ["error"]   = "Il servizio AI ha restituito testo non convertibile in JSON.",
-                ["rawText"] = responseText.Length > 4000 ? responseText[..4000] : responseText
+                ["error"]   = cut ? "Il servizio AI ha interrotto la risposta perche' troppo lunga." : "Il servizio AI ha restituito testo non convertibile in JSON.",
+                ["rawText"] = responseText.Length > 20000 ? responseText[..20000] : responseText
             };
         }
+        if (cut) analysis[CutFlag] = true;
 
         return (
             analysis,
