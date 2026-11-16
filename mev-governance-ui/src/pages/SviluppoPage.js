@@ -183,8 +183,8 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
           <ul className="dev-knowledge-list">{confirmedEntries(knowledge.entries).map(entry => <li key={entry.id} className={`dev-know-${entry.kind}`}><span className="dev-know-kind">{entry.kind}{entry.interventionId ? ` · ${entry.interventionId}` : ''}</span>{entry.text}</li>)}</ul></>}
       </div>
       <div className="dev-source-grid">
-        <div className="dev-source"><span className="dev-source-label">Applicativi associati al sistema «{heading.system || '—'}»</span>
-          {linkedApplications.length ? linkedApplications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b><code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>)
+        <div className="dev-source"><span className="dev-source-label">Applicativi dell’iniziativa{heading.system ? <> · sistema «{heading.system}»</> : ''}</span>
+          {linkedApplications.length ? linkedApplications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b><code>{app.codeUrl || 'Link al repository non indicato (facoltativo)'}</code></p>)
             : <p className="dev-warn">Nessun applicativo corrisponde al sistema dell’iniziativa. {applicationDiagnosis(heading.system, applications, applicationScope(loaded.evaluation, { contractId: loaded.contractId, lot: loaded.lot }), contractName)} Per collegarlo, nel Configuratore apri «Risorse e configurazione → Applicativi».</p>}</div>
         <div className="dev-source"><span className="dev-source-label">Cartelle dei sorgenti (salvate su questo computer)</span>
           {files.length ? <p><b>{files.length} file selezionati</b> · {sourceCount} sorgenti presi in considerazione</p> : techProfile ? <p>Nessuna cartella: uso il profilo tecnico dell’applicativo ({techProfile.totalFiles || 0} file, {techProfile.readFiles || 0} analizzati).</p> : <p className="dev-warn">Nessuna cartella selezionata: le proposte AI e la generazione dei file non sono disponibili.</p>}

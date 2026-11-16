@@ -20,6 +20,6 @@ export function importedGapSuggestions(interventions, catalog) {
 
 export function developmentMarkdown(activities, plans, applications) {
   return '# Schede sviluppo · Visual Studio Code\n\nRiferimenti applicativi (non attestano lettura dei sorgenti):\n'
-    + applications.map(app => `- ${app.name}: ${app.codeUrl || 'Percorso non configurato'}`).join('\n') + '\n\n'
+    + applications.map(app => `- ${app.name}: ${app.codeUrl || 'link al repository non indicato'}`).join('\n') + '\n\n'
     + activities.map(({ key, item, number }) => { const plan = plans[key] || {}; return `## Attività ${number} · ${item.interventionId || 'Senza intervento'}\n${item.detail?.detailDescription || item.reason || ''}\n\n- Stato: ${plan.status || 'Da analizzare'}\n- File coinvolti:\n${plan.files || 'Da individuare'}\n\n### Soluzione\n${plan.solution || 'Da definire'}\n\n### Criteri di accettazione\n${plan.acceptance || 'Da definire'}\n\n### Evidenze di verifica\n${plan.verification || 'Nessuna verifica registrata'}\n`; }).join('\n');
 }

@@ -59,6 +59,17 @@ describe('applications of an initiative with an empty System (the real «TBD · 
     expect(await screen.findByText('ILP')).toBeInTheDocument(); expect(screen.getByText('/src/ilp')).toBeInTheDocument();
     expect(screen.queryByText(/Nessun applicativo corrisponde/)).not.toBeInTheDocument();
   });
+  test('the heading does not show an empty system as a dash, and a missing repository link is not presented as an error', async () => {
+    service.getSharedApplications.mockResolvedValue(apps); await open();
+    await screen.findByText('ILP');
+    expect(screen.getByText('Applicativi dell’iniziativa')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('«—»'); expect(document.body.textContent).not.toContain('Percorso sorgenti non configurato');
+  });
+  test('the heading names the system when the initiative has one', async () => {
+    service.getConfiguratoreRecords.mockImplementation(async params => ({ records: params.entity_type === 'initiative_evaluation' ? [{ ...tbd, payload: JSON.stringify({ ...JSON.parse(tbd.payload), initiative: { code: '', title: 'TBD · cr post uat', system: 'ILP' } }) }] : [] }));
+    service.getSharedApplications.mockResolvedValue(apps); await open();
+    expect(await screen.findByText(/sistema «ILP»/)).toBeInTheDocument();
+  });
   test('with nothing chosen the warning names the contract by its name, not its identifier, and says what to do', async () => {
     service.getSharedApplications.mockResolvedValue([{ id: 'npso', name: 'NPSO' }, { id: 'iper', name: 'IPER' }]); await open();
     const warning = await screen.findByText(/Nessun applicativo corrisponde/);

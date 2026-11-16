@@ -96,7 +96,7 @@ export default function DevelopmentActivities({ items, plans, onChange, applicat
     {!embedded && <header className="workspace-heading"><div><span className="workspace-eyebrow">Consegna · Visual Studio Code</span><h3>Schede di sviluppo · {activities.length} attività</h3></div><span className="workspace-version">{activities.filter(a => plans[a.key]?.status === 'Verificata').length} verificate</span></header>}
     {embedded && <h3 className="dev-sr-only">Schede di sviluppo · {activities.length} attività</h3>}
     <div className="development-repositories"><strong>Applicativi collegati al sistema dell’iniziativa</strong>
-      {applications.length ? applications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b> · <code>{app.codeUrl || 'Percorso sorgenti non configurato'}</code></p>) : <p>Nessun applicativo corrispondente trovato: verificare Sistema e Applicativi e tecnologie.</p>}
+      {applications.length ? applications.map(app => <p key={app.id || app.code || app.name}><b>{app.name}</b> · <code>{app.codeUrl || 'Link al repository non indicato (facoltativo)'}</code></p>) : <p>Nessun applicativo corrispondente trovato: verificare Sistema e Applicativi e tecnologie.</p>}
       <p>Il percorso configurato non può essere letto dal browser. Le cartelle che scegli qui restano salvate in questo browser e non vanno riselezionate a ogni visita. Proposte AI, estratti già usati e schede salvate restano consultabili senza riselezionarla.</p>
       {library ? <SourceLibraryPanel library={library} compact /> : <><button type="button" onClick={onSelectFiles}>Seleziona cartella sorgenti per questa sessione</button>
       <span className="dev-files-count">{sourceFiles.length} file selezionati nella sessione</span></>}
