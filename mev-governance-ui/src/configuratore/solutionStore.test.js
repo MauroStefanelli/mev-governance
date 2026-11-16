@@ -12,7 +12,7 @@ beforeEach(() => {
 const save = (solution, revision = 0, extra = {}) => saveSolution({ contractId: 'C1', lot: '2', initiative, solution, revision, author: 'Anna Rossi', ...extra });
 
 test('a new initiative starts with an empty solution at revision zero', async () => {
-  expect(await loadSolution('C1', 'GOTO-1')).toEqual({ solution: { entries: {}, summary: '' }, revision: 0, exists: false });
+  expect(await loadSolution('C1', 'GOTO-1')).toEqual({ solution: { entries: {}, summary: '', proposed: [] }, revision: 0, exists: false });
   expect(await loadSolution('C1', '  ')).toMatchObject({ revision: 0, exists: false });
   expect(getConfiguratoreRecords).toHaveBeenCalledTimes(1);
 });
@@ -70,3 +70,32 @@ test('records of other contracts or other kinds are never read as this solution'
     { record_key: solutionRecordKey('C2', 'GOTO-1'), entity_type: SOLUTION_ENTITY, contract_id: 'C2', payload: JSON.stringify({ entries: { y: 1 }, revision: 5 }) }];
   expect(await loadSolution('C1', 'GOTO-1')).toMatchObject({ exists: false, revision: 0 });
 });
+
+// ---- the interventions proposed by the AI travel in the same shared record ----
+const proposedItem = (over = {}) => ({ id: 'P-1', title: 'Adeguare la stampa H7', description: 'd', activity: 'a', system: 'ILP', requirements: 'r', rationaleIds: [1], components: ['print-app'], status: 'confermato', byAi: true,
+  mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'REALIZZAZIONE', complexity: 'Complesso', qty: 2, unit: 4800, component: 'frontend', technology: 'Angular', why: 'maschera', correction: null }], rejectedMappings: [], ...over });
+
+test('the proposed interventions are saved with the solution and come back identical, in the same record', async () => {
+  await save({ entries: {}, summary: '', proposed: [proposedItem(), proposedItem({ id: 'P-2', title: 'Escludere CHA', status: 'proposto' })] });
+  expect(store).toHaveLength(1); expect(JSON.parse(store[0].payload).proposed).toHaveLength(2);
+  const loaded = await loadSolution('C1', 'GOTO-1'); expect(loaded.solution.proposed.map(item => [item.id, item.status])).toEqual([['P-1', 'confermato'], ['P-2', 'proposto']]);
+  expect(loaded.solution.proposed[0].mappings[0]).toMatchObject({ catalogId: 236, unit: 4800, qty: 2 });
+});
+test('a solution saved before this feature existed loads with no proposed interventions', async () => {
+  store = [{ record_key: solutionRecordKey('C1', 'GOTO-1'), entity_type: SOLUTION_ENTITY, contract_id: 'C1', payload: JSON.stringify({ version: 1, entries: { 'OTT-1': { approach: 'x' } }, summary: 's', revision: 3 }) }];
+  expect((await loadSolution('C1', 'GOTO-1')).solution).toMatchObject({ proposed: [], summary: 's' });
+});
+test('saving without the list of proposed interventions writes an empty one, not nothing', async () => { await save({ entries: {}, summary: 'x' }); expect(JSON.parse(store[0].payload).proposed).toEqual([]); });
+test('a server that does not give back the proposed interventions is NOT taken as a success', async () => {
+  upsertConfiguratoreRecord.mockImplementationOnce(async body => ({ ...body, payload: JSON.stringify({ ...body.payload, proposed: [] }) }));
+  await expect(save({ entries: {}, summary: '', proposed: [proposedItem()] })).rejects.toThrow('Il server non ha confermato');
+});
+test('a colleague who saved proposals first wins here too', async () => {
+  await save({ entries: {}, summary: '', proposed: [proposedItem({ title: 'Di Lucia' })] }, 0);
+  await expect(save({ entries: {}, summary: '', proposed: [proposedItem({ title: 'Di Anna' })] }, 0)).rejects.toThrow('Un collega ha salvato');
+});
+test('what the server returns is put in order again: foreign ids and empty titles never reach the page', async () => {
+  store = [{ record_key: solutionRecordKey('C1', 'GOTO-1'), entity_type: SOLUTION_ENTITY, contract_id: 'C1', payload: JSON.stringify({ revision: 1, entries: {}, proposed: [{ id: '145480', title: 'x' }, { id: 'P-1', title: ' ' }, proposedItem({ id: 'P-3' })] }) }];
+  expect((await loadSolution('C1', 'GOTO-1')).solution.proposed.map(item => item.id)).toEqual(['P-3']);
+});
+

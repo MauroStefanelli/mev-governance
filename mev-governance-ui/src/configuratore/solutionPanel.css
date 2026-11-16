@@ -32,3 +32,26 @@
 .sol-feed { margin: 0; background: #f4f8ff; border: 1px solid #c6daf6; border-radius: 10px; padding: 9px 14px; font-size: 13px; color: #1e416b; line-height: 1.55; } .sol-feed small { color: #4d6179; } .sol-feed-warn { color: #8a5200; font-weight: 600; } .sol-feed-empty { background: #f7f9fc; border-style: dashed; color: #4d6179; }
 .sol-rationale li small { display: block; color: #4d6179; font-size: 11.5px; margin-top: 1px; }
 .sol-rationale-unverified { background: #fff8e6; border-color: #f0cf8d; } .sol-rationale-unverified > p { margin: 3px 0 0; font-size: 12.3px; color: #7a4700; }
+
+/* ---- interventi proposti dall'AI (sezione Soluzione, senza Tabella di Offerta) ---- */
+.sol-proposed { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; padding: 12px 14px; background: #f4f8ff; border: 1px solid #c6daf6; border-radius: 12px; }
+.sol-proposed-head h4 { margin: 0 0 4px; font-size: 15px; color: #17314f; } .sol-proposed-head h4 small { font-weight: 500; color: #4d6179; margin-left: 6px; } .sol-proposed-head p { margin: 0; font-size: 13px; line-height: 1.55; color: #34506e; }
+.sol-proposed-ask { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; } .sol-proposed-ask label { flex: 1 1 280px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #496078; }
+.sol-proposed-ask label small { font-weight: 400; color: #5d718a; } .sol-proposed-ask input { padding: 8px 10px; border: 1px solid #bacbdf; border-radius: 9px; font: inherit; font-size: 13.5px; font-weight: 400; background: #fff; }
+.sol-prop { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #fff; border: 1px solid #d9e3ef; border-left: 5px solid #1f5fbf; border-radius: 10px; min-width: 0; }
+.sol-prop header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .sol-prop-note { font-size: 12px; color: #7a4700; }
+.sol-prop label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #496078; }
+.sol-prop input, .sol-prop textarea, .sol-prop select { width: 100%; padding: 7px 9px; border: 1px solid #bacbdf; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 400; background: #fff; color: #17314f; box-sizing: border-box; }
+.sol-prop textarea { resize: vertical; } .sol-prop input[type=number] { min-width: 64px; }
+.sol-prop-components code, .sol-prop-discarded code { display: inline-block; margin: 2px 6px 2px 0; padding: 1px 6px; background: #f0f4fa; border-radius: 4px; font-size: 12px; overflow-wrap: anywhere; }
+.sol-prop-ambit, .sol-prop-why, .sol-prop-warn { display: block; color: #5d718a; font-size: 11.5px; } .sol-prop-warn { color: #8a5200; }
+.sol-prop-money { white-space: nowrap; text-align: right; } .sol-prop-money small { display: block; color: #5d718a; font-size: 11px; }
+.sol-prop .sol-table-wrap { overflow-x: auto; } .sol-prop table { min-width: 760px; table-layout: auto; } .sol-prop td, .sol-prop th { vertical-align: top; }
+/* Larghezze minime: senza, su schermi stretti il selettore del tipo scende a 24 px e non si legge. La tabella scorre in orizzontale, i campi no si schiacciano. */
+.sol-prop td:nth-child(1) { min-width: 200px; } .sol-prop td:nth-child(2) select { min-width: 120px; } .sol-prop td:nth-child(3) select { min-width: 100px; } .sol-prop td:nth-child(4) input { min-width: 70px; }
+.sol-prop td:nth-child(5) { min-width: 110px; } .sol-prop td:nth-child(6) input { min-width: 150px; } .sol-prop td:last-child { width: 44px; }
+.sol-prop-based button, .sol-prop-discarded button { font-size: 12.5px; padding: 5px 10px; min-height: 32px; }
+.sol-prop-based ul, .sol-prop-rejected ul, .sol-prop-discarded ul { margin: 6px 0; padding-left: 18px; font-size: 12.5px; color: #34506e; }
+.sol-prop-rejected summary { cursor: pointer; font-size: 12.5px; color: #8a5200; }
+.sol-prop-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .sol-prop-actions button { min-height: 36px; }
+@media (max-width: 700px) { .sol-proposed { padding: 10px; } }

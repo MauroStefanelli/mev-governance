@@ -16,8 +16,11 @@ export function rationaleFacts(entries) {
 }
 
 export function solutionFacts(progress) {
-  if (!progress || !progress.total) return ['Nessun intervento nell’offerta'];
-  const facts = [`${progress.filled} di ${progress.total} interventi descritti`];
+  const proposed = progress?.proposed || { proposed: 0, confirmed: 0 };
+  if (!progress || (!progress.total && !proposed.proposed && !proposed.confirmed)) return ['Nessun intervento: importa la Tabella o fatti proporre gli interventi dall’AI'];
+  const facts = progress.total ? [`${progress.filled} di ${progress.total} interventi descritti`] : [];
+  if (proposed.confirmed) facts.push(plural(proposed.confirmed, 'intervento proposto confermato', 'interventi proposti confermati'));
+  if (proposed.proposed) facts.push(plural(proposed.proposed, 'intervento da confermare', 'interventi da confermare'));
   if (progress.orphans) facts.push(plural(progress.orphans, 'soluzione non più nell’offerta', 'soluzioni non più nell’offerta'));
   if (progress.revision) facts.push(`revisione ${progress.revision}`);
   return facts;

@@ -1,0 +1,461 @@
+[
+{
+"id": 236,
+"nome": "Realizzazione Single Page Application",
+"ambito": "Frontend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 840,
+"Semplice": 280,
+"Complesso": 1400
+},
+"REALIZZAZIONE": {
+"Medio": 2800,
+"Semplice": 1200,
+"Complesso": 4800
+}
+}
+},
+{
+"id": 239,
+"nome": "Servizio/API/Microservizio",
+"ambito": "Backend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 900,
+"Semplice": 300,
+"Complesso": 1500
+},
+"REALIZZAZIONE": {
+"Medio": 3000,
+"Semplice": 1500,
+"Complesso": 4500
+}
+}
+},
+{
+"id": 241,
+"nome": "Realizzazione schema (DDL)",
+"ambito": "Database",
+"prezzi": {
+"MODIFICA": {
+"Medio": 210,
+"Semplice": 70,
+"Complesso": 350
+},
+"REALIZZAZIONE": {
+"Medio": 700,
+"Semplice": 500,
+"Complesso": 1200
+}
+}
+},
+{
+"id": 242,
+"nome": "Realizzazione stored procedure, script SQL o equivalente",
+"ambito": "Database",
+"prezzi": {
+"MODIFICA": {
+"Medio": 180,
+"Semplice": 60,
+"Complesso": 300
+},
+"REALIZZAZIONE": {
+"Medio": 600,
+"Semplice": 300,
+"Complesso": 900
+}
+}
+},
+{
+"id": 249,
+"nome": "Procedure di caricamento, elaborazione e trasformazione dei dati (ETL)",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 180,
+"Semplice": 60,
+"Complesso": 300
+},
+"REALIZZAZIONE": {
+"Medio": 600,
+"Semplice": 300,
+"Complesso": 900
+}
+}
+},
+{
+"id": 406,
+"nome": "Tracciatura - Configurazione (Prodotto, Servizio, altro)",
+"ambito": "Database",
+"prezzi": {
+"MODIFICA": {
+"Medio": 540,
+"Semplice": 180,
+"Complesso": 900
+},
+"REALIZZAZIONE": {
+"Medio": 1800,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 410,
+"nome": "Tracciatura - Shell Script File- System HDFS e Gestione Job",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 1500,
+"Semplice": 500,
+"Complesso": 2500
+},
+"REALIZZAZIONE": {
+"Medio": 5000,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 412,
+"nome": "Tracciatura - Workflow Oozie",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 1200,
+"Semplice": 400,
+"Complesso": 2000
+},
+"REALIZZAZIONE": {
+"Medio": 4000,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 413,
+"nome": "Tracciatura - Coordinator Oozie",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 600,
+"Semplice": 200,
+"Complesso": 1000
+},
+"REALIZZAZIONE": {
+"Medio": 2000,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 415,
+"nome": "Job Spark Streaming e Batch",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 1380,
+"Semplice": 460,
+"Complesso": 2300
+},
+"REALIZZAZIONE": {
+"Medio": 4600,
+"Semplice": 2000,
+"Complesso": 8000
+}
+}
+},
+{
+"id": 416,
+"nome": "Tracciatura - Logistica - Job / Template Ni-Fi e Job pubblicazione su SOLr",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 1080,
+"Semplice": 360,
+"Complesso": 1800
+},
+"REALIZZAZIONE": {
+"Medio": 3600,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 418,
+"nome": "Tracciatura - Collection / Shard SOLr",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 720,
+"Semplice": 240,
+"Complesso": 1200
+},
+"REALIZZAZIONE": {
+"Medio": 2400,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 420,
+"nome": "Tracciatura - Request Handler SOLr",
+"ambito": "Data platform",
+"prezzi": {
+"MODIFICA": {
+"Medio": 360,
+"Semplice": 120,
+"Complesso": 600
+},
+"REALIZZAZIONE": {
+"Medio": 1200,
+"Semplice": 600,
+"Complesso": 3000
+}
+}
+},
+{
+"id": 453,
+"nome": "SAP Custom using Dialog (module pool)",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 2040,
+"Semplice": 680,
+"Complesso": 3400
+},
+"REALIZZAZIONE": {
+"Medio": 6800,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 462,
+"nome": "SAP STD Enhancement",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 810,
+"Semplice": 270,
+"Complesso": 1350
+},
+"REALIZZAZIONE": {
+"Medio": 2700,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 481,
+"nome": "Logistica - Pipeline (Oracle OSB)",
+"ambito": "Backend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 270,
+"Semplice": 90,
+"Complesso": 450
+},
+"REALIZZAZIONE": {
+"Medio": 900,
+"Semplice": 300,
+"Complesso": 1500
+}
+}
+},
+{
+"id": 483,
+"nome": "Logistica - Bridge (JBOSS, WLS)",
+"ambito": "Backend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 300,
+"Semplice": 100,
+"Complesso": 500
+},
+"REALIZZAZIONE": {
+"Medio": 1000,
+"Semplice": 0,
+"Complesso": 0
+}
+}
+},
+{
+"id": 498,
+"nome": "Logistica - Creazione BPEL",
+"ambito": "Backend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 270,
+"Semplice": 90,
+"Complesso": 450
+},
+"REALIZZAZIONE": {
+"Medio": 900,
+"Semplice": 300,
+"Complesso": 1500
+}
+}
+},
+{
+"id": 952,
+"nome": "Bapi",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 594,
+"Semplice": 198,
+"Complesso": 990
+},
+"REALIZZAZIONE": {
+"Medio": 1980,
+"Semplice": 1320,
+"Complesso": 3330
+}
+}
+},
+{
+"id": 954,
+"nome": "Flussi Batch Inbound",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 594,
+"Semplice": 198,
+"Complesso": 990
+},
+"REALIZZAZIONE": {
+"Medio": 1980,
+"Semplice": 1320,
+"Complesso": 3330
+}
+}
+},
+{
+"id": 955,
+"nome": "Flussi Batch Outbound",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 504,
+"Semplice": 168,
+"Complesso": 840
+},
+"REALIZZAZIONE": {
+"Medio": 1680,
+"Semplice": 1020,
+"Complesso": 2340
+}
+}
+},
+{
+"id": 965,
+"nome": "Tabella/Strutture",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 90,
+"Semplice": 30,
+"Complesso": 150
+},
+"REALIZZAZIONE": {
+"Medio": 300,
+"Semplice": 225,
+"Complesso": 450
+}
+}
+},
+{
+"id": 966,
+"nome": "Customizing",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 180,
+"Semplice": 60,
+"Complesso": 300
+},
+"REALIZZAZIONE": {
+"Medio": 600,
+"Semplice": 225,
+"Complesso": 1500
+}
+}
+},
+{
+"id": 967,
+"nome": "Definizione Ruoli/Profili ABAP",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 198,
+"Semplice": 66,
+"Complesso": 330
+},
+"REALIZZAZIONE": {
+"Medio": 660,
+"Semplice": 225,
+"Complesso": 1200
+}
+}
+},
+{
+"id": 992,
+"nome": "Consumer",
+"ambito": "Backend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 900,
+"Semplice": 300,
+"Complesso": 1500
+},
+"REALIZZAZIONE": {
+"Medio": 3000,
+"Semplice": 1500,
+"Complesso": 4500
+}
+}
+},
+{
+"id": 993,
+"nome": "Producer",
+"ambito": "Backend",
+"prezzi": {
+"MODIFICA": {
+"Medio": 900,
+"Semplice": 300,
+"Complesso": 1500
+},
+"REALIZZAZIONE": {
+"Medio": 3000,
+"Semplice": 1500,
+"Complesso": 4500
+}
+}
+},
+{
+"id": 1025,
+"nome": "Creazione WS inbound (SOAP o Rest)",
+"ambito": "SAP",
+"prezzi": {
+"MODIFICA": {
+"Medio": 1350,
+"Semplice": 450,
+"Complesso": 2250
+},
+"REALIZZAZIONE": {
+"Medio": 4500,
+"Semplice": 3000,
+"Complesso": 5400
+}
+}
+}
+]

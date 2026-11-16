@@ -3,7 +3,10 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import '@testing-library/jest-dom';
 import SolutionPanel from './SolutionPanel';
 import { loadSolution, saveSolution } from './solutionStore';
+import { proposeInterventions } from '../services/mevService';
+import REAL_CATALOG from './__fixtures__/lotto2Catalogo.json';
 jest.mock('./solutionStore', () => ({ loadSolution: jest.fn(), saveSolution: jest.fn() }));
+jest.mock('../services/mevService', () => ({ proposeInterventions: jest.fn() }));
 
 const initiative = { code: 'GOTO-1', title: 'Invio prenotazione', system: 'NPSO' };
 const interventions = [
@@ -106,7 +109,7 @@ test('the download is a Markdown file with the details, the team text, the confi
   expect(md).toContain('Sintesi generale');
   expect(md).toContain('### 1. OTT-1 — Invio prenotazione');
   expect(md).toContain('Coda con retry');
-  expect(md).toContain('| Servizio REST | REALIZZAZIONE | Medio | 2 | Gateway | Java |');
+  expect(md).toMatch(/\| Servizio REST \| [^|]* \| REALIZZAZIONE \| Medio \| 2 \| [^|]* \| Gateway \| Java \|/);
   expect(md).toContain('Nessuna modifica allo schema');
   expect(md).toContain('`/src/npso`');
   expect(md).toContain('confermata da Anna Rossi');
@@ -138,7 +141,8 @@ test('a read-only user can read and download but not edit or save', async () => 
 
 test('an offer with no interventions explains what to do and disables the download', async () => {
   render(<SolutionPanel {...props} interventions={[]} />);
-  expect(await screen.findByText(/non ha ancora interventi/)).toBeInTheDocument();
+  expect(await screen.findByText(/Non ci sono ancora interventi/)).toBeInTheDocument();   // non e' piu' un vicolo cieco: si puo' anche chiedere gli interventi all'AI
+  expect(screen.getByText(/farti proporre gli interventi dall’AI/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Scarica MD per Visual Studio Code' })).toBeDisabled();
 });
 
@@ -205,3 +209,109 @@ test('changing the rationale updates the solution immediately, without reloading
   expect(screen.getByLabelText('Razionali e vincoli confermati per OTT-1')).toHaveTextContent('Appena confermato');
   expect(loadSolution).toHaveBeenCalledTimes(1);
 });
+
+// ---- no Offer Table: the AI proposes the interventions, the team confirms them, and the document for Visual Studio Code is built from them ----
+const confirmedRationale = [{ id: 7, kind: 'vincolo', status: 'confermata', text: 'Mantenere l’esclusione del CHA per le PDDP', decidedByFullName: 'Anna Rossi', decidedAt: '2026-05-04T10:00:00Z' }, { id: 8, kind: 'razionale', status: 'proposta', text: 'Ancora da decidere', byAi: true }];
+const aiAnswer = (over = {}) => ({
+  interventions: [
+    { title: 'Adeguare la stampa H7', description: 'Consentire la stampa immediata', activity: 'Stampa etichetta', system: 'ILP', requirements: 'Punto 1', components: ['ILP_BACKEND_print-app'], rationaleIds: [7],
+      mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'REALIZZAZIONE', complexity: 'Complesso', qty: 2, unit: 4800, component: 'ILP_frontend', technology: 'Angular', why: 'maschera di stampa', correction: null }], rejectedMappings: ['la voce di catalogo 77777 non esiste nel catalogo di questo lotto'] },
+    { title: 'Bloccare la partenza HU', description: 'Controllo bloccante', mappings: [{ catalogId: 239, name: 'Servizio/API/Microservizio', ambit: 'Backend', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: 600, component: 'hu-transport-app' }] }],
+  rejected: [{ title: 'Senza voci valide', reason: 'x' }], notes: ['Il servizio AI ha raggiunto il limite di lunghezza: l’elenco può essere incompleto.'], missing: ['manca il flusso di conferma partenza'], model: 'm', ...over });
+const noTable = { ...props, interventions: [], knowledge: confirmedRationale, catalog: REAL_CATALOG, applicationBriefs: [{ name: 'ILP', components: ['ILP_BACKEND_print-app'] }] };
+const generateButton = () => screen.getByRole('button', { name: /Proponi (gli|altri) interventi con l’AI/ });
+
+test('with no Offer Table the panel offers to propose the interventions, and says what it starts from', async () => {
+  render(<SolutionPanel {...noTable} />); expect(await screen.findByRole('region', { name: 'Interventi proposti dall’AI' })).toBeInTheDocument();
+  expect(screen.getByText(/Non serve la Tabella di Offerta/)).toBeInTheDocument(); expect(generateButton()).toBeEnabled();
+  expect(screen.queryByRole('button', { name: /^OTT-/ })).not.toBeInTheDocument();
+});
+test('without a confirmed rationale it does not ask the AI, and says why', async () => {
+  render(<SolutionPanel {...noTable} knowledge={[confirmedRationale[1]]} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' });
+  expect(generateButton()).toBeDisabled(); expect(screen.getByText(/serve almeno una voce/)).toHaveTextContent('confermata'); expect(proposeInterventions).not.toHaveBeenCalled();
+});
+test('without the catalogue of the lot it does not ask the AI, and says why', async () => {
+  render(<SolutionPanel {...noTable} catalog={[]} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); expect(generateButton()).toBeDisabled(); expect(screen.getByText(/catalogo interventi del lotto non è disponibile/)).toBeInTheDocument();
+});
+test('the request carries the catalogue with its prices, the chosen applications, the initiative and the focus, and never the confirmed rationale from the browser', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' });
+  fireEvent.change(screen.getByLabelText(/Su cosa concentrarsi/), { target: { value: 'solo la stampa H7' } }); fireEvent.click(generateButton());
+  await waitFor(() => expect(proposeInterventions).toHaveBeenCalledTimes(1)); const body = proposeInterventions.mock.calls[0][0];
+  expect(body).toMatchObject({ goto: 'GOTO-1', system: 'NPSO', lot: '2', focus: 'solo la stampa H7', applications: [{ name: 'ILP' }] }); expect(body.catalog).toHaveLength(27);
+  expect(body.catalog[0].prezzi.REALIZZAZIONE.Complesso).toBeGreaterThan(0); expect(JSON.stringify(body)).not.toContain('Mantenere l’esclusione'); expect(body.knowledge).toBeUndefined();
+});
+test('the proposals appear to be confirmed one by one, with the catalogue rows, the price from the catalogue and what the AI asked for that did not enter', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  const first = await screen.findByRole('article', { name: 'Intervento proposto P-1' }); expect(screen.getByRole('article', { name: 'Intervento proposto P-2' })).toBeInTheDocument();
+  expect(within(first).getByText(/ipotesi di lavoro, non verificata sul codice/)).toBeInTheDocument(); expect(within(first).getByDisplayValue('Adeguare la stampa H7')).toBeInTheDocument();
+  expect(within(first).getByText('Realizzazione Single Page Application', { exact: false })).toBeInTheDocument(); expect(within(first).getByText('9.600,00 €')).toBeInTheDocument(); expect(within(first).getByText(/4\.800,00 € × 2/)).toBeInTheDocument();
+  expect(within(first).getByText('ILP_BACKEND_print-app')).toBeInTheDocument(); expect(within(first).getByText(/1 voce proposta dall’AI non è entrata/)).toBeInTheDocument();
+  expect(await screen.findByText(/2 interventi proposti: controllali e conferma/)).toBeInTheDocument(); expect(screen.getByText(/Scartati 1/)).toBeInTheDocument(); expect(screen.getByText(/può essere incompleto/)).toBeInTheDocument(); expect(screen.getByText('manca il flusso di conferma partenza')).toBeInTheDocument();
+});
+test('a proposal is NOT an intervention until the team confirms it: it is not in the list, nor in the document', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton()); await screen.findByRole('article', { name: 'Intervento proposto P-1' });
+  expect(screen.queryByRole('button', { name: /P-1/ })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Scarica MD per Visual Studio Code' })).toBeDisabled();
+});
+test('confirming an intervention makes it a row of the solution, ready to describe, and the other proposal stays to be confirmed', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' }));
+  expect(await screen.findByRole('button', { name: /P-1.*Adeguare la stampa H7/ })).toBeInTheDocument(); expect(screen.queryByRole('article', { name: 'Intervento proposto P-1' })).not.toBeInTheDocument();
+  expect(screen.getByRole('article', { name: 'Intervento proposto P-2' })).toBeInTheDocument(); expect(screen.getByText(/1 confermati · 1 da confermare/)).toBeInTheDocument();
+  openItem('P-1'); expect(await screen.findByLabelText('Soluzione proposta')).toBeEnabled(); expect(screen.getByRole('region', { name: 'Attività dell’intervento P-1' })).toHaveTextContent('Realizzazione Single Page Application');
+});
+test('the document for Visual Studio Code is built from the confirmed interventions: catalogue rows, components, checklist, and what is not verified', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' })); await screen.findByRole('button', { name: /P-1/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Scarica MD per Visual Studio Code' })); await waitFor(() => expect(blobs).toHaveLength(1)); const md = await readBlob(blobs[0]);
+  expect(md).toContain('## Prima di cominciare'); expect(md).toMatch(/Interventi proposti dall’AI e confermati dal team:\*\* 1/); expect(md).toContain('### 1. P-1 — Adeguare la stampa H7'); expect(md).toContain('proposto dall’AI e confermato dal team');
+  expect(md).toContain('| Realizzazione Single Page Application | 236 | REALIZZAZIONE | Complesso | 2 | 9.600,00 € | ILP_frontend | Angular |'); expect(md).toContain('- `ILP_BACKEND_print-app`'); expect(md).toContain('- [ ] Realizzare: Realizzazione Single Page Application');
+  expect(md).not.toContain('Bloccare la partenza HU'); expect(md).toContain('Mantenere l’esclusione del CHA per le PDDP');
+});
+test('discarding removes a proposal from the work, and it can be restored', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-2' })).getByRole('button', { name: 'Scarta' })); await waitFor(() => expect(screen.queryByRole('article', { name: 'Intervento proposto P-2' })).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /Mostra gli scartati \(1\)/ })); fireEvent.click(screen.getByRole('button', { name: 'Ripristina' })); expect(await screen.findByRole('article', { name: 'Intervento proposto P-2' })).toBeInTheDocument();
+});
+test('an intervention with no valid catalogue row cannot be confirmed; adding a row from the catalogue allows it, and the price follows the catalogue', async () => {
+  proposeInterventions.mockResolvedValue({ interventions: [{ title: 'Senza voci', mappings: [] }] }); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  const card = await screen.findByRole('article', { name: 'Intervento proposto P-1' }); expect(within(card).getByRole('button', { name: 'Conferma l’intervento' })).toBeDisabled(); expect(within(card).getByText('Serve almeno una voce di catalogo.')).toBeInTheDocument();
+  fireEvent.change(within(card).getByLabelText('Aggiungi voce di catalogo a P-1'), { target: { value: '236' } }); expect(within(card).getByRole('button', { name: 'Conferma l’intervento' })).toBeEnabled();
+  expect(within(card).getByText('2.800,00 €')).toBeInTheDocument();                        // REALIZZAZIONE Medio x 1, dal catalogo
+  fireEvent.change(within(card).getByLabelText(/Quantità, Realizzazione/), { target: { value: '3' } }); expect(within(card).getByText('8.400,00 €')).toBeInTheDocument();
+  fireEvent.change(within(card).getByLabelText(/Complessità, Realizzazione/), { target: { value: 'Complesso' } }); expect(within(card).getByText('14.400,00 €')).toBeInTheDocument();
+});
+test('changing a confirmed intervention puts it back to be confirmed again', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' })); await screen.findByRole('button', { name: /P-1/ });
+  expect(screen.queryByRole('article', { name: 'Intervento proposto P-1' })).not.toBeInTheDocument();
+});
+test('what the team confirmed is saved with the solution, and the unsaved state is shown until then', async () => {
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' })); expect(await screen.findByText('Modifiche non salvate')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Salva soluzione' })); await waitFor(() => expect(saveSolution).toHaveBeenCalledTimes(1));
+  const sent = saveSolution.mock.calls[0][0].solution; expect(sent.proposed.map(item => [item.id, item.status])).toEqual([['P-1', 'confermato'], ['P-2', 'proposto']]);
+});
+test('proposals saved by a colleague are there when the page opens', async () => {
+  loadSolution.mockResolvedValue({ solution: { entries: {}, summary: '', proposed: [{ id: 'P-4', title: 'Di Lucia', description: '', activity: '', system: '', requirements: '', rationaleIds: [], components: [], status: 'confermato', byAi: true, mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: 840, component: '', technology: '', why: '' }] }] }, revision: 3, exists: true });
+  render(<SolutionPanel {...noTable} />); expect(await screen.findByRole('button', { name: /P-4.*Di Lucia/ })).toBeInTheDocument();
+});
+test('an error from the AI is shown and nothing is lost', async () => {
+  proposeInterventions.mockRejectedValue(new Error('Il servizio AI non ha risposto nel formato richiesto: riprova.')); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  expect(await screen.findByRole('alert')).toHaveTextContent('non ha risposto nel formato richiesto'); expect(generateButton()).toBeEnabled();
+});
+test('a second request does not repeat what was already proposed, and keeps the numbering going', async () => {
+  proposeInterventions.mockResolvedValueOnce(aiAnswer()).mockResolvedValueOnce({ interventions: [{ title: 'ADEGUARE LA STAMPA H7', mappings: [] }, { title: 'Nuovo intervento', mappings: aiAnswer().interventions[1].mappings }] });
+  render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton()); await screen.findByRole('article', { name: 'Intervento proposto P-1' });
+  fireEvent.click(generateButton()); expect(await screen.findByRole('article', { name: 'Intervento proposto P-3' })).toBeInTheDocument(); expect(screen.queryByRole('article', { name: 'Intervento proposto P-4' })).not.toBeInTheDocument();
+  expect(proposeInterventions.mock.calls[1][0].existingTitles).toEqual(expect.arrayContaining(['Adeguare la stampa H7', 'Bloccare la partenza HU']));
+});
+test('a person who cannot edit sees the proposals but has no buttons to ask, confirm or discard', async () => {
+  loadSolution.mockResolvedValue({ solution: { entries: {}, summary: '', proposed: [{ id: 'P-1', title: 'In revisione', description: '', activity: '', system: '', requirements: '', rationaleIds: [], components: [], status: 'proposto', byAi: true, mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: 840, component: '', technology: '', why: '' }] }] }, revision: 1, exists: true });
+  render(<SolutionPanel {...noTable} canEdit={false} />); const card = await screen.findByRole('article', { name: 'Intervento proposto P-1' });
+  expect(screen.queryByRole('button', { name: /Proponi/ })).not.toBeInTheDocument(); expect(within(card).queryByRole('button', { name: 'Conferma l’intervento' })).not.toBeInTheDocument(); expect(within(card).getByDisplayValue('In revisione')).toBeDisabled();
+});
+test('an intervention of the Offer Table and a proposed one live together in the same list', async () => {
+  loadSolution.mockResolvedValue({ solution: { entries: {}, summary: '', proposed: [{ id: 'P-1', title: 'Proposto confermato', description: '', activity: '', system: '', requirements: '', rationaleIds: [], components: [], status: 'confermato', byAi: true, mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: 840, component: '', technology: '', why: '' }] }] }, revision: 1, exists: true });
+  render(<SolutionPanel {...props} knowledge={confirmedRationale} catalog={REAL_CATALOG} />); await screen.findByRole('button', { name: /P-1.*Proposto confermato/ }); const heads = screen.getAllByRole('button', { name: /OTT-1|OTT-2|P-1/ }); expect(heads.map(head => head.textContent.match(/OTT-1|OTT-2|P-1/)[0])).toEqual(['OTT-1', 'OTT-2', 'P-1']);
+});
+

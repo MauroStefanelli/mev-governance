@@ -237,6 +237,7 @@ builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.AiService>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IRationaleAssistant, MevGovernanceBackend.Services.AiRationaleAssistant>();
+builder.Services.AddScoped<MevGovernanceBackend.Services.IInterventionAssistant, MevGovernanceBackend.Services.AiInterventionAssistant>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IDocumentAssistant, MevGovernanceBackend.Services.AiDocumentAssistant>();
 builder.Services.AddScoped<MevGovernanceBackend.Services.IKnowledgeExtractor, MevGovernanceBackend.Services.AiKnowledgeExtractor>();
 builder.Services.AddSingleton<MevGovernanceBackend.Services.IOcrEngine, MevGovernanceBackend.Services.TesseractOcrEngine>();

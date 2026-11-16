@@ -11,11 +11,18 @@ test('rationale: confirmed entries by kind and proposals waiting for a decision'
 });
 
 test('solution: how many interventions are described, orphans and revision', () => {
-  expect(solutionFacts(null)).toEqual(['Nessun intervento nell’offerta']);
-  expect(solutionFacts({ total: 0, filled: 0 })).toEqual(['Nessun intervento nell’offerta']);
+  expect(solutionFacts(null)).toEqual(['Nessun intervento: importa la Tabella o fatti proporre gli interventi dall’AI']);
+  expect(solutionFacts({ total: 0, filled: 0 })).toEqual(['Nessun intervento: importa la Tabella o fatti proporre gli interventi dall’AI']);
   expect(solutionFacts({ total: 5, filled: 2, orphans: 0, revision: 0 })).toEqual(['2 di 5 interventi descritti']);
   expect(solutionFacts({ total: 5, filled: 5, orphans: 1, revision: 3 })).toEqual(['5 di 5 interventi descritti', '1 soluzione non più nell’offerta', 'revisione 3']);
   expect(solutionFacts({ total: 1, filled: 1, orphans: 2, revision: 1 })[1]).toBe('2 soluzioni non più nell’offerta');
+});
+
+test('solution: the interventions proposed by the AI are counted, with or without the Offer Table', () => {
+  expect(solutionFacts({ total: 0, filled: 0, proposed: { proposed: 2, confirmed: 0 } })).toEqual(['2 interventi da confermare']);
+  expect(solutionFacts({ total: 0, filled: 0, proposed: { proposed: 0, confirmed: 1 } })).toEqual(['1 intervento proposto confermato']);
+  expect(solutionFacts({ total: 3, filled: 1, orphans: 0, revision: 2, proposed: { proposed: 1, confirmed: 2 } })).toEqual(['1 di 3 interventi descritti', '2 interventi proposti confermati', '1 intervento da confermare', 'revisione 2']);
+  expect(solutionFacts({ total: 0, filled: 0, proposed: { proposed: 0, confirmed: 0 } })).toEqual(['Nessun intervento: importa la Tabella o fatti proporre gli interventi dall’AI']);
 });
 
 test('shared analysis: revision, saved state and status', () => {

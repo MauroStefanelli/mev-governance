@@ -1,4 +1,4 @@
-import { rationaleContext, rationaleCounts, entryProvenance, KIND_LABEL, SOLUTION_FIELDS, FIELD_KEYS, MAX_FIELD, MAX_SUMMARY, emptyEntry, isEmptyEntry, interventionList, solutionRows, solutionProgress, validateEntry, validateSolution, withField, withSummary, solutionMarkdown, solutionFileName } from './solutionModel';
+import { checklist, rationaleContext, rationaleCounts, entryProvenance, KIND_LABEL, SOLUTION_FIELDS, FIELD_KEYS, MAX_FIELD, MAX_SUMMARY, emptyEntry, isEmptyEntry, interventionList, solutionRows, solutionProgress, validateEntry, validateSolution, withField, withSummary, solutionMarkdown, solutionFileName } from './solutionModel';
 
 const interventions = [
   { id: 'OTT-1', titolo: 'Invio prenotazione', descrizione: 'Esporre il servizio', attivita: 'Sviluppo API', sistema: 'NPSO', requisiti: 'REQ-4', mappings: [{ name: 'Servizio REST', type: 'REALIZZAZIONE', complexity: 'Medio', qty: 2, componentApplication: 'Gateway', technology: 'Java', detailDescription: 'dettaglio' }] },
@@ -68,7 +68,7 @@ test('the Markdown carries the initiative, every intervention with its detail, a
   expect(md).toContain('## Sintesi della soluzione\n\nSintesi **chiara**');
   expect(md).toContain('- **NPSO** — `/src/npso`');
   expect(md).toContain('### 1. OTT-1 — Invio prenotazione');
-  expect(md).toContain('| Servizio REST | REALIZZAZIONE | Medio | 2 | Gateway | Java |');
+  expect(md).toMatch(/\| Servizio REST \| [^|]* \| REALIZZAZIONE \| Medio \| 2 \| [^|]* \| Gateway \| Java \|/);
   expect(md).toContain('**Soluzione proposta**\n\nUsare una coda\ncon retry');
   expect(md).toContain('**Verifiche e criteri di accettazione**\n\nRetry testato');
   expect(md).toContain('1 interventi su 2 con soluzione descritta');
@@ -189,3 +189,45 @@ test('the file name is safe and readable', () => {
   expect(solutionFileName({ code: '../../etc/passwd' })).not.toContain('/');
   expect(SOLUTION_FIELDS).toHaveLength(5);
 });
+
+// ---- the document for Visual Studio Code: what a developer needs to start ----
+const ILP_PROPOSED = { id: 'P-1', titolo: 'Adeguare la stampa H7', descrizione: 'Consentire la stampa immediata.', attivita: 'Stampa etichetta', sistema: 'ILP', requisiti: 'Punto 1', proposed: true, components: ['ILP_BACKEND_print-app', 'ILP_frontend'],
+  mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', type: 'REALIZZAZIONE', complexity: 'Complesso', qty: 2, unit: 4800, total: 9600, componentApplication: 'ILP_frontend', technology: 'Angular', detailDescription: 'maschera di stampa', ambit: 'Frontend' }] };
+const TABLE = { id: '145480', titolo: 'Dalla tabella', descrizione: 'd', mappings: [{ catalogId: 239, name: 'Servizio/API/Microservizio', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: 600, total: 600, componentApplication: 'gateway', technology: 'Java' }] };
+const mdOf = (interventions, entries = {}) => solutionMarkdown({ initiative: { code: 'G1', title: 'Stampa', system: 'ILP' }, interventions, solution: { entries }, generatedAt: '2026-05-05T09:00:00Z' });
+
+test('the document opens with what is and is not verified, so nobody mistakes a proposal for a checked fact', () => {
+  const md = mdOf([TABLE, ILP_PROPOSED]);
+  expect(md).toContain('## Prima di cominciare'); expect(md).toContain('niente sul codice'); expect(md).toMatch(/Interventi proposti dall’AI e confermati dal team:\*\* 1/); expect(md).toContain('Non sono file né classi verificati');
+  expect(md.indexOf('## Prima di cominciare')).toBeLessThan(md.indexOf('## Interventi'));
+});
+test('with no proposed intervention the document says they all come from the offer table', () => { expect(mdOf([TABLE])).toContain('tutti dalla Tabella di Offerta'); expect(mdOf([TABLE])).not.toContain('proposti dall’AI e confermati'); });
+test('an index ties each intervention to its catalogue rows and its components, and marks the ones proposed by the AI', () => {
+  const md = mdOf([TABLE, ILP_PROPOSED]);
+  expect(md).toContain('## Indice: interventi, voci di catalogo e componenti');
+  expect(md).toContain('| P-1 — Adeguare la stampa H7 _(proposto dall’AI)_ | Realizzazione Single Page Application (REALIZZAZIONE · Complesso · 2) | ILP_BACKEND_print-app, ILP_frontend |');
+  expect(md).toContain('| 145480 — Dalla tabella | Servizio/API/Microservizio (MODIFICA · Medio · 1) | gateway |');
+  expect(mdOf([{ id: 'X', titolo: 'Senza righe', mappings: [] }])).not.toContain('## Indice');
+});
+test('every intervention lists its candidate components as places to look, not as verified facts', () => { const md = mdOf([ILP_PROPOSED]); expect(md).toContain('**Componenti candidati** _(da verificare nel codice)_'); expect(md).toContain('- `ILP_BACKEND_print-app`'); expect(mdOf([TABLE])).not.toContain('Componenti candidati'); });
+test('the catalogue rows carry the id and the catalogue amount (unit x quantity), with the Italian thousands point', () => {
+  const md = mdOf([ILP_PROPOSED]); expect(md).toContain('| Realizzazione Single Page Application | 236 | REALIZZAZIONE | Complesso | 2 | 9.600,00 € | ILP_frontend | Angular |');
+  expect(mdOf([{ id: 'S', titolo: 'x', mappings: [{ catalogId: 1, name: 'Senza prezzo', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: null, total: null }] }])).toContain('| — |');
+});
+test('every intervention has a checklist for the developer, built only from what it contains', () => {
+  const md = mdOf([ILP_PROPOSED], { 'P-1': { tests: 'Stampa con H7 senza NA', assumptions: 'Il CHA arriva da Sp1' } });
+  expect(md).toContain('**Checklist per chi sviluppa**');
+  ['- [ ] Aprire il componente `ILP_BACKEND_print-app` e verificare dove si realizza l’intervento', '- [ ] Aprire il componente `ILP_frontend` e verificare dove si realizza l’intervento', '- [ ] Realizzare: Realizzazione Single Page Application (ILP_frontend) — complessità Complesso, 2 volte',
+    '- [ ] Eseguire le verifiche indicate in «Verifiche e criteri di accettazione»', '- [ ] Controllare le «Ipotesi da verificare» prima di scrivere codice'].forEach(line => expect(md).toContain(line));
+});
+test('a checklist does not invent steps: with no tests written it says the criteria are missing, with no component it says none was indicated', () => {
+  const lines = checklist({ components: [], mappings: [], entry: {} }); expect(lines).toEqual(['- [ ] Individuare nel codice dove si realizza l’intervento (nessun componente indicato)', '- [ ] Definire le verifiche: nessun criterio di accettazione è ancora stato scritto']);
+  expect(checklist({ components: ['a'], mappings: [{ type: 'MODIFICA', name: 'N', component: '', complexity: '', qty: 1 }], entry: { tests: 't' } })).toEqual(['- [ ] Aprire il componente `a` e verificare dove si realizza l’intervento', '- [ ] Modificare: N', '- [ ] Eseguire le verifiche indicate in «Verifiche e criteri di accettazione»']);
+});
+test('a checklist is limited to six components and an orphan intervention has none', () => {
+  expect(checklist({ components: Array.from({ length: 12 }, (_, i) => 'c' + i), mappings: [], entry: {} }).filter(line => line.includes('Aprire il componente'))).toHaveLength(6);
+  expect(mdOf([], { 'OTT-9': { approach: 'Vecchia' } })).not.toContain('Checklist per chi sviluppa');
+});
+test('the document lists first the interventions of the table and then the proposed ones that were confirmed', () => { const md = mdOf([TABLE, ILP_PROPOSED]); expect(md.indexOf('### 1. 145480')).toBeLessThan(md.indexOf('### 2. P-1')); });
+test('a proposal that was not confirmed is not in the document: it is not an intervention yet', () => { expect(mdOf([TABLE])).not.toContain('P-1'); });
+

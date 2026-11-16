@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SOLUTION_FIELDS, MAX_FIELD, MAX_SUMMARY, solutionRows, solutionProgress, withField, withSummary, validateSolution, solutionMarkdown, solutionFileName, rationaleContext, rationaleCounts, entryProvenance, KIND_LABEL } from './solutionModel';
 import { loadSolution, saveSolution } from './solutionStore';
+import InterventionProposalsPanel from './InterventionProposalsPanel';
+import { mergeInterventions, counts as proposedStats } from './proposedInterventions';
 import { displayName, relativeTime } from './developmentCollaboration';
 import './solutionPanel.css';
 
@@ -12,10 +14,10 @@ const download = (name, text) => {
 
 // The proposed solution of each intervention: read-only context from the offer and the confirmed rationale,
 // editable text written by the team, shared and saved on the server, exportable as Markdown for Visual Studio Code.
-export default function SolutionPanel({ initiative, contractId, lot, interventions = [], knowledge = [], applications = [], canEdit = true, author = '', onProgress }) {
+export default function SolutionPanel({ initiative, contractId, lot, interventions = [], knowledge = [], applications = [], catalog = [], applicationBriefs = [], canEdit = true, author = '', onProgress }) {
   const code = String(initiative?.code || initiative?.title || '').trim();
-  const [solution, setSolution] = useState({ entries: {}, summary: '' });
-  const [saved, setSaved] = useState({ entries: {}, summary: '' });
+  const [solution, setSolution] = useState({ entries: {}, summary: '', proposed: [] });
+  const [saved, setSaved] = useState({ entries: {}, summary: '', proposed: [] });
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,13 +37,16 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
       setSolution(result.solution); setSaved(result.solution); setRevision(result.revision);
     } catch (e) { if (alive.current) setError(`Soluzione non disponibile: ${e.message}`); } finally { if (alive.current) setLoading(false); }
   }, [code, contractId]);
-  useEffect(() => { setSolution({ entries: {}, summary: '' }); setSaved({ entries: {}, summary: '' }); setRevision(0); setOpenId(null); setNotice(''); setError(''); load(); }, [load]);
+  useEffect(() => { setSolution({ entries: {}, summary: '', proposed: [] }); setSaved({ entries: {}, summary: '', proposed: [] }); setRevision(0); setOpenId(null); setNotice(''); setError(''); load(); }, [load]);
 
-  const rows = useMemo(() => solutionRows(interventions, solution), [interventions, solution]);
+  // Gli interventi della soluzione: quelli della Tabella di Offerta e, dopo, quelli proposti dall'AI che il team ha CONFERMATO. Una proposta non confermata non e' un intervento.
+  const allInterventions = useMemo(() => mergeInterventions(interventions, solution.proposed), [interventions, solution.proposed]);
+  const rows = useMemo(() => solutionRows(allInterventions, solution), [allInterventions, solution]);
   const progress = solutionProgress(rows);
   const counts = rationaleCounts(knowledge);
-  const dirty = JSON.stringify({ e: solution.entries, s: solution.summary || '' }) !== JSON.stringify({ e: saved.entries, s: saved.summary || '' });
-  useEffect(() => { onProgress?.({ ...progress, dirty, revision }); }, [progress.total, progress.filled, progress.orphans, dirty, revision]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = JSON.stringify({ e: solution.entries, s: solution.summary || '', p: solution.proposed || [] }) !== JSON.stringify({ e: saved.entries, s: saved.summary || '', p: saved.proposed || [] });
+  const proposedCounts = proposedStats(solution.proposed);
+  useEffect(() => { onProgress?.({ ...progress, dirty, revision, proposed: proposedCounts }); }, [progress.total, progress.filled, progress.orphans, dirty, revision, proposedCounts.proposed, proposedCounts.confirmed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const edit = (id, key, value) => { setSolution(previous => withField(previous, id, key, value)); setNotice(''); };
   const save = async () => {
@@ -60,7 +65,7 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
     if (dirty && !window.confirm('Ricaricare la soluzione salvata? Le modifiche non salvate di questa pagina andranno perse.')) return;
     await load(); setNotice('Soluzione ricaricata dall’ultimo salvataggio.');
   };
-  const exportMd = () => download(solutionFileName(initiative), solutionMarkdown({ initiative, interventions, solution, knowledge, applications }));
+  const exportMd = () => download(solutionFileName(initiative), solutionMarkdown({ initiative, interventions: allInterventions, solution, knowledge, applications }));
 
   const visible = rows.filter(row => filter === 'all' || (filter === 'filled' ? row.filled : !row.filled));
   const idle = !code;
@@ -81,8 +86,10 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
       {error && <p className="sol-error" role="alert">{error}</p>}
       {notice && <p className="sol-notice" role="status">{notice}</p>}
       {loading && <p className="sol-empty" role="status">Caricamento della soluzione…</p>}
-      {noInterventions && !loading && <p className="sol-empty">L’offerta non ha ancora interventi. Importa la Tabella di Offerta (pulsante «Importa Tabella di Offerta» in alto) e qui comparirà un intervento per riga.</p>}
+      {noInterventions && !loading && <p className="sol-empty">Non ci sono ancora interventi. Puoi importare la Tabella di Offerta (pulsante «Importa Tabella di Offerta» in alto) oppure farti proporre gli interventi dall’AI qui sotto, a partire dai razionali confermati: non serve la Tabella.</p>}
 
+      {!idle && !loading && <InterventionProposalsPanel initiative={initiative} lot={lot} catalog={catalog} applications={applicationBriefs} knowledge={knowledge} proposed={solution.proposed || []}
+        importedTitles={(interventions || []).map(item => item.titolo || item.title)} canEdit={canEdit} onChange={proposed => { setSolution(previous => ({ ...previous, proposed })); setNotice(''); }} />}
       {!!rows.length && <>
         {(counts.confirmed > 0 || counts.toConfirm > 0) && <div className="sol-feed" role="status" aria-label="Informazioni dei Razionali e vincoli usate dalla soluzione">
           <b>Dai Razionali e vincoli:</b> {counts.confirmed} confermati ({counts.byKind.vincolo} vincoli · {counts.byKind.decisione} decisioni · {counts.byKind.razionale} razionali)

@@ -12,7 +12,7 @@ export default function KnowledgeOverview({ initiative, rationale = [], solution
   const cards = [
     { id: 'documenti', title: 'Documenti', value: library || (hasInitiative ? '—' : 'Bloccato'), hint: 'Memoria condivisa: requisiti, email, analisi e materiali. L’AI li usa per rispondere.' },
     { id: 'razionali', title: 'Razionali e vincoli', value: confirmed.length ? `${confirmed.length} confermati` : 'Nessuno confermato', hint: confirmed.length ? `${counts.razionale} razionali · ${counts.vincolo} vincoli · ${counts.decisione} decisioni${proposed ? ` · ${proposed} da confermare` : ''}` : proposed ? `${proposed} proposte da confermare` : 'Spiega all’AI perché servono gli interventi.' },
-    { id: 'soluzione', title: 'Soluzione', value: solution?.total ? `${solution.filled} di ${solution.total} interventi` : 'Nessun intervento', hint: solution?.dirty ? 'Ci sono modifiche non salvate.' : 'La soluzione proposta per ogni intervento, scaricabile per Visual Studio Code.' },
+    { id: 'soluzione', title: 'Soluzione', value: solution?.total ? `${solution.filled} di ${solution.total} interventi` : (solution?.proposed?.confirmed || solution?.proposed?.proposed) ? `${solution.proposed.confirmed || 0} proposti confermati` : 'Nessun intervento', hint: solution?.dirty ? 'Ci sono modifiche non salvate.' : 'La soluzione proposta per ogni intervento, scaricabile per Visual Studio Code.' },
     { id: 'conoscenza', title: 'Offerta importata', value: interventions.length ? `${interventions.length} interventi` : 'Nessun import', hint: interventions.length ? `${mappingCount} valorizzazioni di catalogo` : 'Importa la Tabella di Offerta.' },
   ];
   return <div className="know" aria-label="Riepilogo della conoscenza dell’iniziativa">

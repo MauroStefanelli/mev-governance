@@ -102,7 +102,7 @@ test('the solution section opens with the empty-offer guidance when nothing was 
   fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '145480' } });
   fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'Invio' } });
   fireEvent.click(row('Soluzione'));
-  expect(await screen.findByText(/non ha ancora interventi/)).toBeVisible();
+  expect(await screen.findByText(/Non ci sono ancora interventi/)).toBeVisible();
 });
 
 test('the knowledge section opens with its overview and the cards open the matching section', async () => {
@@ -401,3 +401,30 @@ test('removing the application clears the Sistema field it had filled and stops 
   await screen.findByTitle('Valorizzato dal file Excel importato'); fireEvent.click(screen.getByRole('button', { name: '×' }));
   await waitFor(() => expect(screen.queryByTitle('Valorizzato dal file Excel importato')).not.toBeInTheDocument());
 });
+
+// ---- the whole path the user asked for: no Offer Table, shared rationale, an application, interventions proposed by the AI and confirmed, the file for Visual Studio Code ----
+test('without an Offer Table: the rationale is confirmed, the AI proposes the interventions tied to the catalogue, the team confirms one and the file for Visual Studio Code is built', async () => {
+  service.getSharedApplications.mockImplementation(async () => [ILP_APP]);
+  const confirmedEntry = { id: 7, goto: 'goto-1', kind: 'vincolo', status: 'confermata', text: 'Mantenere l’esclusione del CHA per le PDDP', byAi: false, createdBy: 'io', createdByFullName: 'Io', createdAt: new Date().toISOString(), decidedBy: 'io', decidedAt: new Date().toISOString() };
+  service.rationaleRequest.mockImplementation(async path => (String(path).startsWith('related') ? [] : { messages: [], hasMore: false, entries: [confirmedEntry] }));
+  service.proposeInterventions.mockReset().mockResolvedValue({ interventions: [{ title: 'Adeguare la stampa H7', description: 'Consentire la stampa immediata', activity: 'Stampa', system: 'ILP', components: ['ILP_BACKEND_print-app'], rationaleIds: [7],
+    mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'REALIZZAZIONE', complexity: 'Complesso', qty: 2, unit: 4800, component: 'ILP_frontend', technology: 'Angular', why: 'maschera' }] }], rejected: [], notes: [], missing: [] });
+  const urls = []; const blobs = []; window.URL.createObjectURL = jest.fn(blob => { blobs.push(blob); return 'blob:x'; }); window.URL.revokeObjectURL = jest.fn(); jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () { urls.push(this.download); });
+  mount(); await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+  fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: 'GOTO-1' } }); fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'Stampa LDV gialle' } });
+  await chooseApplication('ILP'); await screen.findByTitle('Valorizzato dal file Excel importato');
+  fireEvent.click(row('Soluzione'));
+  const ask = await screen.findByRole('button', { name: 'Proponi gli interventi con l’AI' });
+  await waitFor(() => expect(ask).toBeEnabled());
+  expect(screen.getByText(/Non serve la Tabella di Offerta/)).toBeInTheDocument(); expect(screen.queryByText(/L’offerta non ha ancora interventi/)).not.toBeInTheDocument();
+  fireEvent.click(ask); await waitFor(() => expect(service.proposeInterventions).toHaveBeenCalledTimes(1));
+  const body = service.proposeInterventions.mock.calls[0][0];
+  expect(body).toMatchObject({ goto: 'GOTO-1', system: 'ILP', applications: [{ name: 'ILP', totalComponents: 3 }] }); expect(body.catalog.length).toBeGreaterThan(5); expect(body.catalog.every(entry => entry.id > 0 && entry.nome && entry.prezzi)).toBe(true);
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' }));
+  expect(await screen.findByRole('button', { name: /P-1.*Adeguare la stampa H7/ })).toBeInTheDocument();
+  await waitFor(() => expect(row('Soluzione')).toHaveTextContent('1 intervento proposto confermato'));
+  fireEvent.click(screen.getByRole('button', { name: 'Scarica MD per Visual Studio Code' })); await waitFor(() => expect(blobs).toHaveLength(1));
+  const md = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsText(blobs[0]); });
+  expect(urls[0]).toMatch(/^SOLUZIONE_GOTO-1/); expect(md).toContain('P-1 — Adeguare la stampa H7'); expect(md).toContain('Mantenere l’esclusione del CHA per le PDDP'); expect(md).toContain('- [ ] Realizzare: Realizzazione Single Page Application'); expect(md).toContain('ILP_BACKEND_print-app');
+});
+

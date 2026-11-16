@@ -2204,7 +2204,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           {/* 4 · Soluzione */}
           <SectionRow number="4" id="sezione-soluzione" title="Soluzione" open={isOpen('soluzione')} onToggle={() => toggleSection('soluzione')} keepMounted={hasInitiative}
             facts={hasInitiative ? solutionFacts(solutionProgress) : ['Apri o crea un’iniziativa per usarla']} status={!hasInitiative ? 'Bloccata' : solutionProgress.dirty ? 'Non salvata' : undefined} tone={!hasInitiative ? 'lock' : solutionProgress.dirty ? 'warn' : 'neutral'}>
-            <SolutionPanel initiative={initiative} contractId={initiativeContractId} lot={lot} interventions={importedInterventions} knowledge={rationale} applications={applicationContextFor(initiative.system, applications, lot)} canEdit={canEditInitiative} author={currentUserName} onProgress={setSolutionProgress} />
+            <SolutionPanel initiative={initiative} contractId={initiativeContractId} lot={lot} interventions={importedInterventions} knowledge={rationale} applications={applicationContextFor(initiative.system, applications, lot)} catalog={catalog} applicationBriefs={applicationBriefs(applications, selectedAppIds)} canEdit={canEditInitiative} author={currentUserName} onProgress={setSolutionProgress} />
           </SectionRow>
 
           {/* 5 · Analisi condivisa */}

@@ -122,6 +122,17 @@ export async function rationaleRequest(path, body) {
   return response.json();
 }
 
+// The AI proposes the interventions of an initiative from the confirmed rationale and the chosen applications, tied to rows of the catalogue of the lot (checked again by the server).
+export async function proposeInterventions(body) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/interventions/propose`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+  const details = response.ok ? null : await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(details.message || (response.status === 404 ? 'Il backend non espone ancora la proposta di interventi: aggiorna il backend DEV.' : response.status === 403 ? 'Il tuo ruolo non può chiedere interventi all’AI.' : `Proposta di interventi: errore ${response.status}`));
+    error.status = response.status; throw error;
+  }
+  return response.json();
+}
+
 // Presence, last worker and chat of the Sviluppo application (always scoped by the server to the active environment).
 export async function developmentRequest(path, body) {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/development/${path}`, {

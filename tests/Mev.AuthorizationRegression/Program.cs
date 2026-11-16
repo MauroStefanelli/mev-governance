@@ -22,6 +22,7 @@ db.Database.OpenConnection(); db.Database.EnsureCreated();
 await WorkspaceRegression.Run(db, Check);
 await DevelopmentCollaborationRegression.Run(db, Check);
 await RationaleRegression.Run(db, Check);
+await InterventionProposalsRegression.Run(db, Check);
 await DocumentLibraryRegression.Run(db, Check);
 await InitiativeLedgerRegression.Run(db, Check);
 await HistoryImportRegression.Run(db, Check);
