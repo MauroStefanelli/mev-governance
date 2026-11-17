@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { developmentRequest } from '../services/mevService';
+import './collaborationPanel.css';
 import { HEARTBEAT_MS, MAX_MESSAGE, displayName, initials, relativeTime, mergeMessages, lastMessageId, validateMessage, othersOnline } from './developmentCollaboration';
 
 // Presence + chat of one initiative. Everything lives on the server; this component only polls and posts.
-export default function CollaborationPanel({ code, onNotify }) {
+export default function CollaborationPanel({ code, onNotify, startOpen = true, warning = 'Le schede si salvano per intero: coordinatevi nella chat prima di salvare.', footnote = 'La cronologia della chat è conservata per questa iniziativa e visibile a chi lavora sullo sviluppo nello stesso ambiente.' }) {
   const [users, setUsers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [lastWorked, setLastWorked] = useState(null);
@@ -12,7 +13,7 @@ export default function CollaborationPanel({ code, onNotify }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [offline, setOffline] = useState(false);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(startOpen);
   const [unread, setUnread] = useState(0);
   const [, tick] = useState(0);
   const messagesRef = useRef([]); const listRef = useRef(null); const stick = useRef(true); const knownOthers = useRef(null); const initial = useRef(true);
@@ -90,7 +91,7 @@ export default function CollaborationPanel({ code, onNotify }) {
       {unread > 0 && <span className="dev-collab-unread" aria-label={`${unread} messaggi non letti`}>{unread}</span>}
       <span className="dev-collab-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
     </button>
-    {others.length > 0 && <p className="dev-collab-warning" role="status"><b>Attenzione:</b> {others.map(displayName).join(', ')} {others.length === 1 ? 'sta lavorando' : 'stanno lavorando'} su questa iniziativa. Le schede si salvano per intero: coordinatevi nella chat prima di salvare.</p>}
+    {others.length > 0 && <p className="dev-collab-warning" role="status"><b>Attenzione:</b> {others.map(displayName).join(', ')} {others.length === 1 ? 'sta lavorando' : 'stanno lavorando'} su questa iniziativa. {warning}</p>}
     {open && <div className="dev-collab-body">
       <div className="dev-collab-users" aria-label="Utenti collegati">
         {users.length === 0 && <span className="dev-hint">Connessione in corso…</span>}
@@ -111,7 +112,7 @@ export default function CollaborationPanel({ code, onNotify }) {
           onChange={event => setText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form.requestSubmit(); } }} />
         <button type="submit" className="dev-btn dev-btn-primary" disabled={sending || !text.trim()}>{sending ? 'Invio…' : 'Invia'}</button>
       </form>
-      <small className="dev-hint">La cronologia della chat è conservata per questa iniziativa e visibile a chi lavora sullo sviluppo nello stesso ambiente.</small>
+      <small className="dev-hint">{footnote}</small>
     </div>}
   </aside>;
 }

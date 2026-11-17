@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ConfiguratorePage from './ConfiguratorePage';
 import * as service from '../services/mevService';
@@ -443,5 +443,128 @@ describe('the Excel model of the Offer Table in the Revisione step', () => {
     mountAs(['Bid Manager']); const section = await open();
     expect(await within(section).findByText(/versione 2 · salvato da Anna Rossi/)).toBeInTheDocument();
     expect(within(section).queryByText('Aggiorna il modello (nuova versione)')).not.toBeInTheDocument();
+  });
+});
+
+describe('saving twice in a row never conflicts with yourself', () => {
+  let revisions; let posts;
+  const toastText = () => document.body.textContent;
+  const mountAs = () => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} />);
+  beforeEach(() => {
+    localStorage.setItem('XUSER', 'MSTEFANE');
+    revisions = [{ id: 1, version: 1, author: 'MSTEFANE', createdAt: '2026-11-17T09:00:00Z', reason: 'Prima', payload: JSON.stringify({ title: 'T', system: '', decisions: [], estimate: {} }) }]; posts = [];
+    service.workspaceRequest.mockReset().mockImplementation(async (path, body) => {
+      if (String(path).startsWith('related')) return [];
+      if (!body) return [...revisions].sort((a, b) => b.version - a.version);
+      const latest = Math.max(...revisions.map(revision => revision.version));
+      if (body.expectedVersion !== latest) throw Object.assign(new Error('Un collega ha salvato una nuova revisione. Confrontala prima di salvare.'), { status: 409 });
+      posts.push(body); const saved = { id: revisions.length + 1, version: body.expectedVersion + 1, author: 'MSTEFANE', createdAt: new Date().toISOString(), reason: body.reason, payload: JSON.stringify(body.state) };
+      revisions.push(saved); return saved;
+    });
+    service.developmentRequest.mockReset().mockImplementation(async path => (path === 'presence' ? { users: [], messages: [], lastWorked: null } : path.startsWith('chat') ? { messages: [], hasMore: false } : {}));
+    service.upsertConfiguratoreRecord.mockReset().mockImplementation(async body => ({ ...body, payload: JSON.stringify(body.payload) }));
+  });
+  const openInitiative = async () => {
+    mountAs(); await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+    fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '146023' } });
+    await waitFor(() => expect(service.workspaceRequest).toHaveBeenCalledWith('146023/revisions'));
+    await waitFor(() => expect(screen.getAllByText(/Revisione di lavoro: 1/).length).toBeGreaterThan(0));
+  };
+  test('going to Revisione saves a draft, and Save and Close right after it is not a conflict', async () => {
+    await openInitiative();
+    fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Salva e Chiudi' }));
+    await waitFor(() => expect(posts.length > 1 || /Salvataggio non riuscito/.test(toastText())).toBe(true));
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(toastText()).not.toContain('Salvataggio non riuscito'); expect(posts.map(post => post.expectedVersion)).toEqual([1, 2]);
+  });
+  test('two saves started together are done one after the other, each from the version the previous one made', async () => {
+    await openInitiative();
+    fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salva e Chiudi' }));
+    await waitFor(() => expect(posts.length > 1 || /Salvataggio non riuscito/.test(toastText())).toBe(true));
+    expect(toastText()).not.toContain('Salvataggio non riuscito'); expect(posts.map(post => post.expectedVersion)).toEqual([1, 2]);
+  });
+  test('a real colleague save is still reported, with who saved and when', async () => {
+    await openInitiative();
+    revisions.push({ id: 9, version: 2, author: 'MFABBRI', createdAt: '2026-11-17T09:30:00Z', reason: 'Altro', payload: JSON.stringify({ title: 'T', system: '', decisions: [], estimate: {} }) });
+    fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ }));
+    await waitFor(() => expect(toastText()).toContain('Salvataggio non riuscito'));
+    expect(toastText()).toContain('MFABBRI ha aggiornato lo storico il 17/11'); expect(toastText()).toContain('versione 2, la tua pagina è ferma alla 1'); expect(posts).toHaveLength(0);
+  });
+});
+
+describe('who else works on the same GOTO, and the chat', () => {
+  const colleague = { username: 'mfabbri', fullName: 'Marco Fabbri', isMe: false }; const me = { username: 'mstefane', fullName: 'Mauro Stefanelli', isMe: true };
+  let presence;
+  const mountAs = roles => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role={roles[0]} roles={roles} />);
+  const typeGoto = async value => { await waitFor(() => expect(sectionButtons()).toHaveLength(7)); fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value } }); };
+  const panel = () => document.querySelector('.dev-collab');
+  beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true }); localStorage.setItem('XUSER', 'mstefane');
+    presence = { users: [me, colleague], messages: [{ id: 1, author: 'mfabbri', authorFullName: 'Marco Fabbri', createdAt: new Date().toISOString(), text: 'Sto rivedendo le TOW', mine: false }], lastWorked: { by: 'mfabbri', fullName: 'Marco Fabbri', at: new Date().toISOString(), isMe: false } };
+    service.developmentRequest.mockReset().mockImplementation(async (path, body) => {
+      if (path === 'presence') return presence; if (String(path).startsWith('chat') && !body) return { messages: presence.messages, hasMore: false };
+      if (path === 'chat') return { id: 2, author: 'mstefane', authorFullName: 'Mauro Stefanelli', createdAt: new Date().toISOString(), text: body.text, mine: true }; return {};
+    });
+  });
+  afterEach(() => { jest.useRealTimers(); });
+  const settle = async () => { await act(async () => { jest.advanceTimersByTime(1500); }); };
+  test('with no GOTO nothing is shown and nothing is registered', async () => {
+    mountAs(['Developer']); await waitFor(() => expect(sectionButtons()).toHaveLength(7)); await settle();
+    expect(panel()).toBeNull(); expect(service.developmentRequest).not.toHaveBeenCalledWith('presence', expect.anything());
+  });
+  test('typing the GOTO shows the colleagues connected to it and their chat, once the code has settled', async () => {
+    mountAs(['Developer']); await typeGoto('146023');
+    expect(panel()).toBeNull(); await settle();
+    expect(await screen.findByText('1 collega collegato')).toBeInTheDocument();
+    expect(screen.getByText(/Marco Fabbri sta lavorando su questa iniziativa/)).toBeInTheDocument(); expect(screen.getByText(/L’analisi e la stima si salvano per intero: coordinatevi nella chat prima di salvare, altrimenti il salvataggio di uno può essere rifiutato/)).toBeInTheDocument();
+    expect(screen.queryByText('Sto rivedendo le TOW')).not.toBeInTheDocument(); expect(document.querySelector('.dev-collab-toggle')).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(document.querySelector('.dev-collab-toggle'));
+    expect(await screen.findByText('Sto rivedendo le TOW')).toBeInTheDocument(); expect(screen.getByText(/è la stessa di Sviluppo iniziative: è conservata per questo codice GOTO/)).toBeInTheDocument(); expect(document.body.textContent).not.toContain('Le schede si salvano per intero');
+    expect(service.developmentRequest).toHaveBeenCalledWith('presence', expect.objectContaining({ goto: '146023' }));
+  });
+  test('the code is not registered while it is still being typed', async () => {
+    mountAs(['Developer']); await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+    for (const value of ['1', '14', '146', '1460']) { fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value } }); await act(async () => { jest.advanceTimersByTime(300); }); }
+    await settle();
+    const goto = service.developmentRequest.mock.calls.filter(([path]) => path === 'presence').map(([, body]) => body.goto);
+    expect(goto.length).toBeGreaterThan(0); expect(new Set(goto)).toEqual(new Set(['1460']));
+  });
+  test('a message sent from the Configuratore goes to the chat of that GOTO', async () => {
+    mountAs(['Developer']); await typeGoto('146023'); await settle(); await screen.findByText('1 collega collegato'); fireEvent.click(document.querySelector('.dev-collab-toggle')); await screen.findByText('Sto rivedendo le TOW');
+    fireEvent.change(screen.getByLabelText('Messaggio per i colleghi'), { target: { value: 'Salvo io' } }); fireEvent.click(screen.getByRole('button', { name: 'Invia' }));
+    await waitFor(() => expect(service.developmentRequest).toHaveBeenCalledWith('chat', { goto: '146023', text: 'Salvo io' }));
+  });
+  test('who joins later is announced with a notice, and the page keeps working', async () => {
+    presence = { ...presence, users: [me] }; mountAs(['Developer']); await typeGoto('146023'); await settle(); await screen.findByText('Nessun altro collegato');
+    presence = { ...presence, users: [me, colleague] }; await act(async () => { jest.advanceTimersByTime(16000); });
+    expect(await screen.findByText('1 collega collegato')).toBeInTheDocument(); expect(document.body.textContent).toContain('Marco Fabbri si è collegato a questa iniziativa.');
+  });
+  test('a Bid Manager and a Client do not appear in the chat', async () => {
+    mountAs(['Bid Manager']); await typeGoto('146023'); await settle(); expect(panel()).toBeNull();
+    expect(service.developmentRequest).not.toHaveBeenCalledWith('presence', expect.anything());
+  });
+  test('a confirmed save tells the colleagues who worked last on this GOTO', async () => {
+    service.workspaceRequest.mockReset().mockImplementation(async (path, body) => (String(path).startsWith('related') ? [] : !body ? [] : { id: 1, version: 1, author: 'mstefane', createdAt: new Date().toISOString(), reason: body.reason, payload: JSON.stringify(body.state) }));
+    service.upsertConfiguratoreRecord.mockReset().mockImplementation(async body => ({ ...body, payload: JSON.stringify(body.payload) }));
+    mountAs(['Developer']); await typeGoto('146023'); await settle(); await screen.findByText('1 collega collegato');
+    fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ }));
+    await waitFor(() => expect(service.developmentRequest).toHaveBeenCalledWith('worked', { goto: '146023' }));
+  });
+  test('a failed save does not tell anybody that work was done', async () => {
+    service.workspaceRequest.mockReset().mockImplementation(async (path, body) => { if (String(path).startsWith('related')) return []; if (!body) return []; throw new Error('rete'); });
+    service.upsertConfiguratoreRecord.mockReset().mockImplementation(async body => ({ ...body, payload: JSON.stringify(body.payload) }));
+    mountAs(['Developer']); await typeGoto('146023'); await settle(); await screen.findByText('1 collega collegato');
+    fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ })); await waitFor(() => expect(document.body.textContent).toContain('Salvataggio non riuscito'));
+    expect(service.developmentRequest).not.toHaveBeenCalledWith('worked', expect.anything());
+  });
+  test('the notices of the panel use the page toast and the toast does not restart the panel at every render', async () => {
+    mountAs(['Developer']); await typeGoto('146023'); await settle(); await screen.findByText('1 collega collegato');
+    const first = service.developmentRequest.mock.calls.filter(([path]) => path === 'presence').length;
+    fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'abc' } }); fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'abcd' } });
+    await act(async () => { jest.advanceTimersByTime(500); });
+    expect(service.developmentRequest.mock.calls.filter(([path]) => path === 'presence').length).toBe(first);
   });
 });

@@ -16,6 +16,9 @@ import { rationaleFacts, solutionFacts, analysisFacts, sourceFacts, knowledgeFac
 import { knowledgeForAi, entriesForIntervention } from "../configuratore/rationaleKnowledge";
 import { saveAndClose } from "../configuratore/saveAndClose";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
+import CollaborationPanel from "../configuratore/CollaborationPanel";
+import { useSettled, useStableCallback } from "../configuratore/developmentCollaboration";
+import { developmentRequest } from "../services/mevService";
 import { newProjectPreparation } from "../configuratore/projectPackage";
 import { importedGapSuggestions } from "../configuratore/developmentActivityModel";
 import ConfiguratorManual from "../configuratore/ConfiguratorManual";
@@ -198,6 +201,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(""), 2600);
   };
+  const notifyCollaboration = useStableCallback(toast);
+  const collaborationCode = useSettled(String(initiative.code || '').trim());
 
   // ── Contratti ──
   const activeContract = useMemo(
@@ -567,6 +572,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       const isUpdate = !!editingRecordKey;
       if (showMessage) toast(isUpdate ? "Valutazione aggiornata con successo" : "Valutazione salvata e resa disponibile alle stime future");
       setEditingRecordKey(recordKey); // keep updating the exact reopened archive record
+      // Chi ha salvato per ultimo su questo GOTO: lo vedono anche i colleghi in Sviluppo iniziative.
+      // Un errore qui non e' un errore di salvataggio: il salvataggio e' gia' riuscito.
+      try { if (String(initiative.code || '').trim()) Promise.resolve(developmentRequest('worked', { goto: String(initiative.code).trim() })).catch(() => {}); } catch { /* il segnale 'ultimo lavoro' e' accessorio */ }
       loadArchive();
       refreshWorkspaceArchive();
       setWorkspaceReload(value => value + 1);
@@ -1908,6 +1916,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
            Salva e Chiudi
          </button>
        </nav>
+
+      {/* Chi altro lavora sullo stesso GOTO, e la chat: la stessa di Sviluppo iniziative. Serve il codice GOTO: e' lui a identificare l'iniziativa per tutti. */}
+      {canEditInitiative && collaborationCode && <CollaborationPanel key={collaborationCode.toLowerCase()} code={collaborationCode} onNotify={notifyCollaboration} startOpen={false}
+        warning="L’analisi e la stima si salvano per intero: coordinatevi nella chat prima di salvare, altrimenti il salvataggio di uno può essere rifiutato perché l’altro ha già aggiornato lo storico."
+        footnote="La cronologia della chat è la stessa di Sviluppo iniziative: è conservata per questo codice GOTO e visibile a chi lavora sull’iniziativa nello stesso ambiente." />}
 
       {error && (
         <p role="alert" style={{ color: "#b00020", fontSize: 13, background: "#fdecec", padding: "8px 12px", borderRadius: 6 }}>

@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState, useCallback } from 'react';
+
 export const HEARTBEAT_MS = 15000;
+export const SETTLE_MS = 1200;
 export const MAX_MESSAGE = 2000;
 
 export const displayName = user => String(user?.fullName ?? '').trim() || String(user?.username ?? '').trim() || 'Utente';
@@ -51,3 +54,16 @@ export function activityLine(summary) {
 }
 
 export function othersOnline(users) { return (users || []).filter(user => !user.isMe); }
+
+// A value that is only taken after it stayed the same for a moment: the GOTO is typed one character at a time, and the presence must not be registered for «1», «14», «145».
+export function useSettled(value, delay = SETTLE_MS) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => { if (value === settled) return undefined; const timer = setTimeout(() => setSettled(value), delay); return () => clearTimeout(timer); }, [value, settled, delay]);
+  return settled;
+}
+
+// A function that never changes identity but always calls the latest one: for callbacks given to components that restart their work when the callback changes.
+export function useStableCallback(fn) {
+  const ref = useRef(fn); ref.current = fn;
+  return useCallback((...args) => ref.current(...args), []);
+}
