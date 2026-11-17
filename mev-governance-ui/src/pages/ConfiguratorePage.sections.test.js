@@ -428,3 +428,20 @@ test('without an Offer Table: the rationale is confirmed, the AI proposes the in
   expect(urls[0]).toMatch(/^SOLUZIONE_GOTO-1/); expect(md).toContain('P-1 — Adeguare la stampa H7'); expect(md).toContain('Mantenere l’esclusione del CHA per le PDDP'); expect(md).toContain('- [ ] Realizzare: Realizzazione Single Page Application'); expect(md).toContain('ILP_BACKEND_print-app');
 });
 
+
+describe('the Excel model of the Offer Table in the Revisione step', () => {
+  const mountAs = roles => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role={roles[0]} roles={roles} />);
+  const open = async () => { await waitFor(() => expect(sectionButtons()).toHaveLength(7)); fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: 'G1' } }); fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ })); return screen.findByLabelText('Generazione Tabella di offerta'); };
+  beforeEach(() => { service.offerTemplateStatus.mockReset().mockResolvedValue({ current: { Version: 2, FileName: 'Tabella Offerta.xlsx', UploadedBy: 'anna', UploadedByFullName: 'Anna Rossi', UploadedAt: '2026-11-13T09:30:00Z' }, previous: [] }); });
+  test('a developer sees the model of the lot and can update it', async () => {
+    mountAs(['Developer']); const section = await open();
+    expect(await within(section).findByText(/versione 2 · salvato da Anna Rossi/)).toBeInTheDocument();
+    expect(within(section).getByText('Aggiorna il modello (nuova versione)')).toBeInTheDocument();
+    expect(service.offerTemplateStatus).toHaveBeenCalledWith('2');
+  });
+  test('a Bid Manager sees the model and can export from it, but cannot update it', async () => {
+    mountAs(['Bid Manager']); const section = await open();
+    expect(await within(section).findByText(/versione 2 · salvato da Anna Rossi/)).toBeInTheDocument();
+    expect(within(section).queryByText('Aggiorna il modello (nuova versione)')).not.toBeInTheDocument();
+  });
+});

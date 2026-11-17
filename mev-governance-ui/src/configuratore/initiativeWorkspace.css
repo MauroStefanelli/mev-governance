@@ -127,3 +127,12 @@
   .workspace-heading { align-items: flex-start; flex-wrap: wrap; }
   .tow-resources > summary span { display: block; margin: 6px 0 0; }
 }
+
+/* Modello Excel della Tabella di offerta: salvato una volta per lotto */
+.offer-template { border: 1px solid #d5e0ed; background: #f6f9fd; border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+.offer-template > strong { color: #1f3a5c; font-size: 14px; }
+.offer-template p { margin: 8px 0; overflow-wrap: anywhere; }
+.offer-template-current { color: #24364d; font-weight: 600; }
+.offer-template-upload { display: block; font-size: 12px; font-weight: 600; color: #496078; margin: 8px 0; }
+.offer-template-upload input, .offer-template details input { display: block; margin-top: 6px; max-width: 100%; }
+.offer-template details { border-top: 1px solid #e0e8f2; margin-top: 10px; padding: 10px 0 0; }

@@ -18,6 +18,43 @@ public class OfferWorkbookRequest
 
 public static class OfferWorkbookExporter
 {
+    static string Normalized(string text) => System.Text.RegularExpressions.Regex.Replace(text, @"\s+", "").ToUpperInvariant();
+
+    // The structural checks of the model, shared by the upload (so a wrong file is refused at once) and by every export.
+    static (IXLWorksheet Summary, IXLWorksheet Detail, int Totals, List<List<int>> PriceRows, IXLTable Table) Inspect(XLWorkbook workbook, string lot)
+    {
+        if (workbook.Worksheets.Count != 2 || !workbook.Worksheets.TryGetWorksheet("DettaglioInterventi", out var detail))
+            throw new ArgumentException("Il template deve avere due fogli, incluso DettaglioInterventi.");
+        var summary = workbook.Worksheets.First(s => s.Name != "DettaglioInterventi");
+        if (summary.Cell("A4").GetString() != "ID_INTERVENTO" || detail.Cell("A1").GetString() != "ID Intervento"
+            || detail.Cell("M1").GetString() != "Prezzo Totale")
+            throw new ArgumentException("Template non riconosciuto: utilizzare il modello Tabella Offerta con intestazioni originali.");
+        var economicRows = summary.Column(8).CellsUsed().Where(c => Normalized(c.GetString()) == "IMPORTOECONOMICO").ToList();
+        // Some official examples omit the text TOTALE TOW but retain its row
+        // immediately before Importo economico. Locate the block structurally.
+        if (economicRows.Count != 1) throw new ArgumentException("Nel riepilogo deve essere presente una sola riga 'Importo economico' nella colonna H.");
+        var totals = economicRows[0].Address.RowNumber - 1;
+        if (totals <= 6 || Normalized(summary.Cell(totals + 2, 8).GetString()) != "VALOREINIZIATIVA")
+            throw new ArgumentException("Blocco totali non riconosciuto: verificare le righe precedenti e successive a 'Importo economico'.");
+        var priceRows = Enumerable.Range(1, 4).Select(n => summary.Column(2).CellsUsed()
+            .Where(c => Normalized(c.GetString()) == $"TOW0{lot}.{n}").Select(c => c.Address.RowNumber).ToList()).ToList();
+        if (priceRows.Any(rows => rows.Count != 1) || priceRows.Any(rows => rows[0] <= totals + 2))
+            throw new ArgumentException($"Listino del modello non riconosciuto: servono TOW0{lot}.1–.4 nella colonna B, sotto il riepilogo. Verificare il lotto del file.");
+        if (detail.Tables.Count() != 1) throw new ArgumentException("DettaglioInterventi deve contenere una sola tabella Excel strutturata.");
+        var table = detail.Tables.Single();
+        if (table.RangeAddress.FirstAddress.RowNumber != 1 || table.ColumnCount() != 13 || !table.ShowTotalsRow)
+            throw new ArgumentException("La tabella DettaglioInterventi deve avere 13 colonne e riga totali.");
+        return (summary, detail, totals, priceRows, table);
+    }
+
+    // Used when a model is uploaded: the file must be a readable .xlsx with the structure the export needs, for the lot it is meant for.
+    public static void ValidateTemplate(Stream template, string lot)
+    {
+        try { using var workbook = new XLWorkbook(template); Inspect(workbook, lot); }
+        catch (ArgumentException) { throw; }
+        catch (Exception) { throw new ArgumentException("Il file non è un XLSX leggibile: usa il modello originale della Tabella di offerta."); }
+    }
+
     public static byte[] Generate(Stream template, OfferWorkbookRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Code) || request.Code.Length > 31 || request.Code.IndexOfAny("[]:*?/\\".ToCharArray()) >= 0
@@ -36,28 +73,7 @@ public static class OfferWorkbookExporter
                 throw new ArgumentException($"Prezzo contrattuale mancante: {key}. Non verrà usato il listino dell’esempio.");
         }
         using var workbook = new XLWorkbook(template);
-        if (workbook.Worksheets.Count != 2 || !workbook.Worksheets.TryGetWorksheet("DettaglioInterventi", out var detail))
-            throw new ArgumentException("Il template deve avere due fogli, incluso DettaglioInterventi.");
-        var summary = workbook.Worksheets.First(s => s.Name != "DettaglioInterventi");
-        if (summary.Cell("A4").GetString() != "ID_INTERVENTO" || detail.Cell("A1").GetString() != "ID Intervento"
-            || detail.Cell("M1").GetString() != "Prezzo Totale")
-            throw new ArgumentException("Template non riconosciuto: utilizzare il modello Tabella Offerta con intestazioni originali.");
-        static string Normalized(string text) => System.Text.RegularExpressions.Regex.Replace(text, @"\s+", "").ToUpperInvariant();
-        var economicRows = summary.Column(8).CellsUsed().Where(c => Normalized(c.GetString()) == "IMPORTOECONOMICO").ToList();
-        // Some official examples omit the text TOTALE TOW but retain its row
-        // immediately before Importo economico. Locate the block structurally.
-        if (economicRows.Count != 1) throw new ArgumentException("Nel riepilogo deve essere presente una sola riga 'Importo economico' nella colonna H.");
-        var totals = economicRows[0].Address.RowNumber - 1;
-        if (totals <= 6 || Normalized(summary.Cell(totals + 2, 8).GetString()) != "VALOREINIZIATIVA")
-            throw new ArgumentException("Blocco totali non riconosciuto: verificare le righe precedenti e successive a 'Importo economico'.");
-        var priceRows = Enumerable.Range(1, 4).Select(n => summary.Column(2).CellsUsed()
-            .Where(c => Normalized(c.GetString()) == $"TOW0{request.Lot}.{n}").Select(c => c.Address.RowNumber).ToList()).ToList();
-        if (priceRows.Any(rows => rows.Count != 1) || priceRows.Any(rows => rows[0] <= totals + 2))
-            throw new ArgumentException($"Listino del modello non riconosciuto: servono TOW0{request.Lot}.1–.4 nella colonna B, sotto il riepilogo. Verificare il lotto del file.");
-        if (detail.Tables.Count() != 1) throw new ArgumentException("DettaglioInterventi deve contenere una sola tabella Excel strutturata.");
-        var table = detail.Tables.Single();
-        if (table.RangeAddress.FirstAddress.RowNumber != 1 || table.ColumnCount() != 13 || !table.ShowTotalsRow)
-            throw new ArgumentException("La tabella DettaglioInterventi deve avere 13 colonne e riga totali.");
+        var (summary, detail, totals, priceRows, table) = Inspect(workbook, request.Lot);
         summary.Name = request.Code;
         // Replace the example rows while letting ClosedXML shift formulas/merges below them.
         var oldCount = totals - 6;

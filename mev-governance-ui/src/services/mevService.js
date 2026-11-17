@@ -177,8 +177,22 @@ export async function workspaceDocument(code, { file, id, remove = false } = {})
   return id && !remove ? response.blob() : response.json();
 }
 
+// Il modello Excel della Tabella di offerta e' salvato una volta per lotto (non per iniziativa); l'esportazione parte da quello.
+const offerTemplateRequest = async (path, { method = 'GET', form, blob } = {}) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/offer-workbook/${path}`, {
+    method, headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` }, ...(form ? { body: form } : {}),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || `Modello Excel: errore ${response.status}`);
+  return blob ? response.blob() : response.json();
+};
+export const offerTemplateStatus = lot => offerTemplateRequest(`template?lot=${encodeURIComponent(lot)}`);
+export const uploadOfferTemplate = (file, lot) => { const form = new FormData(); form.append('file', file); form.append('lot', String(lot)); return offerTemplateRequest('template', { method: 'POST', form }); };
+export const downloadOfferTemplate = (lot, version) => offerTemplateRequest(`template/file?lot=${encodeURIComponent(lot)}${version ? `&version=${version}` : ''}`, { blob: true });
+export const restoreOfferTemplate = (lot, version) => offerTemplateRequest(`template/restore?lot=${encodeURIComponent(lot)}&version=${version}`, { method: 'POST' });
+
+// Senza «template» il server parte dal modello salvato per il lotto; con un file lo usa solo per questa esportazione (non lo salva).
 export async function exportOfferWorkbook(template, payload) {
-  const body = new FormData(); body.append('template', template); body.append('payload', JSON.stringify(payload));
+  const body = new FormData(); if (template) body.append('template', template); body.append('payload', JSON.stringify(payload));
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/offer-workbook`, {
     method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` }, body,
   });

@@ -89,6 +89,7 @@ describe('readability', () => {
     'Soluzione: interventi e file per Visual Studio Code': ['Proponi gli interventi con l’AI', 'Su cosa concentrarsi', 'Conferma l’intervento', 'Aggiungi una voce del catalogo', 'Mostra gli scartati', 'Prima di cominciare', 'Checklist per chi sviluppa', 'Scarica MD per Visual Studio Code', 'Salva soluzione'],
     'Razionali e vincoli con l’AI': ['Nascondi la cronologia', 'Mostra la cronologia', 'Conoscenza dell’iniziativa', 'Riprendi in questa iniziativa', 'Aggiungi una voce a mano'],
     'Aggiornare l’app: Render e NAS': ['Ricrea', 'Aggiorna', 'Manual Deploy', 'Applications', 'Images'],
+    'Offerta ed export HLD': ['Modello Excel del lotto', 'Carica il modello originale', 'Aggiorna il modello (nuova versione)', 'Scarica il modello', 'Versioni precedenti', 'Rimetti in uso', 'Usa un file diverso solo per questa esportazione'],
   };
   test.each(Object.entries(WHERE))('«%s» explains each function it is about, in its own text', (title, labels) => {
     const chapter = configuratorChapters.find(c => c.title === title); const own = norm(texts(chapter).join(' '));

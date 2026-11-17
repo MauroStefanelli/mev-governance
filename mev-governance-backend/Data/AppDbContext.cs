@@ -43,6 +43,7 @@ public class AppDbContext : DbContext
     public DbSet<LedgerInitiative> LedgerInitiatives => Set<LedgerInitiative>();
     public DbSet<LedgerEvent> LedgerEvents => Set<LedgerEvent>();
     public DbSet<LedgerImport> LedgerImports => Set<LedgerImport>();
+    public DbSet<OfferWorkbookTemplate> OfferWorkbookTemplates => Set<OfferWorkbookTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

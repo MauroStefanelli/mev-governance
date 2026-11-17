@@ -809,6 +809,28 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH Knowledge ERROR] {ex.Message}"); }
 
+        // Modello Excel della Tabella di offerta: uno per lotto, indipendente dall'iniziativa, con versioni.
+        try
+        {
+            db.Database.ExecuteSqlRaw($@"
+                CREATE TABLE IF NOT EXISTS ""{sch}"".""OfferWorkbookTemplates"" (
+                    ""Id"" BIGSERIAL PRIMARY KEY,
+                    ""AmbienteId"" INTEGER NOT NULL,
+                    ""Lot"" VARCHAR(16) NOT NULL,
+                    ""Version"" INTEGER NOT NULL,
+                    ""FileName"" TEXT NOT NULL DEFAULT '',
+                    ""Size"" BIGINT NOT NULL DEFAULT 0,
+                    ""Sha256"" VARCHAR(64) NOT NULL DEFAULT '',
+                    ""UploadedBy"" VARCHAR(120) NOT NULL DEFAULT '',
+                    ""UploadedByFullName"" TEXT NOT NULL DEFAULT '',
+                    ""UploadedAt"" TIMESTAMPTZ NOT NULL,
+                    ""Content"" BYTEA NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_OfferWorkbookTemplates_AmbienteId_Lot_Version"" ON ""{sch}"".""OfferWorkbookTemplates"" (""AmbienteId"", ""Lot"", ""Version"");");
+            Console.WriteLine("[PRE-PATCH] Modello Tabella di offerta verificato.");
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[PRE-PATCH OfferWorkbookTemplates ERROR] {ex.Message}"); }
+
         // Blocco separato: colonna ImpSubco - aggiunta isolata per resilienza
         try
         {

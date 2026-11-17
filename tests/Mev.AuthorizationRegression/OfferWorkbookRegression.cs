@@ -3,6 +3,26 @@ using MevGovernanceBackend.Services;
 
 public static class OfferWorkbookRegression
 {
+    // A minimal model with the structure the export needs (also used by the tests of the saved model). «marker» tells two models apart.
+    public static byte[] Model(string lot = "2", string marker = "OLD")
+    {
+        using var output = new MemoryStream();
+        using (var workbook = new XLWorkbook())
+        {
+            var summary = workbook.AddWorksheet("EXAMPLE"); summary.Cell("A4").Value = "ID_INTERVENTO";
+            summary.Cell("A6").Value = marker; summary.Cell("Z1").Value = marker; summary.Cell("H7").Value = "TOTALE TOW";
+            summary.Cell("H8").Value = "Importo economico"; summary.Cell("H9").Value = "Valore iniziativa";
+            for (var n = 1; n <= 4; n++) summary.Cell(17 + n, 2).Value = $"TOW0{lot}.{n}";
+            var detail = workbook.AddWorksheet("DettaglioInterventi");
+            var heads = new[] { "ID Intervento", "Componente-applicativo", "Tecnologia", "Unità", "Descrizione Intervento", "ID di catalogo", "Ambito driver", "Nome Driver", "Tipo Intervento", "Complessità", "Quantità", "Prezzo Unitario", "Prezzo Totale" };
+            for (var c = 0; c < heads.Length; c++) detail.Cell(1, c + 1).Value = heads[c];
+            detail.Cell("A2").Value = marker; detail.Cell("M2").Value = 999;
+            var table = detail.Range("A1:M2").CreateTable("Table3"); table.ShowTotalsRow = true;
+            workbook.SaveAs(output);
+        }
+        return output.ToArray();
+    }
+
     public static void Run(Action<bool, string> check)
     {
         using var template = new MemoryStream();
