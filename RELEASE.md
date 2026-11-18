@@ -191,6 +191,27 @@ git checkout develop
 
 ---
 
+## Portare i dati di DEV in PROD (Configuratore Iniziative e Sviluppo iniziative)
+
+Un rilascio porta il codice, non i dati: le iniziative, i razionali, lo storico e i documenti che hai creato in DEV restano in DEV. Per portarli in PROD c'e' `scripts/import-dev-to-prod.py`. Lo schema di PROD (`public`) e quello di DEV (`dev`) stanno nello stesso database di Supabase.
+
+```bash
+scripts/backup-prod.sh                                   # 1) copia di sicurezza (obbligatoria)
+SOURCE_DATABASE_URL=... TARGET_DATABASE_URL=... python3 scripts/import-dev-to-prod.py            # 2) prova a secco: fa tutto e ANNULLA
+SOURCE_DATABASE_URL=... TARGET_DATABASE_URL=... python3 scripts/import-dev-to-prod.py --commit   # 3) scrive davvero
+```
+
+Cosa fa e cosa garantisce:
+
+- **Solo aggiunte, in una transazione.** Nessun `UPDATE` e nessun `DELETE`. Se un controllo fallisce, non cambia niente.
+- **Prima di scrivere** controlla che le tabelle da riempire siano vuote e che nessuna chiave da importare esista gia'. Calcola l'impronta di tutte le altre tabelle e, a fine transazione, verifica che siano identiche.
+- **Dopo il commit** rilegge PROD e confronta ogni tabella, riga per riga, con l'origine.
+- **Non importa** il contratto, i lotti e gli applicativi condivisi (restano quelli di PROD), il calendario release e l'avanzamento (sono di Report Avanzamenti), le gare e le iniziative di prova.
+- **Traduce gli identificativi degli applicativi** (`application-<numero>`) da quelli di DEV a quelli di PROD, per nome. Se un applicativo usato non esiste in PROD si ferma.
+- **Lascia i nomi degli autori** come sono (anche se in PROD non esistono come utenti).
+
+E' pensato per una prima importazione: se una tabella di destinazione contiene gia' righe si rifiuta di proseguire.
+
 ## Note importanti
 
 - **I dati non vengono toccati**: PROD usa lo schema `public` su Supabase,
