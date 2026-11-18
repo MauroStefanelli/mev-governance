@@ -30,3 +30,8 @@ ToolOfferte/
 mev-data/
 mev-certs/
 docker-compose.qnap.rendered.yml
+
+# Copie di sicurezza di PROD (contengono dati reali): mai nel repository
+*.dump
+mev-backup-prod/
+*.righe.txt

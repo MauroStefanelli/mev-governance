@@ -5,7 +5,7 @@ import MevPage from "../../pages/MevPage";
 import MevCapPage from "../../pages/MevCapPage";
 import { toOrder } from "./MevTableView";
 import * as service from "../../services/mevService";
-jest.mock("../../services/mevService", () => ({ ...jest.requireActual("../../services/mevService"), getMevList: jest.fn(), getMevOptions: jest.fn(), getTowImpatto: jest.fn(), getRtiSocieta: jest.fn(), getLastAlign: jest.fn(), updateMev: jest.fn() }));
+jest.mock("../../services/mevService", () => ({ ...jest.requireActual("../../services/mevService"), getMevList: jest.fn(), getMevOptions: jest.fn(), getTowImpatto: jest.fn(), getRtiSocieta: jest.fn(), getLastAlign: jest.fn(), updateMev: jest.fn(), rollbackLastAlign: jest.fn() }));
 beforeEach(() => {
   localStorage.clear();
   jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(3000);
@@ -144,4 +144,24 @@ test("toOrder subtracts ODA from the supply, never shows -0 and tolerates missin
   expect(toOrder(300, 170)).toBe(130); expect(toOrder(100, 170)).toBe(-70); expect(toOrder(0.3, 0.1 + 0.2)).toBe(0); expect(Object.is(toOrder(0.3, 0.1 + 0.2), -0)).toBe(false);
   expect(toOrder(1234.567, 0.001)).toBe(1234.566); expect(toOrder(1000.125, 0.5)).toBe(999.625); // i millesimi (quelli che si mostrano) non si perdono
   expect(toOrder(undefined, 5)).toBe(-5); expect(toOrder("100", "x")).toBe(100); expect(toOrder(null, null)).toBe(0);
+});
+
+// «Annulla ultimo Align» elimina le righe dell'ultimo allineamento (tutte, se l'Align ha caricato l'intero elenco): la conferma deve dirlo, non parlare di «righe aggiornate».
+test("MEV: the confirmation of «Annulla ultimo Align» says that rows are deleted and that it cannot be undone, and nothing is deleted if the user refuses", async () => {
+  localStorage.setItem("role", "Admin");
+  service.getLastAlign.mockResolvedValue({ lastAlignAt: "2026-11-17T14:48:00Z", lastAlignBatchId: "b1" }); service.rollbackLastAlign.mockResolvedValue({ message: "ok" });
+  const confirm = jest.spyOn(window, "confirm").mockReturnValue(false); jest.spyOn(window, "alert").mockImplementation(() => {});
+  render(<MevPage ambienteId="1" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Annulla ultimo Align/ }));
+  expect(confirm).toHaveBeenCalledTimes(1);
+  const message = confirm.mock.calls[0][0];
+  expect(message).toContain("ELIMINATE"); expect(message).toContain("si svuota tutto"); expect(message).toContain("non si può annullare");
+  expect(service.rollbackLastAlign).not.toHaveBeenCalled();
+  confirm.mockReturnValue(true); fireEvent.click(screen.getByRole("button", { name: /Annulla ultimo Align/ }));
+  await waitFor(() => expect(service.rollbackLastAlign).toHaveBeenCalledTimes(1));
+});
+test("MEV: a Client does not get the «Annulla ultimo Align» button even when an Align exists", async () => {
+  localStorage.setItem("role", "Client"); service.getLastAlign.mockResolvedValue({ lastAlignAt: "2026-11-17T14:48:00Z", lastAlignBatchId: "b1" });
+  render(<MevPage ambienteId="1" />); await screen.findByRole("region", { name: /Tabella/ });
+  expect(screen.queryByRole("button", { name: /Annulla ultimo Align/ })).not.toBeInTheDocument(); expect(screen.queryByRole("button", { name: /Allinea Dati/ })).not.toBeInTheDocument();
 });

@@ -227,7 +227,10 @@ public class MevController : BaseController
     // le righe aggiornate al loro stato precedente (perdita PMO esclusa).
     // In pratica: elimina tutte le righe con LastAlignBatchId == ultimo batch.
     // ============================================================
+    // Cancella le righe dell'ultimo allineamento: se l'ultimo Align ha caricato tutto il contratto, le cancella tutte. Solo Admin e SuperAdmin
+    // (prima non c'era alcun controllo: qualunque utente autenticato, Client compreso, poteva svuotare i dati del contratto).
     [HttpDelete("last-align")]
+    [Authorize(Policy = "AdminOrSuper")]
     public IActionResult RollbackLastAlign()
     {
         var ambienteId = GetAmbienteId();

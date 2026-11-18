@@ -75,8 +75,11 @@ e nelle variabili d'ambiente (schema DB `public` per PROD, `dev` per DEV).
 ## Flusso di lavoro consigliato
 
 ```
-sviluppo → commit su develop → auto-deploy su DEV → test → ok
-→ git merge develop main → push main → auto-deploy su PROD
+sviluppo → commit su develop → deploy su DEV → test → ok
+→ COPIA DI SICUREZZA di PROD (scripts/backup-prod.sh)
+→ controllo delle modifiche al database
+→ merge su un branch di prova (conflitti, build, test)
+→ merge su main → push main → deploy su PROD
 ```
 
 ---
@@ -128,36 +131,59 @@ Variabili d'ambiente da verificare su `mev-governance-backend` (PROD):
 
 ---
 
-## Come rilasciare (da ripetere ad ogni release)
+## Come rilasciare in PROD (da ripetere ad ogni release)
+
+Un rilascio aggiorna il **codice**; i **dati** di PROD (schema `public`) non devono cambiare se non per le aggiunte previste (tabelle e colonne nuove, create da sole all'avvio).
+Per questo, prima di toccare `main`, si fa **sempre** la copia di sicurezza e si provano le modifiche al database su una copia.
 
 ### Passo 1 — Testa su DEV
 
-Verifica che tutto funzioni su:
-`https://mev-governance-frontend-dev.onrender.com`
+Verifica che tutto funzioni su `https://mev-governance-frontend-dev.onrender.com`.
 
-### Passo 2 — Merge develop → main
+### Passo 2 — Copia di sicurezza di PROD (obbligatoria)
 
 ```bash
-cd /Users/MSTEFANE/Documents/GitHub/mev-governance
+PROD_DATABASE_URL='<DATABASE_DIRECT_URL del servizio mev-governance-backend di PROD su Render>' scripts/backup-prod.sh
+```
 
-# Assicurati di essere su develop e aggiornato
-git checkout develop
-git pull origin develop
+Lo script legge PROD **soltanto** (transazioni di sola lettura: prima dimostra che una scrittura verrebbe rifiutata) e scrive in `~/mev-backup-prod`, fuori dal repository:
 
-# Passa a main e fai il merge
+- `mev-prod-public-<data>.dump`: la copia dello schema `public` (formato `pg_restore`);
+- `.dump.sha256`: l'impronta del file, per accorgersi se viene alterato;
+- `.righe.txt`: quante righe aveva ogni tabella al momento della copia.
+
+Poi **verifica la copia da sola**: controlla che il file si legga e che contenga tutte le tabelle, lo ripristina in un Postgres temporaneo sul tuo computer e confronta le righe con quelle di PROD. Se qualcosa non torna, esce con un errore e **non va rilasciato**.
+Il file contiene i dati reali (anche gli hash delle password): non committarlo, non inviarlo, tienilo in un posto protetto. Per ripristinare, solo se serve e dopo averne parlato: `pg_restore --clean --if-exists --no-owner --no-privileges --schema=public --dbname=<DB> <file>`.
+
+### Passo 3 — Controlla cosa cambia nel database
+
+Prima di unire, confronta lo schema di PROD con quello di `develop` (sola lettura) e prova l'avvio del backend nuovo su una copia locale: le tabelle nuove devono essere solo **aggiunte**, e le righe esistenti devono restare identiche. Cambi di tipo di colonna, `UPDATE`, `DELETE` o `DROP` nello SQL di avvio di `Program.cs` vanno letti con attenzione.
+
+### Passo 4 — Unisci `develop` in `main` su un branch di prova
+
+`main` può contenere correzioni fatte direttamente per PROD che `develop` non ha: il merge può andare in **conflitto** e va risolto a mano.
+
+```bash
+git checkout main && git pull origin main
+git checkout -b release/prod-prova
+git merge develop            # se ci sono conflitti, risolvili qui; build e test devono passare
+# prova: backend (dotnet build + test), frontend (npm test, npm run build)
+```
+
+Solo quando build e test passano, e hai riletto i conflitti risolti, porta il risultato su `main`:
+
+```bash
 git checkout main
-git pull origin main
-git merge develop --no-ff -m "release: merge develop → main vX.Y"
+git merge --no-ff release/prod-prova -m "release: develop → main <versione>"
 git push origin main
 ```
 
-### Passo 3 — Deploy automatico
+### Passo 5 — Deploy
 
-Il push su `main` triggera automaticamente il redeploy su Render PROD
-per tutti e tre i servizi. Puoi monitorare l'avanzamento su:
-`https://dashboard.render.com`
+Il push su `main` ridistribuisce PROD su Render (backend, frontend, parser). Controlla su `https://dashboard.render.com` che il backend parta senza errori e che la versione in fondo alla pagina sia quella attesa.
+Dopo il primo avvio controlla in PROD: accesso con un Admin e con un Client, numero di iniziative in MEV (deve essere quello della copia, `righe.txt`), pagina «Gestione Team».
 
-### Passo 4 — Torna su develop per continuare lo sviluppo
+### Passo 6 — Torna su `develop`
 
 ```bash
 git checkout develop
@@ -171,6 +197,8 @@ git checkout develop
   DEV usa lo schema `dev`. Sono completamente separati.
 - **Le migrazioni DB** vengono applicate automaticamente al primo avvio
   del backend tramite `db.Database.Migrate()` in `Program.cs`.
+- **«Annulla ultimo Align» cancella righe.** Se l'ultimo «Allinea Dati» ha caricato l'intero elenco, annullarlo svuota il contratto. Il server lo accetta solo da Admin e SuperAdmin; fai sempre la copia (passo 2) prima di un rilascio che riallinea i dati.
+- **La password di `MSTEFANE` viene riscritta a ogni avvio** del backend con il valore di `ADMIN_PASSWORD` (o `Admin2025!` se manca): controlla che la variabile sia impostata sul servizio PROD.
 - **Non fare push direttamente su `main`**: usa sempre `develop` per lo
   sviluppo e poi merge su `main` solo quando sei pronto per il rilascio.
 - **Il branch `develop` rimane quello di default** per il lavoro quotidiano.

@@ -435,7 +435,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
                 style={{ ...btn("ghost"), borderColor: "#fca5a5", color: "#dc2626", background: "#fff5f5" }}
                 disabled={rollingBack || aligning}
                 onClick={async () => {
-                  if (!window.confirm("Annullare l'ultimo allineamento? Le righe inserite o aggiornate nell'ultimo Align verranno eliminate.")) return;
+                  if (!window.confirm(`Annullare l'ultimo allineamento?\nTutte le righe inserite o aggiornate dall'ultimo Align verranno ELIMINATE dal contratto. Se l'ultimo Align ha caricato l'intero elenco, si svuota tutto.\nL'operazione non si può annullare.`)) return;
                   setRollingBack(true);
                   try {
                     const res = await rollbackLastAlign();

@@ -221,15 +221,7 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-     // SuperAdmin ha tutti i permessi di Admin, più i propri
-     options.AddPolicy("AdminOrSuper", policy =>
-         policy.RequireRole("Admin", "SuperAdmin"));
-     // Qualsiasi utente autenticato (per endpoint di sola lettura)
-     options.AddPolicy("AnyAuthenticated", policy =>
-         policy.RequireAuthenticatedUser());
-});
+builder.Services.AddAuthorization(MevGovernanceBackend.Services.AuthPolicies.Register);
 builder.Services.AddControllers(options => options.Filters.Add<MevGovernanceBackend.Services.ContractAccessFilter>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
