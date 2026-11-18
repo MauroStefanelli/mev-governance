@@ -87,7 +87,13 @@ public class MevController : BaseController
         if (request.PmCap      != null) item.PmCap      = request.PmCap;
         if (request.TipoContratto != null) item.TipoContratto = request.TipoContratto;
         if (request.Recupero   != null) item.Recupero   = request.Recupero;
-        if (request.Capgemini  != null) item.Capgemini  = request.Capgemini;
+        if (request.Capgemini  != null)
+        {
+            item.Capgemini = request.Capgemini;
+            // La scheda tiene Mandataria e Mandanti in UN solo campo (l'elenco completo, scritto in Capgemini). La colonna storica «Iet» (una «x» dell'Excel) non e' piu' valida
+            // dopo il salvataggio: se restasse, alla riapertura la «x» riaggiungerebbe la societa' IET anche se l'utente l'aveva tolta.
+            item.Iet = null;
+        }
         if (request.Subco      != null) item.Subco      = request.Subco;
         if (request.SubcoImporti != null) item.SubcoImporti = request.SubcoImporti;
         if (request.ImpSubco    != null) item.ImpSubco    = request.ImpSubco;

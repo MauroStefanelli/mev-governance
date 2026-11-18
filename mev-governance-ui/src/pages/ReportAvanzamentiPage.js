@@ -3,6 +3,7 @@ import { euro } from '../utils';
 import * as XLSX from "xlsx";
 import "./reportAvanzamenti.css";
 import { getMevList, getReleaseSchedules, upsertReleaseSchedule, deleteReleaseSchedule, renameReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
+import { resolveMandataryAndPartners } from "../utils/mevCompanies";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -35,27 +36,8 @@ const statoStyle = (s) => {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const parseSoc = (v) => {
-  if (!v) return [];
-  if (Array.isArray(v)) return v.filter(Boolean);
-  try { const p = JSON.parse(v); if (Array.isArray(p)) return p.filter(Boolean); } catch {}
-  return String(v).split(/[,;]/).map(s => s.trim()).filter(Boolean);
-};
-
-const resolveMandataria = (capVal, ietVal, rtiRows = []) => {
-  const byId = (id) => { const f = rtiRows.find(r => Number(r._id || r.id) === Number(id)); return f?.societa || null; };
-  const fromCap = (() => {
-    if (!capVal) return [];
-    if (String(capVal).trim().toLowerCase() === "x") { const s = byId(1); return s ? [s] : ["Capgemini Italia S.p.A."]; }
-    return parseSoc(capVal);
-  })();
-  const fromIet = (() => {
-    if (!ietVal) return [];
-    if (String(ietVal).trim().toLowerCase() === "x") { const s = byId(2); return s ? [s] : ["I&T"]; }
-    return parseSoc(ietVal);
-  })();
-  return [...new Set([...fromCap, ...fromIet])];
-};
+// Mandataria/Mandante di una riga: la «x» dell'Excel storico si traduce cercando per RUOLO nella tabella RTI & SUBCO (vedi utils/mevCompanies.js), non per numero di riga.
+const resolveMandataria = (capVal, ietVal, rtiRows = []) => resolveMandataryAndPartners(capVal, ietVal, rtiRows);
 
 // ── Campi editabili in tabella (sempre visibili) ──────────────────────────────
 const EDITABLE_FIELDS = [

@@ -165,3 +165,49 @@ test("MEV: a Client does not get the «Annulla ultimo Align» button even when a
   render(<MevPage ambienteId="1" />); await screen.findByRole("region", { name: /Tabella/ });
   expect(screen.queryByRole("button", { name: /Annulla ultimo Align/ })).not.toBeInTheDocument(); expect(screen.queryByRole("button", { name: /Allinea Dati/ })).not.toBeInTheDocument();
 });
+
+// «Levia HUB S.p.A.» e' una SUBCO. Nel file Excel storico la colonna IET contiene una «x»; l'app la traduceva con la riga numero 2 della tabella RTI & SUBCO,
+// che in produzione e' Levia HUB (IET e' la riga 3): Levia HUB compariva tra le Mandanti, e anche togliendola ricompariva alla riapertura.
+describe("Mandataria / Mandante: la «x» di IET e' IET, non la SUBCO della riga 2 (dati reali di produzione)", () => {
+  const PROD_RTI = [{ id: 1, ruolo: "Mandataria", societa: "Capgemini Italia S.p.A." }, { id: 2, ruolo: "SUBCO", societa: "Levia HUB S.p.A." }, { id: 3, ruolo: "Mandante", societa: "IET" }, { id: 4, ruolo: "SUBCO", societa: "Logica Informatica S.r.L." }];
+  const ROW = { id: 282, excelId: 282, goTo: "142379", applicativo: "BEP", descrizione: "Gestione FC Jolly", stato: "Approvato", tipoContratto: "BASE", capgemini: '["Capgemini Italia S.p.A.","IET"]', iet: "x", importoExcel: 100 };
+  const open = async () => {
+    service.getMevList.mockResolvedValue([ROW, { ...ROW, id: 5, excelId: 5, goTo: "G5", capgemini: "x", iet: "x" }]); service.getRtiSocieta.mockResolvedValue(PROD_RTI);
+    render(<MevCapPage ambienteId="1" />); await screen.findByText("2 Iniziative");
+  };
+  test("la tabella mostra Capgemini e IET, mai Levia HUB, per la riga reale e per una riga con la «x» in entrambe le colonne", async () => {
+    await open();
+    const table = screen.getByRole("table"); const body = within(table.querySelector("tbody"));
+    expect(body.queryByText("Levia HUB S.p.A.")).not.toBeInTheDocument();
+    expect(body.getAllByText("IET").length).toBeGreaterThanOrEqual(2); expect(body.getAllByText("Capgemini Italia S.p.A.").length).toBeGreaterThanOrEqual(2);
+  });
+  test("la scheda «Modifica MEV» non propone Levia HUB come Mandataria/Mandante", async () => {
+    await open();
+    fireEvent.click(screen.getByText("142379")); const dialog = await screen.findByRole("dialog", { name: /Modifica MEV/ }).catch(() => document.body);
+    const text = document.body.textContent;
+    expect(text).toContain("Mandataria / Mandante"); const section = [...document.querySelectorAll("*")].find(el => el.textContent.startsWith("Mandataria / Mandante") && el.children.length < 6) || dialog;
+    expect(section.textContent).not.toContain("Levia HUB");
+  });
+  test("la lista di IET si puo' togliere e al salvataggio si manda la lista senza IET", async () => {
+    await open(); service.updateMev.mockResolvedValue({ ...ROW, capgemini: "Capgemini Italia S.p.A." });
+    fireEvent.click(screen.getByText("142379"));
+    fireEvent.click(await screen.findByRole("button", { name: /Salva modifiche/ }));
+    await waitFor(() => expect(service.updateMev).toHaveBeenCalled());
+    const sent = service.updateMev.mock.calls[0][1];
+    expect(sent.capgemini).toBe('["Capgemini Italia S.p.A.","IET"]'); expect(String(sent.capgemini)).not.toContain("Levia");
+  });
+});
+
+describe("MEV: la scheda in sola lettura usa IET e non la SUBCO della riga 2", () => {
+  const PROD_RTI = [{ id: 1, ruolo: "Mandataria", societa: "Capgemini Italia S.p.A." }, { id: 2, ruolo: "SUBCO", societa: "Levia HUB S.p.A." }, { id: 3, ruolo: "Mandante", societa: "IET" }, { id: 4, ruolo: "SUBCO", societa: "Logica Informatica S.r.L." }];
+  beforeEach(() => {
+    service.getMevList.mockResolvedValue([{ id: 282, excelId: 282, goTo: "142379", applicativo: "BEP", stato: "Approvato", capgemini: '["Capgemini Italia S.p.A.","IET"]', iet: "x", importoExcel: 100 },
+      { id: 5, excelId: 5, goTo: "G5", applicativo: "ILP", stato: "Approvato", capgemini: "x", iet: "x", importoExcel: 50 }]);
+    service.getRtiSocieta.mockResolvedValue(PROD_RTI);
+  });
+  test("la scheda della riga elenca IET come Mandante e non la SUBCO", async () => {
+    render(<MevPage ambienteId="1" />); await screen.findByText("2 Iniziative");
+    fireEvent.click(screen.getByText("142379"));
+    const dialog = document.body.textContent; expect(dialog).toContain("IET"); expect(dialog).not.toContain("Levia HUB");
+  });
+});

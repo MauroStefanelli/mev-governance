@@ -6,38 +6,10 @@ import {
   getMevList, updateMev, alignMevData, exportMev, uploadExcel, getRtiSocieta, rollbackLastAlign, getLastAlign
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
+import { resolveMandataryAndPartners } from "../utils/mevCompanies";
 
 // ── Helpers RTI (stessa logica di MevCapPage) ─────────────────────────────────
-const parseSocietà = (val) => {
-  if (!val) return [];
-  try {
-    const parsed = JSON.parse(val);
-    if (Array.isArray(parsed)) return parsed;
-  } catch {}
-  return val ? [val] : [];
-};
-
-const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => {
-  const byId = (id) => {
-    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
-    return found?.societa || null;
-  };
-  const fromCap = (() => {
-    if (!capVal) return [];
-    const trimmed = String(capVal).trim().toLowerCase();
-    if (trimmed === "x") { const soc = byId(1); return soc ? [soc] : ["Capgemini Italia S.p.A."]; }
-    return parseSocietà(capVal);
-  })();
-  const fromIet = (() => {
-    if (!ietVal) return [];
-    const trimmed = String(ietVal).trim().toLowerCase();
-    if (trimmed === "x") { const soc = byId(2); return soc ? [soc] : ["I&T"]; }
-    return parseSocietà(ietVal);
-  })();
-  const combined = [...fromCap];
-  fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
-  return combined;
-};
+const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => resolveMandataryAndPartners(capVal, ietVal, rtiRows);
 
 const resolveSubco = (subcoVal, rtiRows = []) => {
   if (!subcoVal) return [];

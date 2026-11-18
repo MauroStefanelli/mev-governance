@@ -8,6 +8,7 @@ import {
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
 import { NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
+import { resolveMandataryAndPartners } from "../utils/mevCompanies";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 
@@ -29,40 +30,8 @@ const parseSocietà = (val) => {
   return val ? [val] : [];
 };
 
-// Risolve il valore di capgemini/iet per la colonna Mandataria/Mandante.
-// Se il valore è "x" (legacy checkmark) cerca la società per _id in RTI&SUBCO,
-// altrimenti usa parseSocietà normalmente.
-const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => {
-  const byId = (id) => {
-    const found = rtiRows.find(r => String(r._id || r.id) === String(id) || Number(r._id || r.id) === Number(id));
-    return found?.societa || null;
-  };
-
-  const fromCap = (() => {
-    if (!capVal) return [];
-    const trimmed = String(capVal).trim().toLowerCase();
-    if (trimmed === "x") {
-      const soc = byId(1);
-      return soc ? [soc] : ["Capgemini Italia S.p.A."];
-    }
-    return parseSocietà(capVal);
-  })();
-
-  const fromIet = (() => {
-    if (!ietVal) return [];
-    const trimmed = String(ietVal).trim().toLowerCase();
-    if (trimmed === "x") {
-      const soc = byId(2);
-      return soc ? [soc] : ["I&T"];
-    }
-    return parseSocietà(ietVal);
-  })();
-
-  // unisci evitando duplicati
-  const combined = [...fromCap];
-  fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
-  return combined;
-};
+// Risolve il valore di capgemini/iet per la colonna Mandataria/Mandante (la «x» dell'Excel storico = la societa' partecipa: si cerca per RUOLO, non per numero di riga).
+const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => resolveMandataryAndPartners(capVal, ietVal, rtiRows);
 
 // Risolve i nomi delle Subco (JSON con ID RTI o elenco di nomi).
 const resolveSubco = (subcoVal, rtiRows = []) => {
@@ -715,24 +684,8 @@ function EditModal({ row, mode, options, nextId, onClose, onSave, onDelete, towI
 
   const [form, setForm] = useState(() => {
     if (isCreate) return emptyForm;
-    // Risolve il valore legacy "x" di capgemini/iet in nomi società reali
-    const rtiRows = rtiRowsProp;
-    const byId = (id) => rtiRows.find(r => Number(r._id || r.id) === Number(id))?.societa || null;
-    const resolveToArray = (capVal, ietVal) => {
-      const fromCap = (() => {
-        if (!capVal) return [];
-        if (String(capVal).trim().toLowerCase() === "x") { const s = byId(1); return s ? [s] : ["Capgemini Italia S.p.A."]; }
-        return parseSocietà(capVal);
-      })();
-      const fromIet = (() => {
-        if (!ietVal) return [];
-        if (String(ietVal).trim().toLowerCase() === "x") { const s = byId(2); return s ? [s] : ["I&T"]; }
-        return parseSocietà(ietVal);
-      })();
-      const combined = [...fromCap];
-      fromIet.forEach(s => { if (!combined.includes(s)) combined.push(s); });
-      return combined;
-    };
+    // La «x» storica di Capgemini/IET si traduce nel nome della societa' cercandola per ruolo (vedi utils/mevCompanies.js)
+    const resolveToArray = (capVal, ietVal) => resolveMandataryAndPartners(capVal, ietVal, rtiRowsProp);
     const resolved = resolveToArray(row?.capgemini, row?.iet);
     const capMandanti = resolved.length > 0 ? serializeSocietà(resolved) : "";
     return { ...row, capMandanti, capImporti: row?.capImporti || "", subcoImporti: row?.subcoImporti || "" };

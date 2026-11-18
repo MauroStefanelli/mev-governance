@@ -44,6 +44,7 @@ export const PAGE_MANUALS = {
     ], accessNote), tableChapter,
     chapter('Scheda iniziativa', 'Aprire, modificare e salvare', [
       'La scheda si chiama «Modifica MEV» e si apre cliccando la riga. È divisa in sezioni: Identificazione, Responsabili, Release, Stato e Contratto, TOW Offerta, Importi, Partecipazione (Mandataria/Mandante e SUBCO), Extra, Note e PMO Poste.',
+      'Nella sezione «Partecipazione» il campo «Mandataria / Mandante» elenca le società che partecipano (Capgemini, IET…). Le SUBCO, come Levia HUB, si scelgono nel campo SUBCO accanto e non compaiono qui. Se togli una società e salvi, alla riapertura non ricompare. Nei file Excel storici la partecipazione è una «x»: l\'app la riconosce cercando il ruolo (Mandataria o Mandante) nella tabella «RTI & SUBCO», non il numero di riga.',
       'Il campo «ID» è in sola lettura. «Importo ODA», «Importo Fornitura», «Importo Scontato», «Fatturato» e «Residuo Fatt.» sono calcolati dal programma: non si scrivono, si aggiornano quando cambi le quantità TOW.',
       'Premi «✔ Salva modifiche» e attendi l’esito; «✕ Annulla» chiude la scheda senza salvare. «Elimina GoTo» (con il cestino) cancella l’iniziativa e chiede conferma: non si annulla.',
       only(['Client'], 'La scheda si apre e si può salvare anche con il tuo ruolo. Poiché modifica i dati di tutti gli utenti del contratto, usala con attenzione e solo se rientra nel tuo lavoro.'),
