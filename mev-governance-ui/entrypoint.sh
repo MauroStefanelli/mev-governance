@@ -23,9 +23,11 @@ else
   API_URL="${REACT_APP_API_URL}"
 fi
 
+# REACT_APP_RELEASE e' l'etichetta della versione mostrata in fondo alla pagina (es. PROD_REL_004 in produzione). Se la variabile non c'e' resta vuota e l'app ne usa una sua.
 cat > "$HTML/env-config.js" <<EOT
 window._env_ = {
-  REACT_APP_API_URL: "${API_URL}"
+  REACT_APP_API_URL: "${API_URL}",
+  REACT_APP_RELEASE: "${REACT_APP_RELEASE:-}"
 };
 EOT
 

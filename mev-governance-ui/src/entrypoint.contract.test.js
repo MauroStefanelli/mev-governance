@@ -15,6 +15,10 @@ describe('the frontend image: Render keeps working, the NAS gets a proxy', () =>
     expect(entry).toMatch(/if \[ -n "\$BACKEND_URL" \]; then\s+API_URL=""\s+else\s+API_URL="\$\{REACT_APP_API_URL\}"/);
     expect(entry).toMatch(/if \[ -z "\$BACKEND_URL" \]; then[\s\S]*?exec nginx -g "daemon off;"\s+fi/);
   });
+  test('the version label (REACT_APP_RELEASE, e.g. PROD_REL_004) is written at start in both modes, so production shows its own version and not a DEV one', () => {
+    expect(entry).toContain('REACT_APP_RELEASE: "${REACT_APP_RELEASE:-}"');
+    expect(entry.indexOf('REACT_APP_RELEASE: "${REACT_APP_RELEASE:-}"')).toBeLessThan(entry.indexOf('if [ -z "$BACKEND_URL" ]; then'));
+  });
   test('with BACKEND_URL the page calls its own address and /api is forwarded, with the original path and query', () => {
     expect(entry).toContain('API_URL=""');
     expect(entry).toContain('location /api/');
