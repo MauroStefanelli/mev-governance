@@ -30,6 +30,7 @@ ContractMergeRegression.Run(Check);
 await ContractMergeRegression.RunPermissions(db, config, Check);
 OfferWorkbookRegression.Run(Check);
 await OfferWorkbookTemplateRegression.Run(db, Check);
+await ClientContractRoleRegression.Run(db, Check);
 StartupSqlRegression.Run(Check);
 if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }
 var user = new AppUser { Username = "operator", Role = "Admin" };

@@ -32,6 +32,18 @@ public static class ContractRoles
         return roles;
     }
 
+    // The role stored on a contract when the contracts of a Client are assigned in «Gestione Client». Until now the code wrote a fixed «Editor» there, and the per-app permission matrix
+    // (which works on roles) then treated the user as an Editor: pages the Client was never given (MEV-CAP, Gestione Team) became reachable, and the Client column of the matrix did not apply.
+    // A Client gets «Client». Roles somebody chose by hand are kept: only a role made of «Editor» alone (what the old code wrote) is replaced.
+    public static string ForClientAssignment(string? current, string? accountRole)
+    {
+        var isClient = string.Equals(accountRole, "Client", StringComparison.Ordinal);
+        if (string.IsNullOrWhiteSpace(current)) return isClient ? Store(new[] { "Client" }) : "Editor";
+        if (!isClient) return current;
+        var roles = Read(current);
+        return roles.Length == 1 && roles[0] == "Editor" ? Store(new[] { "Client" }) : current;
+    }
+
     public static string[] ForUser(AppDbContext db, AppUser user, int ambienteId)
     {
         var global = db.UserRoles.Where(x => x.UserId == user.Id).Select(x => x.Role).ToList();

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MevGovernanceBackend.Data;
 using MevGovernanceBackend.Models;
+using MevGovernanceBackend.Services;
 
 namespace MevGovernanceBackend.Controllers;
 
@@ -121,10 +122,13 @@ public class ClientPermissionsController : BaseController
         // 2. Sincronizza UserAmbienti: se ha almeno un contratto → assicura sia nell'ambiente;
         //    se non ha più contratti → rimuove dall'ambiente
         var ua = _db.UserAmbienti.FirstOrDefault(x => x.UserId == userId && x.AmbienteId == request.AmbienteId);
+        var accountRole = _db.Users.Where(u => u.Id == userId).Select(u => u.Role).FirstOrDefault();
         if (request.TowContratti.Count > 0)
         {
             if (ua == null)
-                _db.UserAmbienti.Add(new UserAmbiente { UserId = userId, AmbienteId = request.AmbienteId, Ruolo = "Editor" });
+                _db.UserAmbienti.Add(new UserAmbiente { UserId = userId, AmbienteId = request.AmbienteId, Ruolo = ContractRoles.ForClientAssignment(null, accountRole) });
+            else
+                ua.Ruolo = ContractRoles.ForClientAssignment(ua.Ruolo, accountRole); // a Client created by the old code has «Editor»: it becomes «Client»
         }
         else
         {

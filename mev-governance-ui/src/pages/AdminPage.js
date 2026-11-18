@@ -1032,7 +1032,7 @@ const ROLE_COLORS = {
   "Bid Manager": { bg: "#fefce8", fg: "#854d0e", border: "#fde68a" },
 };
 
-function AppPermissionsPanel() {
+export function AppPermissionsPanel() {
   // matrix[appId][role] = { canView, canEdit }
   const [matrix, setMatrix]   = useState({});
   const [loading, setLoading] = useState(true);
@@ -1098,6 +1098,10 @@ function AppPermissionsPanel() {
         <p style={{ margin: "6px 0 0", color: "#68758A", fontSize: 13 }}>
           Definisci quale ruolo può <strong>visualizzare</strong> (accedere ai dati) e <strong>modificare</strong> (salvare dati) in ogni app.
           SuperAdmin ha sempre accesso completo e non è configurabile. Disattivare &quot;Visualizza&quot; disattiva anche &quot;Modifica&quot;.
+        </p>
+        <p style={{ margin: "6px 0 0", color: "#68758A", fontSize: 13 }}>
+          La tabella vale per il <strong>ruolo che l&apos;utente ha sul contratto</strong>, non per il tipo di account. Un utente con più ruoli ottiene quello che almeno uno dei suoi ruoli permette.
+          Un Client vede inoltre solo le pagine che gli sono state assegnate in &quot;Gestione Client&quot;: se un Client vede più pagine del previsto, controlla che sul contratto abbia il solo ruolo Client.
         </p>
       </div>
 
