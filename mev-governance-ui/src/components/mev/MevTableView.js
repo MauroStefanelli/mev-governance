@@ -5,11 +5,14 @@ export const toolbarStyle = { display: "flex", alignItems: "center", gap: 8, mar
 export function PageHeading({ title }) {
   return <header style={{ marginBottom: 22 }}><div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#526581", marginBottom: 6 }}>GOVERNANCE · PORTAFOGLIO ATTIVITÀ</div><h1 style={{ margin: "0 0 8px", fontSize: 28, letterSpacing: -.7 }}>{title}</h1><p style={{ margin: 0, color: "#526581", fontSize: 14 }}>Importi, ordini e subforniture. Una vista condivisa per seguire ogni attività.</p></header>;
 }
+// «Da Ordinare» = Totale Fornitura - Totale ODA. Arrotondato ai millesimi (quanto si mostra) per non far comparire «-0,000» o «0,000» da errori di virgola mobile.
+export const toOrder = (supply, oda) => (Math.round(((Number(supply) || 0) - (Number(oda) || 0)) * 1000) / 1000) + 0; // «+ 0» trasforma -0 in 0
 export function FinancialSummary({ supply, oda, subco, format, approved = false }) {
   return <section aria-label="Riepilogo economico delle iniziative filtrate" style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, marginLeft: "auto", maxWidth: "100%" }}>
     {[
       ["Totale Fornitura", supply, "#1a73e8", "#185abc", "#eef5ff", approved ? "Iniziative filtrate · solo approvati" : "Iniziative filtrate"],
       ["Totale ODA", oda, "#12c937", "#176b2b", "#eefaf1", "Ordinato · iniziative filtrate"],
+      ["Da Ordinare", toOrder(supply, oda), "#7c3aed", "#5b21b6", "#f5f0ff", "Totale Fornitura − Totale ODA"],
       ["Totale SUBCO", subco, "#d97706", "#92400e", "#fff7ed", "Subforniture · iniziative filtrate"],
     ].map(([label, value, accent, ink, bg, detail]) => <div key={label} style={{ background: bg, border: "1px solid #dce4ee", borderTop: `2px solid ${accent}`, borderRadius: 8, padding: "8px 12px", minWidth: 130, textAlign: "right", flex: "0 1 auto", maxWidth: "100%" }}><div style={{ fontSize: 10, fontWeight: 700, color: ink }}>{label}</div><div style={{ margin: "3px 0", fontSize: 17, fontWeight: 750, color: ink, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{format(value)}</div><div style={{ fontSize: 10, color: "#526174" }}>{detail}</div></div>)}
   </section>;

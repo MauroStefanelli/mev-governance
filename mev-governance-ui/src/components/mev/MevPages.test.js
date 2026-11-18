@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import "@testing-library/jest-dom";
 import MevPage from "../../pages/MevPage";
 import MevCapPage from "../../pages/MevCapPage";
+import { toOrder } from "./MevTableView";
 import * as service from "../../services/mevService";
 jest.mock("../../services/mevService", () => ({ ...jest.requireActual("../../services/mevService"), getMevList: jest.fn(), getMevOptions: jest.fn(), getTowImpatto: jest.fn(), getRtiSocieta: jest.fn(), getLastAlign: jest.fn(), updateMev: jest.fn() }));
 beforeEach(() => {
@@ -122,4 +123,25 @@ test.each([["MEV", MevPage], ["MEV-CAP", MevCapPage]])("%s: description filters 
   expect(screen.queryByRole("checkbox", { name: "C" })).not.toBeInTheDocument(); close();
   fireEvent.click(screen.getByRole("button", { name: /Reset filtri/i }));
   expect(screen.getByText("3 Iniziative")).toBeInTheDocument();
+});
+
+// «Da Ordinare» = Totale Fornitura − Totale ODA, accanto agli altri totali e prima di Totale SUBCO.
+// In MEV la fornitura è la somma di tutte le iniziative filtrate (300) e l'ODA 170; in MEV-CAP la fornitura conta solo le approvate (100) mentre l'ODA tutte le filtrate (170).
+test.each([["MEV", MevPage, "€ 130,000", "€ 20,000"], ["MEV-CAP", MevCapPage, "€ -70,000", "€ 20,000"]])("%s: «Da Ordinare» is Totale Fornitura minus Totale ODA, between ODA and SUBCO", async (_, Page, all, one) => {
+  render(<Page ambienteId="1" />);
+  await screen.findByRole("region", { name: /Tabella/ });
+  const summary = screen.getByRole("region", { name: "Riepilogo economico delle iniziative filtrate" });
+  const labels = [...summary.children].map(card => card.firstChild.textContent);
+  expect(labels).toEqual(["Totale Fornitura", "Totale ODA", "Da Ordinare", "Totale SUBCO"]);
+  const card = label => [...summary.children].find(item => item.firstChild.textContent === label);
+  expect(card("Da Ordinare").children[1].textContent).toBe(all); expect(card("Da Ordinare").textContent).toContain("Totale Fornitura − Totale ODA");
+  const trigger = screen.getByRole("button", { name: /Filtra goTo:/ });
+  trigger.focus(); fireEvent.keyDown(trigger, { key: "Enter" }); fireEvent.click(screen.getByRole("checkbox", { name: "GOTO-A" }));
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Seleziona valori filtro" }), { key: "Escape" });
+  await waitFor(() => expect(card("Da Ordinare").children[1].textContent).toBe(one));
+});
+test("toOrder subtracts ODA from the supply, never shows -0 and tolerates missing values", () => {
+  expect(toOrder(300, 170)).toBe(130); expect(toOrder(100, 170)).toBe(-70); expect(toOrder(0.3, 0.1 + 0.2)).toBe(0); expect(Object.is(toOrder(0.3, 0.1 + 0.2), -0)).toBe(false);
+  expect(toOrder(1234.567, 0.001)).toBe(1234.566); expect(toOrder(1000.125, 0.5)).toBe(999.625); // i millesimi (quelli che si mostrano) non si perdono
+  expect(toOrder(undefined, 5)).toBe(-5); expect(toOrder("100", "x")).toBe(100); expect(toOrder(null, null)).toBe(0);
 });
