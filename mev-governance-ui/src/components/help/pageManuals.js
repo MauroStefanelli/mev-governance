@@ -1,44 +1,122 @@
 const chapter = (title, subtitle, steps, note, extra = {}) => ({ title, subtitle, steps, note, ...extra });
+// Un passo che vale solo per alcuni ruoli: { text, roles }. I ruoli sono quelli di chi legge il manuale (vedi manualRoles.js).
+const only = (roles, text) => ({ text, roles });
+const ADMIN = ['Admin', 'SuperAdmin'];
 const accessNote = 'Le azioni visibili dipendono dal ruolo e dai permessi assegnati. Verifica il contratto/ambiente nella barra superiore: i dati operativi sono riferiti al contesto attivo.';
 const tableChapter = chapter('Filtri e consultazione', 'Restringere i dati senza modificarli', [
   'Apri i filtri nelle intestazioni e seleziona i valori desiderati. Le opzioni si aggiornano considerando le selezioni negli altri filtri.',
   'Scorri orizzontalmente per raggiungere tutte le colonne. Usa “Colonne fisse” per scegliere quali mantenere visibili; la scelta è memorizzata separatamente per MEV e MEV-CAP.',
   '“Reset filtri” ripristina la vista completa. I totali si aggiornano sulle iniziative filtrate: controlla il perimetro prima di confrontare gli importi.',
 ], 'Su schermi stretti la parte fissa può ridursi automaticamente a ID/GoTo, senza sovrascrivere la preferenza scelta.');
-const alignChapter = chapter('Importazione ed esportazione', 'Excel ufficiale e dati presenti nell’app', [
-  '“Carica Excel”, quando disponibile, carica il file sul server: non equivale ancora all’importazione dei dati in tabella.',
-  '“Allinea Dati” esegue l’allineamento con il file ufficiale. Leggi la conferma e attendi l’esito prima di iniziare altre modifiche.',
-  '“Esporta Excel” produce il file delle righe attualmente filtrate. Controlla prima filtri e numero di iniziative.',
-], 'L’allineamento è un’operazione diversa dal salvataggio delle modifiche manuali. Le azioni sono disponibili solo agli utenti autorizzati.');
-
+const alignChapter = chapter('Importazione ed esportazione', 'Scaricare i dati; per gli amministratori anche aggiornarli dall’Excel ufficiale', [
+  '«Esporta Excel» scarica un file con le righe che stai vedendo, cioè quelle che passano i filtri. Prima di premerlo controlla i filtri e il numero di iniziative: con tutti i filtri azzerati il file contiene l’intero elenco.',
+  'Il file contiene le stesse colonne della tabella. I filtri attivi non compaiono nel file: se ti servono, annotali a parte.',
+  only(['Client'], 'Per te l’Excel è solo di consultazione: non puoi caricare né riallineare i dati, e per questo nella barra in alto non vedi «Carica Excel», «Allinea Dati» né «Annulla ultimo Align». I dati che vedi sono limitati ai contratti che ti sono stati assegnati.'),
+  only(['Editor', 'Developer'], 'Puoi esportare l’Excel, ma non caricare né riallineare i dati: «Carica Excel», «Allinea Dati» e «Annulla ultimo Align» sono riservati agli amministratori. Se serve aggiornare i dati dall’Excel ufficiale, chiedilo a un Admin.'),
+  only(ADMIN, '«Carica Excel» (Admin e SuperAdmin) carica il file ufficiale sul server. Da solo non cambia i dati in tabella: li cambia «Allinea Dati».'),
+  only(ADMIN, '«Allinea Dati» chiede conferma («Riallineare i dati MEV con l’Excel ufficiale?») e importa il file caricato. Le modifiche inserite a mano nei campi PMO (P Anno, P Release, P Importo, P Note, Note CAP) vengono preservate. Attendi la conferma di completamento prima di iniziare altre modifiche.'),
+  only(ADMIN, '«Annulla ultimo Align» compare solo se esiste un allineamento da annullare e riporta i dati a prima dell’ultimo «Allinea Dati». Usalo subito se l’esito non è quello atteso.'),
+], 'L’allineamento è un’operazione diversa dal salvataggio delle modifiche manuali: le due cose non si sostituiscono. In MEV-CAP «Carica Excel» è disponibile solo all’Admin; «Allinea Dati» invece compare a tutti: chiede comunque conferma prima di partire.');
 export const PAGE_MANUALS = {
   mev: { title: 'MEV', summary: 'Consulta le iniziative, filtra importi e ordini e aggiorna i campi di pianificazione disponibili.', chapters: [
-    chapter('Quadro economico', 'Iniziative e valori nel contratto attivo', ['Controlla GOTO, applicativo, anno e stato per identificare l’iniziativa.', 'Leggi i totali Fornitura, ODA, Da Ordinare e SUBCO in alto: sommano i valori delle righe filtrate. Da Ordinare è Totale Fornitura meno Totale ODA, cioè quanto della fornitura non è ancora stato ordinato (negativo se l’ordinato supera la fornitura). Imp. Subco rappresenta l’importo della subfornitura.', 'Clicca una riga per consultare il dettaglio. I pulsanti Note aprono il testo associato.'], accessNote),
+    chapter('Cosa trovi nella pagina', 'Il quadro economico delle iniziative del contratto', [
+      'La pagina «MEV · Quadro economico» elenca le iniziative del contratto che hai selezionato nella barra in alto. Se cambi contratto, l’elenco cambia: controlla sempre quale è attivo prima di leggere gli importi.',
+      only(['Client'], 'Vedi solo le iniziative dei contratti che ti sono stati assegnati. Se un’iniziativa che cerchi non c’è, non è un errore della pagina: non rientra nei contratti a te abilitati; chiedi a un Admin.'),
+      'In alto trovi quattro totali che seguono i filtri: «Totale Fornitura», «Totale ODA», «Da Ordinare» e «Totale SUBCO». «Da Ordinare» è Totale Fornitura meno Totale ODA, cioè quanto della fornitura non è ancora stato ordinato (negativo se l’ordinato supera la fornitura). I totali sommano le righe filtrate: se togli un filtro cambiano.',
+      'Ogni riga è un’iniziativa. Le colonne principali sono ID, GoTo, Applicativo, Descrizione, Anno, Stato, «Importo CAP», ODA, RDA, «Importo ODA», Subco, «Imp. Subco» (importo della subfornitura) e i campi di pianificazione PMO (P Anno, P Release, P Importo, P Note, Note CAP).',
+      'Clicca su una riga (fuori dai campi modificabili) per aprire la scheda dell’iniziativa: è in sola lettura, per tutti i ruoli. Mostra identificazione, responsabili (PM Poste, PM CAP), mandataria/mandante e subco, release, stato e contratto. Si chiude con «×».',
+    ], accessNote),
     tableChapter,
-    chapter('Pianificazione e salvataggio', 'Aggiornare i campi senza perdere le modifiche', ['Modifica i campi abilitati della riga, ad esempio P Anno, P Release, P Importo, P Note e Note CAP.', 'Premi “Salva” sulla riga modificata e controlla l’indicazione di conferma. La sola digitazione non è un salvataggio.', 'Verifica l’iniziativa e l’importo prima di passare ad altre pagine o riallineare i dati.']), alignChapter,
+    chapter('Pianificazione e salvataggio', 'Aggiornare i campi PMO senza perdere le modifiche', [
+      'Cinque campi della riga si scrivono direttamente nella tabella: «P Anno», «P Release», «P Importo», «P Note» e «Note CAP». Gli altri sono dati dell’Excel ufficiale e si leggono soltanto.',
+      'Dopo aver scritto, premi «Salva» sulla stessa riga: diventa «✓» quando il salvataggio è confermato. La sola digitazione non è un salvataggio: se cambi pagina prima di salvare, la modifica si perde.',
+      only(['Client'], 'Nella pagina i campi PMO risultano modificabili anche per te: usali solo se è previsto dal tuo lavoro. Le modifiche sono visibili a tutti gli utenti di quel contratto.'),
+      'I campi PMO inseriti a mano vengono preservati quando un amministratore riallinea i dati dall’Excel ufficiale: non servono a correggere l’Excel, ma a pianificare.',
+      'Verifica l’iniziativa e l’importo prima di passare ad altre pagine.',
+    ], 'I valori PMO sono stime di pianificazione: non cambiano gli importi dell’Excel ufficiale («Importo CAP», «Importo ODA»).'),
+    alignChapter,
   ] },
   mevcap: { title: 'MEV-CAP', summary: 'Gestisci i dettagli delle iniziative, i responsabili, le associazioni e le quantità TOW.', chapters: [
-    chapter('Panoramica', 'La vista operativa delle iniziative', ['Seleziona i filtri per restringere il portafoglio e consulta i totali.', 'Il Totale Fornitura considera le iniziative filtrate approvate; Totale ODA e SUBCO seguono le righe filtrate secondo le etichette della pagina. «Da Ordinare» è Totale Fornitura meno Totale ODA e segue gli stessi filtri: poiché la fornitura conta solo le iniziative approvate mentre l’ODA conta tutte le filtrate, il valore può risultare negativo.', 'Clicca una riga per aprire la scheda di modifica dell’iniziativa.'], accessNote), tableChapter,
-    chapter('Scheda iniziativa', 'Dati operativi e TOW', ['Nella scheda verifica responsabili, stato, release, tipo contratto e riferimenti ODA/RDA.', 'Controlla le società Mandataria/Mandante e Subco e le relative associazioni. Compila le quantità TOW e i campi economici previsti.', 'Premi “Salva modifiche” e attendi l’esito; “Annulla” chiude la scheda senza confermare.', '“Nuovo GoTo” apre la creazione di una nuova iniziativa. Compila i campi obbligatori e verifica il contratto attivo.'], 'Il ricalcolo dai TOW dipende dalla disponibilità di prezzi affidabili per l’ambiente. Una voce a catalogo può richiedere un importo anziché una quantità.'), alignChapter,
+    chapter('Cosa trovi nella pagina', 'La vista operativa delle iniziative', [
+      'La pagina «MEV-CAP · Gestione attività» mostra le stesse iniziative di MEV con più dettaglio: responsabili (PM Poste, PM CAP), release, tipo contratto, ODA/RDA, mandataria/mandante, subco e le quantità TOW (TOW01–TOW06 e totale).',
+      'I totali in alto seguono i filtri. A differenza di MEV, «Totale Fornitura» somma solo le iniziative in stato Approvato, mentre «Totale ODA» somma tutte quelle filtrate: per questo «Da Ordinare» (Totale Fornitura meno Totale ODA) può risultare negativo.',
+      'La tabella è di sola lettura: per modificare un’iniziativa clicca sulla riga e apri la scheda.',
+    ], accessNote), tableChapter,
+    chapter('Scheda iniziativa', 'Aprire, modificare e salvare', [
+      'La scheda si chiama «Modifica MEV» e si apre cliccando la riga. È divisa in sezioni: Identificazione, Responsabili, Release, Stato e Contratto, TOW Offerta, Importi, Partecipazione (Mandataria/Mandante e SUBCO), Extra, Note e PMO Poste.',
+      'Il campo «ID» è in sola lettura. «Importo ODA», «Importo Fornitura», «Importo Scontato», «Fatturato» e «Residuo Fatt.» sono calcolati dal programma: non si scrivono, si aggiornano quando cambi le quantità TOW.',
+      'Premi «✔ Salva modifiche» e attendi l’esito; «✕ Annulla» chiude la scheda senza salvare. «Elimina GoTo» (con il cestino) cancella l’iniziativa e chiede conferma: non si annulla.',
+      only(['Client'], 'La scheda si apre e si può salvare anche con il tuo ruolo. Poiché modifica i dati di tutti gli utenti del contratto, usala con attenzione e solo se rientra nel tuo lavoro.'),
+      '«Nuovo GoTo» (in fondo alla barra degli strumenti) apre la stessa scheda vuota (titolo «Nuovo GoTo»): «Applicativo» e «Descrizione» sono obbligatori e il pulsante diventa «✚ Crea GoTo». Verifica il contratto attivo prima di creare.',
+    ], 'Il ricalcolo dai TOW dipende dalla disponibilità di prezzi affidabili per l’ambiente. Una voce a catalogo può richiedere un importo anziché una quantità.'), alignChapter,
   ] },
   contratti: { title: 'Contratti', summary: 'Consulta contratti e pianificazione delle release nell’ambiente selezionato.', chapters: [
-    chapter('Consultare i contratti', 'Identificare il perimetro contrattuale', ['Verifica l’ambiente attivo e individua il contratto nell’elenco.', 'Apri i dettagli disponibili e controlla riferimenti, importi e dati collegati prima di aggiornare le informazioni.', 'I dati contrattuali e le associazioni guidano le viste operative: usa codici coerenti con quelli delle iniziative.'], accessNote),
-    chapter('Pianificazione Release', 'Organizzare le attività nel tempo', ['Apri la pianificazione release del contratto interessato.', 'Consulta o aggiorna i campi modificabili della release e conferma con “Salva”.', 'Verifica la coerenza tra release pianificate e assegnazione delle iniziative. La pianificazione non sostituisce l’aggiornamento dei dati delle singole MEV.']),
+    chapter('Consultare i contratti', 'Valori, ordinato e residuo per servizio e TOW', [
+      'La pagina riassume il contratto attivo (barra in alto): per ogni servizio mostra «Valore Totale», «Approvato», «Ordinato», «Impegnato» e «Residuo». Se cambi contratto, cambiano tutti i valori.',
+      'Le righe «Servizi a Task e Collaudo» e «Servizi a Canone» si espandono: dentro trovi il dettaglio per TOW con valore unitario, valore totale, quantità e quantità approvate e residue. I tre grafici a torta («Totale Servizi», «Servizi a Task e Collaudo», «Servizi a Canone») mostrano come si ripartisce il valore.',
+            '«↺ Ricalcola» rilegge dalle iniziative i valori ordinato, impegnato e residuo e aggiorna la pagina. Usalo dopo che le iniziative o gli ordini sono cambiati; non modifica le iniziative.',
+      'I dati contrattuali e le associazioni guidano le altre pagine: usa codici coerenti con quelli delle iniziative.',
+    ], accessNote),
+    chapter('Pianificazione Release', 'Organizzare le attività nel tempo', [
+      'In fondo alla pagina, nella sezione «Pianificazione Release», trovi le release pianificate del contratto con le loro date.',
+      '«+ Nuova release» ne aggiunge una; «↑ Importa Excel» ne carica più di una da un file; «↻» ricarica l’elenco. Sulla riga, «✏» modifica e «✕» elimina (chiede conferma).',
+      'Per modificare una release cambia i campi e conferma con «Salva»; per uscire senza cambiare usa «Annulla».',
+      only(['Client'], 'Nel programma questi comandi risultano disponibili anche per te: modificano il calendario condiviso del contratto, quindi usali solo se rientra nel tuo lavoro.'),
+      'Verifica la coerenza tra release pianificate e assegnazione delle iniziative. La pianificazione non sostituisce l’aggiornamento dei dati delle singole MEV.',
+    ]),
   ] },
   contratti_interni: { title: 'Ordini', summary: 'Consulta ordini, buoni di consegna e iniziative collegate.', chapters: [
-    chapter('Ordini e buoni di consegna', 'Ritrovare documenti e collegamenti', ['Verifica il contratto attivo prima di consultare gli ordini.', 'Apri i gruppi e i dettagli disponibili per vedere buoni di consegna, riferimenti e iniziative associate.', 'Confronta anno/release e importi con le MEV collegate; un riferimento documentale diverso può indicare un’associazione da controllare.'], accessNote),
-    chapter('Controllo operativo', 'Usare correttamente le informazioni', ['Usa i filtri o la ricerca disponibili per individuare l’ordine interessato.', 'Controlla il livello del dato: ordine, buono di consegna e singola MEV non sono la stessa entità.', 'Per le funzioni di acquisizione o gestione documentale usa gli strumenti abilitati, senza duplicare lo stesso documento.']),
+    chapter('Leggere la tabella', 'Contratti, ordinato e da ordinare', [
+      'La pagina è di sola consultazione: non ci sono pulsanti di modifica, per nessun ruolo.',
+      'La prima tabella elenca i contratti con «Tipo Contratto», «RIF. Contratto», «Imp. Lordo», «Importo Netto», «Ordinato», «Da Ordinare», «Avanzato» e «Da Avanzare». «Da Ordinare» è la parte di importo non ancora ordinata; «Da Avanzare» quella non ancora avanzata.',
+      'Clicca su un contratto per aprire i livelli sotto: anno e poi BC (buono di consegna). Per ogni BC vedi RDA, AT ID, «Imp. Fornitura», «Ordinato (BdO)», «Fatturato» e «Da fatturare».',
+    ], accessNote),
+    chapter('Controllo operativo', 'Usare correttamente le informazioni', [
+      'Verifica il contratto attivo prima di consultare gli ordini: i valori sono riferiti al contratto selezionato in alto.',
+      'Controlla il livello del dato: contratto, buono di consegna e singola MEV non sono la stessa entità, e gli importi non vanno sommati tra livelli diversi.',
+      'Confronta anno e importi con le MEV collegate; un riferimento diverso può indicare un’associazione da controllare.',
+      only(ADMIN, 'Per acquisire ordini e verbali non si usa questa pagina: usa «Gestione Ordini» (Strumenti), disponibile agli amministratori.'),
+    ]),
   ] },
   reportavanzamenti: { title: 'Report Avanzamenti', summary: 'Monitora le attività per release e aggiorna gli avanzamenti autorizzati.', chapters: [
-    chapter('Selezionare la release', 'Definire il perimetro del report', ['Controlla il contratto attivo e seleziona la release nella parte superiore.', 'Consulta la panoramica delle attività; usa i filtri disponibili per restringere i risultati.', 'Clicca un’attività per aprire il dettaglio: l’anagrafica MEV è distinta dai campi di avanzamento.'], accessNote),
-    chapter('Aggiornare e controllare', 'Dati MEV e avanzamento', ['Nel dettaglio verifica quali sezioni sono indicate come modificabili e quali come sola lettura.', 'Aggiorna solo i campi autorizzati e usa i comandi di salvataggio della scheda.', 'Dopo il salvataggio controlla l’attività nel report e la release selezionata.']),
-    chapter('Release e importazione', 'Gestire dati senza confondere i perimetri', ['Gli utenti autorizzati possono creare o rinominare una release tramite i comandi dedicati.', 'Se importi dati di avanzamento, verifica il file e la release rilevata prima di confermare.', 'Leggi attentamente le conferme di eliminazione: rimuovere avanzamenti di una release ed eliminare la release dal calendario sono operazioni distinte.']),
+    chapter('Selezionare la release', 'Definire il perimetro del report', [
+      'In alto scegli la «Release» (oppure «— Tutte le release —»). Il riepilogo mostra «GoTo in release», «Approvati» e «Importo Fornitura» della release scelta.',
+      'La tabella elenca le attività con GoTo, titolo, sistemi, PM Poste, PM CAP, stato, importo e mandataria/mandante, e barre di avanzamento per Requisito, Analisi, Progettazione e Sviluppo, con la «Data Aggiorn.».',
+      'Clicca su un’attività per aprire il dettaglio. In alto a destra «Chiudi» torna all’elenco.',
+      only(['Client'], 'Il dettaglio di un’attività è per te di sola lettura: puoi consultare gli avanzamenti ma non cambiarli.'),
+    ], accessNote),
+    chapter('Il dettaglio di un’attività', 'Dati MEV e avanzamento', [
+      'Il dettaglio ha una sezione «Dati MEV» (anagrafica: GoTo, sistema, PM, importo, mandataria/mandante), sempre in sola lettura, e le sezioni di avanzamento: «Avanzamento attività» (percentuali), «Documenti e aggiornamenti» (HLD, AFU, ICD, Manuale Utente, RN/Man Inst, Unit Test, note) e «Pianificazione e rilasci» (Drop Deploy Collaudo, Data T0, Deadline).',
+      only(['Client', 'Editor', 'Developer', 'Bid Manager'], 'Ogni sezione di avanzamento porta il distintivo «Sola lettura»: puoi consultarla ma non modificarla. Le modifiche agli avanzamenti sono riservate agli amministratori.'),
+      only(ADMIN, 'Le sezioni di avanzamento portano il distintivo «Modificabile»: scrivi i valori e usa «Salva» nella scheda. «🗑 Elimina dati riga» cancella i dati di avanzamento di quella attività e chiede conferma.'),
+      'Dopo il salvataggio controlla l’attività nel report e la release selezionata.',
+    ]),
+    chapter('Release e importazione', 'Gestire dati senza confondere i perimetri', [
+      '«+ Nuova» crea una nuova release. «Importa da Excel» (con una release selezionata) legge i valori di avanzamento da un file: li mostra come modifiche da salvare, e solo «Salva tutto» li scrive. Controlla il file e la release rilevata prima di confermare.',
+      only(['Client', 'Editor', 'Developer', 'Bid Manager'], 'Anche per il tuo ruolo «+ Nuova» e «Importa da Excel» risultano disponibili. Poiché «Salva tutto» scrive sui dati condivisi, usali solo se è previsto dal tuo lavoro.'),
+      only(ADMIN, 'Con una release selezionata puoi anche rinominarla (✏ «Rinomina release») o toglierla dal calendario (🗑 «Elimina release dal calendario»: non cancella i dati di avanzamento). «🗑 Elimina dati» cancella i dati di avanzamento della release scelta, o di tutte: leggi con attenzione la conferma, sono operazioni distinte.'),
+    ], 'Rimuovere gli avanzamenti di una release ed eliminare la release dal calendario sono operazioni diverse. «Salva tutto» compare solo quando ci sono modifiche in sospeso.'),
   ] },
   chart: { title: 'Grafici', summary: 'Esplora la distribuzione delle iniziative per release, applicativo e anno.', chapters: [
-    chapter('Leggere i grafici', 'Una sintesi dei dati MEV', ['Verifica il contratto attivo e il perimetro rappresentato.', 'Consulta grafici, categorie e legende per confrontare release, applicativi e anni.', 'Per verificare una singola iniziativa o modificarne i dati apri MEV o MEV-CAP. I grafici sono una sintesi e non sostituiscono il dettaglio operativo.'], accessNote),
+    chapter('Leggere i grafici', 'Una sintesi dei dati MEV', [
+      'La pagina «Grafici» è di sola lettura per tutti i ruoli. Mostra le iniziative del contratto attivo raggruppate per «Release», «Applicativo» o «Anno»: scegli il raggruppamento con le tre schede in alto.',
+      'In cima ci sono gli indicatori «Approvato», «In Approvazione», «In Analisi / Stima», «Ordinato» e «Impegnato». Le caselle degli stati scelgono quali stati sommare; il pulsante di selezione di tutti li riattiva.',
+      '«Ordina per» cambia l’ordine delle righe: per importo decrescente oppure per nome del raggruppamento scelto. L’ultima riga, «Totale complessivo», somma tutto.',
+      only(['Client'], 'I grafici si basano sulle iniziative caricate dalla pagina MEV: se non vedi dati, apri prima MEV e poi torna ai grafici.'),
+      'Per verificare una singola iniziativa o modificarne i dati apri MEV o MEV-CAP. I grafici sono una sintesi e non sostituiscono il dettaglio operativo.',
+    ], accessNote),
   ] },
   team: { title: 'Gestione Team', summary: 'Consulta e gestisci le risorse del team nel contratto attivo.', chapters: [
-    chapter('Risorse del team', 'Anagrafica e aggiornamenti', ['Controlla l’ambiente e consulta l’elenco delle risorse.', 'Gli utenti autorizzati possono aggiungere un membro o aprirne la scheda per modificarlo.', 'Compila i dati richiesti, salva e verifica la risorsa nell’elenco.', 'Per eliminare una risorsa usa il comando dedicato e leggi la conferma prima di procedere.'], accessNote),
+    chapter('Risorse del team', 'Anagrafica e costi', [
+      'In alto trovi tre indicatori: «Costo al giorno», «Costo al mese» e «Risorse attive». Sotto, le risorse sono divise in «Team Attivo» e «Team Destaffato» (quest’ultimo si apre e si chiude). Il campo di ricerca cerca per risorsa, ambito e specialità.',
+      'Ogni riga mostra Risorsa, Ambito, Poste App., GRADE, ADRC (€), COR (€), «% Impegno», Corp ID, data ingresso e data uscita. Clicca una riga per aprire la scheda.',
+      only(['Client'], 'La pagina ti è stata assegnata: vedi le risorse del contratto e i costi. Nel programma i comandi di modifica risultano disponibili anche per il tuo ruolo; i dati sono condivisi con tutto il team, quindi modificali solo se rientra nel tuo lavoro.'),
+    ], accessNote),
+    chapter('Aggiungere, modificare, importare', 'Tenere l’anagrafica aggiornata', [
+      '«+ Nuovo membro» apre la scheda vuota; cliccando una riga si apre «Modifica membro». I campi sono Risorsa, Ambito, Specialità, Poste Application, GRADE, CDC, Practice, ADRC (€), COR (€), «% Impegno», Corp ID, e-mail, date di ingresso e uscita e note. Salva e verifica la risorsa nell’elenco.',
+      'Per togliere una risorsa dal team attivo compila la data di uscita: passa al «Team Destaffato» e i costi attivi si ricalcolano. «🗑 Elimina» la cancella del tutto e chiede conferma («Elimina risorsa»): non si annulla.',
+      '«📥 Importa Excel» carica più risorse da un file: controlla l’anteprima e l’esito prima di proseguire.',
+    ]),
   ] },
   consumotow: { title: 'Gestione TOW', summary: 'Configura contratti operativi, quantità, prezzi e associazioni TOW.', chapters: [
     chapter('Contratti e TOW', 'Dati che alimentano i calcoli', ['Verifica l’ambiente e il contratto operativo selezionato.', 'Consulta le righe TOW e distingui quantità, prezzo unitario, sconto e flag “A catalogo”.', 'Nelle righe a catalogo il valore può rappresentare un importo complessivo: controlla l’etichetta del campo prima di inserirlo.'], accessNote),
@@ -77,8 +155,20 @@ export const PAGE_MANUALS = {
     ], 'L’operazione è unica: o riesce tutta oppure non cambia niente. Se la finestra non compare il backend non è aggiornato; se compare un errore, nulla è stato modificato.'),
     chapter('Contratto MEV e utenti', 'Accessi al contesto operativo', ['Seleziona un contratto MEV oppure crealo con il comando dedicato.', 'Consulta gli utenti associati e assegna i ruoli previsti dal sistema.', 'Verifica che ciascun utente abbia solo i ruoli necessari nel contratto corretto; il ruolo operativo può cambiare tra ambienti.'], accessNote),
   ] },
-  admin: { title: 'Amministrazione utenti', summary: 'Gestisci account, ruoli e abilitazioni alle funzioni.', chapters: [
-    chapter('Account e autorizzazioni', 'Gestire gli utenti dell’app', ['Consulta gli utenti e apri la scheda interessata oppure crea un nuovo account.', 'Verifica dati anagrafici, stato dell’account e abilitazioni prima di salvare.', 'Distingui ruolo dell’account, accessi al contratto e permessi alle pagine: servono congiuntamente a determinare ciò che l’utente vede e può fare.', 'La tabella «Configurazione accessi per sotto-applicazione» vale per il ruolo che l’utente ha sul contratto. Quando assegni i contratti a un utente con account Client, sul contratto riceve il ruolo Client; i ruoli già assegnati a mano restano. Un utente con più ruoli ottiene ciò che almeno uno dei suoi ruoli permette: se un Client vede più pagine del previsto, controlla che sul contratto non abbia anche Editor.'], accessNote),
+  admin: { title: 'Gestione Utenti e Funzioni', summary: 'Crea e gestisci gli account, i ruoli e le funzioni abilitate a ciascun ruolo.', chapters: [
+    chapter('Utenti e ruoli', 'Creare un account e assegnare i ruoli', [
+      'La scheda «Utenti e Ruoli» ha in alto il modulo «Nuovo Utente»: Username, Nome Completo, Email, Password e Ruolo. Il ruolo scelto qui è quello dell’account; i ruoli effettivi dell’utente si assegnano poi sul contratto.',
+      'Sotto, l’«Elenco utenti» mostra ruolo, stato, ultima attività e le azioni: attiva/disattiva, «Storico accessi», «API Key», «Modifica», «Elimina» e il cambio password. Eliminare chiede conferma ed è definitivo.',
+      'Nella tabella puoi cambiare il ruolo principale e aggiungere ruoli extra con le caselle. Un utente con più ruoli ottiene ciò che almeno uno dei suoi ruoli permette: assegna solo quelli necessari.',
+      only(ADMIN, 'Per un utente con ruolo Client compare il pulsante «Gestisci permessi pagine e contratti»: apre «Pagine visibili» (quali card vede il Client) e «Contratti visibili» (a quali contratti ha accesso). Salva con «Salva Permessi».'),
+      only(['SuperAdmin'], 'Solo tu vedi il pulsante del tema («Chiaro»/«Scuro») accanto all’utente.'),
+    ], accessNote),
+    chapter('Funzioni e permessi per ruolo', 'Quali app può vedere e modificare ogni ruolo', [
+      'La scheda «Funzioni e Permessi App» contiene la tabella «Configurazione accessi per sotto-applicazione»: per ogni app (MEV, MEV-CAP, Contratti TOW, Contratti Interni, Grafici, Report Avanzamenti, Ordini Consegna, Consumo TOW, Tools, Gare, Configuratore, Sviluppo iniziative, Gestione Team) e per ogni ruolo ci sono le colonne «Vista» e «Modifica».',
+      'Togliere «Vista» nasconde l’app a quel ruolo e toglie anche «Modifica». SuperAdmin ha sempre accesso completo e non è configurabile. Premi «Salva permessi» per applicare.',
+      'La tabella vale per il ruolo che l’utente ha sul contratto. Quando assegni i contratti a un utente con account Client, sul contratto riceve il ruolo Client; i ruoli già assegnati a mano restano. Un utente con più ruoli ottiene ciò che almeno uno dei suoi ruoli permette: se un Client vede più pagine del previsto, controlla che sul contratto non abbia anche Editor.',
+      'Importante: nell’interfaccia la colonna «Modifica» non blocca i pulsanti delle pagine. Per limitare davvero chi scrive, agisci sulla colonna «Vista» e sulle pagine assegnate ai Client.',
+    ]),
   ] },
   dbconfig: { title: 'Configurazione database', summary: 'Consulta e gestisci la configurazione di connessione prevista dall’app.', chapters: [
     chapter('Impostazioni applicazione', 'Parametri operativi dell’app', ['Apri la scheda Impostazioni Applicazione per consultare i parametri disponibili.', 'Verifica il significato dei campi e salva solo modifiche concordate con chi gestisce l’ambiente.', 'Le impostazioni di applicazione sono diverse dalla configurazione della connessione database.']),
