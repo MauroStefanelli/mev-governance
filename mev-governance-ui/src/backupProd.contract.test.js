@@ -59,3 +59,24 @@ describe('RELEASE.md: the PROD procedure', () => {
 test('backup files can never be committed by mistake', () => {
   expect(ignore).toContain('*.dump'); expect(ignore).toContain('mev-backup-prod/'); expect(ignore).toContain('*.righe.txt');
 });
+
+// A ogni rilascio in PROD la versione mostrata in fondo alla pagina (PROD_REL_nnn) si incrementa a mano su Render: non sta nel repository. La regola e lo strumento sono fissati qui.
+describe('the PROD version (PROD_REL_nnn) is raised at every release to PROD', () => {
+  const version = fs.readFileSync(path.join(ROOT, 'scripts', 'prod-version.py'), 'utf8');
+  test('the procedure says so, and says where: the REACT_APP_RELEASE variable of the PROD frontend on Render, before the push to main', () => {
+    expect(release).toContain('Incrementa la versione di PROD (SEMPRE, a ogni rilascio in PROD)'); expect(release).toContain('REACT_APP_RELEASE'); expect(release).toContain('scripts/prod-version.py');
+    expect(release.indexOf('Incrementa la versione di PROD')).toBeLessThan(release.indexOf('### Passo 5')); expect(release).toContain('non sta nel repository');
+    expect(release).toMatch(/Flusso di lavoro consigliato\s+```[^`]*incrementa PROD_REL_nnn su Render[^`]*```/);
+  });
+  test('the helper reads the version PROD shows now from the public page (no login, nothing written) and proposes the next one', () => {
+    expect(version).toContain("FRONTEND = 'https://mev-governance-frontend.onrender.com'"); expect(version).toContain('def next_label(label)'); expect(version).toContain("int(match.group(1)) + 1:03d");
+    expect(version).not.toMatch(/method=['"](POST|PUT|DELETE|PATCH)['"]|data=/);
+  });
+  test('after the deploy it waits for the exact number and fails if PROD does not show it', () => {
+    expect(version).toContain("'--wait'"); expect(version).toContain('sys.exit(f\'[versione] ERRORE'); expect(version).toContain('if label == args.wait');
+  });
+  test('the number is never written into the repository: no committed file sets a PROD_REL value for the build', () => {
+    const tracked = ['mev-governance-ui/.env', 'mev-governance-ui/.env.development', 'render.yaml'].map(file => fs.readFileSync(path.join(ROOT, file), 'utf8')).join('\n');
+    expect(tracked).not.toMatch(/REACT_APP_RELEASE\s*[=:]\s*"?PROD_REL/);
+  });
+});

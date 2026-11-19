@@ -79,7 +79,8 @@ sviluppo → commit su develop → deploy su DEV → test → ok
 → COPIA DI SICUREZZA di PROD (scripts/backup-prod.sh)
 → controllo delle modifiche al database
 → merge su un branch di prova (conflitti, build, test)
-→ merge su main → push main → deploy su PROD
+→ incrementa PROD_REL_nnn su Render (scripts/prod-version.py)
+→ merge su main → push main → deploy su PROD → verifica della versione
 ```
 
 ---
@@ -177,6 +178,20 @@ git checkout main
 git merge --no-ff release/prod-prova -m "release: develop → main <versione>"
 git push origin main
 ```
+
+### Passo 4b — Incrementa la versione di PROD (SEMPRE, a ogni rilascio in PROD)
+
+La versione che compare in fondo alla pagina di PROD (es. `PROD_REL_002`) **non sta nel repository**: la scrive Render al momento della build, dalla variabile `REACT_APP_RELEASE` del servizio frontend di PROD. Per questo non cambia da sola: a ogni rilascio in PROD va incrementata **a mano** (`002` → `003` → `004`…). Prima del push:
+
+```bash
+scripts/prod-version.py          # dice cosa mostra PROD adesso e qual e' il numero da impostare
+```
+
+1. Su Render, servizio `mev-governance-frontend` (PROD) → **Environment** → `REACT_APP_RELEASE` = il numero indicato (es. `PROD_REL_003`).
+2. Poi il push su `main` (passo 5): la build parte con il nuovo numero. Se `main` e' gia' stato pubblicato, basta un *Manual Deploy* del frontend.
+3. Verifica: `scripts/prod-version.py --wait PROD_REL_003` aspetta che PROD mostri proprio quel numero (e segnala se non succede).
+
+Non e' un numero di DEV: `DEV_REL_nnn` (in `release.js`) si incrementa a ogni rilascio su DEV e non c'entra con questo. Se la variabile manca, la pagina mostra la versione di riserva `DEV_REL_nnn`: e' il segnale che ci si e' dimenticati.
 
 ### Passo 5 — Deploy
 
