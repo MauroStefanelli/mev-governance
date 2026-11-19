@@ -45,7 +45,8 @@ public static class MevEndpointsRegression
         var openWriters = typeof(MevController).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(m => m.GetCustomAttributes<HttpMethodAttribute>().Any(a => a.HttpMethods.Any(h => h is "POST" or "PUT" or "DELETE" or "PATCH")))
             .Where(m => PolicyOf(m) == null).Select(m => m.Name).OrderBy(n => n).ToList();
-        var expected = new[] { nameof(MevController.Align), nameof(MevController.CreateMev), nameof(MevController.DeleteMev), nameof(MevController.UpdateMev) }.OrderBy(n => n).ToList();
+        // ExportFormatted usa POST solo per mandare l'elenco delle righe: legge e basta (e un Client riceve solo i suoi contratti), quindi e' aperta a chi legge MEV, come GET /api/mev.
+        var expected = new[] { nameof(MevController.Align), nameof(MevController.CreateMev), nameof(MevController.DeleteMev), nameof(MevController.UpdateMev), nameof(MevController.ExportFormatted) }.OrderBy(n => n).ToList();
         check(openWriters.SequenceEqual(expected), $"Writing endpoints of MEV without a role check are exactly the known ones ({string.Join(", ", openWriters)})");
     }
 }

@@ -811,6 +811,37 @@ public class MevController : BaseController
         );
     }
     // ============================================================
+    // POST /api/mev/export  — «Esporta Excel» di MEV e MEV-CAP
+    // La pagina manda solo QUALI righe (gli id che ha davanti dopo i filtri) e quale pagina: i dati si rileggono dal database, con gli stessi limiti di GET /api/mev
+    // (un Client riceve solo le righe dei suoi contratti, anche se chiede id di altri). Il file ha una tabella con filtri, gli importi in euro e le intestazioni fisse.
+    // ============================================================
+    public const int MaxExportRows = 20000;
+    [HttpPost("export")]
+    public IActionResult ExportFormatted([FromBody] ExportMevRequest request)
+    {
+        var ambienteId = GetAmbienteId();
+        if (ambienteId <= 0) return Forbid();
+        var page = request?.Page == "mevcap" ? "mevcap" : "mev";
+        var ids = (request?.Ids ?? new List<int>()).Distinct().ToList();
+        if (ids.Count > MaxExportRows) return BadRequest(new { message = $"Troppe righe da esportare (massimo {MaxExportRows})." });
+
+        IQueryable<MevItem> query = _db.MevItems.AsNoTracking().Where(m => m.AmbienteId == ambienteId);
+        if (User.IsInRole("Client"))
+        {
+            if (!int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)) return Unauthorized();
+            var allowed = _db.UserClientContratti.Where(r => r.UserId == userId && r.AmbienteId == ambienteId).Select(r => r.TowContratto!.ToUpper()).ToList();
+            query = query.Where(m => allowed.Contains(m.TipoContratto!.ToUpper()));
+        }
+        // Senza elenco di id si esporta tutto cio' che l'utente puo' vedere; con l'elenco, solo quelle righe (nell'ordine della tabella).
+        if (request?.Ids != null) query = query.Where(m => ids.Contains(m.Id));
+        var items = query.OrderBy(m => m.ExcelOrder).ToList();
+        var rti = _db.RtiSocietaRighe.AsNoTracking().Where(r => r.AmbienteId == ambienteId).OrderBy(r => r.Ordine).ThenBy(r => r.Id).ToList();
+        var bytes = MevWorkbookExport.Build(page, items, rti, string.IsNullOrWhiteSpace(request?.Filters) ? null : request!.Filters!.Trim()[..Math.Min(request.Filters!.Trim().Length, 500)]);
+        var stamp = DateTime.Now.ToString("yyyyMMdd");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Logistica {MevWorkbookExport.TitleFor(page)} Governance {stamp}.xlsx");
+    }
+
+    // ============================================================
     // DELETE /api/mev/{id}
     // Elimina una singola riga MEV per l'ambiente corrente.
     // ============================================================
@@ -885,4 +916,11 @@ public class MevController : BaseController
         });
     }
 
+}
+
+public class ExportMevRequest
+{
+    public string? Page { get; set; }
+    public List<int>? Ids { get; set; }
+    public string? Filters { get; set; }
 }

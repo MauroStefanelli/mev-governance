@@ -1619,7 +1619,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
         </button>
 
         <button style={btn("success")} onClick={async () => {
-          try { await exportMev(filteredRows, filters); }
+          try { await exportMev(filteredRows, filters, 'mevcap'); }
           catch (e) { alert(`Errore export: ${e.message}`); }
         }}>
           Esporta Excel

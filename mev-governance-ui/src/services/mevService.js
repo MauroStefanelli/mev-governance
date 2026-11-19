@@ -290,7 +290,33 @@ export async function getMevOptions() {
   return response.json();
 }
 
-export const exportMev = async (rows, filters = {}) => {
+// «Esporta Excel» di MEV e MEV-CAP. Il file lo scrive il BACKEND (tabella con filtri, importi in euro, intestazioni fisse): la pagina manda solo quali righe ha davanti
+// dopo i filtri; i dati si rileggono dal database, con gli stessi limiti di chi esporta. Se il backend non ha ancora questa funzione (404/405), si usa il vecchio file semplice.
+const FILTER_NAMES = { goTo: 'GoTo', applicativo: 'Applicativo', descrizione: 'Descrizione', stato: 'Stato', annoCompetenza: 'Anno', pAnno: 'P Anno', pRelease: 'P Release', oda: 'ODA', rda: 'RDA',
+  mandataria: 'Mandataria/Mandante', subco: 'Subco', importoExcel: 'Importo', pNote: 'P Note', noteCap: 'Note CAP', capgemini: 'Mandataria/Mandante', pmPoste: 'PM Poste', pmCap: 'PM CAP', releaseExcel: 'Release', tipoContratto: 'Tipo contratto' };
+export const describeFilters = (filters = {}) => Object.entries(filters || {}).map(([key, value]) => {
+  const values = Array.isArray(value) ? value : value === '' || value == null ? [] : [value];
+  const shown = values.map(item => String(item)).filter(item => item !== '');
+  return shown.length ? `${FILTER_NAMES[key] || key}: ${shown.join(' / ')}` : '';
+}).filter(Boolean).join(' · ');
+
+const saveBlob = (blob, name) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+const fileNameFrom = (response, fallback) => { const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(response.headers?.get?.('Content-Disposition') || ''); try { return match ? decodeURIComponent(match[1]) : fallback; } catch { return fallback; } };
+
+export const exportMev = async (rows, filters = {}, page = 'mev') => {
+  const stamp = new Date(); const day = `${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}`;
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/mev/export`, {
+    method: 'POST', headers: authHeaders(),
+    body: JSON.stringify({ page: page === 'mevcap' ? 'mevcap' : 'mev', ids: (rows || []).map(row => row.id).filter(id => id != null), filters: describeFilters(filters) }),
+  });
+  if (response.status === 401) throw new Error('401');
+  if (response.status === 404 || response.status === 405) return exportMevBasic(rows, filters);   // backend non ancora aggiornato
+  if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.message || `Esportazione non riuscita (${response.status})`); }
+  saveBlob(await response.blob(), fileNameFrom(response, `Logistica ${page === 'mevcap' ? 'MEV-CAP' : 'MEV'} Governance ${day}.xlsx`));
+};
+
+// Il vecchio file, semplice (senza tabella ne' formati): solo come riserva.
+export const exportMevBasic = async (rows, filters = {}) => {
   const XLSX = await import("xlsx");
 
   const now = new Date();

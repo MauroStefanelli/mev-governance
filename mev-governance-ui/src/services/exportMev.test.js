@@ -1,6 +1,6 @@
-import { exportMev } from './mevService';
+import { exportMevBasic as exportMev } from './mevService';
 
-// L'export della tabella MEV («Esporta Excel»). La colonna «Imp. Subco» c'e' nella tabella e nel totale in alto: deve esserci anche nel file, subito dopo «Subco».
+// Il file di RISERVA di «Esporta Excel» (usato se il backend non ha ancora l'esportazione formattata). La colonna «Imp. Subco» c'e' nella tabella e nel totale in alto: deve esserci anche nel file, subito dopo «Subco».
 // Era una correzione fatta solo su main (PROD) e il rilascio da develop l'avrebbe persa.
 const written = {};
 jest.mock('xlsx', () => {

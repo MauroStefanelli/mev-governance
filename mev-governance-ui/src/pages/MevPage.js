@@ -428,7 +428,7 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
         )}
 
         <button style={btn("success")} onClick={async () => {
-          try { await exportMev(filteredRows, filters); }
+          try { await exportMev(filteredRows, filters, 'mev'); }
           catch (e) { alert(`Errore export: ${e.message}`); }
         }}>
           ↓ Esporta Excel

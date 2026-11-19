@@ -33,6 +33,7 @@ await OfferWorkbookTemplateRegression.Run(db, Check);
 await ClientContractRoleRegression.Run(db, Check);
 await MevEndpointsRegression.Run(Check);
 await MevMandatoryRegression.Run(db, Check);
+await MevExportRegression.Run(db, Check);
 StartupSqlRegression.Run(Check);
 if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }
 var user = new AppUser { Username = "operator", Role = "Admin" };
