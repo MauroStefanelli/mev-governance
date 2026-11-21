@@ -115,3 +115,19 @@ test('a descriptions field is limited to 2000 characters', async () => {
   await screen.findByRole('table');
   expect(screen.getByLabelText('Descrizione Driver voce 236')).toHaveAttribute('maxLength', '2000');
 });
+
+test('the save bar says there is nothing to save, then warns (and changes look) once something is edited', async () => {
+  service.offeredCatalogTable.mockResolvedValue(table([serverRow(236)]));
+  const { container } = render(<OfferedCatalogTable contractId="c" lotId="2" />);
+  await screen.findByRole('table');
+  const bar = () => container.querySelector('.oc-savebar');
+  expect(bar()).not.toHaveClass('is-dirty');
+  expect(screen.getByText('Nessuna modifica da salvare.')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Realizzazione Medio voce 236'), { target: { value: '1500' } });
+  expect(bar()).toHaveClass('is-dirty');
+  expect(screen.getByText(/Hai modifiche non salvate: le celle cambiate sono evidenziate in giallo/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Realizzazione Medio voce 236').closest('td')).toHaveClass('is-changed');
+  expect(screen.getByLabelText('Realizzazione Semplice voce 236').closest('td')).not.toHaveClass('is-changed');
+  fireEvent.change(screen.getByLabelText('Realizzazione Medio voce 236'), { target: { value: '1400' } });
+  expect(bar()).not.toHaveClass('is-dirty');      // tornando al valore salvato non resta nulla da salvare
+});

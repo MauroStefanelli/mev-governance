@@ -1248,10 +1248,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                     })}
 
                     {/* Pannello associazione Codice MEV */}
-                    {section === 'offered' && visible.map(l => <div key={'offered-' + l.lotId} style={{ marginBottom: 18 }}>
-                      <h3>Lotto {l.lotId} — {l.name}</h3>
-                      <OfferedCatalogPanel contractId={c.contractId} lotId={l.lotId} />
-                    </div>)}
+                    {section === 'offered' && visible.map(l => <OfferedCatalogPanel key={'offered-' + l.lotId} contractId={c.contractId} lotId={l.lotId} />)}
                     {section === 'links' && (
                       <div style={{ border: '1px solid #cbdcf3', background: '#f5f9ff', borderRadius: 14, padding: 16, display: 'grid', gap: 16, minWidth: 0 }}>
                         <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: '#29415e' }}>

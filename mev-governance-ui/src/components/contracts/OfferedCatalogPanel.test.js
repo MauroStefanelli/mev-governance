@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import OfferedCatalogPanel, { discountOf } from './OfferedCatalogPanel';
 import * as service from '../../services/mevService';
@@ -13,6 +13,7 @@ const lotInfo = (extra = {}) => ({ contractId: 'poste-tet-2025', contractName: '
 const file = new File(['x'], 'offerto.xlsx');
 const okPreview = { ok: true, format: 'Foglio catalogo con prezzi offerti (ID di catalogo, Descrizione semplice/medio/complesso)', errors: [], warnings: ['Riga 2 (ID 236), «Realizzazione Medio»: il prezzo offerto 3000 supera la base d\'asta 2800.'],
   rows: [{ id: '236', ambito: 'Frontend', nome: 'Realizzazione Single Page Application', descrizione: 'Descrizione del driver dal file', descrizioni: { Semplice: '- Numero Campi min uguale= 10', Medio: '- >10 Numero Campi', Complesso: '- Numero Campi > 20' }, prezzi: ['REALIZZAZIONE', 'MODIFICA'].flatMap(tipo => ['Semplice', 'Medio', 'Complesso'].map(fascia => ({ tipo, fascia, gara: 2800, offerto: 1400 }))) }] };
+const openImport = async () => fireEvent.click(await screen.findByRole('button', { name: /^(Carica|Aggiorna) catalogo$/ }));
 const pick = () => fireEvent.change(screen.getByLabelText('File Excel del catalogo offerto'), { target: { files: [file] } });
 beforeEach(() => { jest.resetAllMocks(); window.confirm = jest.fn(() => true); global.URL.createObjectURL = jest.fn(() => 'blob:x'); global.URL.revokeObjectURL = jest.fn(); jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {}); });
 
@@ -34,10 +35,14 @@ test('before the import it says the lot uses the tender prices and offers the Ex
   service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
   service.downloadOfferedCatalogTemplate.mockResolvedValue(new Blob(['x']));
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
-  expect(await screen.findByText(/non è ancora stato caricato: il lotto usa i prezzi di gara/)).toBeInTheDocument();
-  expect(screen.getByText(/27 voci/)).toBeInTheDocument();
+  expect(await screen.findByText('Il catalogo offerto non è ancora stato caricato')).toBeInTheDocument();
+  expect(screen.getByText('27 voci')).toBeInTheDocument();
+  expect(screen.getByText('Non caricato')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Rimuovi/ })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Scarica il modello Excel' }));
+  expect(screen.queryByRole('button', { name: 'Scarica il modello Excel' })).toBeNull();      // il caricamento e' chiuso finche' non si preme Carica
+  expect(screen.queryByLabelText('File Excel del catalogo offerto')).toBeNull();
+  await openImport();
+  fireEvent.click(await screen.findByRole('button', { name: 'Scarica il modello Excel' }));
   await waitFor(() => expect(service.downloadOfferedCatalogTemplate).toHaveBeenCalledWith('poste-tet-2025', '2'));
 });
 
@@ -45,6 +50,7 @@ test('the file is only CHECKED first: nothing is saved until the user confirms, 
   service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
   service.previewOfferedCatalog.mockResolvedValue(okPreview);
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+  await openImport();
   await screen.findByRole('button', { name: 'Scarica il modello Excel' });
   expect(screen.getByRole('button', { name: 'Controlla il file' })).toBeDisabled();
   pick();
@@ -61,18 +67,25 @@ test('confirming saves, reloads the state and tells the user', async () => {
   service.previewOfferedCatalog.mockResolvedValue(okPreview);
   service.importOfferedCatalog.mockResolvedValue({ count: 27 });
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+  await openImport();
   await screen.findByRole('button', { name: 'Scarica il modello Excel' });
   pick(); fireEvent.click(screen.getByRole('button', { name: 'Controlla il file' }));
   fireEvent.click(await screen.findByRole('button', { name: /Salva il catalogo offerto \(1 voci\)/ }));
   expect(await screen.findByText('Catalogo offerto salvato: 27 voci.')).toBeInTheDocument();
   expect(service.importOfferedCatalog).toHaveBeenCalledWith(file, 'poste-tet-2025', '2');
-  expect(await screen.findByText(/offerto\.xlsx · caricato il .* da Anna Rossi/)).toBeInTheDocument();
+  const recap = await screen.findByRole('group', { name: 'Riepilogo del catalogo' });
+  await waitFor(() => expect(within(recap).getByText('in uso nel Configuratore')).toBeInTheDocument());
+  expect(within(recap).getAllByText('27 voci')).toHaveLength(2);      // gara e offerto
+  expect(within(recap).getByText(/da Anna Rossi · offerto\.xlsx/)).toBeInTheDocument();
+  expect(within(recap).getByText('in uso nel Configuratore')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Caricamento del catalogo offerto' })).toBeNull();      // dopo il salvataggio il pannello di caricamento si richiude
 });
 
 test('a file with errors lists them all, offers no save button, and nothing is sent to save', async () => {
   service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
   service.previewOfferedCatalog.mockResolvedValue({ ok: false, errors: ['Riga 2: l\'ID 99999 non esiste nel catalogo di gara di questo lotto.', 'Mancano 1 voci del catalogo di gara: ID 239.'], warnings: [], rows: [] });
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+  await openImport();
   await screen.findByRole('button', { name: 'Scarica il modello Excel' });
   pick(); fireEvent.click(screen.getByRole('button', { name: 'Controlla il file' }));
   expect(await screen.findByText(/Il file non può essere salvato \(2 problemi\)/)).toBeInTheDocument();
@@ -87,6 +100,7 @@ test('the errors the server sends when saving are shown too', async () => {
   const failure = Object.assign(new Error('Il file contiene errori: nessuna voce è stata salvata.'), { errors: ['Riga 5: x'], warnings: [] });
   service.importOfferedCatalog.mockRejectedValue(failure);
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+  await openImport();
   await screen.findByRole('button', { name: 'Scarica il modello Excel' });
   pick(); fireEvent.click(screen.getByRole('button', { name: 'Controlla il file' }));
   fireEvent.click(await screen.findByRole('button', { name: /Salva il catalogo offerto/ }));
@@ -130,8 +144,10 @@ test('the preview says which format was recognised and that the descriptions wil
   service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
   service.previewOfferedCatalog.mockResolvedValue(okPreview);
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+  await openImport();
   await screen.findByRole('button', { name: 'Scarica il modello Excel' });
-  expect(screen.getByText(/caricalo così com’è: le altre colonne vengono ignorate/)).toBeInTheDocument();
+  expect(screen.getByText(/Caricalo così com’è/)).toBeInTheDocument();
+  expect(screen.getByText(/Le altre colonne vengono ignorate/)).toBeInTheDocument();
   expect(screen.getByText(/Le colonne «Descrizione Driver», «Descrizione Semplice», «Descrizione Medio» e «Descrizione Complesso» sono facoltative/)).toBeInTheDocument();
   pick(); fireEvent.click(screen.getByRole('button', { name: 'Controlla il file' }));
   expect(await screen.findByText(/Formato riconosciuto: Foglio catalogo con prezzi offerti/)).toBeInTheDocument();
@@ -147,4 +163,62 @@ test('the Archivio shows the descriptions by complexity of the offered catalog u
   expect(src('pages/ContractArchivePage.js')).toMatch(/Driver:<\/strong> \{driverText\}/);
   expect(src('pages/ContractArchivePage.js')).toMatch(/offered: l\.offeredCatalog \|\| \[\]/);
   expect(src('pages/ConfiguratorePage.js')).toMatch(/cc\.descrizioni && \["Semplice", "Medio", "Complesso"\]/);
+});
+
+describe('the loading part opens only on request', () => {
+  test('with no catalog the button says «Carica catalogo»; with one it says «Aggiorna catalogo»', async () => {
+    service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
+    const first = render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+    expect(await screen.findByRole('button', { name: 'Carica catalogo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aggiorna catalogo' })).toBeNull();
+    first.unmount();
+    service.offeredCatalogLots.mockResolvedValue([lotInfo({ offered: { count: 27, meta: { fileName: 'a.xlsx' } } })]);
+    service.offeredCatalogTable.mockResolvedValue({ stamp: 's', loaded: true, meta: {}, rows: [] });
+    render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+    expect(await screen.findByRole('button', { name: 'Aggiorna catalogo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Carica catalogo' })).toBeNull();
+  });
+  test('nothing of the Excel import is on the page until the button is pressed; «Chiudi» hides it again and forgets the chosen file', async () => {
+    service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
+    render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+    await screen.findByRole('button', { name: 'Carica catalogo' });
+    for (const hidden of [/Scarica il modello Excel/, /Controlla il file/, /Scegli il file Excel/]) expect(screen.queryByRole('button', { name: hidden })).toBeNull();
+    expect(screen.queryByLabelText('File Excel del catalogo offerto')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Caricamento del catalogo offerto' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Carica catalogo' }));
+    const panel = screen.getByRole('region', { name: 'Caricamento del catalogo offerto' });
+    expect(within(panel).getByText('Carica il catalogo offerto')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Scarica il modello Excel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Carica catalogo' })).toBeNull();      // il pulsante non si ripete mentre il pannello e' aperto
+    pick(); expect(within(panel).getByText('offerto.xlsx', { selector: '.oc-file-name' })).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Chiudi' }));
+    expect(screen.queryByRole('region', { name: 'Caricamento del catalogo offerto' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Carica catalogo' }));
+    expect(screen.queryByText('offerto.xlsx', { selector: '.oc-file-name' })).toBeNull();      // il file scelto prima non resta
+  });
+  test('a lot with no tender voices cannot offer the Excel model (there is nothing to fill in)', async () => {
+    service.offeredCatalogLots.mockResolvedValue([lotInfo({ tenderCount: 0 })]);
+    render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+    await openImport();
+    expect(await screen.findByRole('button', { name: 'Scarica il modello Excel' })).toBeDisabled();
+  });
+  test('the lot title, the summary cards and the empty state are shown', async () => {
+    service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
+    render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+    expect(await screen.findByRole('heading', { name: /Poste TeT · Lotto 2 — Lotto 2/ })).toBeInTheDocument();
+    const recap = screen.getByRole('group', { name: 'Riepilogo del catalogo' });
+    expect(within(recap).getByText('Catalogo di gara')).toBeInTheDocument();
+    expect(within(recap).getByText('Non caricato')).toBeInTheDocument();
+    expect(screen.getByText('Il catalogo offerto non è ancora stato caricato')).toBeInTheDocument();
+  });
+  test('the table is the main content once loaded, and «Rimuovi» is not offered while the loading part is open', async () => {
+    service.offeredCatalogLots.mockResolvedValue([lotInfo({ offered: { count: 27, meta: { fileName: 'a.xlsx' } } })]);
+    service.offeredCatalogTable.mockResolvedValue({ stamp: 's', loaded: true, meta: {}, rows: [] });
+    render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+    expect(await screen.findByRole('button', { name: 'Rimuovi il catalogo offerto' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Catalogo offerto caricato')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiorna catalogo' }));
+    expect(screen.queryByRole('button', { name: 'Rimuovi il catalogo offerto' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Caricamento del catalogo offerto' })).toBeInTheDocument();
+  });
 });
