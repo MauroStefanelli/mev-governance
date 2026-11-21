@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { offeredCatalogLots, downloadOfferedCatalogTemplate, previewOfferedCatalog, importOfferedCatalog, removeOfferedCatalog } from '../../services/mevService';
 import { euro } from '../../utils';
+import OfferedCatalogTable from './OfferedCatalogTable';
 
 const save = (blob, name) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
 const when = value => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -18,6 +19,7 @@ export default function OfferedCatalogPanel({ contractId, lotId, onChanged }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [notice, setNotice] = useState('');
+  const [version, setVersion] = useState(0);   // cambia dopo un import o una rimozione: la tabella si ricarica
   const load = useCallback(async () => { try { setLots(await offeredCatalogLots()); setError(''); } catch (e) { setError(e.message); setLots([]); } }, []);
   useEffect(() => { load(); }, [load]);
   const lot = (lots || []).find(entry => entry.contractId === contractId && String(entry.lotId) === String(lotId));
@@ -25,8 +27,8 @@ export default function OfferedCatalogPanel({ contractId, lotId, onChanged }) {
   const download = () => run(async () => save(await downloadOfferedCatalogTemplate(contractId, lotId), `catalogo-offerto-${contractId}-lotto-${lotId}.xlsx`));
   const choose = event => { setFile(event.target.files?.[0] || null); setPreview(null); setNotice(''); setError(''); };
   const check = () => run(async () => setPreview(await previewOfferedCatalog(file, contractId, lotId)));
-  const importFile = () => run(async () => { const result = await importOfferedCatalog(file, contractId, lotId); setNotice(`Catalogo offerto salvato: ${result.count} voci.`); setFile(null); setPreview(null); await load(); onChanged?.(); });
-  const remove = () => { if (!window.confirm('Rimuovere il catalogo offerto? Il lotto tornerà a usare i prezzi di gara. Il catalogo di gara non viene toccato.')) return; run(async () => { await removeOfferedCatalog(contractId, lotId); setNotice('Catalogo offerto rimosso: il lotto usa di nuovo i prezzi di gara.'); await load(); onChanged?.(); }); };
+  const importFile = () => run(async () => { const result = await importOfferedCatalog(file, contractId, lotId); setNotice(`Catalogo offerto salvato: ${result.count} voci.`); setFile(null); setPreview(null); setVersion(v => v + 1); await load(); onChanged?.(); });
+  const remove = () => { if (!window.confirm('Rimuovere il catalogo offerto? Il lotto tornerà a usare i prezzi di gara. Il catalogo di gara non viene toccato.')) return; run(async () => { await removeOfferedCatalog(contractId, lotId); setNotice('Catalogo offerto rimosso: il lotto usa di nuovo i prezzi di gara.'); setVersion(v => v + 1); await load(); onChanged?.(); }); };
 
   if (lots === null) return <p role="status">Caricamento…</p>;
   if (!lot) return <section className="ca-offered" aria-label="Voci di catalogo offerti"><h3>Voci di catalogo offerti</h3><p className="ca-caption">Non hai il permesso di gestire il catalogo offerto di questo lotto: puoi farlo solo sui lotti del contratto su cui lavori.</p>{error && <p role="alert">{error}</p>}</section>;
@@ -59,6 +61,7 @@ export default function OfferedCatalogPanel({ contractId, lotId, onChanged }) {
         <p><button type="button" disabled={busy} onClick={importFile}>Salva il catalogo offerto ({preview.rows.length} voci)</button></p>
       </>}
     </div>}
+    {has && <OfferedCatalogTable contractId={contractId} lotId={lotId} reloadKey={version} onSaved={load} />}
     {has && <p><button type="button" disabled={busy} onClick={remove}>Rimuovi il catalogo offerto</button> <span className="ca-caption">Il lotto torna ai prezzi di gara; le iniziative già salvate non cambiano.</span></p>}
     <p className="ca-caption">Le iniziative già salvate non cambiano da sole: nel Configuratore, aprendo l’iniziativa, compare «Riallinea ai prezzi offerti» con l’anteprima dei totali.</p>
   </section>;

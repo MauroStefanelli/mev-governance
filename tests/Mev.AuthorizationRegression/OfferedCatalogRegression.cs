@@ -197,6 +197,34 @@ public static class OfferedCatalogRegression
         }
         { var wb = Filled(tender, 0.5m); wb.Worksheet("CatalogoOfferto").Cell(40, 1).Value = ""; check(Read(wb, tender).Ok, "empty rows at the bottom are ignored"); }
 
+        // ---- la tabella modificabile: le modifiche passano dagli STESSI controlli del file ----
+        JsonArray Edits(Action<JsonObject>? change = null)
+        {
+            var rows = new JsonArray();
+            foreach (var row in good.Rows)
+            {
+                var o = new JsonObject { ["id"] = row.Id, ["nome"] = "nome da ignorare", ["ambito"] = "ambito da ignorare", ["prezzi"] = new JsonObject() };
+                foreach (var type in OfferedCatalogWorkbook.Types) { var t = new JsonObject(); foreach (var band in OfferedCatalogWorkbook.Bands) t[band] = row.Prices.Single(p => p.Type == type && p.Band == band).Offered; o["prezzi"]![type] = t; }
+                change?.Invoke(o); rows.Add(o);
+            }
+            return rows;
+        }
+        var okEdit = OfferedCatalogWorkbook.FromEdits(Edits(), tender);
+        check(okEdit.Ok && okEdit.Rows.Count == 27 && okEdit.Errors.Count == 0, "table: an unchanged table is accepted with all 27 voices");
+        var editedA = OfferedCatalogWorkbook.FromEdits(Edits(o => { if (o["id"]!.ToString() == "236") { o["prezzi"]!["REALIZZAZIONE"]!["Medio"] = "1.234,50"; o["descrizione"] = "Nuova descrizione"; o["descrizioni"] = new JsonObject { ["Semplice"] = "S", ["Complesso"] = "C" }; } }), tender);
+        var entry236 = OfferedCatalogWorkbook.ToEntries(editedA.Rows)[0]!;
+        check(editedA.Ok && entry236["prezzi"]!["REALIZZAZIONE"]!["Medio"]!.GetValue<decimal>() == 1234.50m && entry236["descrizione"]!.ToString() == "Nuova descrizione" && entry236["descrizioni"]!["Complesso"]!.ToString() == "C" && entry236["descrizioni"]!["Medio"] == null, "table: an edited price (written «1.234,50»), the driver description and some band descriptions are saved; empty ones are not invented");
+        check(entry236["nome"] == null && entry236["ambito"] == null && editedA.Rows[0].Name == "Realizzazione Single Page Application" && editedA.Rows[0].Ambit == "Frontend", "table: name and ambit sent by the table are IGNORED (they stay those of the tender catalog)");
+        { var r = OfferedCatalogWorkbook.FromEdits(Edits(o => { if (o["id"]!.ToString() == "236") o["prezzi"]!["REALIZZAZIONE"]!["Medio"] = null; }), tender); check(!r.Ok && r.Errors.Any(e => e.Contains("ID 236") && e.Contains("Realizzazione Medio") && e.Contains("manca il prezzo offerto")), "table: clearing a price where the tender has one is refused"); }
+        { var r = OfferedCatalogWorkbook.FromEdits(Edits(o => { if (o["id"]!.ToString() == "236") o["prezzi"]!["REALIZZAZIONE"]!["Medio"] = "abc"; }), tender); check(!r.Ok && r.Errors.Any(e => e.Contains("«abc» non è un importo")), "table: text that is not an amount is refused"); }
+        { var r = OfferedCatalogWorkbook.FromEdits(Edits(o => { if (o["id"]!.ToString() == "236") o["prezzi"]!["MODIFICA"]!["Semplice"] = -3; }), tender); check(!r.Ok && r.Errors.Any(e => e.Contains("negativo")), "table: a negative price is refused"); }
+        { var r = OfferedCatalogWorkbook.FromEdits(Edits(o => { if (o["id"]!.ToString() == "236") o["descrizione"] = new string('x', 2500); }), tender); check(!r.Ok && r.Errors.Any(e => e.Contains("Descrizione Driver") && e.Contains("supera 2000")), "table: a description that is far too long is refused"); }
+        { var rows = Edits(); rows.RemoveAt(3); var r = OfferedCatalogWorkbook.FromEdits(rows, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("Mancano 1 voci")), "table: a missing voice is refused (every voice of the lot is needed)"); }
+        { var rows = Edits(); rows[2]!["id"] = "236"; var r = OfferedCatalogWorkbook.FromEdits(rows, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("più di una volta")), "table: a duplicated ID is refused"); }
+        { var rows = Edits(); rows[2]!["id"] = "99999"; var r = OfferedCatalogWorkbook.FromEdits(rows, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("99999")), "table: an unknown ID is refused"); }
+        { var r = OfferedCatalogWorkbook.FromEdits(Edits(o => { if (o["id"]!.ToString() == "236") o["prezzi"]!["REALIZZAZIONE"]!["Medio"] = 5000; }), tender); check(r.Ok && r.Warnings.Any(w => w.Contains("supera la base d'asta")), "table: a price above the tender base is saved but WARNED, as in the file"); }
+        check(OfferedCatalogWorkbook.FromEdits(new JsonArray(), tender).Errors.Count > 0, "table: an empty table is refused");
+
         // ---- chi puo' gestirlo ----
         check(OfferedCatalogWorkbook.CanManage(true, false, null, "4490015980") && OfferedCatalogWorkbook.CanManage(true, false, null, null), "SuperAdmin: every lot");
         check(OfferedCatalogWorkbook.CanManage(false, true, "4490015980", "4490015980"), "Admin: the lot of HIS contract");
@@ -212,7 +240,8 @@ public static class OfferedCatalogRegression
         {
             var c = As(role);
             check(await c.Lots() is ForbidResult && await c.Template("poste-tet-2025", "2") is ForbidResult && await c.Preview(null!, "poste-tet-2025", "2") is ForbidResult
-                && await c.Import(null!, "poste-tet-2025", "2") is ForbidResult && await c.Remove("poste-tet-2025", "2") is ForbidResult, $"{role}: refused on all five actions of the offered catalog");
+                && await c.Import(null!, "poste-tet-2025", "2") is ForbidResult && await c.Remove("poste-tet-2025", "2") is ForbidResult
+                && await c.Table("poste-tet-2025", "2") is ForbidResult && await c.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "2", Rows = new JsonArray() }) is ForbidResult, $"{role}: refused on all seven actions of the offered catalog (including the table)");
         }
         var attrs = typeof(OfferedCatalogController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true);
         check(attrs.Length == 1, "the controller requires a login");
@@ -241,6 +270,46 @@ public static class OfferedCatalogRegression
         var servedLot = System.Text.Json.JsonDocument.Parse(served).RootElement[0].GetProperty("lots")[0];
         check(servedLot.GetProperty("offeredCatalog").GetArrayLength() == 27 && servedLot.GetProperty("offeredCatalogMeta").GetProperty("fileName").GetString() == "f.xlsx", "api: GET contracts sends the offered catalog (27 voices) and its file name to the Configuratore");
         check(servedLot.GetProperty("catalog").GetArrayLength() == 27 && servedLot.GetProperty("offeredCatalog")[0].GetProperty("prezzi").GetProperty("REALIZZAZIONE").GetProperty("Medio").GetDecimal() == 1400m, "api: the tender catalog is still sent as before, next to the offered one");
+        // la tabella: lettura e salvataggio con controllo di versione, sul lotto vero
+        var tableApi = new OfferedCatalogController(db, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["DB_CONNECTION_STRING"] = pg, ["DB_SCHEMA"] = "offtest" }).Build())
+        { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "anna"), new Claim(ClaimTypes.Role, "SuperAdmin") }, "test")) } } };
+        var tableDoc = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)await tableApi.Table("poste-tet-2025", "2")).Value)).RootElement;
+        check(tableDoc.GetProperty("rows").GetArrayLength() == 27 && tableDoc.GetProperty("loaded").GetBoolean() && tableDoc.GetProperty("rows")[0].GetProperty("id").ToString() == "236" && tableDoc.GetProperty("rows")[0].GetProperty("prezzi").GetProperty("REALIZZAZIONE").GetProperty("Medio").GetDecimal() == 1400m && tableDoc.GetProperty("rows")[0].GetProperty("prezziGara").GetProperty("REALIZZAZIONE").GetProperty("Medio").GetDecimal() == 2800m, "table api: 27 voices in tender order, each with the offered price (1.400) next to the tender price (2.800)");
+        // l'import dal FILE passa dall'endpoint vero (non solo dallo store): risposta e salvataggio devono funzionare
+        var importFile = Path.Combine(AppContext.BaseDirectory, "Fixtures", "CatalogoLotto2Offerto.xlsx");
+        await using (var xs = File.OpenRead(importFile))
+        {
+            var form = new FormFile(xs, 0, xs.Length, "file", "CatalogoLotto2Offerto.xlsx");
+            var imported = await tableApi.Import(form, "poste-tet-2025", "2");
+            check(imported is OkObjectResult ok1 && System.Text.Json.JsonSerializer.Serialize(ok1.Value).Contains("\"stamp\""), "import api: the file import answers OK (no error 500) and returns the version stamp");
+        }
+        var afterImport = (await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!;
+        check(afterImport.Payload["offeredCatalog"]!.AsArray().Count == 27 && afterImport.Payload["offeredCatalogMeta"]!["fileName"]!.ToString() == "CatalogoLotto2Offerto.xlsx" && afterImport.Payload["offeredCatalogMeta"]!["importedAt"]!.ToString().Contains('.'), "import api: 27 voices saved with the file name and a precise version stamp");
+        tableDoc = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)await tableApi.Table("poste-tet-2025", "2")).Value)).RootElement;
+        check(tableDoc.GetProperty("rows")[0].GetProperty("prezzi").GetProperty("REALIZZAZIONE").GetProperty("Medio").GetDecimal() == 1400m, "import api: the table shows what the import saved");
+        var stamp0 = tableDoc.GetProperty("stamp").GetString() ?? "";
+        var sendRows = new JsonArray(good.Rows.Select(r => { var o = new JsonObject { ["id"] = r.Id, ["prezzi"] = new JsonObject() }; foreach (var type in OfferedCatalogWorkbook.Types) { var t = new JsonObject(); foreach (var band in OfferedCatalogWorkbook.Bands) t[band] = r.Prices.Single(p => p.Type == type && p.Band == band).Offered; o["prezzi"]![type] = t; } return (JsonNode)o; }).ToArray());
+        sendRows[0]!["prezzi"]!["REALIZZAZIONE"]!["Medio"] = 1500; sendRows[0]!["descrizione"] = "Descrizione modificata";
+        var saved1 = await tableApi.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "2", Stamp = stamp0, Rows = (JsonArray)sendRows.DeepClone() });
+        check(saved1 is OkObjectResult, "table api: the edited table is saved");
+        var afterEdit = (await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!;
+        check(afterEdit.Payload["offeredCatalog"]![0]!["prezzi"]!["REALIZZAZIONE"]!["Medio"]!.GetValue<decimal>() == 1500m && afterEdit.Payload["offeredCatalog"]![0]!["descrizione"]!.ToString() == "Descrizione modificata", "table api: the new price (1.500) and description are in the database");
+        check(afterEdit.Payload["catalog"]!.ToJsonString() == before.Payload["catalog"]!.ToJsonString() && afterEdit.Payload["towPrices"]!.ToJsonString() == before.Payload["towPrices"]!.ToJsonString(), "table api: the TENDER catalog and the TOW prices are untouched by a table save");
+        var stamp1 = OfferedCatalogStore.Stamp(afterEdit.Payload);
+        check(stamp1 != "" && stamp1 != stamp0 && afterEdit.Payload["offeredCatalogMeta"]!["updatedBy"]!.ToString() == "anna", "table api: the version stamp changes and records who saved");
+        var saved2 = await tableApi.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "2", Stamp = stamp1, Rows = (JsonArray)sendRows.DeepClone() });
+        var stamp2 = OfferedCatalogStore.Stamp((await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!.Payload);
+        check(saved2 is OkObjectResult && stamp2 != stamp1 && stamp2 != stamp0 && System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)saved2).Value).Contains(stamp2), "table api: EVERY save makes a new version stamp, and the answer carries it (so the next save from the same page works)");
+        var stale = await tableApi.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "2", Stamp = stamp1, Rows = (JsonArray)sendRows.DeepClone() });
+        check(stale is ConflictObjectResult, "table api: a save made on an OLD version (somebody else saved meanwhile) is refused with a conflict");
+        check((await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!.Payload["offeredCatalog"]![0]!["prezzi"]!["REALIZZAZIONE"]!["Medio"]!.GetValue<decimal>() == 1500m, "table api: the refused save wrote nothing");
+        var badRows = (JsonArray)sendRows.DeepClone(); badRows[1]!["prezzi"]!["REALIZZAZIONE"]!["Medio"] = "xx";
+        var bad = await tableApi.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "2", Stamp = stamp2, Rows = badRows });
+        check(bad is BadRequestObjectResult && (await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!.Payload["offeredCatalog"]![1]!["prezzi"]!["REALIZZAZIONE"]!["Medio"]!.GetValue<decimal>() != 0m, "table api: a table with an error is refused as a whole and nothing is written");
+        check(await tableApi.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "9", Stamp = stamp1, Rows = (JsonArray)sendRows.DeepClone() }) is NotFoundObjectResult, "table api: a lot that does not exist is not found");
+        var adminOther = new OfferedCatalogController(db, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["DB_CONNECTION_STRING"] = pg, ["DB_SCHEMA"] = "offtest" }).Build())
+        { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "paolo"), new Claim(ClaimTypes.Role, "Admin"), new Claim("ambienteId", "2") }, "test")) } } };
+        check(await adminOther.Table("poste-tet-2025", "2") is NotFoundObjectResult && await adminOther.SaveTable(new TableEdit { ContractId = "poste-tet-2025", Lot = "2", Stamp = stamp1, Rows = (JsonArray)sendRows.DeepClone() }) is NotFoundObjectResult, "table api: an Admin of ANOTHER contract can neither read nor save this lot's table");
         check(!await OfferedCatalogStore.Save(conn, "offtest", "poste-tet-2025", "9", entries, null), "db: a lot that does not exist is not created");
         check(await OfferedCatalogStore.Save(conn, "offtest", "poste-tet-2025", "2", null, null), "db: the offered catalog is removed");
         var removed = (await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!;

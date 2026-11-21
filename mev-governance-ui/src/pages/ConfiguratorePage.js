@@ -16,6 +16,7 @@ import { loadPmPoste, pmOptions, pmSelectValue, pmFromSelect, showsFreeText, OTH
 import { rationaleFacts, solutionFacts, analysisFacts, sourceFacts, knowledgeFacts } from "../configuratore/sectionSummaries";
 import { knowledgeForAi, entriesForIntervention } from "../configuratore/rationaleKnowledge";
 import { saveAndClose } from "../configuratore/saveAndClose";
+import SaveProgress from "../configuratore/SaveProgress";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
 import CollaborationPanel from "../configuratore/CollaborationPanel";
 import { useSettled, useStableCallback } from "../configuratore/developmentCollaboration";
@@ -93,6 +94,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // «Salva e Chiudi»: fase (idle | saving | done | failed), punto raggiunto e messaggio, per la finestra di avanzamento.
+  const [closing, setClosing] = useState({ phase: 'idle', step: '', message: '' });
   const [error, setError] = useState("");
   const [toastMsg, setToastMsg] = useState("");
 
@@ -530,8 +533,12 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     }
   }, [initiativeContractId, lot]);
 
-  const persistInitiativeEvaluation = async (showMessage = true) => {
+  const lastSaveError = useRef('');
+  const closingBusy = useRef(false);
+  const persistInitiativeEvaluation = async (showMessage = true, onStep) => {
+    lastSaveError.current = '';
     if (!initiative.code && !initiative.title) {
+      lastSaveError.current = "Inserisci almeno codice o titolo dell'iniziativa";
       if (showMessage) toast("Inserisci almeno codice o titolo dell'iniziativa");
       return false;
     }
@@ -572,7 +579,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       },
     };
     try {
-      await saveInitiativeSnapshot(body, workspaceContext, upsertConfiguratoreRecord);
+      await saveInitiativeSnapshot(body, workspaceContext, upsertConfiguratoreRecord, onStep);
       const isUpdate = !!editingRecordKey;
       if (showMessage) toast(isUpdate ? "Valutazione aggiornata con successo" : "Valutazione salvata e resa disponibile alle stime future");
       setEditingRecordKey(recordKey); // keep updating the exact reopened archive record
@@ -584,9 +591,32 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       setWorkspaceReload(value => value + 1);
       return true;
     } catch (error) {
+      lastSaveError.current = error.message;
       toast("Salvataggio non riuscito: " + error.message);
       return false;
     }
+  };
+
+  // «Salva e Chiudi»: mostra l'avanzamento, chiude solo se il salvataggio riesce, e se fallisce lascia la pagina aperta con il motivo.
+  const saveAndCloseWithProgress = async () => {
+    // Il riferimento vale subito (lo stato React no): due click nello stesso istante avviano un solo salvataggio.
+    if (closingBusy.current) return;
+    closingBusy.current = true;
+    setClosing({ phase: 'saving', step: 'waiting', message: '' });
+    let ok = false;
+    try {
+      ok = await saveAndClose(() => persistInitiativeEvaluation(true, name => setClosing(prev => (prev.phase === 'saving' ? { ...prev, step: name } : prev))), () => {
+        resetInitiative();
+        setEditingRecordKey(null);
+        setStep(1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    } catch (error) { lastSaveError.current = error?.message || 'Errore imprevisto'; }
+    closingBusy.current = false;
+    if (ok) {
+      setClosing({ phase: 'done', step: 'done', message: '' });
+      setTimeout(() => setClosing(prev => (prev.phase === 'done' ? { phase: 'idle', step: '', message: '' } : prev)), 1100);
+    } else setClosing({ phase: 'failed', step: '', message: lastSaveError.current || 'Il salvataggio non è riuscito.' });
   };
 
   // ── Reset / iniziativa ──
@@ -1908,17 +1938,13 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
            </button>
          ); })}
          <button
-           style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)" }}
-           onClick={async () => {
-              await saveAndClose(() => persistInitiativeEvaluation(true), () => {
-                resetInitiative();
-                setEditingRecordKey(null);
-                setStep(1);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              });
-           }}>
-           Salva e Chiudi
+           style={{ ...btnStyles.primary, marginLeft: "auto", background: "linear-gradient(135deg,#102a47 0%,#1a73e8 100%)", opacity: closing.phase === 'saving' ? .7 : 1 }}
+           disabled={closing.phase === 'saving'}
+           aria-busy={closing.phase === 'saving'}
+           onClick={saveAndCloseWithProgress}>
+           {closing.phase === 'saving' ? "Salvataggio…" : "Salva e Chiudi"}
          </button>
+         <SaveProgress phase={closing.phase} step={closing.step} message={closing.message} onDismiss={() => setClosing({ phase: 'idle', step: '', message: '' })} title="Salvataggio dell’iniziativa in corso" />
        </nav>
 
       {/* Chi altro lavora sullo stesso GOTO, e la chat: la stessa di Sviluppo iniziative. Serve il codice GOTO: e' lui a identificare l'iniziativa per tutti. */}

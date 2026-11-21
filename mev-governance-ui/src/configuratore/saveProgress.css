@@ -1,0 +1,34 @@
+/* «Salva e Chiudi»: finestra di avanzamento del salvataggio. */
+.save-progress-backdrop { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 16px; background: rgba(16, 42, 71, .45); backdrop-filter: blur(2px); animation: save-progress-fade .18s ease-out; }
+.save-progress { width: min(440px, 100%); background: #fff; border-radius: 18px; padding: 28px 28px 24px; text-align: center; box-shadow: 0 18px 50px rgba(16, 42, 71, .35); animation: save-progress-pop .22s ease-out; font-family: inherit; color: #17314f; }
+.save-progress h2 { margin: 12px 0 4px; font-size: 19px; }
+.save-progress-sub { margin: 4px 0 14px; font-size: 13px; color: #5d718a; }
+.save-progress-error { margin: 8px 0; padding: 10px 12px; background: #fdecec; color: #8a1c1c; border: 1px solid #f5c2c2; border-radius: 10px; font-size: 13px; text-align: left; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+.save-progress-icon { height: 56px; display: grid; place-items: center; }
+.save-progress-spinner { width: 46px; height: 46px; border-radius: 50%; border: 5px solid #dbe7f7; border-top-color: #1a73e8; animation: save-progress-spin .8s linear infinite; }
+.save-progress-ring { stroke: #16a34a; stroke-width: 3; stroke-dasharray: 145; stroke-dashoffset: 145; animation: save-progress-draw .5s ease-out forwards; }
+.save-progress-ring-bad { stroke: #d63a2f; }
+.save-progress-tick, .save-progress-cross { stroke: #16a34a; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: save-progress-draw .4s .25s ease-out forwards; }
+.save-progress-cross { stroke: #d63a2f; }
+.save-progress-steps { list-style: none; margin: 0 0 14px; padding: 0; text-align: left; display: grid; gap: 10px; }
+.save-progress-steps li { display: flex; gap: 12px; align-items: flex-start; opacity: .5; transition: opacity .2s; }
+.save-progress-steps li.is-doing, .save-progress-steps li.is-done { opacity: 1; }
+.save-progress-steps small { display: block; color: #5d718a; font-size: 12px; }
+.save-progress-steps strong { font-size: 13.5px; }
+.save-progress-mark { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 2px solid #c4d3e6; display: grid; place-items: center; font-size: 13px; font-weight: 800; color: #fff; }
+.save-progress-steps .is-done .save-progress-mark { background: #16a34a; border-color: #16a34a; }
+.save-progress-steps .is-doing .save-progress-mark { border-color: #1a73e8; border-top-color: transparent; animation: save-progress-spin .8s linear infinite; }
+.save-progress-bar { height: 5px; border-radius: 5px; background: #e6eef9; overflow: hidden; }
+.save-progress-bar span { display: block; height: 100%; width: 40%; border-radius: 5px; background: linear-gradient(90deg, #1a73e8, #5aa2ff); animation: save-progress-slide 1.2s ease-in-out infinite; }
+.save-progress-button { margin-top: 6px; min-height: 40px; padding: 8px 22px; border: 0; border-radius: 10px; background: #1a73e8; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.save-progress-button:focus-visible { outline: 3px solid #75a7f7; outline-offset: 2px; }
+@keyframes save-progress-spin { to { transform: rotate(360deg); } }
+@keyframes save-progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+@keyframes save-progress-draw { to { stroke-dashoffset: 0; } }
+@keyframes save-progress-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes save-progress-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .save-progress-backdrop, .save-progress { animation: none; }
+  .save-progress-spinner, .save-progress-steps .is-doing .save-progress-mark, .save-progress-bar span { animation-duration: 2.4s; }
+  .save-progress-ring, .save-progress-tick, .save-progress-cross { animation: none; stroke-dashoffset: 0; }
+}

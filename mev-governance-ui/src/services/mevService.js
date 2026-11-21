@@ -186,9 +186,9 @@ const offerTemplateRequest = async (path, { method = 'GET', form, blob } = {}) =
   return blob ? response.blob() : response.json();
 };
 // «Voci di catalogo offerti»: i prezzi offerti dopo l'aggiudicazione, accanto al catalogo di gara del lotto (mai sopra).
-const offeredCatalogRequest = async (path, { method = 'GET', form, blob } = {}) => {
+const offeredCatalogRequest = async (path, { method = 'GET', form, blob, json } = {}) => {
   const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/offered-catalog${path}`, {
-    method, headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` }, ...(form ? { body: form } : {}),
+    method, headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}`, ...(json ? { 'Content-Type': 'application/json' } : {}) }, ...(form ? { body: form } : json ? { body: JSON.stringify(json) } : {}),
   });
   if (!response.ok) { const body = await response.json().catch(() => ({})); const error = new Error(body.message || `Catalogo offerto: errore ${response.status}`); error.errors = body.errors || []; error.warnings = body.warnings || []; throw error; }
   return blob ? response.blob() : response.json();
@@ -196,6 +196,8 @@ const offeredCatalogRequest = async (path, { method = 'GET', form, blob } = {}) 
 const offeredForm = (file, contractId, lot) => { const form = new FormData(); form.append('file', file); form.append('contractId', contractId); form.append('lot', String(lot)); return form; };
 const offeredQuery = (contractId, lot) => `?contractId=${encodeURIComponent(contractId)}&lot=${encodeURIComponent(lot)}`;
 export const offeredCatalogLots = () => offeredCatalogRequest('/lots');
+export const offeredCatalogTable = (contractId, lot) => offeredCatalogRequest(`/table${offeredQuery(contractId, lot)}`);
+export const saveOfferedCatalogTable = (contractId, lot, stamp, rows) => offeredCatalogRequest('/table', { method: 'PUT', json: { contractId, lot: String(lot), stamp, rows } });
 export const downloadOfferedCatalogTemplate = (contractId, lot) => offeredCatalogRequest(`/template${offeredQuery(contractId, lot)}`, { blob: true });
 export const previewOfferedCatalog = (file, contractId, lot) => offeredCatalogRequest('/preview', { method: 'POST', form: offeredForm(file, contractId, lot) });
 export const importOfferedCatalog = (file, contractId, lot) => offeredCatalogRequest('/import', { method: 'POST', form: offeredForm(file, contractId, lot) });

@@ -35,16 +35,21 @@ export function conflictMessage(history, context, user = me()) {
 // Saves are done one after the other. The draft saved on entering Revisione and «Salva e Chiudi» can start together: both would read the same history and the second would
 // be refused by the server as if somebody else had saved. Queued, the second one reads the history the first one wrote.
 let queue = Promise.resolve();
-export function saveInitiativeSnapshot(body, context, saveOffer) {
-  const run = queue.then(() => saveNow(body, context, saveOffer));
+const step0 = (onStep, name) => { try { onStep?.(name); } catch { /* vedi sopra */ } };
+// `onStep` (facoltativo) riceve la fase in corso: 'waiting' (un altro salvataggio e' ancora in corso), 'history', 'offer', 'revision'. Serve solo a mostrare l'avanzamento.
+export function saveInitiativeSnapshot(body, context, saveOffer, onStep) {
+  step0(onStep, 'waiting');
+  const run = queue.then(() => saveNow(body, context, saveOffer, onStep));
   queue = run.catch(() => {});
   return run;
 }
 
-async function saveNow(body, context, saveOffer) {
+async function saveNow(body, context, saveOffer, onStep) {
+  const step = name => { try { onStep?.(name); } catch { /* mostrare l'avanzamento non deve mai far fallire un salvataggio */ } };
   const code = String(body.payload.initiative.code || '').trim();
   if (!code) throw new Error('Inserisci il GOTO per salvare offerta e storico insieme.');
   const path = `${encodeURIComponent(code)}/revisions`;
+  step('history');
   const history = await workspaceRequest(path);
   const current = history[0] ? JSON.parse(history[0].payload) : {};
   const matching = context?.goto === code && context.version > 0;
@@ -54,10 +59,12 @@ async function saveNow(body, context, saveOffer) {
   const state = { ...analysis, title: body.payload.initiative.title || analysis.title || code,
     system: body.payload.initiative.system || analysis.system || '', estimate: body.payload };
   // Save offer first. A later revision failure is explicitly a partial save.
+  step('offer');
   const offer = await saveOffer(body);
   const offerPayload = typeof offer.payload === 'string' ? JSON.parse(offer.payload) : offer.payload;
   if (!offerPayload || !verifiedPlanSnapshot(body.payload.developmentPlans, offerPayload.developmentPlans))
     throw new Error('Il server non ha confermato le schede dell’offerta. La pagina rimane aperta: non ricaricare.');
+  step('revision');
   try {
     const revision = await workspaceRequest(path, { expectedVersion: history[0]?.version || 0,
       reason: 'Salvataggio valutazione con schede e proposte AI correnti', state });

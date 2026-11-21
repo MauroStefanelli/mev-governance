@@ -89,6 +89,56 @@ public class OfferedCatalogController : BaseController
         return (record, null);
     }
 
+    // The table: every voice of the tender catalog with its tender prices and, where loaded, the offered prices and descriptions, ready to be edited.
+    // `stamp` is the version of the offered catalog being shown: it comes back with the edits so a save made by someone else in the meantime is not overwritten.
+    [HttpGet("table")]
+    public async Task<IActionResult> Table([FromQuery] string contractId, [FromQuery] string lot)
+    {
+        if (!IsSuper && !IsAdmin) return Forbid();
+        var (schema, cs) = Target();
+        await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
+        var (record, error) = await Authorized(conn, schema, contractId, lot);
+        if (error != null) return error;
+        var offered = (record!.Payload["offeredCatalog"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(o => o["id"] != null).GroupBy(o => o["id"]!.ToString()).ToDictionary(g => g.Key, g => g.First());
+        var rows = OfferedCatalogStore.TenderCatalog(record.Payload).OfType<JsonObject>().Select(entry =>
+        {
+            var id = entry["id"]?.ToString() ?? ""; offered.TryGetValue(id, out var mine);
+            return new
+            {
+                id = entry["id"], ambito = entry["ambito"]?.ToString() ?? "", nome = entry["nome"]?.ToString() ?? "",
+                descrizioneGara = entry["descrizione"]?.ToString() ?? "",
+                prezziGara = entry["prezzi"], covered = mine != null,
+                descrizione = mine?["descrizione"]?.ToString() ?? "", descrizioni = mine?["descrizioni"], prezzi = mine?["prezzi"],
+            };
+        }).ToList();
+        return Ok(new { stamp = OfferedCatalogStore.Stamp(record.Payload), loaded = offered.Count > 0, meta = record.Payload["offeredCatalogMeta"], rows });
+    }
+
+    // Saves the table. The same checks as the file import (every voice once, prices and descriptions valid) and, in addition, the version being edited must still be the saved one.
+    // Name and ambit are not accepted from here: they stay those of the tender catalog.
+    [HttpPut("table")]
+    public async Task<IActionResult> SaveTable([FromBody] TableEdit req)
+    {
+        if (!IsSuper && !IsAdmin) return Forbid();
+        if (req == null) return BadRequest(new { message = "Dati mancanti." });
+        var (schema, cs) = Target();
+        await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
+        var (record, error) = await Authorized(conn, schema, req.ContractId, req.Lot);
+        if (error != null) return error;
+        if (req.Rows == null) return BadRequest(new { message = "Non ci sono voci da salvare." });
+        var result = OfferedCatalogWorkbook.FromEdits(req.Rows, OfferedCatalogStore.TenderCatalog(record!.Payload));
+        if (!result.Ok) return BadRequest(new { message = "Ci sono errori: nessuna modifica è stata salvata.", errors = result.Errors, warnings = result.Warnings });
+        var meta = record.Payload["offeredCatalogMeta"] is JsonObject old ? (JsonObject)old.DeepClone() : new JsonObject();
+        meta["updatedAt"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); meta["updatedBy"] = User.Identity?.Name ?? ""; meta["updatedByFullName"] = User.FindFirst("fullName")?.Value ?? "";
+        meta["rows"] = result.Rows.Count; if (meta["fileName"] == null) meta["fileName"] = "modificato dalla tabella";
+        var answerMeta = (JsonObject)meta.DeepClone();   // `meta` goes into the lot payload below; the answer needs its own copy (a JSON node has only one parent)
+        var outcome = await OfferedCatalogStore.SaveChecked(conn, schema, req.ContractId!.Trim(), req.Lot!.Trim(), OfferedCatalogWorkbook.ToEntries(result.Rows), meta, req.Stamp ?? "");
+        if (outcome == SaveOutcome.Conflict) return Conflict(new { message = "Il catalogo offerto è stato modificato da un altro utente dopo che lo hai aperto. Ricarica la tabella e rifai le modifiche: nulla è stato salvato." });
+        if (outcome == SaveOutcome.NotFound) return NotFound(new { message = "Lotto non trovato nell'Archivio contrattuale." });
+        return Ok(new { message = "Catalogo offerto salvato.", count = result.Rows.Count, warnings = result.Warnings, meta = answerMeta, stamp = answerMeta["updatedAt"]?.ToString() ?? "" });
+    }
+
     // The Excel model to fill in: the voices of the tender catalog with empty price cells.
     [HttpGet("template")]
     public async Task<IActionResult> Template([FromQuery] string contractId, [FromQuery] string lot)
@@ -146,12 +196,13 @@ public class OfferedCatalogController : BaseController
         if (!result!.Ok) return BadRequest(new { message = "Il file contiene errori: nessuna voce è stata salvata.", errors = result.Errors, warnings = result.Warnings });
         var meta = new JsonObject
         {
-            ["fileName"] = Path.GetFileName(file.FileName), ["importedAt"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            ["fileName"] = Path.GetFileName(file.FileName), ["importedAt"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             ["importedBy"] = User.Identity?.Name ?? "", ["importedByFullName"] = User.FindFirst("fullName")?.Value ?? "", ["rows"] = result.Rows.Count, ["format"] = result.Format,
         };
+        var answerMeta = (JsonObject)meta.DeepClone();   // `meta` goes into the lot payload; the answer needs its own copy (a JSON node has only one parent)
         if (!await OfferedCatalogStore.Save(conn, schema, contractId.Trim(), lot.Trim(), OfferedCatalogWorkbook.ToEntries(result.Rows), meta))
             return NotFound(new { message = "Lotto non trovato nell'Archivio contrattuale." });
-        return Ok(new { message = "Catalogo offerto salvato.", count = result.Rows.Count, warnings = result.Warnings, meta });
+        return Ok(new { message = "Catalogo offerto salvato.", count = result.Rows.Count, warnings = result.Warnings, meta = answerMeta, stamp = answerMeta["importedAt"]?.ToString() ?? "" });
     }
 
     // Removes the offered catalog: the lot goes back to the tender prices. The tender catalog is not touched.
@@ -166,4 +217,12 @@ public class OfferedCatalogController : BaseController
         await OfferedCatalogStore.Save(conn, schema, contractId.Trim(), lot.Trim(), null, null);
         return Ok(new { message = "Catalogo offerto rimosso: il lotto torna ai prezzi di gara." });
     }
+}
+
+public class TableEdit
+{
+    public string? ContractId { get; set; }
+    public string? Lot { get; set; }
+    public string? Stamp { get; set; }
+    public JsonArray? Rows { get; set; }
 }

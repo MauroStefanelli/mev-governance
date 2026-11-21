@@ -137,6 +137,23 @@ public static class OfferedCatalogWorkbook
         value = Math.Round(n, 2, MidpointRounding.AwayFromZero); return true;
     }
 
+    // The checks of ONE price and ONE description, shared by the file import and by the edits made in the table, so the two can never disagree.
+    static string Money(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    public static bool CheckPrice(Result result, string where, string id, string header, decimal? offered, decimal? baseValue)
+    {
+        if (offered == null && baseValue is > 0) { result.Error($"{where} (ID {id}), «{header}»: manca il prezzo offerto (in gara è {Money(baseValue.Value)})."); return false; }
+        if (offered != null && baseValue is > 0 && offered > baseValue) result.Warnings.Add($"{where} (ID {id}), «{header}»: il prezzo offerto {offered} supera la base d'asta {baseValue}.");
+        if (offered == 0 && baseValue is > 0) result.Warnings.Add($"{where} (ID {id}), «{header}»: il prezzo offerto è 0 ma in gara è {Money(baseValue.Value)}.");
+        return true;
+    }
+    public static bool CheckDescription(Result result, string where, string id, string label, string? raw, out string? clean)
+    {
+        clean = null; var text = (raw ?? "").Trim();
+        if (text == "") return true;
+        if (text.Length > MaxDescription) { result.Error($"{where} (ID {id}): {label} supera {MaxDescription} caratteri."); return false; }
+        clean = text; return true;
+    }
+
     public const string ModelFormat = "Modello scaricato da Voci di catalogo offerti";
     public const string CatalogFormat = "Foglio catalogo con prezzi offerti (ID di catalogo, Descrizione semplice/medio/complesso)";
     public const int MaxDescription = 2000;
@@ -250,24 +267,17 @@ public static class OfferedCatalogWorkbook
                     var header = Header(type, band); var cell = sheet.Cell(r, layout.Price[(type, band)]);
                     var baseValue = Read(entry, type, band);
                     if (!TryPrice(cell, out var offered, out var problem)) { result.Error($"Riga {r} (ID {id}), «{header}»: {problem}."); rowOk = false; continue; }
-                    if (offered == null && baseValue is > 0) { result.Error($"Riga {r} (ID {id}), «{header}»: manca il prezzo offerto (in gara è {baseValue.Value.ToString("0.##", CultureInfo.InvariantCulture)})."); rowOk = false; continue; }
-                    if (offered != null && baseValue is > 0 && offered > baseValue) result.Warnings.Add($"Riga {r} (ID {id}), «{header}»: il prezzo offerto {offered} supera la base d'asta {baseValue}.");
-                    if (offered == 0 && baseValue is > 0) result.Warnings.Add($"Riga {r} (ID {id}), «{header}»: il prezzo offerto è 0 ma in gara è {baseValue.Value.ToString("0.##", CultureInfo.InvariantCulture)}.");
+                    if (!CheckPrice(result, $"Riga {r}", id, header, offered, baseValue)) { rowOk = false; continue; }
                     prices.Add(new Price(type, band, baseValue, offered));
                 }
                 string? driverDescription = null;
-                if (layout.DriverDescription is { } driverColumn && sheet.Cell(r, driverColumn).GetString().Trim() is { Length: > 0 } driverText)
-                {
-                    if (driverText.Length > MaxDescription) { result.Error($"Riga {r} (ID {id}): la «Descrizione Driver» supera {MaxDescription} caratteri."); rowOk = false; }
-                    else driverDescription = driverText;
-                }
+                if (layout.DriverDescription is { } driverColumn)
+                { if (!CheckDescription(result, $"Riga {r}", id, "la «Descrizione Driver»", sheet.Cell(r, driverColumn).GetString(), out driverDescription)) rowOk = false; }
                 Dictionary<string, string>? descriptions = null;
                 foreach (var (band, column) in layout.Descriptions)
                 {
-                    var text = sheet.Cell(r, column).GetString().Trim();
-                    if (text == "") continue;
-                    if (text.Length > MaxDescription) { result.Error($"Riga {r} (ID {id}): la descrizione «{band}» supera {MaxDescription} caratteri."); rowOk = false; continue; }
-                    (descriptions ??= new())[Bands.First(b => string.Equals(b, band, StringComparison.OrdinalIgnoreCase))] = text;
+                    if (!CheckDescription(result, $"Riga {r}", id, $"la descrizione «{band}»", sheet.Cell(r, column).GetString(), out var text)) { rowOk = false; continue; }
+                    if (text != null) (descriptions ??= new())[Bands.First(b => string.Equals(b, band, StringComparison.OrdinalIgnoreCase))] = text;
                 }
                 if (rowOk) result.Rows.Add(new Row(id, ambit, name, prices, descriptions, driverDescription));
             }
@@ -275,6 +285,60 @@ public static class OfferedCatalogWorkbook
             if (notInFile.Count > 0) result.Error($"Mancano {notInFile.Count} voci del catalogo di gara: ID {string.Join(", ", notInFile.Take(15))}{(notInFile.Count > 15 ? "…" : "")}. Servono tutte le voci del lotto.");
             if (result.Rows.Count == 0 && result.Errors.Count == 0) result.Error("Il file non contiene voci.");
         }
+        return result;
+    }
+
+    // A price that arrives from the table: a JSON number, or text written the Italian way. Empty = not set.
+    public static bool TryPriceValue(JsonNode? node, out decimal? value, out string? problem)
+    {
+        value = null; problem = null;
+        if (node == null) return true;
+        decimal n; var text = node.ToString().Replace("€", "").Replace("\u00a0", "").Replace(" ", "").Trim();
+        if (text == "") return true;
+        if (text.Contains(',')) text = text.Replace(".", "").Replace(',', '.');
+        else if (text.Count(c => c == '.') > 1) text = text.Replace(".", "");
+        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out n)) { problem = $"«{node}» non è un importo"; return false; }
+        if (n < 0) { problem = "l'importo è negativo"; return false; }
+        value = Math.Round(n, 2, MidpointRounding.AwayFromZero); return true;
+    }
+
+    // The rows edited in the table, checked with the SAME rules as the file: every voice of the tender catalog once, no unknown ID, prices and descriptions valid.
+    // Name and ambit are never read: they stay those of the tender catalog.
+    public static Result FromEdits(JsonArray edits, JsonArray tenderCatalog)
+    {
+        var result = new Result { Format = "Modifiche dalla tabella" };
+        if (edits.Count > MaxRows) { result.Error($"Troppe righe: massimo {MaxRows}."); return result; }
+        var tenderById = new Dictionary<string, JsonObject>();
+        foreach (var entry in tenderCatalog.OfType<JsonObject>()) { var id = entry["id"]?.ToString()?.Trim() ?? ""; if (id != "" && !tenderById.ContainsKey(id)) tenderById[id] = entry; }
+        var seen = new HashSet<string>(); int index = 0;
+        foreach (var edit in edits)
+        {
+            index++; var where = $"Voce {index}";
+            if (edit is not JsonObject row) { result.Error($"{where}: dati non validi."); continue; }
+            var id = row["id"]?.ToString()?.Trim() ?? "";
+            if (id == "" || !tenderById.TryGetValue(id, out var entry)) { result.Error($"{where}: l'ID {(id == "" ? "manca" : id + " non esiste nel catalogo di gara di questo lotto")}."); continue; }
+            if (!seen.Add(id)) { result.Error($"{where}: l'ID {id} compare più di una volta."); continue; }
+            var prices = new List<Price>(); bool rowOk = true;
+            foreach (var type in Types) foreach (var band in Bands)
+            {
+                var header = Header(type, band); var baseValue = Read(entry, type, band);
+                var node = (row["prezzi"] as JsonObject)?[type] is JsonObject typed ? typed[band] : null;
+                if (!TryPriceValue(node, out var offered, out var problem)) { result.Error($"{where} (ID {id}), «{header}»: {problem}."); rowOk = false; continue; }
+                if (!CheckPrice(result, where, id, header, offered, baseValue)) { rowOk = false; continue; }
+                prices.Add(new Price(type, band, baseValue, offered));
+            }
+            if (!CheckDescription(result, where, id, "la «Descrizione Driver»", row["descrizione"]?.ToString(), out var driver)) rowOk = false;
+            Dictionary<string, string>? descriptions = null;
+            foreach (var band in Bands)
+            {
+                if (!CheckDescription(result, where, id, $"la descrizione «{band}»", (row["descrizioni"] as JsonObject)?[band]?.ToString(), out var text)) { rowOk = false; continue; }
+                if (text != null) (descriptions ??= new())[band] = text;
+            }
+            if (rowOk) result.Rows.Add(new Row(id, entry["ambito"]?.ToString() ?? "", entry["nome"]?.ToString() ?? "", prices, descriptions, driver));
+        }
+        var missing = tenderById.Keys.Where(id => !seen.Contains(id)).ToList();
+        if (missing.Count > 0) result.Error($"Mancano {missing.Count} voci del catalogo di gara: ID {string.Join(", ", missing.Take(15))}{(missing.Count > 15 ? "…" : "")}. Servono tutte le voci del lotto.");
+        if (result.Rows.Count == 0 && result.Errors.Count == 0) result.Error("Non ci sono voci da salvare.");
         return result;
     }
 

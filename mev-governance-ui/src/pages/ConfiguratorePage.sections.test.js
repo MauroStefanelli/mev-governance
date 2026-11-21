@@ -479,6 +479,51 @@ describe('saving twice in a row never conflicts with yourself', () => {
     await waitFor(() => expect(posts).toHaveLength(2));
     expect(toastText()).not.toContain('Salvataggio non riuscito'); expect(posts.map(post => post.expectedVersion)).toEqual([1, 2]);
   });
+  test('Save and Close shows a progress window right away, keeps the page open and closes it only when the save succeeded', async () => {
+    await openInitiative();
+    // Il server e' lento: la finestra deve restare visibile finche' non risponde.
+    let answer; service.upsertConfiguratoreRecord.mockImplementation(body => new Promise(resolve => { answer = () => resolve({ ...body, payload: JSON.stringify(body.payload) }); }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salva e Chiudi' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Salvataggio dell’iniziativa in corso');
+    expect(screen.getByRole('button', { name: /Salvataggio…/ })).toBeDisabled();
+    await waitFor(() => expect(answer).toBeDefined());
+    expect(screen.getByRole('dialog')).toHaveTextContent('Salvo l’offerta');
+    expect(screen.getByText('Controllo lo storico condiviso').closest('li')).toHaveClass('is-done');
+    answer();
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Salvataggio completato'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 3000 });
+    expect(screen.getByRole('button', { name: 'Salva e Chiudi' })).toBeEnabled();
+  });
+  test('Save and Close that fails leaves a window with the reason and does not close the initiative', async () => {
+    await openInitiative();
+    revisions.push({ id: 9, version: 2, author: 'MFABBRI', createdAt: '2026-11-17T09:30:00Z', reason: 'Altro', payload: JSON.stringify({ title: 'T', system: '', decisions: [], estimate: {} }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Salva e Chiudi' }));
+    const failed = await screen.findByRole('alertdialog');
+    expect(failed).toHaveTextContent('Salvataggio non riuscito');
+    expect(failed).toHaveTextContent('MFABBRI ha aggiornato lo storico');
+    expect(screen.getByLabelText('Codice GOTO')).toHaveValue('146023');
+    fireEvent.click(screen.getByRole('button', { name: 'Ho capito' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Salva e Chiudi' })).toBeEnabled();
+    expect(screen.getByLabelText('Codice GOTO')).toHaveValue('146023');
+  });
+  test('two clicks in the same instant start ONE save (the guard works even before the page redraws)', async () => {
+    await openInitiative();
+    let answer; service.upsertConfiguratoreRecord.mockImplementation(body => new Promise(resolve => { answer = () => resolve({ ...body, payload: JSON.stringify(body.payload) }); }));
+    const button = screen.getByRole('button', { name: 'Salva e Chiudi' });
+    act(() => { button.click(); button.click(); button.click(); });
+    await waitFor(() => expect(answer).toBeDefined());
+    answer();
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Salvataggio completato'));
+    expect(service.upsertConfiguratoreRecord).toHaveBeenCalledTimes(1);
+  });
+  test('a second click on Save and Close while it is saving does not start a second save', async () => {
+    await openInitiative();
+    const button = screen.getByRole('button', { name: 'Salva e Chiudi' });
+    fireEvent.click(button); fireEvent.click(button);
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Salvataggio completato'));
+    expect(service.upsertConfiguratoreRecord).toHaveBeenCalledTimes(1);
+  });
   test('two saves started together are done one after the other, each from the version the previous one made', async () => {
     await openInitiative();
     fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ }));
