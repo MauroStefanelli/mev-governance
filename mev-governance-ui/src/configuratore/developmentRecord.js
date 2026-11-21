@@ -2,6 +2,7 @@ import { getConfiguratoreRecords, upsertConfiguratoreRecord, getSharedApplicatio
 import { verifiedPlanSnapshot } from './saveInitiativeSnapshot';
 import { newProjectPreparation } from './projectPackage';
 import { applicationsFor, applicationContextFor, applicationIdentity } from './configuratoreCore';
+import { effectiveCatalog } from './offeredCatalog';
 
 export const DEVELOPMENT_ENTITY = 'implementation_plan';
 export const DEFAULT_DELIVERY = { tool: 'vscode', branch: '', notes: '', tests: '' };
@@ -89,7 +90,7 @@ export const catalogFor = (contracts, appData, source) => {
   if (!source) return [];
   const contract = contracts.find(entry => entry.contractId === source.contractId);
   const lot = (contract?.lots || []).find(entry => entry.active !== false && String(entry.lotId) === String(source.lot));
-  if (lot?.catalog?.length) return lot.catalog;
+  if (lot?.catalog?.length) return effectiveCatalog(lot);
   return source.contractId === 'poste-tet-2025' ? (appData?.cataloghi || {})[String(source.lot)] || [] : [];
 };
 

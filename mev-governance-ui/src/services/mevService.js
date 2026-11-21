@@ -185,6 +185,22 @@ const offerTemplateRequest = async (path, { method = 'GET', form, blob } = {}) =
   if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || `Modello Excel: errore ${response.status}`);
   return blob ? response.blob() : response.json();
 };
+// «Voci di catalogo offerti»: i prezzi offerti dopo l'aggiudicazione, accanto al catalogo di gara del lotto (mai sopra).
+const offeredCatalogRequest = async (path, { method = 'GET', form, blob } = {}) => {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/offered-catalog${path}`, {
+    method, headers: { Authorization: `Bearer ${localStorage.getItem('jwt') || ''}` }, ...(form ? { body: form } : {}),
+  });
+  if (!response.ok) { const body = await response.json().catch(() => ({})); const error = new Error(body.message || `Catalogo offerto: errore ${response.status}`); error.errors = body.errors || []; error.warnings = body.warnings || []; throw error; }
+  return blob ? response.blob() : response.json();
+};
+const offeredForm = (file, contractId, lot) => { const form = new FormData(); form.append('file', file); form.append('contractId', contractId); form.append('lot', String(lot)); return form; };
+const offeredQuery = (contractId, lot) => `?contractId=${encodeURIComponent(contractId)}&lot=${encodeURIComponent(lot)}`;
+export const offeredCatalogLots = () => offeredCatalogRequest('/lots');
+export const downloadOfferedCatalogTemplate = (contractId, lot) => offeredCatalogRequest(`/template${offeredQuery(contractId, lot)}`, { blob: true });
+export const previewOfferedCatalog = (file, contractId, lot) => offeredCatalogRequest('/preview', { method: 'POST', form: offeredForm(file, contractId, lot) });
+export const importOfferedCatalog = (file, contractId, lot) => offeredCatalogRequest('/import', { method: 'POST', form: offeredForm(file, contractId, lot) });
+export const removeOfferedCatalog = (contractId, lot) => offeredCatalogRequest(offeredQuery(contractId, lot), { method: 'DELETE' });
+
 export const offerTemplateStatus = lot => offerTemplateRequest(`template?lot=${encodeURIComponent(lot)}`);
 export const uploadOfferTemplate = (file, lot) => { const form = new FormData(); form.append('file', file); form.append('lot', String(lot)); return offerTemplateRequest('template', { method: 'POST', form }); };
 export const downloadOfferTemplate = (lot, version) => offerTemplateRequest(`template/file?lot=${encodeURIComponent(lot)}${version ? `&version=${version}` : ''}`, { blob: true });

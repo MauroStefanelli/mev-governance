@@ -16,6 +16,7 @@ import {
 import { CONTRACT_SUMMARIES } from '../configuratore/contractSummaries';
 
 import { euro } from '../utils';
+import OfferedCatalogPanel from '../components/contracts/OfferedCatalogPanel';
 
 // ── Stili allineati a ConfiguratorePage ───────────────────────────────────
 const S = {
@@ -1046,7 +1047,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                     </div>
 
                     <nav className="ca-section-nav" aria-label="Sezioni del contratto">
-                      { [['lots', 'Lotti e prezzi'], ['documents', 'Documenti'], ['links', 'Collegamenti MEV'], ['users', 'Contratti e Accessi']].map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} className={section === id ? 'is-active' : ''} onClick={() => setSection(id)}>{label}</button>) }
+                      { [['lots', 'Lotti e prezzi'], ['documents', 'Documenti'], ['offered', 'Voci di catalogo offerti'], ['links', 'Collegamenti MEV'], ['users', 'Contratti e Accessi']].map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} className={section === id ? 'is-active' : ''} onClick={() => setSection(id)}>{label}</button>) }
                     </nav>
                     {section === 'users' && (() => {
                       const linked = ambienti.filter(a => visible.some(l => l.codiceContratto === a.codiceContratto));
@@ -1237,6 +1238,10 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                     })}
 
                     {/* Pannello associazione Codice MEV */}
+                    {section === 'offered' && visible.map(l => <div key={'offered-' + l.lotId} style={{ marginBottom: 18 }}>
+                      <h3>Lotto {l.lotId} — {l.name}</h3>
+                      <OfferedCatalogPanel contractId={c.contractId} lotId={l.lotId} />
+                    </div>)}
                     {section === 'links' && (
                       <div style={{ border: '1px solid #cbdcf3', background: '#f5f9ff', borderRadius: 14, padding: 16, display: 'grid', gap: 16, minWidth: 0 }}>
                         <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 700, color: '#29415e' }}>

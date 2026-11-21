@@ -968,6 +968,9 @@ public class ConfiguratoreController : ControllerBase
                     // Includi catalog e towPrices dal payload (popolati dall'import PDF/Excel)
                     ["catalog"] = payload.GetValueOrDefault("catalog") ?? new List<object?>(),
                     ["towPrices"] = payload.GetValueOrDefault("towPrices") ?? new Dictionary<string, object?>(),
+                    // Prezzi OFFERTI dopo l'aggiudicazione (voce per voce), accanto al catalogo di gara: vedi OfferedCatalogController.
+                    ["offeredCatalog"] = payload.GetValueOrDefault("offeredCatalog") ?? new List<object?>(),
+                    ["offeredCatalogMeta"] = payload.GetValueOrDefault("offeredCatalogMeta"),
                 };
                 // Compatibility projection for old imports: obtain only missing catalog base
                 // prices from the original linked tender, without rewriting stored contracts.

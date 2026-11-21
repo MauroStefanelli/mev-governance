@@ -134,6 +134,14 @@ export const PAGE_MANUALS = {
   ] },
   superadmin: { title: 'Archivio Contrattuale e accessi', summary: 'Consulta cataloghi e listini per lotto e gestisci collegamenti ai contratti MEV e accessi degli utenti.', chapters: [
     chapter('Archivio contrattuale', 'Cataloghi, documenti e prezzi per lotto', ['Scegli il contratto nell’elenco dell’Archivio. Consulta le sezioni Lotti e prezzi, Documenti, Collegamenti MEV e Contratti e Accessi.', 'Apri il lotto per consultare Voci Catalogo e prezzi TOW. Distingui prezzi unitari, quantità contrattuali, pesi e percentuali di impatto del configuratore.', 'Per un nuovo contratto usa l’importazione dai documenti o dalla gara prevista dalla pagina. Dopo il caricamento verifica il numero di voci e prezzi disponibili.', 'Controlla il collegamento al codice contratto MEV: il nome del contratto archiviato non coincide necessariamente con il codice dell’ambiente.']),
+    chapter('Voci di catalogo offerti', 'I prezzi dopo l’aggiudicazione, accanto a quelli di gara', [
+      'Le voci di catalogo caricate dai documenti di gara hanno i prezzi della base d’asta. Dopo l’aggiudicazione valgono i prezzi offerti, con gli sconti: si caricano nella sezione «Voci di catalogo offerti» del contratto, lotto per lotto, e restano accanto al catalogo di gara, che non viene modificato.',
+      'Premi «Scarica il modello Excel»: il file contiene già ID, ambito e nome di ogni voce di gara. Nel foglio «CatalogoOfferto» scrivi il prezzo offerto nelle celle gialle (Realizzazione e Modifica, Semplice, Medio e Complesso). Il foglio «BaseAsta» mostra i prezzi di gara solo per confronto; il foglio «Istruzioni» riassume le regole.',
+      'Non cambiare ID, intestazioni, nomi dei fogli né le righe: servono tutte le voci del lotto. Se in gara una voce ha prezzo 0 lascia la cella vuota; in tutti gli altri casi il prezzo offerto è obbligatorio. Scrivi importi positivi o zero, senza il simbolo €.',
+      'Scegli il file compilato e premi «Controlla il file»: non salva nulla, mostra gli errori riga per riga (ID inesistente o doppio, voce mancante, prezzo mancante o non valido) e, se è corretto, il confronto tra prezzo di gara, prezzo offerto e sconto. Un prezzo offerto più alto della base d’asta non blocca il salvataggio ma viene segnalato.',
+      'Con «Salva il catalogo offerto» il catalogo sostituisce l’eventuale precedente. Un file con anche un solo errore non viene salvato. «Rimuovi il catalogo offerto» riporta il lotto ai prezzi di gara.',
+      'Da quel momento il Configuratore e Sviluppo usano i prezzi offerti per le nuove voci. Le iniziative già salvate non cambiano da sole: aprendole nel Configuratore compare «Riallinea ai prezzi offerti», con l’anteprima dei totali e la conferma.',
+    ], 'La stessa sezione è disponibile all’Admin dalla Home («Voci di catalogo offerti»), limitata ai lotti del suo contratto.'),
     chapter('Eliminare o unire un contratto', 'Spostare i dati utili prima di cancellare un duplicato', [
       'Un contratto può comparire due volte, ad esempio perché è stato importato a mano con i PDF e poi di nuovo dalla gara. Sotto il titolo dell’Archivio compare «Possibile duplicato» quando due contratti hanno gli stessi lotti e lo stesso catalogo; sul contratto compare «Dati incompleti» se un lotto attivo non ha prezzi TOW o catalogo.',
       'Apri il contratto che vuoi togliere e premi «Elimina contratto…». Non cancella subito: si apre una finestra in cui scegli quale contratto resta (di solito quello completo, già proposto) e vedi, riga per riga, cosa verrebbe spostato. Tra i contratti che possono restare c’è anche quello di sistema, indicato «(contratto di sistema)»: può ricevere i dati, anche se lui non si può eliminare.',
@@ -338,6 +346,19 @@ export const PAGE_MANUALS = {
         ['«Chiudere senza salvare?».', 'Conferma solo se vuoi perdere le modifiche non salvate.'],
       ],
     }),
+  ] },
+  catalogoofferto: { title: 'Voci di catalogo offerti', summary: 'Carica da Excel i prezzi offerti dopo l’aggiudicazione: diventano il catalogo usato dalle iniziative del tuo contratto.', chapters: [
+    chapter('Caricare i prezzi offerti', 'Dal modello Excel al catalogo del lotto', [
+      'La pagina elenca i lotti del contratto su cui lavori. Per ogni lotto vedi quante voci ha il catalogo di gara e se il catalogo offerto è già stato caricato.',
+      'Premi «Scarica il modello Excel»: contiene già ID, ambito e nome di ogni voce. Nel foglio «CatalogoOfferto» scrivi il prezzo offerto nelle celle gialle; il foglio «BaseAsta» mostra la base d’asta per confronto.',
+      'Non cambiare ID, intestazioni, nomi dei fogli e righe. Se in gara una voce ha prezzo 0 lascia la cella vuota, altrimenti il prezzo offerto è obbligatorio. Scrivi importi senza il simbolo €.',
+      'Scegli il file e premi «Controlla il file»: vedi errori riga per riga oppure il confronto tra prezzo di gara, offerto e sconto. Solo dopo «Salva il catalogo offerto» il catalogo viene usato; un file con errori non viene salvato.',
+      'Se un lotto non compare, non è collegato al codice del tuo contratto: chiedilo al SuperAdmin.',
+    ], 'Il catalogo di gara non viene mai modificato. «Rimuovi il catalogo offerto» riporta il lotto ai prezzi di gara.'),
+    chapter('Che effetto ha sulle iniziative', 'Nuove voci e iniziative già salvate', [
+      'Le nuove iniziative e le voci senza un prezzo salvato usano i prezzi offerti.',
+      'Le iniziative già salvate conservano i loro prezzi unitari: non cambiano da sole. Chi lavora nel Configuratore trova «Riallinea ai prezzi offerti», che mostra prima i totali e chiede conferma.',
+    ]),
   ] },
   configuratore: { title: 'Configuratore Iniziative', summary: 'Trasforma requisiti, analisi e interventi in una proposta tecnica ed economica con storico e supporto AI.' },
 };

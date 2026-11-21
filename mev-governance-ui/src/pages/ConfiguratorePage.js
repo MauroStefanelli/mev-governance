@@ -1,5 +1,6 @@
 import { addAppToSystem, removeAppFromSystem, applicationBriefs } from "../configuratore/applicationContext";
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
+import { effectiveCatalog } from "../configuratore/offeredCatalog";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import RationalePanel from "../configuratore/RationalePanel";
 import LibraryPanel from "../configuratore/LibraryPanel";
@@ -35,6 +36,7 @@ import { workspaceRequest } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
+import RealignOfferedPrices from "../configuratore/RealignOfferedPrices";
 import { catalogUnitPrice } from "../configuratore/catalogReconciliation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
@@ -342,6 +344,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         lotId: String(l.lotId),
         name: l.name || `Lotto ${l.lotId}`,
         catalog: l.catalog || [],
+        offeredCatalog: l.offeredCatalog || [],
         towPrices: l.towPrices || {},
         tow5Share: l.tow5Share ?? 65,
         active: l.active !== false,
@@ -375,7 +378,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     return activeContractLot(c, lot);
   }, [activeContract, builtinContract, lot]);
 
-  const catalog = useMemo(() => activeLot?.catalog || [], [activeLot]);
+  // Dopo l'aggiudicazione valgono i prezzi OFFERTI (Archivio → Voci di catalogo offerti); senza, quelli di gara.
+  const catalog = useMemo(() => effectiveCatalog(activeLot), [activeLot]);
   const towPriceSources = useMemo(() => contracts.flatMap(contract => (contract.lots || [])
     .filter(entry => entry.active !== false && !entry.deleted && String(entry.lotId) === String(lot))
     .map(entry => ({ id: contract.contractId, name: contract.name, lot: entry }))), [contracts, lot]);
@@ -656,7 +660,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       const importContract = allContracts.find(c => c.contractId === selectedContractId);
       const importLot = importContract?.lots?.find(l => l.active !== false && String(l.lotId) === parsed.lot);
       if (parsed.lot && !importLot) throw new Error("Il lotto del file non è disponibile nel contratto selezionato");
-      if (importLot) parsed = await parseInitiativeWorkbook(file, importLot.catalog || []);
+      if (importLot) parsed = await parseInitiativeWorkbook(file, effectiveCatalog(importLot));
       if (parsed.lot && allContracts.find((c) => c.contractId === selectedContractId)?.lots?.some((l) => l.active !== false && String(l.lotId) === parsed.lot)) {
         setLot(parsed.lot);
       }
@@ -666,7 +670,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       setProjectPreparation(newProjectPreparation());
       setDetailReviews({});
       // Start only after successful import; technical review never blocks import.
-      void runDetailReview(parsed.items, importLot?.catalog || catalog, parsed.interventions, parsed.lot || lot);
+      void runDetailReview(parsed.items, importLot ? effectiveCatalog(importLot) : catalog, parsed.interventions, parsed.lot || lot);
       setSuggestions([]);
       setSourceWorkbookName(parsed.fileName);
       const importedInitiative = { ...initiative, code: parsed.code || initiative.code,
@@ -685,7 +689,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         setImportHistoryError(`Excel importato, ma revisione non salvata: ${e.message} I dati importati restano nella pagina. Salva una revisione dal workspace dopo aver verificato lo storico.`);
       }
       toast(`${parsed.interventions.length} interventi e ${parsed.items.length} dettagli importati; verifico possibili integrazioni`);
-      runGapAnalysis(parsed.interventions, importLot?.catalog || catalog);
+      runGapAnalysis(parsed.interventions, importLot ? effectiveCatalog(importLot) : catalog);
     } catch (err) {
       toast("Importazione non riuscita: " + err.message);
     } finally {
@@ -2350,6 +2354,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           <SectionRow number="7" id="sezione-conoscenza" title="Conoscenza dell’Iniziativa" open={isOpen('conoscenza')} onToggle={() => toggleSection('conoscenza')} keepMounted
             facts={knowledgeFacts({ rationale, libraryFacts, solutionProgress, importedInterventions, mappingCount, tow5Total })}>
             <KnowledgeOverview initiative={initiative} rationale={rationale} solution={solutionProgress} interventions={importedInterventions} mappingCount={mappingCount} tow5Total={tow5Total} library={libraryFacts} onOpen={openSection} />
+           <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />
            <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
            {importedInterventions.length > 0 && (
              <div style={styles.card}>
@@ -2769,7 +2774,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {/* STEP 3: OFFERTA */}
       {step === 3 && (
         <div>
-          <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+          <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />
+           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview()} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

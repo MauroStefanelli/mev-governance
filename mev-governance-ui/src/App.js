@@ -12,6 +12,7 @@ import ContrattiInterniPage from "./pages/ContrattiInterniPage";
 import ToolsPage from "./pages/ToolsPage";
 import ConsumoTowAdminPage from "./pages/ConsumoTowAdminPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
+import OfferedCatalogPage from "./pages/OfferedCatalogPage";
 import ConfiguratorePage from "./pages/ConfiguratorePage";
 import SviluppoPage from "./pages/SviluppoPage";
 import GarePage from "./pages/GarePage";
@@ -952,11 +953,12 @@ function App() {
         {page === "tools"             && canViewApp("tools")             && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("tools"))) && <ToolsPage onUnauthorized={handleUnauthorized} />}
         {page === "consumotow"        && canViewApp("consumotow")        && (hasRole("Admin", "SuperAdmin") || (role === "Client" && clientPages?.includes("consumotow"))) && <ConsumoTowAdminPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} />}
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
+        {page === "catalogoofferto"   && hasRole("Admin", "SuperAdmin") && <OfferedCatalogPage />}
         {page === "configuratore"     && canViewApp("configuratore")     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} onNavigate={setPage} />}
         {page === "sviluppo"          && canViewApp("sviluppo")          && hasRole("SuperAdmin", "Developer") && <SviluppoPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} />}
         {page === "gara"              && canViewApp("gara")              && hasRole("Bid Manager", "SuperAdmin") && <GarePage onUnauthorized={handleUnauthorized} />}
         {/* Accesso negato */}
-        {page !== "home" && !["admin","dbconfig","superadmin"].includes(page) && !canViewApp(page) && (
+        {page !== "home" && !["admin","dbconfig","superadmin","catalogoofferto"].includes(page) && !canViewApp(page) && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 300, gap: 12, color: "#68758A" }}>
             <span style={{ fontSize: 40 }}>🔒</span>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Accesso non autorizzato</div>
