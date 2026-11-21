@@ -202,6 +202,14 @@ public static class OfferedCatalogRegression
         check(after.Payload["catalog"]!.ToJsonString() == before.Payload["catalog"]!.ToJsonString(), "db: the TENDER catalog is byte-for-byte the same after the import");
         check(after.Payload["towPrices"]!.ToJsonString() == before.Payload["towPrices"]!.ToJsonString() && after.Payload["catalogFile"]!.ToString() == "gara.pdf" && after.Payload["codiceContratto"]!.ToString() == "4490015980", "db: TOW prices, file name and contract link are untouched");
         check(after.Payload["offeredCatalog"]![0]!["prezzi"]!["REALIZZAZIONE"]!["Medio"]!.GetValue<decimal>() == 1400m, "db: the offered price is stored (1.400)");
+        // Il Configuratore legge i contratti da GET api/configuratore/contracts: il catalogo offerto deve arrivare fin li', altrimenti «Riallinea ai prezzi offerti» non compare mai.
+        await using (var contract = new NpgsqlCommand("INSERT INTO offtest.\"PC_DataRecords\" (record_key, entity_type, contract_id, lot_id, title, payload) VALUES ('poste-tet-2025|contract','contract','poste-tet-2025','','Poste','{\"name\":\"Poste TeT\"}'::jsonb)", conn)) await contract.ExecuteNonQueryAsync();
+        var api = new ConfiguratoreController(db, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["DB_CONNECTION_STRING"] = pg, ["DB_SCHEMA"] = "offtest" }).Build())
+        { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "anna"), new Claim(ClaimTypes.Role, "SuperAdmin") }, "test")) } } };
+        var served = System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)await api.GetContracts()).Value);
+        var servedLot = System.Text.Json.JsonDocument.Parse(served).RootElement[0].GetProperty("lots")[0];
+        check(servedLot.GetProperty("offeredCatalog").GetArrayLength() == 27 && servedLot.GetProperty("offeredCatalogMeta").GetProperty("fileName").GetString() == "f.xlsx", "api: GET contracts sends the offered catalog (27 voices) and its file name to the Configuratore");
+        check(servedLot.GetProperty("catalog").GetArrayLength() == 27 && servedLot.GetProperty("offeredCatalog")[0].GetProperty("prezzi").GetProperty("REALIZZAZIONE").GetProperty("Medio").GetDecimal() == 1400m, "api: the tender catalog is still sent as before, next to the offered one");
         check(!await OfferedCatalogStore.Save(conn, "offtest", "poste-tet-2025", "9", entries, null), "db: a lot that does not exist is not created");
         check(await OfferedCatalogStore.Save(conn, "offtest", "poste-tet-2025", "2", null, null), "db: the offered catalog is removed");
         var removed = (await OfferedCatalogStore.LoadLot(conn, "offtest", "poste-tet-2025", "2"))!;

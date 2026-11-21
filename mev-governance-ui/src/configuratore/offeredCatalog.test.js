@@ -110,11 +110,16 @@ test('realign: a voice that is only in the tender catalog (not offered) is NOT r
 });
 
 describe('RealignOfferedPrices panel', () => {
-  test('is not shown without an offered catalog or without rows', () => {
-    const { container, rerender } = render(<RealignOfferedPrices items={saved} lot={lot()} onApply={jest.fn()} />);
+  test('without rows nothing is shown; without an offered catalog it SAYS which catalog is used and where to load the offered one (it does not vanish)', () => {
+    const { container, rerender } = render(<RealignOfferedPrices items={[]} lot={lot({ offeredCatalog: offered(0.5) })} onApply={jest.fn()} />);
     expect(container).toBeEmptyDOMElement();
-    rerender(<RealignOfferedPrices items={[]} lot={lot({ offeredCatalog: offered(0.5) })} onApply={jest.fn()} />);
-    expect(container).toBeEmptyDOMElement();
+    rerender(<RealignOfferedPrices items={saved} lot={lot()} onApply={jest.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/Catalogo in uso: Prezzi di gara \(base d’asta\)/);
+    expect(screen.getByRole('status')).toHaveTextContent(/non è stato caricato il catalogo offerto/);
+    expect(screen.getByRole('status')).toHaveTextContent(/Voci di catalogo offerti/);
+    expect(screen.queryByRole('button', { name: /Riallinea/ })).toBeNull();
+    rerender(<RealignOfferedPrices items={saved} lot={lot({ offeredCatalog: offered(0.5) })} onApply={jest.fn()} />);
+    expect(screen.getByText(/catalogo in uso: Prezzi offerti/)).toBeInTheDocument();
   });
   test('shows the preview and changes nothing until the user confirms', () => {
     const onApply = jest.fn();

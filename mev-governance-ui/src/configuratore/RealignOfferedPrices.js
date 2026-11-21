@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { resolveCatalogEntry } from './catalogReconciliation';
-import { hasOfferedCatalog, realignPreview, applyRealign } from './offeredCatalog';
+import { hasOfferedCatalog, realignPreview, applyRealign, catalogBasisLabel } from './offeredCatalog';
 import { euro } from '../utils';
 
 // «Riallinea ai prezzi offerti»: the unit prices saved in an initiative come from the offer file and are NOT recalculated when the offered catalog is loaded.
 // This shows what would change (nothing is touched), and replaces the prices only after an explicit confirmation.
 export default function RealignOfferedPrices({ items, lot, onApply }) {
   const [open, setOpen] = useState(false);
-  if (!hasOfferedCatalog(lot) || !(items || []).length) return null;
+  if (!(items || []).length) return null;
+  // Senza catalogo offerto il pannello non sparisce in silenzio: dice quale catalogo e' in uso e dove si carica quello offerto.
+  if (!hasOfferedCatalog(lot)) return <p className="offer-realign-note" role="status" style={{ fontSize: 12, color: '#52657d', margin: '8px 0' }}>
+    Catalogo in uso: {catalogBasisLabel(lot)}. Per questo lotto non è stato caricato il catalogo offerto: «Riallinea ai prezzi offerti» compare dopo il caricamento in Archivio contrattuale → «Voci di catalogo offerti».</p>;
   const preview = realignPreview(items, lot, resolveCatalogEntry);
   const diff = preview.totalAfter - preview.totalBefore;
   return <section className="offer-realign" aria-label="Riallinea ai prezzi offerti" style={{ background: '#fffbea', border: '1px solid #f3d98b', borderRadius: 8, padding: 14, margin: '12px 0' }}>
-    <strong>Prezzi offerti disponibili per questo lotto</strong>
+    <strong>Prezzi offerti disponibili per questo lotto</strong> <span style={{ fontSize: 12, color: '#7a4b00' }}>· catalogo in uso: {catalogBasisLabel(lot)}</span>
     <p style={{ margin: '6px 0', fontSize: 13 }}>I prezzi di questa iniziativa sono quelli salvati: non cambiano da soli. {preview.changed > 0
       ? `${preview.changed} righe hanno un prezzo diverso da quello offerto.` : 'Tutte le righe hanno già il prezzo offerto.'}</p>
     {preview.changed > 0 && <>
