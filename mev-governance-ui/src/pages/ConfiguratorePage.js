@@ -1,6 +1,7 @@
 import { addAppToSystem, removeAppFromSystem, applicationBriefs } from "../configuratore/applicationContext";
 import { initialCatalogSelection } from "../configuratore/catalogSelection";
 import { effectiveCatalog } from "../configuratore/offeredCatalog";
+import { classify, catalogForAi, validProposal, criteriaOf } from "../configuratore/catalogCriteria";
 import InitiativeWorkspace from "../configuratore/InitiativeWorkspace";
 import RationalePanel from "../configuratore/RationalePanel";
 import LibraryPanel from "../configuratore/LibraryPanel";
@@ -729,7 +730,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   // ── Step 2: gap analysis (port da analyzeImportedGaps) ──
   const runGapAnalysis = (interventions, selectedCatalog = catalog) => {
-    setSuggestions(importedGapSuggestions(interventions, selectedCatalog));
+    setSuggestions(importedGapSuggestions(interventions, selectedCatalog, lot));
   };
 
   const safeParse = (s) => {
@@ -771,16 +772,22 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     });
     let ranked = [...scores].map(([id, score]) => ({ c: catalog.find((x) => x.id === id), score })).filter((x) => x.c && catalogEntryInScope(x.c, initiativeScopeText(initiative))).sort((a, b) => b.score - a.score).slice(0, 10);
     if (!ranked.length) ranked = catalog.filter(c => catalogEntryInScope(c, initiativeScopeText(initiative))).slice(0, 6).map((c) => ({ c, score: 1 }));
+    // Tipo (crea / modifica) e complessita' secondo i dettagli del catalogo: criteri per livello della voce, vedi catalogCriteria.js.
+    const requirementText = [initiative.title, initiative.description, initiative.requirements].filter(Boolean).join(" ");
     setSuggestions(
-      ranked.map(({ c, score }, i) => ({
-        id: c.id,
-        selected: i < Math.min(4, ranked.length),
-        type: source.match(/modific|adegua|evoluz|rientro/) ? "MODIFICA" : "REALIZZAZIONE",
-        complexity: "Medio",
-        qty: 1,
-        score,
-        reason: reasonFor(c, source),
-      }))
+      ranked.map(({ c, score }, i) => {
+        const decision = classify(requirementText || source, c, lot);
+        return {
+          id: c.id,
+          selected: i < Math.min(4, ranked.length),
+          type: decision.type,
+          complexity: decision.complexity,
+          needsReview: decision.needsReview,
+          qty: 1,
+          score,
+          reason: `${reasonFor(c, source)} ${decision.note}`,
+        };
+      })
     );
     setStep(2);
     } finally {
@@ -867,12 +874,15 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       contract: { id: selectedContractId, name: activeContract?.name || "" },
       lot,
       initiative,
-      catalog: catalog.map((c) => ({
+      // Il catalogo con i dettagli che servono a decidere tipo e complessita': descrizione del driver intera e criteri per livello (catalogCriteria.js).
+      catalog: catalogForAi(catalog, lot).map((c) => ({
         id:          c.id,
         name:        c.nome,
         area:        c.ambito,
-        description: c.descrizione || "",
-        prices:      c.prezzi || c.price || {},
+        description: c.descrizione,
+        criteria:    c.criteri,
+        types:       c.tipi,
+        prices:      (catalog.find((x) => String(x.id) === String(c.id)) || {}).prezzi || {},
       })),
       excelInterventions: importedInterventions.map((x) => ({
         id:          x.interventionId || x.id,
@@ -1036,10 +1046,12 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
           next.push(s);
         }
         s.selected = true;
-        s.type = p.type === "REALIZZAZIONE" ? "REALIZZAZIONE" : "MODIFICA";
-        s.complexity = p.complexity || "Medio";
+        // Tipo e complessita' scritti dall'AI devono esistere con un prezzo per questa voce: se no si correggono e lo si scrive nel motivo.
+        const checked = validProposal(catalogItem, { type: p.type, complexity: p.complexity });
+        s.type = checked.type;
+        s.complexity = checked.complexity;
         s.qty = Math.max(0.01, Number(p.quantity) || 1);
-        s.reason = p.rationale || s.reason;
+        s.reason = [p.rationale || s.reason, checked.fixes.length ? `Correzione automatica: ${checked.fixes.join('; ')}.` : ''].filter(Boolean).join(' ');
         s.additionalInfo = [s.additionalInfo, p.additionalInfo, "Validato tramite secondo parere AI"].filter(Boolean).join(" · ");
       });
     setSuggestions(next);
@@ -2651,6 +2663,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                        {s.additionalInfo === "Proposta AI" && (
                          <span style={{ marginLeft: 8, background: "#ede9fe", color: "#6d28d9", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>✦ AI</span>
                        )}
+                       {s.needsReview && <span style={{ marginLeft: 8, background: "#fff4d6", color: "#7a4b00", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>Da verificare</span>}
                      </div>
                      <strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{esc(cc.nome)}</strong>
                      {cc.descrizione && (
@@ -2663,6 +2676,16 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                          <span style={{ fontWeight: 600 }}>Motivo proposta: </span>{s.reason}
                        </p>
                      )}
+                     {(() => {
+                       // I criteri di complessità della voce, con il livello scelto in evidenza: per controllare a colpo d'occhio se tipo e complessità sono giustificati.
+                       const criteria = criteriaOf(cc, lot);
+                       if (!criteria) return <p style={{ margin: "6px 0 0", fontSize: 11, color: "#7a8ba1" }}>Questa voce non ha criteri di complessità scritti nel catalogo.</p>;
+                       return <details style={{ marginTop: 6 }}><summary style={{ cursor: "pointer", fontSize: 12, color: "#1a5276" }}>Criteri di complessità della voce</summary>
+                         {["Semplice", "Medio", "Complesso"].filter((level) => criteria[level]).map((level) => (
+                           <p key={level} style={{ margin: "4px 0", fontSize: 11.5, lineHeight: 1.45, padding: "6px 8px", borderRadius: 5, background: level === s.complexity ? "#e8f6ef" : "#f7f9fb", border: level === s.complexity ? "1px solid #bfe5cf" : "1px solid #eef2f6" }}>
+                             <strong>{level}{level === s.complexity ? " · scelto" : ""}:</strong> {criteria[level]}</p>
+                         ))}</details>;
+                     })()}
                    </div>
                  </label>
                  <p className="suggestion-explanation">Questa voce del catalogo è una possibile integrazione per l’intervento <strong>{s.interventionId || gid}</strong>. Controlla attività, motivazione, tipo, complessità e quantità; selezionala solo se necessaria e non già coperta dalle righe esistenti. Il suggerimento non è un’attività approvata.</p>

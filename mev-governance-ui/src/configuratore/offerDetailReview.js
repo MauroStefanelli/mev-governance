@@ -1,4 +1,5 @@
 import { resolveCatalogEntry } from './catalogReconciliation';
+import { criteriaOf } from './catalogCriteria';
 
 export function detailReviewInput(item, catalog, interventions, contractId, lot, index) {
   const entry = resolveCatalogEntry(item, catalog);
@@ -8,7 +9,7 @@ export function detailReviewInput(item, catalog, interventions, contractId, lot,
     contractId, lot: String(lot),
     intervention: { id: item.interventionId, title: intervention?.titolo || item.interventionTitle || '', description: intervention?.descrizione || '', activity: intervention?.attivita || '', requirements: intervention?.requisiti || '', system: intervention?.sistema || '' },
     detail: { component: item.detail?.componentApplication || '', technology: item.detail?.technology || '', unit: item.detail?.unitName || '', description: item.detail?.detailDescription || item.reason || '', excelCatalogId: item.original?.catalogId ?? item.id, type: item.type, complexity: item.complexity, quantity: item.qty },
-    catalogEntry: entry ? { id: entry.id, name: entry.nome, ambit: entry.ambito || '', description: entry.descrizione || '', criteria: entry.criteri || {} } : null,
+    catalogEntry: entry ? { id: entry.id, name: entry.nome, ambit: entry.ambito || '', description: entry.descrizione || '', criteria: criteriaOf(entry, lot) || {} } : null,
   };
 }
 

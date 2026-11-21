@@ -564,7 +564,8 @@ public class AiService
         "la coerenza tecnica delle proposte: verifica se le dipendenze tecnologiche, i pattern architetturali e " +
         "la complessità del codice confermano o contraddicono le stime proposte; segnala eventuali discrepanze nei warnings. " +
         "Se il contesto include 'confirmedRationale', sono razionali, vincoli e decisioni confermati dagli utenti: rispettali, non proporre interventi che li contraddicono e citali nel rationale quando giustificano una proposta. " +
-        "Proponi interventi necessari e sufficienti, senza inventare voci. " +
+        "Proponi interventi necessari e sufficienti, senza inventare voci. " + InterventionProposalsRules.Text +
+        "Il catalogo fornito contiene, per ogni voce, 'description' (descrizione del driver), 'criteria' (criteri per livello di complessità, se esistono) e 'types' (i tipi con prezzo): usali per scegliere type e complexity di ogni proposta. " +
         "Per ogni proposta, compila 'interventionId' con l'ID_INTERVENTO di riferimento dal campo 'excelInterventions' " +
         "(es. \"regexp-001\") se la proposta è specifica per quell'intervento; lascia vuoto (\"\") se è generica. " +
         "Nel campo 'rationale' NON ripetere l'interventionId: scrivi solo la motivazione tecnica in italiano, chiara e dettagliata. " +

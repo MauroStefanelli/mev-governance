@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { proposeInterventions } from '../services/mevService';
 import { validComplexities } from './configuratoreCore';
+import { criteriaOf } from './catalogCriteria';
 import { fmtItIT } from '../utils';
 import { STATUS, TYPES, MAX_QTY, MAX_PROPOSED, proposalsFromAi, confirm, discard, restore, withText, withMapping, addMapping, removeMapping, canConfirm, counts } from './proposedInterventions';
 
@@ -8,7 +9,8 @@ const entryOf = (catalog, id) => (catalog || []).find(entry => Number(entry.id) 
 
 // Only numbers the catalogue really has: the server refuses a body it cannot read, and a price that is not a number is not a price.
 const catalogForServer = catalog => (catalog || []).filter(entry => Number.isFinite(Number(entry.id)) && String(entry.nome || '').trim()).map(entry => ({
-  id: Number(entry.id), nome: String(entry.nome), ambito: String(entry.ambito || ''), descrizione: String(entry.descrizione || '').slice(0, 300),
+  id: Number(entry.id), nome: String(entry.nome), ambito: String(entry.ambito || ''), descrizione: String(entry.descrizione || '').slice(0, 700),
+  criteri: criteriaOf(entry) || undefined,
   prezzi: Object.fromEntries(Object.entries(entry.prezzi || {}).map(([type, byComplexity]) => [type, Object.fromEntries(Object.entries(byComplexity || {}).filter(([, price]) => Number(price) > 0).map(([complexity, price]) => [complexity, Number(price)]))])),
 }));
 

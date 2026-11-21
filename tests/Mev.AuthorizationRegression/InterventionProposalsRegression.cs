@@ -32,6 +32,36 @@ public static class InterventionProposalsRegression
 
     public static async Task Run(AppDbContext db, Action<bool, string> check)
     {
+        // ---------- the details of the catalogue the model reads: description of the driver, criteria per level, types; never prices ----------
+        var withCriteria = new List<CatalogEntryIn>
+        {
+            new(241, "Realizzazione schema (DDL)", "Database", new string('d', 900), new() { ["REALIZZAZIONE"] = new() { ["Semplice"] = 500, ["Medio"] = 700, ["Complesso"] = 1200 }, ["MODIFICA"] = new() { ["Semplice"] = 70, ["Medio"] = 210, ["Complesso"] = 350 } },
+                new() { ["Semplice"] = "Da 1 a 10 tabelle", ["Medio"] = "Da 11 a 30 tabelle", ["Complesso"] = "Più di 30 tabelle" }),
+            new(453, "SAP Custom using Dialog (module pool)", "SAP", "d", new() { ["REALIZZAZIONE"] = new() { ["Medio"] = 1360 } }, new() { ["Semplice"] = "N.A.", ["Medio"] = "N.A.", ["Complesso"] = "n.a" }),
+            new(9005, "Voce con un solo criterio", "Backend", "", new() { ["MODIFICA"] = new() { ["Semplice"] = 100, ["Medio"] = 200, ["Complesso"] = 300 } }, new() { ["Medio"] = new string('c', 900), ["Semplice"] = "  " }),
+        };
+        var forAi = JsonSerializer.Serialize(InterventionProposals.CatalogForAi(withCriteria), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var forAiDoc = JsonDocument.Parse(forAi).RootElement;
+        check(forAiDoc[0].GetProperty("criteri").GetProperty("Medio").GetString() == "Da 11 a 30 tabelle" && forAiDoc[0].GetProperty("criteri").GetProperty("Complesso").GetString() == "Più di 30 tabelle", "AI catalogue: the criteria of each complexity level are sent");
+        check(forAiDoc[0].GetProperty("descrizione").GetString()!.Length == 700, "AI catalogue: the description of the driver is sent up to 700 characters (it was cut at 300)");
+        check(forAiDoc[1].GetProperty("criteri").ValueKind == JsonValueKind.Null, "AI catalogue: a voice whose criteria are all «N.A.» has NO criteria (the model must not believe there is a rule)");
+        check(forAiDoc[2].GetProperty("criteri").EnumerateObject().Count() == 1 && forAiDoc[2].GetProperty("criteri").GetProperty("Medio").GetString()!.Length == 420 && !forAiDoc[2].GetProperty("criteri").TryGetProperty("Semplice", out _), "AI catalogue: empty levels are left out and long criteria are cut at 420 characters");
+        check(!forAi.Contains("\"prezzi\"") && !forAi.Contains("1200") && !forAi.Contains("1360") && !forAi.Contains("500"), "AI catalogue: no price is ever sent to the model");
+        check(forAiDoc[1].GetProperty("tipi").EnumerateArray().Select(t => t.GetString()).SequenceEqual(new[] { "REALIZZAZIONE" }), "AI catalogue: the types with a price are listed (only REALIZZAZIONE for voice 453)");
+
+        // ---------- the rules for type and complexity are in EVERY prompt that reads the catalogue ----------
+        foreach (var (name, text) in new[] { ("proposals from the rationale", AiInterventionAssistant.Instructions), ("second opinion / review rules", InterventionProposalsRules.Text) })
+        {
+            check(text.Contains("REGOLE PER TIPO E COMPLESSITÀ") && text.Contains("MODIFICA se l'attività cambia qualcosa che esiste") && text.Contains("REALIZZAZIONE se nasce qualcosa che non esiste"), $"prompt ({name}): the rule for the TYPE (change what exists / create what is new)");
+            check(text.Contains("livello PIÙ ALTO compatibile con i criteri e giustificabile dal testo") && text.Contains("Non salire di livello senza un elemento del criterio"), $"prompt ({name}): the rule for the COMPLEXITY (highest compatible and justified)");
+            check(text.Contains("soglie numeriche") && text.Contains("non inventarli") && text.Contains("cita il criterio"), $"prompt ({name}): numeric thresholds, no invented criteria, the criterion is quoted");
+        }
+        check(AiInterventionAssistant.Instructions.Contains("CATALOGO INTERVENTI di Poste") && AiInterventionAssistant.Instructions.Contains("SOLO tra quelle del catalogo fornito"), "prompt (proposals): the voices are still chosen ONLY from the catalogue");
+        var aiServiceSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "mev-governance-backend", "Services", "AiService.cs"));
+        var reviewSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "mev-governance-backend", "Controllers", "ConfiguratoreAiController.cs"));
+        check(aiServiceSource.Contains("InterventionProposalsRules.Text") && aiServiceSource.Contains("'criteria'"), "prompt (second opinion): it carries the shared rules and tells the model where the criteria are");
+        check(reviewSource.Contains("InterventionProposalsRules.Text") && reviewSource.Contains("proponi in suggestion il tipo e il livello corretti"), "prompt (row review): it carries the shared rules and asks for the correct type and level in the suggestion");
+
         // ---------- the check of what the model answers ----------
         var good = Obj("{\"interventions\":[{\"title\":\"Adeguare la stampa H7\",\"description\":\"d\",\"activity\":\"a\",\"system\":\"ILP\",\"requirements\":\"r\",\"components\":[\"print-app\"],\"rationaleIds\":[1,2],\"mappings\":[{\"catalogId\":236,\"type\":\"realizzazione\",\"complexity\":\"complesso\",\"qty\":2,\"component\":\"frontend\",\"technology\":\"Angular\",\"why\":\"maschera\"}]}]}");
         var one = InterventionProposals.Check(good, Catalog());
@@ -104,6 +134,15 @@ public static class InterventionProposalsRegression
         check(!sent.Contains("SOLO PROPOSTO") && !sent.Contains("SCARTATO") && !sent.Contains("ALTRO AMBIENTE") && !sent.Contains("ALTRA INIZIATIVA"), "A proposal, a discarded entry, another environment and another initiative NEVER reach the AI");
         check(sent.Contains("ILP_BACKEND_print-app") && sent.Contains("Realizzazione Single Page Application") && JsonDocument.Parse(sent).RootElement.GetProperty("existingTitles")[0].GetString() == "Titolo già presente" && JsonDocument.Parse(sent).RootElement.GetProperty("focus").GetString() == "solo punto 1", "The applications, the catalogue, the titles to avoid and the focus reach the AI");
         check(!sent.Contains("4800") && !sent.Contains("\"prezzi\""), "No price of the catalogue reaches the AI");
+        // the criteria of the voice (here read from the request, as the browser sends them) reach the AI through the real endpoint, and the «N.A.» ones do not
+        var withCriteria2 = Catalog(); withCriteria2.Insert(0, new(241, "Realizzazione schema (DDL)", "Database", "Schema delle tabelle", new() { ["REALIZZAZIONE"] = new() { ["Medio"] = 700 } }, new() { ["Semplice"] = "Da 1 a 10 tabelle", ["Medio"] = "Da 11 a 30 tabelle", ["Complesso"] = "Più di 30 tabelle" }));
+        withCriteria2.Insert(1, new(453, "SAP Custom", "SAP", "d", new() { ["REALIZZAZIONE"] = new() { ["Medio"] = 100 } }, new() { ["Semplice"] = "N.A.", ["Medio"] = "N.A.", ["Complesso"] = "N.A." }));
+        Ok(await As(user, "Developer").Propose(new("G9", "Stampa H7", "ILP", "Consentire la stampa", "2", withCriteria2, null, applications, null, null)));
+        var sentCriteria = JsonDocument.Parse(fake.Seen.Last()).RootElement.GetProperty("catalog");
+        var schema = sentCriteria.EnumerateArray().Single(e => e.GetProperty("id").GetInt32() == 241); var sap = sentCriteria.EnumerateArray().Single(e => e.GetProperty("id").GetInt32() == 453);
+        check(schema.GetProperty("criteri").GetProperty("Medio").GetString() == "Da 11 a 30 tabelle" && schema.GetProperty("criteri").GetProperty("Complesso").GetString() == "Più di 30 tabelle", "Interventions endpoint: the criteria per level reach the AI");
+        check(sap.GetProperty("criteri").ValueKind == JsonValueKind.Null, "Interventions endpoint: a voice whose criteria are «N.A.» reaches the AI WITHOUT criteria");
+        check(!fake.Seen.Last().Contains("\"prezzi\""), "Interventions endpoint: still no price reaches the AI");
         check(!sent.Contains("\"codeUrl\"") && !sent.Contains("notes"), "Nothing of the applications beyond their sheet reaches the AI");
         var item = answer.GetProperty("interventions")[0];
         check(item.GetProperty("mappings").GetArrayLength() == 1 && item.GetProperty("mappings")[0].GetProperty("unit").GetDecimal() == 840 && item.GetProperty("rejectedMappings").GetArrayLength() == 1, "The answer has the checked rows, with the catalogue price, and the rejected ones");

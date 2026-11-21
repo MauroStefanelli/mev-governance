@@ -1,20 +1,25 @@
 import { resolveCatalogEntry } from './catalogReconciliation';
 import { appNorm } from './configuratoreCore';
 import { catalogEntryInScope } from './suggestionScope';
+import { classify } from './catalogCriteria';
 
 export const activityKey = (item, index) => String(item.sourceRowId || item.key || `activity-${index + 1}`);
 export const developmentActivities = items => items.map((item, index) => ({ key: activityKey(item, index), item, number: index + 1 }));
 
-export function importedGapSuggestions(interventions, catalog) {
+export function importedGapSuggestions(interventions, catalog, lot) {
   return interventions.flatMap(intervention => {
     const requirement = [intervention.titolo, intervention.descrizione, intervention.attivita, intervention.requisiti].filter(Boolean).join(' ');
     const covered = new Set((intervention.mappings || []).map(mapping => resolveCatalogEntry({ id: mapping.catalogId, name: mapping.name, ambit: mapping.ambit }, catalog)?.id).filter(id => id != null).map(String));
     return catalog.filter(entry => {
       const name = String(entry.nome || '').trim();
       return name.length >= 15 && !covered.has(String(entry.id)) && catalogEntryInScope(entry, requirement) && appNorm(requirement).includes(appNorm(name));
-    }).map(entry => ({ id: entry.id, selected: false, type: /modific|adegua|evoluz/i.test(requirement) ? 'MODIFICA' : 'REALIZZAZIONE', complexity: 'Medio', qty: 1,
-      interventionId: intervention.id, interventionTitle: intervention.titolo,
-      reason: `Il testo dell’intervento ${intervention.id} cita esplicitamente «${entry.nome}», senza una riga già associata alla stessa voce. Verificare se è coperta da altre attività prima di aggiungerla. Evidenza importata: ${requirement.slice(0, 700)}` }));
+    }).map(entry => {
+      // Tipo e complessita' secondo i dettagli del catalogo (criteri per livello): vedi catalogCriteria.js. La nota dice perche' e se va verificato.
+      const decision = classify(requirement, entry, lot);
+      return { id: entry.id, selected: false, type: decision.type, complexity: decision.complexity, qty: 1, needsReview: decision.needsReview,
+        interventionId: intervention.id, interventionTitle: intervention.titolo,
+        reason: `Il testo dell’intervento ${intervention.id} cita esplicitamente «${entry.nome}», senza una riga già associata alla stessa voce. Verificare se è coperta da altre attività prima di aggiungerla. ${decision.note} Evidenza importata: ${requirement.slice(0, 700)}` };
+    });
   });
 }
 
