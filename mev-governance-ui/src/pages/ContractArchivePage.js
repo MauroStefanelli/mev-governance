@@ -184,7 +184,9 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                   {(modal.data || []).map((v, i) => {
                     const pr = v.prezzi || {};
                     const prices = { Realizzazione: pr.REALIZZAZIONE || pr.Realizzazione || pr.realizzazione || {}, Modifica: pr.MODIFICA || pr.Modifica || pr.modifica || {} };
-                    const texts = (modal.offered || []).find(o => String(o.id) === String(v.id))?.descrizioni;
+                    const offeredEntry = (modal.offered || []).find(o => String(o.id) === String(v.id));
+                    const texts = offeredEntry?.descrizioni;
+                    const driverText = offeredEntry?.descrizione;
                     return (
                       <React.Fragment key={i}>
                       <tr style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
@@ -196,9 +198,10 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                           return <td key={`${type}-${f}`} style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right', whiteSpace: 'nowrap' }}>{value != null ? euro.format(value) : '–'}</td>;
                         }))}
                       </tr>
-                      {texts && <tr style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}><td colSpan={9} style={{ padding: '0 14px 12px', borderBottom: '1px solid #eef2f5', fontSize: 12, color: '#475569' }}>
+                      {(texts || driverText) && <tr style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}><td colSpan={9} style={{ padding: '0 14px 12px', borderBottom: '1px solid #eef2f5', fontSize: 12, color: '#475569' }}>
                         <details><summary style={{ cursor: 'pointer' }}>Descrizione per complessità (dal catalogo offerto)</summary>
-                          {['Semplice', 'Medio', 'Complesso'].filter(f => texts[f]).map(f => <p key={f} style={{ margin: '6px 0' }}><strong>{f}:</strong> {texts[f]}</p>)}
+                          {driverText && <p style={{ margin: '6px 0' }}><strong>Driver:</strong> {driverText}</p>}
+                          {['Semplice', 'Medio', 'Complesso'].filter(f => texts?.[f]).map(f => <p key={f} style={{ margin: '6px 0' }}><strong>{f}:</strong> {texts[f]}</p>)}
                         </details></td></tr>}
                       </React.Fragment>
                     );

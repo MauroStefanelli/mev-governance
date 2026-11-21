@@ -153,3 +153,20 @@ test('the descriptions by complexity travel with the offered voice and only ther
   expect(effectiveCatalog(lot({ offeredCatalog: [{ ...offered(0.5, [236])[0], descrizioni: {} }] })).find(e => e.id === 236).descrizioni).toBeUndefined();
   expect(offeredComparison(lot({ offeredCatalog: [{ ...offered(0.5, [236])[0], descrizioni: texts }] })).find(r => r.id === 236).descrizioni).toEqual(texts);
 });
+
+test('the driver description of the file replaces the tender one in the catalog in use, but never in the lot, and only where the file has one', () => {
+  const entries = [{ ...offered(0.5, [236])[0], descrizione: 'Descrizione del driver dal file' }, ...offered(0.5, [239])];
+  // Nei dati reali ogni voce di gara ha la sua descrizione (27 su 27); la fixture dei prezzi non la porta, quindi la si aggiunge qui.
+  const tender = lotto2.map(e => ({ ...e, descrizione: `Descrizione di gara ${e.id}` }));
+  const theLot = lot({ catalog: tender, offeredCatalog: entries });
+  const inUse = effectiveCatalog(theLot);
+  const a = inUse.find(e => e.id === 236);
+  expect(a.descrizione).toBe('Descrizione del driver dal file');
+  expect(a.descrizioneGara).toBe(tender.find(e => e.id === 236).descrizione);        // quella di gara si conserva accanto
+  expect(inUse.find(e => e.id === 239).descrizione).toBe(tender.find(e => e.id === 239).descrizione);   // il file non ne ha: resta quella di gara
+  expect(inUse.find(e => e.id === 241).descrizione).toBe(tender.find(e => e.id === 241).descrizione);   // voce non offerta
+  expect(theLot.catalog.find(e => e.id === 236).descrizione).toBe(tender.find(e => e.id === 236).descrizione);   // il catalogo di gara del lotto non e' toccato
+  expect(effectiveCatalog(lot({ catalog: tender })).find(e => e.id === 236).descrizione).toBe(tender.find(e => e.id === 236).descrizione);   // senza catalogo offerto: gara
+  expect(effectiveCatalog(lot({ catalog: tender, offeredCatalog: [{ ...offered(0.5, [236])[0], descrizione: '   ' }] })).find(e => e.id === 236).descrizione).toBe(tender.find(e => e.id === 236).descrizione);   // testo vuoto: non cancella
+  expect(offeredComparison(theLot).find(r => r.id === 236).descrizione).toBe('Descrizione del driver dal file');
+});

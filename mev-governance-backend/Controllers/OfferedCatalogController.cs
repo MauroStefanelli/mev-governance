@@ -118,6 +118,7 @@ public class OfferedCatalogController : BaseController
     {
         id = r.Id, ambito = r.Ambit, nome = r.Name,
         prezzi = r.Prices.Select(p => new { tipo = p.Type, fascia = p.Band, gara = p.Base, offerto = p.Offered }),
+        descrizione = r.DriverDescription,
         descrizioni = r.Descriptions,
     });
 

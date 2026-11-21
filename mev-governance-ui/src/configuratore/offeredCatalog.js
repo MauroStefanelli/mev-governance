@@ -31,7 +31,9 @@ export function effectiveCatalog(lot) {
       }
     }
     const descrizioni = match.descrizioni && Object.keys(match.descrizioni).length ? match.descrizioni : undefined;
-    return { ...entry, prezzi, priceBasis: 'offerto', basePrezzi: entry.prezzi, ...(descrizioni ? { descrizioni } : {}) };
+    // La descrizione del driver del file sostituisce quella di gara SOLO nel catalogo con cui si lavora; quella di gara resta nel lotto (catalog) e torna rimuovendo il catalogo offerto.
+    const text = typeof match.descrizione === 'string' && match.descrizione.trim() ? match.descrizione : null;
+    return { ...entry, prezzi, priceBasis: 'offerto', basePrezzi: entry.prezzi, ...(text ? { descrizione: text, descrizioneGara: entry.descrizione || '' } : {}), ...(descrizioni ? { descrizioni } : {}) };
   });
 }
 
@@ -51,7 +53,7 @@ export function offeredComparison(lot) {
       cells.push({ type, band, base, offered: price,
         discount: base > 0 && price != null ? Math.round((1 - price / base) * 10000) / 100 : null });
     }
-    return { id: entry.id, ambito: entry.ambito || '', nome: entry.nome || '', covered: !!match, descrizioni: match?.descrizioni || null, cells };
+    return { id: entry.id, ambito: entry.ambito || '', nome: entry.nome || '', covered: !!match, descrizione: match?.descrizione || null, descrizioni: match?.descrizioni || null, cells };
   });
 }
 

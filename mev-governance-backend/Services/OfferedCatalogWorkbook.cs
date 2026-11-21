@@ -21,7 +21,7 @@ public static class OfferedCatalogWorkbook
     public static List<string> PriceHeaders() => Types.SelectMany(t => Bands.Select(b => Header(t, b))).ToList();
 
     public record Price(string Type, string Band, decimal? Base, decimal? Offered);
-    public record Row(string Id, string Ambit, string Name, List<Price> Prices, Dictionary<string, string>? Descriptions = null);
+    public record Row(string Id, string Ambit, string Name, List<Price> Prices, Dictionary<string, string>? Descriptions = null, string? DriverDescription = null);
     public class Result
     {
         public List<string> Errors { get; } = new();
@@ -132,7 +132,7 @@ public static class OfferedCatalogWorkbook
     sealed class Layout
     {
         public IXLWorksheet Sheet = null!; public string Format = ""; public int HeaderRow;
-        public int Id, Name; public int? Ambit; public Dictionary<string, int> Descriptions = new();
+        public int Id, Name; public int? Ambit, DriverDescription; public Dictionary<string, int> Descriptions = new();
         public Dictionary<(string Type, string Band), int> Price = new();
     }
 
@@ -149,6 +149,7 @@ public static class OfferedCatalogWorkbook
                 var layout = new Layout { Sheet = sheet, Format = CatalogFormat, HeaderRow = r, Id = idColumn };
                 layout.Name = header.FirstOrDefault(h => h.Value == "nome driver").Key;
                 var ambit = header.FirstOrDefault(h => h.Value == "ambito driver").Key; if (ambit != 0) layout.Ambit = ambit;
+                var driverText = header.FirstOrDefault(h => h.Value == "descrizione driver").Key; if (driverText != 0) layout.DriverDescription = driverText;
                 foreach (var band in Bands) { var column = header.FirstOrDefault(h => h.Value == "descrizione " + band.ToLowerInvariant()).Key; if (column != 0) layout.Descriptions[band] = column; }
                 if (layout.Name == 0) { result.Error($"Foglio '{sheet.Name}': manca la colonna «Nome Driver» accanto a «ID di catalogo»."); return layout; }
                 // The offered prices sit under a label such as «P. OFFERTO REALIZZAZIONE» in the row above the header, on three columns Semplice / Medio / Complesso.
@@ -236,6 +237,12 @@ public static class OfferedCatalogWorkbook
                     if (offered == 0 && baseValue is > 0) result.Warnings.Add($"Riga {r} (ID {id}), «{header}»: il prezzo offerto è 0 ma in gara è {baseValue.Value.ToString("0.##", CultureInfo.InvariantCulture)}.");
                     prices.Add(new Price(type, band, baseValue, offered));
                 }
+                string? driverDescription = null;
+                if (layout.DriverDescription is { } driverColumn && sheet.Cell(r, driverColumn).GetString().Trim() is { Length: > 0 } driverText)
+                {
+                    if (driverText.Length > MaxDescription) { result.Error($"Riga {r} (ID {id}): la «Descrizione Driver» supera {MaxDescription} caratteri."); rowOk = false; }
+                    else driverDescription = driverText;
+                }
                 Dictionary<string, string>? descriptions = null;
                 foreach (var (band, column) in layout.Descriptions)
                 {
@@ -244,7 +251,7 @@ public static class OfferedCatalogWorkbook
                     if (text.Length > MaxDescription) { result.Error($"Riga {r} (ID {id}): la descrizione «{band}» supera {MaxDescription} caratteri."); rowOk = false; continue; }
                     (descriptions ??= new())[Bands.First(b => string.Equals(b, band, StringComparison.OrdinalIgnoreCase))] = text;
                 }
-                if (rowOk) result.Rows.Add(new Row(id, ambit, name, prices, descriptions));
+                if (rowOk) result.Rows.Add(new Row(id, ambit, name, prices, descriptions, driverDescription));
             }
             var notInFile = tenderById.Keys.Where(id => !seen.Contains(id)).ToList();
             if (notInFile.Count > 0) result.Error($"Mancano {notInFile.Count} voci del catalogo di gara: ID {string.Join(", ", notInFile.Take(15))}{(notInFile.Count > 15 ? "…" : "")}. Servono tutte le voci del lotto.");
@@ -267,7 +274,9 @@ public static class OfferedCatalogWorkbook
                 prezzi[type] = bands;
             }
             var entry = new JsonObject { ["id"] = long.TryParse(row.Id, out var n) ? JsonValue.Create(n) : JsonValue.Create(row.Id), ["prezzi"] = prezzi };
-            // The descriptions by complexity come from the file and are saved next to the offered prices (the tender description of the voice is not touched).
+            // The descriptions come from the file and are saved next to the offered prices: the one of the driver (`descrizione`) and the ones by complexity (`descrizioni`).
+            // The tender catalog is never rewritten: removing the offered catalog brings back the tender description.
+            if (!string.IsNullOrWhiteSpace(row.DriverDescription)) entry["descrizione"] = row.DriverDescription;
             if (row.Descriptions is { Count: > 0 }) { var texts = new JsonObject(); foreach (var band in Bands) if (row.Descriptions.TryGetValue(band, out var text)) texts[band] = text; entry["descrizioni"] = texts; }
             array.Add(entry);
         }
