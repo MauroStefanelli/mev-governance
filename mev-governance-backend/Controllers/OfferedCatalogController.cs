@@ -118,6 +118,7 @@ public class OfferedCatalogController : BaseController
     {
         id = r.Id, ambito = r.Ambit, nome = r.Name,
         prezzi = r.Prices.Select(p => new { tipo = p.Type, fascia = p.Band, gara = p.Base, offerto = p.Offered }),
+        descrizioni = r.Descriptions,
     });
 
     // Reads and checks the file WITHOUT saving: errors cell by cell, warnings, and the comparison with the tender prices.
@@ -129,7 +130,7 @@ public class OfferedCatalogController : BaseController
         await using var conn = new NpgsqlConnection(cs); await conn.OpenAsync();
         var (result, _, error) = await ReadFile(conn, schema, file, contractId, lot);
         if (error != null) return error;
-        return Ok(new { ok = result!.Ok, errors = result.Errors, warnings = result.Warnings, rows = Comparison(result) });
+        return Ok(new { ok = result!.Ok, format = result.Format, errors = result.Errors, warnings = result.Warnings, rows = Comparison(result) });
     }
 
     // Checks again and saves. A file with even one error is refused as a whole: the offered catalog is replaced entirely or not at all.
@@ -145,7 +146,7 @@ public class OfferedCatalogController : BaseController
         var meta = new JsonObject
         {
             ["fileName"] = Path.GetFileName(file.FileName), ["importedAt"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            ["importedBy"] = User.Identity?.Name ?? "", ["importedByFullName"] = User.FindFirst("fullName")?.Value ?? "", ["rows"] = result.Rows.Count,
+            ["importedBy"] = User.Identity?.Name ?? "", ["importedByFullName"] = User.FindFirst("fullName")?.Value ?? "", ["rows"] = result.Rows.Count, ["format"] = result.Format,
         };
         if (!await OfferedCatalogStore.Save(conn, schema, contractId.Trim(), lot.Trim(), OfferedCatalogWorkbook.ToEntries(result.Rows), meta))
             return NotFound(new { message = "Lotto non trovato nell'Archivio contrattuale." });

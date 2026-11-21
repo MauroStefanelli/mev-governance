@@ -11,8 +11,8 @@ import lotto2 from '../../configuratore/__fixtures__/lotto2Catalogo.json';
 jest.mock('../../services/mevService');
 const lotInfo = (extra = {}) => ({ contractId: 'poste-tet-2025', contractName: 'Poste TeT', lotId: '2', lotName: 'Lotto 2', tenderCount: 27, offered: { count: 0, meta: null }, ...extra });
 const file = new File(['x'], 'offerto.xlsx');
-const okPreview = { ok: true, errors: [], warnings: ['Riga 2 (ID 236), «Realizzazione Medio»: il prezzo offerto 3000 supera la base d\'asta 2800.'],
-  rows: [{ id: '236', ambito: 'Frontend', nome: 'Realizzazione Single Page Application', prezzi: ['REALIZZAZIONE', 'MODIFICA'].flatMap(tipo => ['Semplice', 'Medio', 'Complesso'].map(fascia => ({ tipo, fascia, gara: 2800, offerto: 1400 }))) }] };
+const okPreview = { ok: true, format: 'Foglio catalogo con prezzi offerti (ID di catalogo, Descrizione semplice/medio/complesso)', errors: [], warnings: ['Riga 2 (ID 236), «Realizzazione Medio»: il prezzo offerto 3000 supera la base d\'asta 2800.'],
+  rows: [{ id: '236', ambito: 'Frontend', nome: 'Realizzazione Single Page Application', descrizioni: { Semplice: '- Numero Campi min uguale= 10', Medio: '- >10 Numero Campi', Complesso: '- Numero Campi > 20' }, prezzi: ['REALIZZAZIONE', 'MODIFICA'].flatMap(tipo => ['Semplice', 'Medio', 'Complesso'].map(fascia => ({ tipo, fascia, gara: 2800, offerto: 1400 }))) }] };
 const pick = () => fireEvent.change(screen.getByLabelText('File Excel del catalogo offerto'), { target: { files: [file] } });
 beforeEach(() => { jest.resetAllMocks(); window.confirm = jest.fn(() => true); global.URL.createObjectURL = jest.fn(() => 'blob:x'); global.URL.revokeObjectURL = jest.fn(); jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {}); });
 
@@ -124,4 +124,22 @@ test('the Admin reaches the page from the Home and from a route; the SuperAdmin 
   expect(src('pages/HomePage.js')).toMatch(/id: "catalogoofferto"[\s\S]*?roles: \["Admin"\]/);
   expect(src('App.js')).toMatch(/page === "catalogoofferto"\s+&& hasRole\("Admin", "SuperAdmin"\)/);
   expect(src('pages/ContractArchivePage.js')).toMatch(/\['offered', 'Voci di catalogo offerti'\]/);
+});
+
+test('the preview says which format was recognised and that the descriptions will be saved, and shows them', async () => {
+  service.offeredCatalogLots.mockResolvedValue([lotInfo()]);
+  service.previewOfferedCatalog.mockResolvedValue(okPreview);
+  render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
+  await screen.findByRole('button', { name: 'Scarica il modello Excel' });
+  expect(screen.getByText(/caricalo così com’è: le altre colonne vengono ignorate/)).toBeInTheDocument();
+  pick(); fireEvent.click(screen.getByRole('button', { name: 'Controlla il file' }));
+  expect(await screen.findByText(/Formato riconosciuto: Foglio catalogo con prezzi offerti/)).toBeInTheDocument();
+  expect(screen.getByText(/Descrizioni semplice\/medio\/complesso trovate per 1 voci: vengono salvate con i prezzi/)).toBeInTheDocument();
+  expect(screen.getByText('Descrizioni per complessità')).toBeInTheDocument();
+  expect(screen.getByText('- Numero Campi min uguale= 10')).toBeInTheDocument();
+});
+test('the Archivio shows the descriptions by complexity of the offered catalog under the voice, and the Configuratore in the voice detail', () => {
+  expect(src('pages/ContractArchivePage.js')).toMatch(/Descrizione per complessità \(dal catalogo offerto\)/);
+  expect(src('pages/ContractArchivePage.js')).toMatch(/offered: l\.offeredCatalog \|\| \[\]/);
+  expect(src('pages/ConfiguratorePage.js')).toMatch(/cc\.descrizioni && \["Semplice", "Medio", "Complesso"\]/);
 });

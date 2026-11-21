@@ -21,12 +21,13 @@ public static class OfferedCatalogWorkbook
     public static List<string> PriceHeaders() => Types.SelectMany(t => Bands.Select(b => Header(t, b))).ToList();
 
     public record Price(string Type, string Band, decimal? Base, decimal? Offered);
-    public record Row(string Id, string Ambit, string Name, List<Price> Prices);
+    public record Row(string Id, string Ambit, string Name, List<Price> Prices, Dictionary<string, string>? Descriptions = null);
     public class Result
     {
         public List<string> Errors { get; } = new();
         public List<string> Warnings { get; } = new();
         public List<Row> Rows { get; } = new();
+        public string Format { get; set; } = "";
         public bool Ok => Errors.Count == 0 && Rows.Count > 0;
         public void Error(string message) { if (Errors.Count < MaxErrors) Errors.Add(message); else if (Errors.Count == MaxErrors) Errors.Add("…altri errori non elencati: correggi quelli sopra e riprova."); }
     }
@@ -120,51 +121,130 @@ public static class OfferedCatalogWorkbook
         value = Math.Round(n, 2, MidpointRounding.AwayFromZero); return true;
     }
 
+    public const string ModelFormat = "Modello scaricato da Voci di catalogo offerti";
+    public const string CatalogFormat = "Foglio catalogo con prezzi offerti (ID di catalogo, Descrizione semplice/medio/complesso)";
+    public const int MaxDescription = 2000;
+
+    static string Norm(string? text) => System.Text.RegularExpressions.Regex.Replace((text ?? "").Trim().ToLowerInvariant(), @"\s+", " ");
+
+    // Where the columns of a sheet are. Two layouts are understood: the model of this program (sheet CatalogoOfferto, one header row) and the catalog sheet
+    // used for the tender («ID di catalogo», «Descrizione semplice/medio/complesso», offered prices under «P. OFFERTO REALIZZAZIONE» / «PREZZO OFFERTO MODIFICA»).
+    sealed class Layout
+    {
+        public IXLWorksheet Sheet = null!; public string Format = ""; public int HeaderRow;
+        public int Id, Name; public int? Ambit; public Dictionary<string, int> Descriptions = new();
+        public Dictionary<(string Type, string Band), int> Price = new();
+    }
+
+    static Layout? FindCatalogLayout(XLWorkbook workbook, Result result)
+    {
+        foreach (var sheet in workbook.Worksheets)
+        {
+            var last = Math.Min(sheet.LastRowUsed()?.RowNumber() ?? 0, 15);
+            for (int r = 1; r <= last; r++)
+            {
+                var header = sheet.Row(r).CellsUsed().ToDictionary(c => c.Address.ColumnNumber, c => Norm(c.GetString()));
+                var idColumn = header.FirstOrDefault(h => h.Value == "id di catalogo").Key;
+                if (idColumn == 0) continue;
+                var layout = new Layout { Sheet = sheet, Format = CatalogFormat, HeaderRow = r, Id = idColumn };
+                layout.Name = header.FirstOrDefault(h => h.Value == "nome driver").Key;
+                var ambit = header.FirstOrDefault(h => h.Value == "ambito driver").Key; if (ambit != 0) layout.Ambit = ambit;
+                foreach (var band in Bands) { var column = header.FirstOrDefault(h => h.Value == "descrizione " + band.ToLowerInvariant()).Key; if (column != 0) layout.Descriptions[band] = column; }
+                if (layout.Name == 0) { result.Error($"Foglio '{sheet.Name}': manca la colonna «Nome Driver» accanto a «ID di catalogo»."); return layout; }
+                // The offered prices sit under a label such as «P. OFFERTO REALIZZAZIONE» in the row above the header, on three columns Semplice / Medio / Complesso.
+                // Other blocks with the same label (side calculations) are skipped because their header cells are not Semplice / Medio / Complesso.
+                var labels = r > 1 ? sheet.Row(r - 1).CellsUsed().Select(c => (Column: c.Address.ColumnNumber, Text: Norm(c.GetString()))).OrderBy(x => x.Column).ToList() : new();
+                foreach (var type in Types)
+                {
+                    var word = type == "REALIZZAZIONE" ? "realizzazione" : "modifica";
+                    foreach (var label in labels.Where(l => l.Text.Contains("offert") && l.Text.Contains(word)))
+                    {
+                        if (Bands.Select((b, i) => header.GetValueOrDefault(label.Column + i) == b.ToLowerInvariant()).All(x => x))
+                        { for (int i = 0; i < Bands.Length; i++) layout.Price[(type, Bands[i])] = label.Column + i; break; }
+                    }
+                }
+                var missing = Types.Where(t => Bands.Any(b => !layout.Price.ContainsKey((t, b)))).ToList();
+                if (missing.Count > 0) { result.Error($"Foglio '{sheet.Name}': non trovo le colonne dei prezzi offerti ({string.Join(" e ", missing.Select(TypeTitle))}). Sopra «Semplice / Medio / Complesso» deve esserci un'intestazione come «P. OFFERTO REALIZZAZIONE» e «PREZZO OFFERTO MODIFICA»."); return layout; }
+                return layout;
+            }
+        }
+        return null;
+    }
+
+    static Layout? FindModelLayout(XLWorkbook workbook, Result result)
+    {
+        if (!workbook.Worksheets.TryGetWorksheet(DataSheet, out var sheet)) return null;
+        var expected = FixedHeaders.Concat(PriceHeaders()).ToList();
+        var columns = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cell in sheet.Row(1).CellsUsed()) columns[cell.GetString().Trim()] = cell.Address.ColumnNumber;
+        var missing = expected.Where(h => !columns.ContainsKey(h)).ToList();
+        if (missing.Count > 0) { result.Error($"Intestazioni mancanti nella riga 1: {string.Join(", ", missing)}. Non modificare le intestazioni del modello."); return new Layout { Sheet = sheet }; }
+        var layout = new Layout { Sheet = sheet, Format = ModelFormat, HeaderRow = 1, Id = columns["ID"], Name = columns["Voce"], Ambit = columns["Ambito"] };
+        foreach (var type in Types) foreach (var band in Bands) layout.Price[(type, band)] = columns[Header(type, band)];
+        return layout;
+    }
+
     public static Result Read(Stream file, JsonArray tenderCatalog)
     {
         var result = new Result();
         XLWorkbook workbook;
         try { workbook = new XLWorkbook(file); }
-        catch (Exception) { result.Error("Il file non è un XLSX leggibile: usa il modello scaricato da 'Voci di catalogo offerti'."); return result; }
+        catch (Exception) { result.Error("Il file non è un XLSX leggibile: usa il modello scaricato da 'Voci di catalogo offerti' oppure il foglio catalogo con i prezzi offerti."); return result; }
         using (workbook)
         {
-            if (!workbook.Worksheets.TryGetWorksheet(DataSheet, out var sheet))
-            { result.Error($"Manca il foglio '{DataSheet}': usa il modello scaricato da 'Voci di catalogo offerti' senza rinominare i fogli."); return result; }
-            var expected = FixedHeaders.Concat(PriceHeaders()).ToList();
-            var columns = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var cell in sheet.Row(1).CellsUsed()) columns[cell.GetString().Trim()] = cell.Address.ColumnNumber;
-            var missing = expected.Where(h => !columns.ContainsKey(h)).ToList();
-            if (missing.Count > 0) { result.Error($"Intestazioni mancanti nella riga 1: {string.Join(", ", missing)}. Non modificare le intestazioni del modello."); return result; }
-            var last = sheet.LastRowUsed()?.RowNumber() ?? 1;
-            if (last - 1 > MaxRows) { result.Error($"Il file ha più di {MaxRows} righe: controlla che sia il modello del lotto."); return result; }
+            var layout = FindModelLayout(workbook, result);
+            if (result.Errors.Count > 0) return result;
+            layout ??= FindCatalogLayout(workbook, result);
+            if (result.Errors.Count > 0) return result;
+            if (layout == null)
+            { result.Error($"Non riconosco il file: serve il modello scaricato da 'Voci di catalogo offerti' (foglio '{DataSheet}') oppure un foglio catalogo con le colonne «ID di catalogo», «Nome Driver» e i prezzi offerti."); return result; }
+            result.Format = layout.Format;
+            var sheet = layout.Sheet; var isModel = layout.Format == ModelFormat;
+            var last = sheet.LastRowUsed()?.RowNumber() ?? layout.HeaderRow;
+            if (last - layout.HeaderRow > MaxRows) { result.Error($"Il file ha più di {MaxRows} righe: controlla che sia il file del lotto."); return result; }
 
             var tender = tenderCatalog.OfType<JsonObject>().ToList();
             var tenderById = new Dictionary<string, JsonObject>();
             foreach (var entry in tender) { var id = entry["id"]?.ToString()?.Trim() ?? ""; if (id != "" && !tenderById.ContainsKey(id)) tenderById[id] = entry; }
             var seen = new HashSet<string>();
-            for (int r = 2; r <= last; r++)
+            for (int r = layout.HeaderRow + 1; r <= last; r++)
             {
-                var id = sheet.Cell(r, columns["ID"]).GetString().Trim();
-                var rowEmpty = id == "" && expected.Skip(1).All(h => sheet.Cell(r, columns[h]).IsEmpty());
-                if (rowEmpty) continue;
-                if (id == "") { result.Error($"Riga {r}: manca l'ID della voce."); continue; }
+                var id = sheet.Cell(r, layout.Id).GetString().Trim();
+                // A row without an ID: in the model it is an error unless it is empty; in the catalog sheet it is a calculation or a note under the table, and is ignored.
+                if (id == "")
+                {
+                    if (!isModel) continue;
+                    if (layout.Price.Values.Append(layout.Name).All(c => sheet.Cell(r, c).IsEmpty())) continue;
+                    result.Error($"Riga {r}: manca l'ID della voce."); continue;
+                }
                 if (!tenderById.TryGetValue(id, out var entry)) { result.Error($"Riga {r}: l'ID {id} non esiste nel catalogo di gara di questo lotto."); continue; }
                 if (!seen.Add(id)) { result.Error($"Riga {r}: l'ID {id} compare più di una volta."); continue; }
                 var name = entry["nome"]?.ToString() ?? ""; var ambit = entry["ambito"]?.ToString() ?? "";
-                var fileName = sheet.Cell(r, columns["Voce"]).GetString().Trim();
-                if (fileName != "" && !string.Equals(fileName, name.Trim(), StringComparison.OrdinalIgnoreCase))
+                var fileName = sheet.Cell(r, layout.Name).GetString().Trim();
+                if (fileName != "" && !string.Equals(Norm(fileName), Norm(name), StringComparison.Ordinal))
                     result.Warnings.Add($"Riga {r}: il nome «{fileName}» è diverso da quello di gara «{name}»; vale l'ID {id}.");
+                if (layout.Ambit is { } ambitColumn && sheet.Cell(r, ambitColumn).GetString().Trim() is { Length: > 0 } fileAmbit && !string.Equals(Norm(fileAmbit), Norm(ambit), StringComparison.Ordinal))
+                    result.Warnings.Add($"Riga {r}: l'ambito «{fileAmbit}» è diverso da quello di gara «{ambit}»; resta quello di gara.");
                 var prices = new List<Price>(); bool rowOk = true;
                 foreach (var type in Types) foreach (var band in Bands)
                 {
-                    var header = Header(type, band); var cell = sheet.Cell(r, columns[header]);
+                    var header = Header(type, band); var cell = sheet.Cell(r, layout.Price[(type, band)]);
                     var baseValue = Read(entry, type, band);
                     if (!TryPrice(cell, out var offered, out var problem)) { result.Error($"Riga {r} (ID {id}), «{header}»: {problem}."); rowOk = false; continue; }
                     if (offered == null && baseValue is > 0) { result.Error($"Riga {r} (ID {id}), «{header}»: manca il prezzo offerto (in gara è {baseValue.Value.ToString("0.##", CultureInfo.InvariantCulture)})."); rowOk = false; continue; }
                     if (offered != null && baseValue is > 0 && offered > baseValue) result.Warnings.Add($"Riga {r} (ID {id}), «{header}»: il prezzo offerto {offered} supera la base d'asta {baseValue}.");
+                    if (offered == 0 && baseValue is > 0) result.Warnings.Add($"Riga {r} (ID {id}), «{header}»: il prezzo offerto è 0 ma in gara è {baseValue.Value.ToString("0.##", CultureInfo.InvariantCulture)}.");
                     prices.Add(new Price(type, band, baseValue, offered));
                 }
-                if (rowOk) result.Rows.Add(new Row(id, ambit, name, prices));
+                Dictionary<string, string>? descriptions = null;
+                foreach (var (band, column) in layout.Descriptions)
+                {
+                    var text = sheet.Cell(r, column).GetString().Trim();
+                    if (text == "") continue;
+                    if (text.Length > MaxDescription) { result.Error($"Riga {r} (ID {id}): la descrizione «{band}» supera {MaxDescription} caratteri."); rowOk = false; continue; }
+                    (descriptions ??= new())[Bands.First(b => string.Equals(b, band, StringComparison.OrdinalIgnoreCase))] = text;
+                }
+                if (rowOk) result.Rows.Add(new Row(id, ambit, name, prices, descriptions));
             }
             var notInFile = tenderById.Keys.Where(id => !seen.Contains(id)).ToList();
             if (notInFile.Count > 0) result.Error($"Mancano {notInFile.Count} voci del catalogo di gara: ID {string.Join(", ", notInFile.Take(15))}{(notInFile.Count > 15 ? "…" : "")}. Servono tutte le voci del lotto.");
@@ -186,7 +266,10 @@ public static class OfferedCatalogWorkbook
                 foreach (var band in Bands) { var p = row.Prices.First(x => x.Type == type && x.Band == band); bands[band] = p.Offered.HasValue ? JsonValue.Create(p.Offered.Value) : null; }
                 prezzi[type] = bands;
             }
-            array.Add(new JsonObject { ["id"] = long.TryParse(row.Id, out var n) ? JsonValue.Create(n) : JsonValue.Create(row.Id), ["prezzi"] = prezzi });
+            var entry = new JsonObject { ["id"] = long.TryParse(row.Id, out var n) ? JsonValue.Create(n) : JsonValue.Create(row.Id), ["prezzi"] = prezzi };
+            // The descriptions by complexity come from the file and are saved next to the offered prices (the tender description of the voice is not touched).
+            if (row.Descriptions is { Count: > 0 }) { var texts = new JsonObject(); foreach (var band in Bands) if (row.Descriptions.TryGetValue(band, out var text)) texts[band] = text; entry["descrizioni"] = texts; }
+            array.Add(entry);
         }
         return array;
     }

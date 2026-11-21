@@ -30,7 +30,8 @@ export function effectiveCatalog(lot) {
         prezzi[type][band] = value ?? priceOf(entry.prezzi, type, band);
       }
     }
-    return { ...entry, prezzi, priceBasis: 'offerto', basePrezzi: entry.prezzi };
+    const descrizioni = match.descrizioni && Object.keys(match.descrizioni).length ? match.descrizioni : undefined;
+    return { ...entry, prezzi, priceBasis: 'offerto', basePrezzi: entry.prezzi, ...(descrizioni ? { descrizioni } : {}) };
   });
 }
 
@@ -50,7 +51,7 @@ export function offeredComparison(lot) {
       cells.push({ type, band, base, offered: price,
         discount: base > 0 && price != null ? Math.round((1 - price / base) * 10000) / 100 : null });
     }
-    return { id: entry.id, ambito: entry.ambito || '', nome: entry.nome || '', covered: !!match, cells };
+    return { id: entry.id, ambito: entry.ambito || '', nome: entry.nome || '', covered: !!match, descrizioni: match?.descrizioni || null, cells };
   });
 }
 

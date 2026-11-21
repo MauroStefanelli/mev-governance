@@ -39,6 +39,12 @@ public static class OfferedCatalogRegression
     public static async Task Run(AppDbContext db, Action<bool, string> check)
     {
         var tender = Tender();
+        var localReal = Environment.GetEnvironmentVariable("MEV_REAL_CATALOG");
+        if (!string.IsNullOrEmpty(localReal) && File.Exists(localReal))
+        {
+            using var local = File.OpenRead(localReal); var readReal = OfferedCatalogWorkbook.Read(local, tender);
+            check(readReal.Ok && readReal.Rows.Count == 27 && readReal.Errors.Count == 0, "LOCAL real file (MEV_REAL_CATALOG): accepted with 27 voices and no errors");
+        }
         check(tender.Count == 27, "the real lot 2 tender catalog has 27 voices");
 
         // ---- il modello ----
@@ -99,7 +105,7 @@ public static class OfferedCatalogRegression
         }
         {
             var wb = Filled(tender, 0.5m); wb.Worksheet("CatalogoOfferto").Name = "Foglio1";
-            var r = Read(wb, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("Manca il foglio 'CatalogoOfferto'")), "error: a renamed sheet is refused");
+            var r = Read(wb, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("Non riconosco il file")), "error: a renamed sheet (neither the model nor the catalog sheet) is refused with a clear message");
         }
         { var r = OfferedCatalogWorkbook.Read(new MemoryStream(new byte[] { 1, 2, 3, 4 }), tender); check(!r.Ok && r.Errors.Single().Contains("non è un XLSX leggibile"), "error: a file that is not an XLSX is refused with a clear message"); }
         { var r = Read(new XLWorkbook(new MemoryStream(OfferedCatalogWorkbook.BuildTemplate(tender, "x", "2"))), tender); check(!r.Ok && r.Errors.Any(e => e.Contains("manca il prezzo offerto")), "error: the EMPTY model is refused (nothing filled in)"); }
@@ -108,6 +114,40 @@ public static class OfferedCatalogRegression
             for (int r0 = 2; r0 <= 28; r0++) ws.Cell(r0, 5).Value = "xx";
             var r = Read(wb, tender); check(!r.Ok && r.Errors.Count <= OfferedCatalogWorkbook.MaxErrors + 1, "error: the list of errors is capped (not hundreds of lines)");
         }
+
+        // ---- il foglio catalogo con i prezzi offerti (stessa struttura del file vero del lotto 2: ID, descrizioni per complessita', colonne di calcolo; i valori sono inventati) ----
+        var realFile = Path.Combine(AppContext.BaseDirectory, "Fixtures", "CatalogoLotto2Offerto.xlsx");
+        OfferedCatalogWorkbook.Result Real(Action<IXLWorksheet>? edit = null)
+        {
+            using var wb = new XLWorkbook(realFile); edit?.Invoke(wb.Worksheets.First());
+            var m = new MemoryStream(); wb.SaveAs(m); m.Position = 0; return OfferedCatalogWorkbook.Read(m, tender);
+        }
+        var real = Real();
+        check(real.Ok && real.Rows.Count == 27 && real.Errors.Count == 0, "catalog sheet: the real file is accepted with all 27 voices and no errors");
+        check(real.Format == OfferedCatalogWorkbook.CatalogFormat, "catalog sheet: the format is recognised as the catalog sheet");
+        var r236 = real.Rows.Single(x => x.Id == "236");
+        check(r236.Prices.Single(p => p.Type == "REALIZZAZIONE" && p.Band == "Semplice").Offered == 600m && r236.Prices.Single(p => p.Type == "REALIZZAZIONE" && p.Band == "Medio").Offered == 1400m && r236.Prices.Single(p => p.Type == "REALIZZAZIONE" && p.Band == "Complesso").Offered == 2400m, "catalog sheet: voice 236 Realizzazione 600 / 1.400 / 2.400 (read from the columns under «P. OFFERTO REALIZZAZIONE»)");
+        check(r236.Prices.Single(p => p.Type == "MODIFICA" && p.Band == "Semplice").Offered == 140m && r236.Prices.Single(p => p.Type == "MODIFICA" && p.Band == "Medio").Offered == 420m && r236.Prices.Single(p => p.Type == "MODIFICA" && p.Band == "Complesso").Offered == 700m, "catalog sheet: voice 236 Modifica 140 / 420 / 700");
+        check(real.Rows.Single(x => x.Id == "239").Prices.Single(p => p.Type == "REALIZZAZIONE" && p.Band == "Complesso").Offered == 2250m, "catalog sheet: voice 239 Realizzazione Complesso 2.250 (read from the right column)");
+        check(real.Rows.Single(x => x.Id == "406").Prices.Single(p => p.Type == "REALIZZAZIONE" && p.Band == "Semplice").Offered == 0m, "catalog sheet: a 0 offered where the tender is 0 is kept (voice 406, Realizzazione Semplice)");
+        check(real.Rows.Count(x => x.Descriptions != null) == 18 && real.Rows.Count(x => x.Descriptions?.Count == 3) == 18 && r236.Descriptions!["Semplice"] == "Descrizione Semplice di prova per la voce 236" && r236.Descriptions["Complesso"] == "Descrizione Complesso di prova per la voce 236", "catalog sheet: the descriptions Semplice/Medio/Complesso are read for the 18 voices that have them");
+        check(real.Rows.Single(x => x.Id == "406").Descriptions == null, "catalog sheet: a voice without descriptions has none (nothing invented)");
+        check(real.Warnings.Count == 3 && real.Warnings.Any(w => w.Contains("Riga 8") && w.Contains("ambito") && w.Contains("resta quello di gara")) && real.Warnings.Any(w => w.Contains("ID 242")) && real.Warnings.Any(w => w.Contains("ID 410")), "catalog sheet: name and ambit that differ from the tender are only WARNED (3 warnings), the tender ones stay");
+        var realEntries = OfferedCatalogWorkbook.ToEntries(real.Rows);
+        check(realEntries.Count == 27 && realEntries[0]!["nome"] == null && realEntries[0]!["ambito"] == null && realEntries[0]!["descrizione"] == null, "catalog sheet: saved are id, prices and descriptions by complexity, never name, ambit or the general description");
+        check(realEntries[0]!["descrizioni"]!["Medio"]!.ToString() == "Descrizione Medio di prova per la voce 236" && realEntries.Single(e => e!["id"]!.GetValue<long>() == 406)!["descrizioni"] == null, "catalog sheet: the descriptions are saved under «descrizioni» and only where present");
+        check(Real(ws => ws.Cell(40, 17).Value = 5).Ok && Real(ws => { ws.Cell(31, 24).Value = 6015; }).Ok, "catalog sheet: the calculation cells under the table (no ID in that row) are ignored");
+        { var r = Real(ws => ws.Cell(3, 10).Clear()); check(!r.Ok && r.Errors.Any(e => e.Contains("Riga 3") && e.Contains("Realizzazione Semplice") && e.Contains("manca il prezzo offerto")), "catalog sheet: an empty offered price is refused with the row and the column"); }
+        { var r = Real(ws => ws.Cell(3, 11).Value = 5000); check(r.Ok && r.Warnings.Any(w => w.Contains("Riga 3") && w.Contains("supera la base d'asta")), "catalog sheet: an offered price above the tender is warned"); }
+        { var r = Real(ws => ws.Row(6).Delete()); check(!r.Ok && r.Errors.Any(e => e.Contains("Mancano 1 voci") && e.Contains("242")), "catalog sheet: a missing voice is refused and named"); }
+        { var r = Real(ws => ws.Cell(4, 2).Value = 99999); check(!r.Ok && r.Errors.Any(e => e.Contains("Riga 4") && e.Contains("99999")), "catalog sheet: an unknown ID is refused"); }
+        { var r = Real(ws => ws.Cell(4, 2).Value = 236); check(!r.Ok && r.Errors.Any(e => e.Contains("più di una volta")), "catalog sheet: a duplicated ID is refused"); }
+        { var r = Real(ws => { ws.Cell(1, 10).Value = "Altro"; ws.Cell(1, 13).Value = "Altro"; }); check(!r.Ok && r.Errors.Any(e => e.Contains("non trovo le colonne dei prezzi offerti")), "catalog sheet: without the «P. OFFERTO» labels the price columns are not guessed"); }
+        { var r = Real(ws => { ws.Cell(1, 10).Value = "PREZZO BASE REALIZZAZIONE"; ws.Cell(1, 13).Value = "PREZZO BASE MODIFICA"; }); check(!r.Ok && r.Errors.Any(e => e.Contains("non trovo le colonne dei prezzi offerti")), "catalog sheet: columns labelled as BASE prices are never read as offered prices"); }
+        { var r = Real(ws => ws.Cell(3, 6).Value = new string('x', 2500)); check(!r.Ok && r.Errors.Any(e => e.Contains("Riga 3") && e.Contains("supera 2000 caratteri")), "catalog sheet: a description that is far too long is refused"); }
+        { var r = Real(ws => ws.Cell(3, 13).Value = -1); check(!r.Ok && r.Errors.Any(e => e.Contains("negativo")), "catalog sheet: a negative price is refused"); }
+        check(good.Format == OfferedCatalogWorkbook.ModelFormat, "model: the format is recognised as the model");
+        check(OfferedCatalogWorkbook.ToEntries(good.Rows)[0]!["descrizioni"] == null, "model: without descriptions nothing is saved under «descrizioni»");
 
         // ---- importi scritti all'italiana, avvisi ----
         {

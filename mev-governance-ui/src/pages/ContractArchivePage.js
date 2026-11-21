@@ -184,8 +184,10 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                   {(modal.data || []).map((v, i) => {
                     const pr = v.prezzi || {};
                     const prices = { Realizzazione: pr.REALIZZAZIONE || pr.Realizzazione || pr.realizzazione || {}, Modifica: pr.MODIFICA || pr.Modifica || pr.modifica || {} };
+                    const texts = (modal.offered || []).find(o => String(o.id) === String(v.id))?.descrizioni;
                     return (
-                      <tr key={i} style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
+                      <React.Fragment key={i}>
+                      <tr style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}>
                         <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', fontWeight: 700, whiteSpace: 'nowrap' }}>{v.id}</td>
                         <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', color: '#475569' }}>{v.ambito}</td>
                         <td style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5' }}>{v.nome}</td>
@@ -194,6 +196,11 @@ function LotDataModal({ modal, onClose, onSaveTowImpact }) {
                           return <td key={`${type}-${f}`} style={{ padding: '12px 14px', borderBottom: '1px solid #eef2f5', textAlign: 'right', whiteSpace: 'nowrap' }}>{value != null ? euro.format(value) : '–'}</td>;
                         }))}
                       </tr>
+                      {texts && <tr style={{ background: i % 2 === 1 ? '#f7f9fb' : '#fff' }}><td colSpan={9} style={{ padding: '0 14px 12px', borderBottom: '1px solid #eef2f5', fontSize: 12, color: '#475569' }}>
+                        <details><summary style={{ cursor: 'pointer' }}>Descrizione per complessità (dal catalogo offerto)</summary>
+                          {['Semplice', 'Medio', 'Complesso'].filter(f => texts[f]).map(f => <p key={f} style={{ margin: '6px 0' }}><strong>{f}:</strong> {texts[f]}</p>)}
+                        </details></td></tr>}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -1123,7 +1130,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
                                   if (cat.length > 0) {
                                     return (
                                       <button
-                                        onClick={() => setModal({ type: 'catalog', title: `Lotto ${l.lotId} – ${l.name || ''} – Catalogo`, data: cat })}
+                                        onClick={() => setModal({ type: 'catalog', title: `Lotto ${l.lotId} – ${l.name || ''} – Catalogo`, data: cat, offered: l.offeredCatalog || [] })}
                                         style={{ minHeight: 36, fontSize: 12, color: '#166534', background: '#e8f6ef', padding: '6px 10px', borderRadius: 5, border: '1px solid #bbf7d0', cursor: 'pointer', fontWeight: 700 }}>
                                         {cat.length} voci catalogo
                                       </button>

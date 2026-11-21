@@ -137,3 +137,14 @@ describe('RealignOfferedPrices panel', () => {
     expect(screen.queryByRole('button', { name: /Riallinea/ })).toBeNull();
   });
 });
+
+test('the descriptions by complexity travel with the offered voice and only there', () => {
+  const texts = { Semplice: '- Numero Campi min uguale= 10', Medio: '- >10 Numero Campi min = 20', Complesso: '- Numero Campi > 20' };
+  const withTexts = effectiveCatalog(lot({ offeredCatalog: [{ ...offered(0.5, [236])[0], descrizioni: texts }, ...offered(0.5, [239])] }));
+  expect(withTexts.find(e => e.id === 236).descrizioni).toEqual(texts);
+  expect(withTexts.find(e => e.id === 236).descrizione).toBe(lotto2.find(e => e.id === 236).descrizione);   // la descrizione generale resta quella di gara
+  expect(withTexts.find(e => e.id === 239).descrizioni).toBeUndefined();
+  expect(withTexts.find(e => e.id === 241).descrizioni).toBeUndefined();
+  expect(effectiveCatalog(lot({ offeredCatalog: [{ ...offered(0.5, [236])[0], descrizioni: {} }] })).find(e => e.id === 236).descrizioni).toBeUndefined();
+  expect(offeredComparison(lot({ offeredCatalog: [{ ...offered(0.5, [236])[0], descrizioni: texts }] })).find(r => r.id === 236).descrizioni).toEqual(texts);
+});

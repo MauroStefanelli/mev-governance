@@ -2751,6 +2751,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                      </summary>
                      <div style={{ padding: "8px 14px 12px", background: "#f8f9fa", fontSize: 12, borderTop: "1px solid #eef2f5" }}>
                        <div style={{ color: "#444", lineHeight: 1.6, marginBottom: 8 }}>{esc(cc.descrizione || "Nessuna descrizione disponibile.")}</div>
+                       {cc.descrizioni && ["Semplice", "Medio", "Complesso"].filter(f => cc.descrizioni[f]).map(f => (
+                         <div key={f} style={{ color: "#444", lineHeight: 1.5, fontSize: 12, marginBottom: 6 }}><strong>{f}:</strong> {esc(cc.descrizioni[f])}</div>
+                       ))}
                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                          {["REALIZZAZIONE", "MODIFICA"].map(tipo => {
                            const p = cc.prezzi?.[tipo] || {};
