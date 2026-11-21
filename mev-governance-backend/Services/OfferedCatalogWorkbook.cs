@@ -18,6 +18,10 @@ public static class OfferedCatalogWorkbook
     static string TypeTitle(string type) => type == "REALIZZAZIONE" ? "Realizzazione" : "Modifica";
     public static string Header(string type, string band) => $"{TypeTitle(type)} {band}";
     public static readonly string[] FixedHeaders = { "ID", "Ambito", "Voce" };
+    // Optional columns of the model: the descriptions. A model downloaded before they existed has no such columns and is still accepted.
+    public const string DriverDescriptionHeader = "Descrizione Driver";
+    public static string BandDescriptionHeader(string band) => $"Descrizione {band}";
+    public static List<string> DescriptionHeaders() => new[] { DriverDescriptionHeader }.Concat(Bands.Select(BandDescriptionHeader)).ToList();
     public static List<string> PriceHeaders() => Types.SelectMany(t => Bands.Select(b => Header(t, b))).ToList();
 
     public record Price(string Type, string Band, decimal? Base, decimal? Offered);
@@ -50,14 +54,18 @@ public static class OfferedCatalogWorkbook
         var data = workbook.AddWorksheet(DataSheet);
         var headers = FixedHeaders.Concat(PriceHeaders()).ToList();
         for (int c = 0; c < headers.Count; c++) data.Cell(1, c + 1).Value = headers[c];
+        var descriptionHeaders = DescriptionHeaders();
+        for (int c = 0; c < descriptionHeaders.Count; c++) data.Cell(1, headers.Count + c + 1).Value = descriptionHeaders[c];
         var reference = workbook.AddWorksheet(BaseSheet);
         for (int c = 0; c < headers.Count; c++) reference.Cell(1, c + 1).Value = headers[c];
+        reference.Cell(1, headers.Count + 1).Value = "Descrizione Driver (gara)";
         int row = 2;
         foreach (var entry in tenderCatalog.OfType<JsonObject>())
         {
             var id = entry["id"]?.ToString() ?? "";
             data.Cell(row, 1).SetValue(id); data.Cell(row, 2).SetValue(entry["ambito"]?.ToString() ?? ""); data.Cell(row, 3).SetValue(entry["nome"]?.ToString() ?? "");
             reference.Cell(row, 1).SetValue(id); reference.Cell(row, 2).SetValue(entry["ambito"]?.ToString() ?? ""); reference.Cell(row, 3).SetValue(entry["nome"]?.ToString() ?? "");
+            if (!string.IsNullOrWhiteSpace(entry["descrizione"]?.ToString())) reference.Cell(row, headers.Count + 1).SetValue(entry["descrizione"]!.ToString());
             int col = 4;
             foreach (var type in Types) foreach (var band in Bands)
             {
@@ -68,17 +76,23 @@ public static class OfferedCatalogWorkbook
             }
             row++;
         }
+        var dataColumns = headers.Count + descriptionHeaders.Count;
         foreach (var sheet in new[] { data, reference })
         {
-            var head = sheet.Range(1, 1, 1, headers.Count);
+            var head = sheet.Range(1, 1, 1, sheet == data ? dataColumns : headers.Count + 1);
             head.Style.Font.Bold = true; head.Style.Fill.BackgroundColor = XLColor.FromHtml("#1d4ed8"); head.Style.Font.FontColor = XLColor.White;
             sheet.SheetView.FreezeRows(1); sheet.SheetView.FreezeColumns(3);
             sheet.Column(1).Width = 8; sheet.Column(2).Width = 16; sheet.Column(3).Width = 52;
             for (int c = 4; c <= headers.Count; c++) sheet.Column(c).Width = 22;
         }
-        var offeredInput = data.Range(2, 4, Math.Max(2, row - 1), headers.Count);
+        for (int c = headers.Count + 1; c <= dataColumns; c++) data.Column(c).Width = 45;
+        reference.Column(headers.Count + 1).Width = 45;
+        var offeredInput = data.Range(2, 4, Math.Max(2, row - 1), dataColumns);
         offeredInput.Style.Fill.BackgroundColor = XLColor.FromHtml("#fff7d6");
-        reference.Range(1, 1, Math.Max(2, row - 1), headers.Count).Style.Protection.Locked = true;
+        data.Range(2, headers.Count + 1, Math.Max(2, row - 1), dataColumns).Style.Alignment.WrapText = true;
+        data.Range(2, headers.Count + 1, Math.Max(2, row - 1), dataColumns).Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+        reference.Range(2, headers.Count + 1, Math.Max(2, row - 1), headers.Count + 1).Style.Alignment.WrapText = true;
+        reference.Range(1, 1, Math.Max(2, row - 1), headers.Count + 1).Style.Protection.Locked = true;
         var help = workbook.AddWorksheet(HelpSheet);
         var lines = new[]
         {
@@ -89,8 +103,10 @@ public static class OfferedCatalogWorkbook
             "2. Non cambiare ID, Ambito, Voce né le intestazioni delle colonne: l'ID è ciò che collega la riga alla voce del catalogo di gara.",
             "3. Non aggiungere né togliere righe: servono tutte le voci del catalogo di gara. Una voce che non offri o che non ha prezzo (0 in gara) si lascia vuota.",
             "4. I prezzi sono importi in euro, numeri positivi o zero (es. 1250 oppure 1250,50). Non scrivere il simbolo €.",
-            "5. Il foglio 'BaseAsta' mostra i prezzi di gara, solo per confronto: non viene letto.",
-            "6. Salva il file in formato .xlsx e caricalo in 'Voci di catalogo offerti'. Prima di salvare, il programma mostra un'anteprima e segnala gli errori.",
+            "5. Le colonne 'Descrizione Driver', 'Descrizione Semplice', 'Descrizione Medio' e 'Descrizione Complesso' sono facoltative: scrivile solo se vuoi che le voci abbiano una descrizione dettagliata.",
+            "   La 'Descrizione Driver' scritta qui sostituisce quella di gara nel catalogo con cui si lavora; se la lasci vuota resta quella di gara. Massimo 2000 caratteri per cella.",
+            "6. Il foglio 'BaseAsta' mostra i prezzi e la descrizione di gara, solo per confronto: non viene letto.",
+            "7. Salva il file in formato .xlsx e caricalo in 'Voci di catalogo offerti'. Prima di salvare, il programma mostra un'anteprima e segnala gli errori.",
             "",
             "REGOLE CONTROLLATE",
             "- ogni ID del file deve esistere nel catalogo di gara e comparire una sola volta;",
@@ -99,7 +115,7 @@ public static class OfferedCatalogWorkbook
             "- un prezzo offerto oltre la base d'asta non blocca il caricamento ma viene segnalato.",
         };
         for (int i = 0; i < lines.Length; i++) help.Cell(i + 1, 1).Value = lines[i];
-        help.Column(1).Width = 130; help.Cell(1, 1).Style.Font.Bold = true; help.Cell(3, 1).Style.Font.Bold = true; help.Cell(11, 1).Style.Font.Bold = true;
+        help.Column(1).Width = 130; help.Cell(1, 1).Style.Font.Bold = true; help.Cell(3, 1).Style.Font.Bold = true; help.Cell(13, 1).Style.Font.Bold = true;
         using var stream = new MemoryStream(); workbook.SaveAs(stream); return stream.ToArray();
     }
 
@@ -182,6 +198,8 @@ public static class OfferedCatalogWorkbook
         if (missing.Count > 0) { result.Error($"Intestazioni mancanti nella riga 1: {string.Join(", ", missing)}. Non modificare le intestazioni del modello."); return new Layout { Sheet = sheet }; }
         var layout = new Layout { Sheet = sheet, Format = ModelFormat, HeaderRow = 1, Id = columns["ID"], Name = columns["Voce"], Ambit = columns["Ambito"] };
         foreach (var type in Types) foreach (var band in Bands) layout.Price[(type, band)] = columns[Header(type, band)];
+        if (columns.TryGetValue(DriverDescriptionHeader, out var driverColumn)) layout.DriverDescription = driverColumn;
+        foreach (var band in Bands) if (columns.TryGetValue(BandDescriptionHeader(band), out var bandColumn)) layout.Descriptions[band] = bandColumn;
         return layout;
     }
 
@@ -215,7 +233,7 @@ public static class OfferedCatalogWorkbook
                 if (id == "")
                 {
                     if (!isModel) continue;
-                    if (layout.Price.Values.Append(layout.Name).All(c => sheet.Cell(r, c).IsEmpty())) continue;
+                    if (layout.Price.Values.Append(layout.Name).Concat(layout.Descriptions.Values).Concat(layout.DriverDescription is { } dc ? new[] { dc } : Array.Empty<int>()).All(c => sheet.Cell(r, c).IsEmpty())) continue;
                     result.Error($"Riga {r}: manca l'ID della voce."); continue;
                 }
                 if (!tenderById.TryGetValue(id, out var entry)) { result.Error($"Riga {r}: l'ID {id} non esiste nel catalogo di gara di questo lotto."); continue; }

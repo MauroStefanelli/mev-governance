@@ -41,7 +41,7 @@ export default function OfferedCatalogPanel({ contractId, lotId, onChanged }) {
       : 'Il catalogo offerto non è ancora stato caricato: il lotto usa i prezzi di gara.'}</p>
     <ol style={{ fontSize: 13, paddingLeft: 18 }}>
       <li>Se hai già il foglio del catalogo con i prezzi offerti (colonne «ID di catalogo», «Nome Driver», «P. OFFERTO REALIZZAZIONE», «PREZZO OFFERTO MODIFICA» ed eventualmente «Descrizione semplice/medio/complesso»), caricalo così com’è: le altre colonne vengono ignorate.</li>
-      <li>Altrimenti <button type="button" disabled={busy || !lot.tenderCount} onClick={download}>Scarica il modello Excel</button>: contiene già ID, ambito e nome di ogni voce di gara; compili i prezzi offerti nelle celle gialle, senza cambiare ID, nomi dei fogli e intestazioni.</li>
+      <li>Altrimenti <button type="button" disabled={busy || !lot.tenderCount} onClick={download}>Scarica il modello Excel</button>: contiene già ID, ambito e nome di ogni voce di gara; compili i prezzi offerti nelle celle gialle, senza cambiare ID, nomi dei fogli e intestazioni. Le colonne «Descrizione Driver», «Descrizione Semplice», «Descrizione Medio» e «Descrizione Complesso» sono facoltative: la descrizione del driver sostituisce quella di gara.</li>
       <li><label>File compilato <input type="file" aria-label="File Excel del catalogo offerto" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={choose} /></label>{' '}
         <button type="button" disabled={busy || !file} onClick={check}>Controlla il file</button></li>
     </ol>

@@ -132,6 +132,7 @@ test('the preview says which format was recognised and that the descriptions wil
   render(<OfferedCatalogPanel contractId="poste-tet-2025" lotId="2" />);
   await screen.findByRole('button', { name: 'Scarica il modello Excel' });
   expect(screen.getByText(/caricalo così com’è: le altre colonne vengono ignorate/)).toBeInTheDocument();
+  expect(screen.getByText(/Le colonne «Descrizione Driver», «Descrizione Semplice», «Descrizione Medio» e «Descrizione Complesso» sono facoltative/)).toBeInTheDocument();
   pick(); fireEvent.click(screen.getByRole('button', { name: 'Controlla il file' }));
   expect(await screen.findByText(/Formato riconosciuto: Foglio catalogo con prezzi offerti/)).toBeInTheDocument();
   expect(screen.getByText(/Descrizioni semplice\/medio\/complesso trovate per 1 voci: vengono salvate con i prezzi/)).toBeInTheDocument();

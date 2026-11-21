@@ -56,8 +56,36 @@ public static class OfferedCatalogRegression
             check(headers.SequenceEqual(new[] { "ID", "Ambito", "Voce", "Realizzazione Semplice", "Realizzazione Medio", "Realizzazione Complesso", "Modifica Semplice", "Modifica Medio", "Modifica Complesso" }), "template: the headers are the fixed ones");
             check(data.LastRowUsed()!.RowNumber() == 28 && data.Cell(2, 1).GetString() == "236" && data.Cell(2, 3).GetString() == "Realizzazione Single Page Application" && data.Cell(2, 2).GetString() == "Frontend", "template: one row per tender voice, id/ambit/name already filled");
             check(Enumerable.Range(2, 27).All(r => Enumerable.Range(4, 6).All(c => data.Cell(r, c).IsEmpty())), "template: the price cells are EMPTY (a forgotten price cannot pass as «offered = tender»)");
+            check(Enumerable.Range(10, 4).Select(i => data.Cell(1, i).GetString()).SequenceEqual(new[] { "Descrizione Driver", "Descrizione Semplice", "Descrizione Medio", "Descrizione Complesso" }), "template: the four description columns exist after the prices (Descrizione Driver, Semplice, Medio, Complesso)");
+            check(Enumerable.Range(2, 27).All(r => Enumerable.Range(10, 4).All(c => data.Cell(r, c).IsEmpty())), "template: the description cells are EMPTY (nothing is pre-filled, so nothing is replaced by mistake)");
+            // The fixture of the prices has no tender description: a catalog WITH descriptions (as the real one has) is used for this check.
+            var withText = new JsonArray(tender.OfType<JsonObject>().Select(e => { var c = (JsonObject)e.DeepClone(); c["descrizione"] = $"Descrizione di gara {c["id"]}"; return (JsonNode)c; }).ToArray());
+            using var wbText = new XLWorkbook(new MemoryStream(OfferedCatalogWorkbook.BuildTemplate(withText, "x", "2")));
+            var refText = wbText.Worksheet(OfferedCatalogWorkbook.BaseSheet);
+            var dataText = wbText.Worksheet(OfferedCatalogWorkbook.DataSheet);
+            check(Enumerable.Range(2, 27).All(r => Enumerable.Range(10, 4).All(c => dataText.Cell(r, c).IsEmpty())), "template: even when the tender voices HAVE a description the description cells of the model stay EMPTY (the user decides what to write)");
+            check(refText.Cell(1, 10).GetString().Contains("gara") && refText.Cell(2, 10).GetString() == "Descrizione di gara 236" && refText.Cell(28, 10).GetString() == "Descrizione di gara 1025", "template: the sheet BaseAsta shows the tender description of each voice for reference");
             check(reference.Cell(2, 4).GetDouble() == 1200 && reference.Cell(2, 6).GetDouble() == 4800 && reference.Cell(2, 7).GetDouble() == 280, "template: the sheet BaseAsta shows the tender prices (1200/…/4800, 280)");
         }
+
+        // ---- le descrizioni nel MODELLO (stesse quattro colonne del foglio catalogo): compilo il modello scaricato e lo rileggo ----
+        {
+            var wb = Filled(tender, 0.5m); var ws = wb.Worksheet("CatalogoOfferto");
+            ws.Cell(2, 10).Value = "Driver dal modello"; ws.Cell(2, 11).Value = "Semplice dal modello"; ws.Cell(2, 12).Value = "Medio dal modello"; ws.Cell(2, 13).Value = "Complesso dal modello";
+            ws.Cell(3, 11).Value = "Solo semplice";
+            var r = Read(wb, tender); var a = r.Rows.Single(x => x.Id == "236"); var b = r.Rows.Single(x => x.Id == "239");
+            check(r.Ok && r.Format == OfferedCatalogWorkbook.ModelFormat && a.DriverDescription == "Driver dal modello" && a.Descriptions!["Semplice"] == "Semplice dal modello" && a.Descriptions["Medio"] == "Medio dal modello" && a.Descriptions["Complesso"] == "Complesso dal modello", "model: the four description columns are read like those of the catalog sheet");
+            check(b.DriverDescription == null && b.Descriptions!.Count == 1 && b.Descriptions["Semplice"] == "Solo semplice" && r.Rows.Single(x => x.Id == "241").Descriptions == null, "model: a voice may have only some descriptions; empty cells are not invented");
+            var entries0 = OfferedCatalogWorkbook.ToEntries(r.Rows);
+            check(entries0[0]!["descrizione"]!.ToString() == "Driver dal modello" && entries0[0]!["descrizioni"]!["Complesso"]!.ToString() == "Complesso dal modello" && entries0[0]!["nome"] == null, "model: the descriptions are saved with the prices, never the name");
+        }
+        {
+            // A model downloaded BEFORE the description columns existed (nine columns) is still accepted.
+            var wb = Filled(tender, 0.5m); var ws = wb.Worksheet("CatalogoOfferto"); ws.Range(1, 10, 28, 13).Clear();
+            var r = Read(wb, tender); check(r.Ok && r.Rows.Count == 27 && r.Rows.All(x => x.Descriptions == null && x.DriverDescription == null), "model: an older model without the description columns is still accepted");
+        }
+        { var wb = Filled(tender, 0.5m); wb.Worksheet("CatalogoOfferto").Cell(2, 10).Value = new string('x', 2500); var r = Read(wb, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("Riga 2") && e.Contains("Descrizione Driver") && e.Contains("supera 2000")), "model: a description that is far too long is refused"); }
+        { var wb = Filled(tender, 0.5m); var ws = wb.Worksheet("CatalogoOfferto"); ws.Cell(40, 11).Value = "testo orfano"; var r = Read(wb, tender); check(!r.Ok && r.Errors.Any(e => e.Contains("Riga 40") && e.Contains("manca l'ID")), "model: a description written on a row without an ID is an error, not silently dropped"); }
 
         // ---- un file compilato bene ----
         var good = Read(Filled(tender, 0.5m), tender);
