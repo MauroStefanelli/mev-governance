@@ -6,8 +6,8 @@ import { TextEncoder as NodeTextEncoder } from 'util';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import HistoryImportPanel from './HistoryImportPanel';
-import { historyImportRequest } from '../services/mevService';
-jest.mock('../services/mevService', () => ({ historyImportRequest: jest.fn() }));
+import { historyImportRequest, rationaleRequest } from '../services/mevService';
+jest.mock('../services/mevService', () => ({ historyImportRequest: jest.fn(), rationaleRequest: jest.fn() }));
 
 const TOKEN = 'ghp_' + '0123456789abcdefghijABCDEFGHIJ0123';
 const REAL_ZIP = '/tmp/backup-full.zip';
@@ -304,4 +304,69 @@ test('a tar.gz archive is accepted: the same notes are found as in a zip', async
   const tarball = zlib.gzipSync(Buffer.concat([block(OK[0], OK[1]), block(OK2[0], OK2[1]), Buffer.alloc(1024)]));
   const dialog = await openPanel(); choose(dialog, toFile(tarball, 'backup.tar.gz'), textFile([OK[0], OK2[0]].join('\n'))); fireEvent.click(within(dialog).getByRole('button', { name: 'Controlla i file' }));
   const plan = await within(dialog).findByLabelText('Anteprima'); expect(plan).toHaveTextContent(/2\s*note da leggere/); expect(plan).toHaveTextContent('ILP · 1'); expect(plan).toHaveTextContent('NPSO · 1');
+});
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// I ragionamenti scritti nelle iniziative e CONDIVISI fanno parte della conoscenza storica: scheda dedicata, conteggio e riuso.
+describe('«Condivisi dalle iniziative»', () => {
+  const sharedEntry = (id, extra = {}) => ({ entry: { id, goto: 'g1', gotoLabel: '145480', kind: 'razionale', text: `Ragionamento condiviso ${id}`, interventionId: 'MNPRES-001', status: 'confermata', shared: true, sharedBy: 'anna', sharedByFullName: 'Anna Rossi', sharedAt: '2026-11-18T10:00:00Z', createdBy: 'luca', createdByFullName: 'Luca Bianchi', ...extra }, takenBy: extra.takenBy ?? 0 });
+  let calls;
+  beforeEach(() => {
+    calls = [];
+    rationaleRequest.mockReset().mockImplementation(async path => {
+      calls.push(path);
+      const q = new URLSearchParams(String(path).split('?')[1] || '');
+      const all = [sharedEntry(1, { takenBy: 2 }), sharedEntry(2, { text: 'Il batch notturno gestisce i resi' }), sharedEntry(3)];
+      let rows = all; if (q.get('q')) rows = rows.filter(r => r.entry.text.toLowerCase().includes(q.get('q').toLowerCase()));
+      return { entries: rows, hasMore: false, matching: rows.length, total: all.length, systems: [{ system: 'npso', count: all.length }] };
+    });
+  });
+  const openShared = async (summary = {}) => {
+    server.summary = { ...server.summary, pending: 0, shared: 3, sharedInitiatives: 1, ...summary };
+    render(<HistoryImportPanel canEdit />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conoscenza storica AI/ }));
+    fireEvent.click(await screen.findByRole('tab', { name: /Condivisi dalle iniziative/ }));
+  };
+  test('the button says how much knowledge there is, counting the shared reasonings too', async () => {
+    server.summary = { ...server.summary, pending: 0, filesRead: 241, shared: 3 };
+    render(<HistoryImportPanel canEdit />);
+    expect(await screen.findByText('241 note lette · 3 condivisi dalle iniziative')).toBeInTheDocument();
+  });
+  test('with only shared reasonings and no notes read it still says so', async () => {
+    server.summary = { ...server.summary, pending: 0, filesRead: 0, shared: 1 };
+    render(<HistoryImportPanel canEdit />);
+    expect(await screen.findByText('1 condiviso dalle iniziative')).toBeInTheDocument();
+  });
+  test('the tab shows the count and lists the shared reasonings with who wrote and shared them and how many initiatives took them', async () => {
+    await openShared();
+    expect(screen.getByRole('tab', { name: /Condivisi dalle iniziative/ })).toHaveTextContent('3');
+    const panel = await screen.findByRole('tabpanel', { name: /Condivisi dalle iniziative/ });
+    expect(await within(panel).findByText('Ragionamento condiviso 1')).toBeInTheDocument();
+    expect(within(panel).getByText(/scritto da Luca Bianchi · condiviso da Anna Rossi il .* · ripreso da 2 altre iniziative/)).toBeInTheDocument();
+    expect(within(panel).getAllByText(/non ancora ripreso/).length).toBe(2);
+    expect(within(panel).getAllByText(/Iniziativa 145480 · intervento MNPRES-001/).length).toBe(3);
+    expect(within(panel).getByText('3 voci condivise.')).toBeInTheDocument();
+  });
+  test('it can be searched and filtered by system', async () => {
+    await openShared();
+    const panel = await screen.findByRole('tabpanel', { name: /Condivisi dalle iniziative/ });
+    await within(panel).findByText('Ragionamento condiviso 1');
+    fireEvent.change(within(panel).getByRole('searchbox', { name: 'Cerca tra i razionali condivisi' }), { target: { value: 'batch' } });
+    await waitFor(() => expect(calls.some(c => String(c).includes('q=batch'))).toBe(true));
+    expect(await within(panel).findByText('1 voci su 3 per «batch».')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: /NPSO · 3/ }));
+    await waitFor(() => expect(calls.some(c => String(c).includes('system=npso'))).toBe(true));
+  });
+  test('the empty state explains how a reasoning gets here', async () => {
+    rationaleRequest.mockReset().mockResolvedValue({ entries: [], hasMore: false, matching: 0, total: 0, systems: [] });
+    await openShared({ shared: 0 });
+    expect(await screen.findByText(/Ancora nessun ragionamento condiviso/)).toBeInTheDocument();
+    expect(screen.getByText(/Per condividerne uno, usa «Condividi con le altre iniziative»/)).toBeInTheDocument();
+  });
+  test('the list is read from the shared endpoint (not from the imported notes)', async () => {
+    await openShared();
+    await screen.findByText('Ragionamento condiviso 1');
+    expect(calls.some(c => String(c) === 'shared')).toBe(true);
+  });
 });

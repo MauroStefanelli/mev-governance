@@ -60,3 +60,16 @@ export function reviewStatus(inputs, reviews, signatureOf) {
   const state = total === 0 ? 'empty' : verified === 0 ? 'none' : remaining === 0 ? 'complete' : 'partial';
   return { total, verified, failed, outdated, missing, remaining, state, percent: total ? Math.round((verified / total) * 100) : 0 };
 }
+
+// I razionali che l'AI deve leggere per una riga: quelli confermati che riguardano il SUO intervento e quelli generali dell'iniziativa (senza intervento).
+// La firma di una riga (detailReviewSignature) include questi testi: se se ne aggiunge, modifica o revoca uno, la riga risulta «modificata dopo la verifica»
+// e «Aggiorna le N righe» la rifà. Senza questo i nuovi ragionamenti non cambierebbero mai nulla per le righe già verificate.
+export const rationaleSignature = entries => (entries || []).filter(entry => entry.status === 'confermata')
+  .map(entry => `${entry.id}:${entry.kind}:${String(entry.text || '').trim()}`).sort().join('|');
+
+// Quante righe cambiano stato se si aggiunge un razionale: chiariscono all'utente cosa succede dopo aver condiviso un ragionamento.
+export function rowsAffectedByRationale(inputs, interventionId) {
+  const all = inputs || [];
+  if (!interventionId) return all.length;                                     // un razionale generale vale per tutte le righe
+  return all.filter(input => String(input.intervention?.id ?? '') === String(interventionId)).length;
+}

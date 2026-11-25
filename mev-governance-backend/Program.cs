@@ -779,6 +779,10 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SourceSha""    VARCHAR(64) NULL;
                 ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SourceAuthor"" TEXT NULL;
                 ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""ImportedBy""   TEXT NULL;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""Shared""             BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SharedAt""           TIMESTAMPTZ NULL;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SharedBy""           VARCHAR(120) NULL;
+                ALTER TABLE ""{sch}"".""RationaleEntries"" ADD COLUMN IF NOT EXISTS ""SharedByFullName""   TEXT NULL;
                 CREATE TABLE IF NOT EXISTS ""{sch}"".""KnowledgeImportFiles"" (
                     ""Id"" BIGSERIAL PRIMARY KEY,
                     ""AmbienteId"" INTEGER NOT NULL,

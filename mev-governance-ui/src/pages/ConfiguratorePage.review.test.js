@@ -236,3 +236,179 @@ test('when the AI fails for every row the window stops with the reason (it does 
   expect(stopped).not.toHaveTextContent('Verifica completata');
   expect(stopped).toHaveTextContent('0 di 8 righe verificate (0%)');
 });
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// I razionali dalla colonna «Verifica AI attività / catalogo», e la verifica di UN intervento.
+// Due interventi (A: 5 righe, B: 3 righe) per vedere che «rifai questo intervento» non tocca l'altro.
+const twoInterventions = () => {
+  const rowsA = Array.from({ length: 5 }, (_, i) => { const r = detail(239, 1200, 'Medio', 'REALIZZAZIONE', 'MNPRES-001'); r[4] = `Attivita A${i + 1}`; return r; });
+  const rowsB = Array.from({ length: 3 }, (_, i) => { const r = detail(242, 300, 'Medio', 'REALIZZAZIONE', 'MNPRES-002'); r[4] = `Attivita B${i + 1}`; return r; });
+  return [...rowsA, ...rowsB];
+};
+const twoFile = async () => {
+  const zip = new JSZip();
+  zip.file('xl/workbook.xml', '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="145480" r:id="r1"/><sheet name="DettaglioInterventi" r:id="r2"/></sheets></workbook>');
+  zip.file('xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/><Relationship Id="r2" Target="worksheets/sheet2.xml"/></Relationships>');
+  zip.file('xl/worksheets/sheet1.xml', worksheetXml([['Interventi\nCodice: 145480\nTitolo: Iniziativa pilota'], ['ID_INTERVENTO', 'Titolo', 'Descrizione', 'Attività', 'Sistema', 'Copertura Requisiti', '', '', 'Quantità TOW RTI'], ['', '', '', '', '', '', '', '', 'TOW 02.1', 'TOW 02.2', 'TOW 02.3', 'TOW 02.4', 'TOW 02.5'],
+    ['MNPRES-001', 'Intervento A', '', 'Attività A', 'NPSO', 'REQ-1', '', '', .5, 0, .5, .6, 100], ['MNPRES-002', 'Intervento B', '', 'Attività B', 'NPSO', 'REQ-2', '', '', .5, 0, .5, .6, 100], ['', '', '', '', '', '', '', 'TOTALE TOW']]));
+  zip.file('xl/worksheets/sheet2.xml', worksheetXml([['ID Intervento', 'Componente-applicativo', 'Tecnologia', 'Unità', 'Descrizione Intervento', 'ID di catalogo', 'Ambito driver', 'Nome Driver', 'Tipo Intervento2', 'Complessità', 'Quantità', 'Prezzo Unitario', 'Prezzo Totale'], ...twoInterventions()]));
+  const data = await zip.generateAsync({ type: 'arraybuffer' });
+  return { name: 'pilota.xlsx', arrayBuffer: async () => data };
+};
+let saved;
+const withRationaleServer = () => {
+  saved = [];
+  service.rationaleRequest.mockReset().mockImplementation(async (path, body) => {
+    const p = String(path);
+    if (p.startsWith('related')) return [];
+    if (p === 'entries') { const e = { id: 100 + saved.length, goto: body.goto, kind: body.kind, text: body.text, interventionId: body.interventionId, status: 'confermata', shared: false }; saved.push(e); return e; }
+    const m = /^entries\/(\d+)\/(share|unshare)$/.exec(p);
+    if (m) { const e = saved.find(x => x.id === Number(m[1])); e.shared = m[2] === 'share'; return { ...e }; }
+    return { messages: [], hasMore: false, entries: [] };
+  });
+};
+const goToOfferWithTwo = async () => {
+  withRationaleServer();
+  mount();
+  const input = await waitFor(() => { const el = document.querySelector('input[type="file"][accept=".xlsx"]'); expect(el).toBeInTheDocument(); return el; });
+  await act(async () => { fireEvent.change(input, { target: { files: [await twoFile()] } }); });
+  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
+  while (gates.length) { await act(async () => { gates.shift().resolve(); }); }
+  fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
+  await screen.findByRole('region', { name: 'Verifica AI delle righe' });
+  gates.length = 0; service.reviewOfferDetails.mockClear();
+};
+const openAllGroups = () => document.querySelectorAll('details.offer-activity-group').forEach(d => { d.open = true; });
+const addRationaleOnFirstRow = async (text, interventionLabel) => {
+  openAllGroups();
+  const forms = await screen.findAllByRole('button', { name: '+ Aggiungi un razionale' });
+  fireEvent.click(forms[0]);
+  fireEvent.change(screen.getByLabelText('Ragionamento'), { target: { value: text } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Salva il razionale' })); });
+};
+
+describe('rationales from the column «Verifica AI attività / catalogo»', () => {
+  test('every verified row shows the rationale area and the button to redo ITS intervention', async () => {
+    await goToOfferWithTwo();
+    openAllGroups();
+    expect((await screen.findAllByText('Razionali che l’AI legge per questa riga')).length).toBe(8);
+    expect(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' }).length).toBe(5);
+    expect(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' }).length).toBe(3);
+  });
+
+  test('writing a rationale saves it (confirmed) on the server for the right intervention, and the rows of THAT intervention become «to update», the others do not', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Si aggiunge un campo a una pagina esistente: è una MODIFICA semplice.');
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]).toMatchObject({ kind: 'razionale', interventionId: 'MNPRES-001', status: 'confermata' });
+    expect(service.rationaleRequest).toHaveBeenCalledWith('entries', expect.objectContaining({ goto: expect.any(String), text: 'Si aggiunge un campo a una pagina esistente: è una MODIFICA semplice.', interventionId: 'MNPRES-001' }));
+    await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));          // le 5 righe dell'intervento A sono da rifare, le 3 di B no
+    expect(card()).toHaveTextContent('Mancano 5: 5 modificate dopo la verifica');
+    expect(within(card()).getByRole('button', { name: 'Aggiorna le 5 righe modificate' })).toBeInTheDocument();
+    expect(screen.getAllByText('Da aggiornare: dati modificati dopo la verifica').length).toBe(5);
+    expect(service.reviewOfferDetails).not.toHaveBeenCalled();                                 // salvare un razionale NON chiama l'AI da solo
+  });
+
+  test('«Rifai la verifica dell’intervento B» (already verified) says so and does NOT call the AI; the 5 rows of A, which are to update, are left alone', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Ragionamento A.');
+    await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));         // A e' da aggiornare, B e' a posto
+    gates.length = 0; service.reviewOfferDetails.mockClear();
+    openAllGroups();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' })[0]);
+    await waitFor(() => expect(dialogOrAlert()).toHaveTextContent('3 di 3 righe verificate (100%)'));      // la finestra parla delle 3 righe di B
+    expect(service.reviewOfferDetails).not.toHaveBeenCalled();                                  // B e' gia' verificata: l'AI non viene richiamata
+    fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
+    expect(card()).toHaveTextContent('3 di 8 righe verificate');                                // A resta da aggiornare: non e' stata toccata
+  });
+  test('«Rifai la verifica dell’intervento B» with force (from the window) redoes only the 3 rows of B, never the 5 of A', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Ragionamento A.');
+    await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));
+    gates.length = 0; service.reviewOfferDetails.mockClear();
+    openAllGroups();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' })[0]);
+    await waitFor(() => expect(dialogOrAlert()).toHaveTextContent('3 di 3 righe verificate (100%)'));
+    fireEvent.click(within(dlg()).getByRole('button', { name: 'Verifica tutto da capo' }));
+    await waitFor(() => expect(gates).toHaveLength(1));
+    expect(gates[0].rows).toHaveLength(3);                                                        // «da capo» resta sull'intervento B: non allarga il lavoro alle 5 righe di A
+    expect(gates[0].rows.every(r => r.intervention.id === 'MNPRES-002')).toBe(true);
+    await act(async () => { gates.shift().resolve(); });
+    await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+  });
+
+  test('«Rifai la verifica dell’intervento» asks the AI ONLY for the rows of that intervention, and the AI receives the new rationale', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Il campo si aggiunge a una pagina che esiste già.');
+    await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));
+    gates.length = 0; service.reviewOfferDetails.mockClear();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' })[0]);
+    await waitFor(() => expect(gates).toHaveLength(1));
+    expect(gates[0].rows).toHaveLength(5);                                                      // solo le 5 righe di A: le 3 di B non vengono rimandate
+    expect(gates[0].rows.every(r => r.intervention.id === 'MNPRES-001')).toBe(true);
+    const sent = service.reviewOfferDetails.mock.calls[0][0].rows[0];
+    expect(sent.confirmedRationale).toEqual([expect.objectContaining({ text: 'Il campo si aggiunge a una pagina che esiste già.', kind: 'razionale' })]);
+    expect(dlg()).toHaveTextContent('L’AI sta ragionando sulle righe');
+    await act(async () => { gates.shift().resolve(); });
+    await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+    expect(dlg()).toHaveTextContent('5 di 5 righe verificate (100%)');                         // la finestra parla delle righe di QUELL'intervento
+    expect(service.reviewOfferDetails).toHaveBeenCalledTimes(1);
+  });
+
+  test('after redoing one intervention the whole verification is complete again; B was never asked', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Ragionamento A.');
+    await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));
+    gates.length = 0; service.reviewOfferDetails.mockClear();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' })[0]);
+    await waitFor(() => expect(gates).toHaveLength(1)); await act(async () => { gates.shift().resolve(); });
+    await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+    fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
+    expect(card()).toHaveTextContent('Tutte le 8 righe sono verificate');
+    expect(service.reviewOfferDetails).toHaveBeenCalledTimes(1);
+  });
+
+  test('«Aggiorna le N righe modificate» (all interventions) redoes only the changed rows, in one go', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Ragionamento A.');
+    await waitFor(() => expect(within(card()).getByRole('button', { name: 'Aggiorna le 5 righe modificate' })).toBeInTheDocument());
+    gates.length = 0; service.reviewOfferDetails.mockClear();
+    fireEvent.click(within(card()).getByRole('button', { name: 'Aggiorna le 5 righe modificate' }));
+    await waitFor(() => expect(gates).toHaveLength(1)); expect(gates[0].rows).toHaveLength(5);
+    await act(async () => { gates.shift().resolve(); });
+    await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+  });
+
+  test('a rationale for the WHOLE initiative makes every row «to update»', async () => {
+    await goToOfferWithTwo(); openAllGroups();
+    fireEvent.click((await screen.findAllByRole('button', { name: '+ Aggiungi un razionale' }))[0]);
+    fireEvent.change(screen.getByLabelText('Vale per'), { target: { value: 'iniziativa' } });
+    fireEvent.change(screen.getByLabelText('Ragionamento'), { target: { value: 'Vale per tutto il lotto.' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Salva il razionale' })); });
+    await waitFor(() => expect(saved).toHaveLength(1)); expect(saved[0].interventionId).toBeNull();
+    // nessuna riga ha piu' un giudizio valido: la scheda torna allo stato «da verificare» (non «0 di 8»)
+    await waitFor(() => expect(card()).toHaveTextContent('8 righe da aggiornare'));
+    expect(card()).toHaveTextContent('Erano già verificate, ma i dati sono cambiati');
+    expect(within(card()).getByRole('button', { name: 'Aggiorna tutte le 8 righe' })).toBeInTheDocument();
+    expect(screen.getAllByText('Da aggiornare: dati modificati dopo la verifica').length).toBe(8);
+  });
+
+  test('sharing a rationale calls the server, shows it as shared, and does NOT make the rows «to update»', async () => {
+    await goToOfferWithTwo();
+    await addRationaleOnFirstRow('Da riusare su altre iniziative.');
+    await waitFor(() => expect(saved).toHaveLength(1));
+    // dopo il salvataggio le righe di A sono da aggiornare: le rifacciamo, cosi' si vede che la condivisione non cambia nulla
+    gates.length = 0; fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' })[0]);
+    await waitFor(() => expect(gates).toHaveLength(1)); await act(async () => { gates.shift().resolve(); });
+    await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata')); fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
+    openAllGroups();
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'Condividi con le altre iniziative' })[0]); });
+    await waitFor(() => expect(service.rationaleRequest).toHaveBeenCalledWith('entries/100/share', {}));
+    expect(saved[0].shared).toBe(true);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /Condiviso · Ritira/ }).length).toBeGreaterThan(0));
+    expect(card()).toHaveTextContent('Tutte le 8 righe sono verificate');                       // condividere non e' un nuovo ragionamento
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /Condiviso · Ritira/ })[0]); });
+    await waitFor(() => expect(service.rationaleRequest).toHaveBeenCalledWith('entries/100/unshare', {}));
+  });
+});

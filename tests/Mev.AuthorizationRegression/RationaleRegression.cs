@@ -238,8 +238,12 @@ public static class RationaleRegression
 
         // Inheritance: same system, other initiative, confirmed only, copied as a proposal with its source.
         Ok(await anna.Ask(new("G2", "Nuova iniziativa", "Altra", "NPSO", null, null)));
+        // NOTHING is offered to other initiatives until a person SHARES it: being confirmed in its own initiative is not enough.
+        check(Ok(await anna.Related("NPSO", "G2")).GetArrayLength() == 0, "Related offers NOTHING that nobody shared (a confirmed entry stays in its own initiative)");
+        var confirmedIds = Ok(await anna.Confirmed("g1")).EnumerateArray().Select(r => r.GetProperty("id").GetInt64()).ToList();
+        foreach (var id in confirmedIds) Ok(await anna.Share(id));
         var related = Ok(await anna.Related("NPSO", "G2"));
-        check(related.GetArrayLength() == 2 && related.EnumerateArray().All(r => r.GetProperty("goto").GetString() == "g1"), "Related returns confirmed entries of other initiatives on the same system");
+        check(related.GetArrayLength() == 2 && related.EnumerateArray().All(r => r.GetProperty("goto").GetString() == "g1" && r.GetProperty("shared").GetBoolean()), "Related returns the SHARED confirmed entries of other initiatives on the same system");
         check(Ok(await anna.Related("NPSO", "G1")).GetArrayLength() == 0, "Related excludes the current initiative");
         check(Ok(await anna.Related("IPER", "G2")).GetArrayLength() == 0, "Related is limited to the same system");
         check(Ok(await anna.Related("  ", "G2")).GetArrayLength() == 0, "Related without a system returns nothing");
@@ -252,6 +256,46 @@ public static class RationaleRegression
         check(await anna.Inherit(second, new("G2", "NPSO")) is NotFoundResult, "A discarded entry cannot be inherited");
         check(await As(user, "Developer", 2).Inherit(sourceId, new("G2", "NPSO")) is NotFoundResult, "Inheritance is isolated by environment");
         check((await db.RationaleEntries.SingleAsync(e => e.Id == sourceId)).Goto == "g1", "Inheriting leaves the original entry untouched");
+
+        // ---- SHARE: an explicit decision per entry, with its own rules ----
+        var shareable = Ok(await luca.Add(new("G1", "decisione", "Per i resi si usa il batch notturno", "OTT-9", "NPSO"))).GetProperty("id").GetInt64();
+        check(Ok(await anna.Related("NPSO", "G2")).EnumerateArray().All(r => r.GetProperty("id").GetInt64() != shareable), "A new confirmed entry is NOT shared by itself");
+        var shared = Ok(await anna.Share(shareable));
+        check(shared.GetProperty("shared").GetBoolean() && shared.GetProperty("sharedBy").GetString() == "anna" && shared.GetProperty("sharedAt").ValueKind != JsonValueKind.Null, "Sharing records who shared it and when (attributed by the server)");
+        check(Ok(await anna.Related("NPSO", "G2")).EnumerateArray().Any(r => r.GetProperty("id").GetInt64() == shareable), "A shared entry is offered to another initiative of the same system");
+        check(Ok(await anna.Related("IPER", "G2")).GetArrayLength() == 0, "A shared entry is NOT offered on another system");
+        check(Ok(await As(user, "Developer", 2).Related("NPSO", "G2")).GetArrayLength() == 0, "A shared entry is NOT offered in another environment");
+        check(await As(user, "Developer", 2).Share(shareable) is NotFoundResult, "Another environment cannot share (or even see) the entry");
+        check(await As(user, "Bid Manager").Share(shareable) is ForbidResult && await As(user, "Client").Share(shareable) is ForbidResult, "A supervisor or a Client cannot share");
+        check(await anna.Share(99999) is NotFoundResult, "Sharing an unknown entry is not found");
+        var proposal = db.RationaleEntries.Add(new RationaleEntry { AmbienteId = 1, Goto = "g1", Kind = "razionale", Text = "solo proposta", Status = "proposta", SystemKey = "npso", CreatedBy = "x", CreatedAt = DateTime.UtcNow }); await db.SaveChangesAsync();
+        check(await anna.Share(proposal.Entity.Id) is ConflictObjectResult, "A PROPOSAL cannot be shared: only a confirmed entry");
+        var noSystem = db.RationaleEntries.Add(new RationaleEntry { AmbienteId = 1, Goto = "g1", Kind = "razionale", Text = "senza sistema", Status = "confermata", SystemKey = "", CreatedBy = "x", CreatedAt = DateTime.UtcNow }); await db.SaveChangesAsync();
+        check(await anna.Share(noSystem.Entity.Id) is ConflictObjectResult, "An entry without a system cannot be shared: the other initiatives find it by system");
+        var fromHistory = db.RationaleEntries.Add(new RationaleEntry { AmbienteId = 1, Goto = "g1", Kind = "razionale", Text = "da storico", Status = "confermata", SystemKey = "npso", SourceFile = "ilp-note.md", CreatedBy = "x", CreatedAt = DateTime.UtcNow }); await db.SaveChangesAsync();
+        check(await anna.Share(fromHistory.Entity.Id) is ConflictObjectResult, "An entry that came from the history import is already knowledge: it is not shared again");
+        check(Ok(await anna.Share(shareable)).GetProperty("shared").GetBoolean() && db.RationaleEntries.Count(e => e.Id == shareable && e.Shared) == 1, "Sharing twice changes nothing");
+        var sharedList = Ok(await anna.SharedList(null, null, null));
+        check(sharedList.GetProperty("matching").GetInt32() == confirmedIds.Count + 1 && sharedList.GetProperty("entries").EnumerateArray().All(e => e.GetProperty("entry").GetProperty("shared").GetBoolean()), "The shared list has only shared, confirmed entries");
+        check(sharedList.GetProperty("systems")[0].GetProperty("system").GetString() == "npso", "The shared list offers the systems to filter by");
+        check(Ok(await anna.SharedList(null, "batch notturno", null)).GetProperty("matching").GetInt32() == 1 && Ok(await anna.SharedList("iper", null, null)).GetProperty("matching").GetInt32() == 0, "The shared list can be searched and filtered by system");
+        check(Ok(await As(user, "Developer", 2).SharedList(null, null, null)).GetProperty("matching").GetInt32() == 0, "The shared list is isolated by environment");
+        // taken by other initiatives: the count that shows the knowledge is really reused
+        Ok(await anna.Inherit(shareable, new("G2", "NPSO")));
+        check(Ok(await anna.SharedList(null, "batch notturno", null)).GetProperty("entries")[0].GetProperty("takenBy").GetInt32() == 1, "The shared list says how many initiatives took an entry");
+        // unshare
+        var unshared = Ok(await anna.Unshare(shareable));
+        check(!unshared.GetProperty("shared").GetBoolean() && unshared.GetProperty("sharedBy").ValueKind == JsonValueKind.Null, "Unsharing clears the share");
+        check(Ok(await anna.Related("NPSO", "G2")).EnumerateArray().All(r => r.GetProperty("id").GetInt64() != shareable), "An entry that is no longer shared is no longer offered");
+        check(db.RationaleEntries.Single(e => e.Id == shareable).Status == "confermata" && Ok(await anna.Confirmed("G1")).EnumerateArray().Any(r => r.GetProperty("id").GetInt64() == shareable), "…but it stays confirmed in its own initiative");
+        check(await As(user, "Client").Unshare(shareable) is ForbidResult, "A Client cannot unshare");
+        Ok(await anna.Share(shareable));
+        // a revoked entry stops being shared knowledge
+        await anna.Decide(shareable, new("revocata", null));
+        check(Ok(await anna.SharedList(null, "batch notturno", null)).GetProperty("matching").GetInt32() == 0 && Ok(await anna.Related("NPSO", "G2")).EnumerateArray().All(r => r.GetProperty("id").GetInt64() != shareable), "A REVOKED entry leaves the shared knowledge");
+        // le voci di prova della condivisione (e quella ripresa da G2) vengono tolte: il resto del test conta le voci di G1 e non deve vederle
+        foreach (var id in db.RationaleEntries.Where(e => e.Id == proposal.Entity.Id || e.Id == noSystem.Entity.Id || e.Id == fromHistory.Entity.Id || e.Id == shareable || e.SourceEntryId == shareable).Select(e => e.Id).ToList()) db.RationaleEntries.Remove(db.RationaleEntries.Single(e => e.Id == id));
+        await db.SaveChangesAsync();
 
         // Revoked knowledge stops being shared.
         await anna.Decide(first, new("revocata", null));

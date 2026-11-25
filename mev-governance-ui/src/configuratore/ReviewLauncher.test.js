@@ -86,3 +86,15 @@ test('the brain of the card shows the REAL percentage', () => {
   expect(within(screen.getByRole('region')).getByRole('img', { name: 'Righe verificate: 33%' })).toBeInTheDocument();
 });
 test('launcherCopy never throws on an empty status', () => { expect(() => launcherCopy({ total: 0 }, false)).not.toThrow(); expect(launcherCopy({ total: 0 }, true).tone).toBe('busy'); });
+
+test('every row was verified but ALL changed afterwards: it is not a first run — it says «da aggiornare» and why', () => {
+  show(statusOf(4, Object.fromEntries(rows(4).map(r => [r.rowId, ok({ ...r, v: 99 })]))));
+  expect(screen.getByRole('heading')).toHaveTextContent('4 righe da aggiornare');
+  expect(screen.getByText(/Erano già verificate, ma i dati sono cambiati dopo/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Aggiorna tutte le 4 righe' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Verifica con l’AI' })).toBeNull();
+});
+test('a single row that changed says «la riga»', () => {
+  show(statusOf(1, { '0': ok({ rowId: '0', v: 99 }) }));
+  expect(screen.getByRole('button', { name: 'Aggiorna la riga' })).toBeInTheDocument(); expect(screen.getByRole('heading')).toHaveTextContent('1 riga da aggiornare');
+});

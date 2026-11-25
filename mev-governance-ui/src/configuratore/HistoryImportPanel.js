@@ -1,9 +1,17 @@
 import { createPortal } from 'react-dom';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { historyImportRequest } from '../services/mevService';
+import { historyImportRequest, rationaleRequest } from '../services/mevService';
 import { parseManifest, readNotes, classifyNotes, bySystem, buildReport, filterAlreadyRead, runImport, pendingLabel, KIND_LABEL, explainUnusable } from './historyImportModel';
 import { readFileText, downloadText } from './ledgerModel';
 import './historyImportPanel.css';
+
+// Cosa dice il pulsante quando non ci sono voci da confermare: la conoscenza e' fatta di note importate e di ragionamenti condivisi dalle iniziative.
+export const knowledgeLabel = summary => {
+  const parts = [];
+  if (summary?.filesRead) parts.push(`${summary.filesRead} note lette`);
+  if (summary?.shared) parts.push(`${summary.shared} ${summary.shared === 1 ? 'condiviso' : 'condivisi'} dalle iniziative`);
+  return parts.length ? parts.join(' · ') : 'Importa dal tuo lavoro';
+};
 
 // Icon: a book with a spark ("knowledge gathered from past work"). Decorative: the button carries the accessible name.
 export function KnowledgeIcon({ size = 22 }) {
@@ -42,8 +50,13 @@ export default function HistoryImportPanel({ canEdit = true }) {
   const [view, setView] = useState('review');
   const [browse, setBrowse] = useState({ status: 'confermata', system: '', kind: '', q: '' });
   const [library, setLibrary] = useState(null);
+  // Le voci che le persone hanno scritto nelle iniziative e deciso di CONDIVIDERE: fanno parte della conoscenza storica insieme alle note importate.
+  const [sharedList, setSharedList] = useState(null);
+  const [sharedFilter, setSharedFilter] = useState({ system: '', q: '' });
+  const [sharedLoading, setSharedLoading] = useState(false);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [sharedSearch, setSharedSearch] = useState('');
   const trigger = useRef(null); const closeButton = useRef(null); const alive = useRef(true); const cancelled = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -64,6 +77,17 @@ export default function HistoryImportPanel({ canEdit = true }) {
     finally { if (alive.current) setLibraryLoading(false); }
   }, []);
   useEffect(() => { if (open && view === 'library') loadLibrary(browse); }, [open, view, browse, loadLibrary]);
+  const loadShared = useCallback(async (filters, more = false, cursor = null) => {
+    setSharedLoading(true);
+    try {
+      const params = new URLSearchParams(); if (filters.system) params.set('system', filters.system); if (filters.q) params.set('q', filters.q); if (cursor) params.set('before', String(cursor));
+      const r = await rationaleRequest(`shared${params.toString() ? `?${params}` : ''}`);
+      if (alive.current) { setSharedList(previous => more && previous ? { ...r, entries: [...previous.entries, ...r.entries] } : r); setError(''); }
+    } catch (e) { if (alive.current) setError(e.message); }
+    finally { if (alive.current) setSharedLoading(false); }
+  }, []);
+  useEffect(() => { if (open && view === 'shared') loadShared(sharedFilter); }, [open, view, sharedFilter, loadShared]);
+  useEffect(() => { const timer = setTimeout(() => setSharedFilter(previous => previous.q === sharedSearch.trim() ? previous : { ...previous, q: sharedSearch.trim() }), 350); return () => clearTimeout(timer); }, [sharedSearch]);
   useEffect(() => { const timer = setTimeout(() => setBrowse(previous => previous.q === searchText.trim() ? previous : { ...previous, q: searchText.trim() }), 350); return () => clearTimeout(timer); }, [searchText]);
   useEffect(() => { loadSummary(); }, [loadSummary]);
   useEffect(() => { if (open) loadPending(); }, [open, system]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -120,7 +144,7 @@ export default function HistoryImportPanel({ canEdit = true }) {
 
   return <>
     <button type="button" ref={trigger} className="hi-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open} title="Importa la conoscenza già raccolta con assistenti AI: razionali e vincoli da confermare">
-      <KnowledgeIcon /><span className="hi-trigger-text"><strong>Conoscenza storica AI</strong><small>{summary ? (count ? pendingLabel(count) : summary.filesRead ? `${summary.filesRead} note lette` : 'Importa dal tuo lavoro') : 'Importa dal tuo lavoro'}</small></span>
+      <KnowledgeIcon /><span className="hi-trigger-text"><strong>Conoscenza storica AI</strong><small>{summary ? (count ? pendingLabel(count) : knowledgeLabel(summary)) : 'Importa dal tuo lavoro'}</small></span>
     </button>
     {open && createPortal(<div className="hi-overlay" onMouseDown={event => { if (event.target === event.currentTarget && !run?.busy) close(); }}>
       <aside className="hi" role="dialog" aria-modal="true" aria-label="Conoscenza storica AI">
@@ -187,6 +211,7 @@ export default function HistoryImportPanel({ canEdit = true }) {
         <div className="hi-tabs" role="tablist" aria-label="Cosa vuoi vedere">
           <button type="button" role="tab" id="hi-tab-review" aria-selected={view === 'review'} aria-controls="hi-panel-review" className={`hi-tab${view === 'review' ? ' is-active' : ''}`} onClick={() => setView('review')}>Da confermare{summary ? <span className="hi-pill">{summary.pending}</span> : null}</button>
           <button type="button" role="tab" id="hi-tab-library" aria-selected={view === 'library'} aria-controls="hi-panel-library" className={`hi-tab${view === 'library' ? ' is-active' : ''}`} onClick={() => setView('library')}>Cosa è stato importato{summary ? <span className="hi-pill">{summary.confirmed}</span> : null}</button>
+          <button type="button" role="tab" id="hi-tab-shared" aria-selected={view === 'shared'} aria-controls="hi-panel-shared" className={`hi-tab${view === 'shared' ? ' is-active' : ''}`} onClick={() => setView('shared')}>Condivisi dalle iniziative{summary ? <span className="hi-pill">{summary.shared ?? 0}</span> : null}</button>
         </div>
         {view === 'review' && <section className="hi-card" id="hi-panel-review" role="tabpanel" aria-labelledby="hi-tab-review" aria-label="Voci da confermare">
           <h3>Voci da confermare {pending ? <span className="hi-pill">{pending.total}</span> : null}</h3>
@@ -230,6 +255,23 @@ export default function HistoryImportPanel({ canEdit = true }) {
               <small>da <code>{(e.sourceFile || '').split('/').pop()}</code>{e.sourceAuthor ? ` · ${e.sourceAuthor}` : ''}{e.decidedAt ? ` · ${e.status === 'scartata' ? 'scartata' : 'confermata'} da ${e.decidedByFullName || e.decidedBy} il ${stamp(e.decidedAt)}` : ` · importata ${stamp(e.createdAt)}`}</small></div>
           </li>)}</ul>}
           {library?.hasMore && <button type="button" className="hi-btn" disabled={libraryLoading} onClick={() => loadLibrary(browse, true, library.entries[library.entries.length - 1].id)}>{libraryLoading ? 'Caricamento…' : 'Mostra altre'}</button>}
+        </section>}
+        {view === 'shared' && <section className="hi-card" id="hi-panel-shared" role="tabpanel" aria-labelledby="hi-tab-shared" aria-label="Condivisi dalle iniziative">
+          <p className="hi-hint">I ragionamenti scritti nelle iniziative e condivisi da chi lavora su di esse. Le altre iniziative dello stesso sistema li trovano in «Razionali e vincoli» e possono riprenderli come proposta. Per condividerne uno, usa «Condividi con le altre iniziative» nel passo Offerta o in «Razionali e vincoli».</p>
+          <input type="search" className="hi-search" aria-label="Cerca tra i razionali condivisi" placeholder="Cerca nel testo o nel codice dell’iniziativa…" value={sharedSearch} maxLength={200} onChange={e => setSharedSearch(e.target.value)} />
+          {sharedList && sharedList.systems.length > 0 && <div className="hi-filter" role="group" aria-label="Filtra per sistema">
+            <button type="button" className={`hi-chip hi-chip-btn${sharedFilter.system === '' ? ' is-active' : ''}`} aria-pressed={sharedFilter.system === ''} onClick={() => setSharedFilter(previous => ({ ...previous, system: '' }))}>Tutti i sistemi · {sharedList.total}</button>
+            {sharedList.systems.map(g => <button type="button" key={g.system} className={`hi-chip hi-chip-btn${sharedFilter.system === g.system ? ' is-active' : ''}`} aria-pressed={sharedFilter.system === g.system} onClick={() => setSharedFilter(previous => ({ ...previous, system: g.system }))}>{(g.system || 'senza sistema').toUpperCase()} · {g.count}</button>)}
+          </div>}
+          {sharedList && <p className="hi-hint" role="status">{sharedList.matching === sharedList.total ? `${sharedList.total} voci condivise` : `${sharedList.matching} voci su ${sharedList.total}`}{sharedFilter.q ? ` per «${sharedFilter.q}»` : ''}.</p>}
+          {sharedLoading && !sharedList && <p className="hi-hint">Caricamento…</p>}
+          {sharedList && sharedList.entries.length === 0 && <p className="hi-empty">{sharedList.total === 0 ? 'Ancora nessun ragionamento condiviso. Quando condividi un razionale da un’iniziativa compare qui e diventa conoscenza riutilizzabile.' : 'Nessuna voce per questa ricerca.'}</p>}
+          {sharedList && sharedList.entries.length > 0 && <ul className="hi-entries">{sharedList.entries.map(({ entry: e, takenBy }) => <li key={e.id} className="hi-entry">
+            <div><span className={`hi-kind hi-kind-${e.kind}`}>{KIND_LABEL[e.kind] || e.kind}</span> <span className="hi-sys">{e.goto ? `Iniziativa ${e.gotoLabel || e.goto}` : ''}{e.interventionId ? ` · intervento ${e.interventionId}` : ''}</span>
+              <p>{e.text}</p>
+              <small>scritto da {e.createdByFullName || e.createdBy}{e.sharedAt ? ` · condiviso da ${e.sharedByFullName || e.sharedBy} il ${stamp(e.sharedAt)}` : ''} · {takenBy ? `ripreso da ${takenBy} ${takenBy === 1 ? 'altra iniziativa' : 'altre iniziative'}` : 'non ancora ripreso'}</small></div>
+          </li>)}</ul>}
+          {sharedList?.hasMore && <button type="button" className="hi-btn" disabled={sharedLoading} onClick={() => loadShared(sharedFilter, true, sharedList.entries[sharedList.entries.length - 1].entry.id)}>{sharedLoading ? 'Caricamento…' : 'Mostra altre'}</button>}
         </section>}
       </aside>
     </div>, document.body)}

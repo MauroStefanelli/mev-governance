@@ -42,6 +42,7 @@ public class RationaleController : BaseController
     {
         e.Id, @goto = e.Goto, e.GotoLabel, e.Kind, e.Text, e.InterventionId, e.Status, e.ByAi, e.SourceMessageId, e.SourceEntryId,
         e.CreatedBy, e.CreatedByFullName, e.CreatedAt, e.DecidedBy, e.DecidedByFullName, e.DecidedAt,
+        e.Shared, e.SharedAt, e.SharedBy, e.SharedByFullName,
     };
     private static object MessageView(RationaleMessage m, string me) => new { m.Id, m.Role, m.Author, m.AuthorFullName, m.CreatedAt, m.Text, m.Model, mine = m.Role == "user" && m.Author == me };
 
@@ -172,6 +173,55 @@ public class RationaleController : BaseController
         return Ok(EntryView(entry));
     }
 
+    // SHARE: a person decides that a confirmed reasoning is worth reusing on OTHER initiatives. It then appears in the «Conoscenza storica AI» and the other initiatives of the same
+    // system find it (as a proposal they can take, never applied silently). Only a confirmed entry written in the app can be shared: not a proposal, not what the history import brought.
+    [HttpPost("entries/{id:long}/share")]
+    public async Task<IActionResult> Share(long id)
+    {
+        if (!CanWork || GetAmbienteId() <= 0 || Who() is not { } who) return Forbid();
+        var entry = await db.RationaleEntries.SingleOrDefaultAsync(e => e.Id == id && e.AmbienteId == GetAmbienteId());
+        if (entry == null) return NotFound();
+        if (entry.Status != "confermata") return Conflict(new { message = "Si può condividere solo una voce confermata." });
+        if (entry.SourceFile != null) return Conflict(new { message = "Questa voce viene già dalla Conoscenza storica: non serve condividerla." });
+        if (string.IsNullOrWhiteSpace(entry.SystemKey)) return Conflict(new { message = "Indica il sistema dell'iniziativa: le altre iniziative trovano la voce in base al sistema." });
+        if (!entry.Shared) { entry.Shared = true; entry.SharedAt = DateTime.UtcNow; entry.SharedBy = who.Username; entry.SharedByFullName = who.FullName; await db.SaveChangesAsync(); }
+        return Ok(EntryView(entry));
+    }
+
+    // Takes a voice back out of the shared knowledge. It stays in its own initiative.
+    [HttpPost("entries/{id:long}/unshare")]
+    public async Task<IActionResult> Unshare(long id)
+    {
+        if (!CanWork || GetAmbienteId() <= 0 || Who() is null) return Forbid();
+        var entry = await db.RationaleEntries.SingleOrDefaultAsync(e => e.Id == id && e.AmbienteId == GetAmbienteId());
+        if (entry == null) return NotFound();
+        if (entry.Shared) { entry.Shared = false; entry.SharedAt = null; entry.SharedBy = null; entry.SharedByFullName = null; await db.SaveChangesAsync(); }
+        return Ok(EntryView(entry));
+    }
+
+    // The shared reasonings, newest first, with how many other initiatives took them: the «Conoscenza storica AI» shows them next to the imported notes.
+    [HttpGet("shared")]
+    public async Task<IActionResult> SharedList([FromQuery] string? system, [FromQuery] string? q, [FromQuery] long? before)
+    {
+        if (!CanRead || GetAmbienteId() <= 0 || Who() is null) return Forbid();
+        var environment = GetAmbienteId();
+        var all = db.RationaleEntries.AsNoTracking().Where(e => e.AmbienteId == environment && e.Shared && e.Status == "confermata");
+        var systems = (await all.GroupBy(e => e.SystemKey).Select(g => new { system = g.Key, count = g.Count() }).ToListAsync()).OrderBy(g => g.system).ToList();
+        var query = all;
+        var key = (system ?? "").Trim().ToLowerInvariant();
+        if (key.Length > 0) query = query.Where(e => e.SystemKey == key);
+        var term = (q ?? "").Trim().ToLowerInvariant();
+        if (term.Length > 200) return BadRequest(new { message = "La ricerca è troppo lunga." });
+        if (term.Length > 0) query = query.Where(e => e.Text.ToLower().Contains(term) || e.Goto.ToLower().Contains(term));
+        var matching = await query.CountAsync();
+        if (before is long cursor) query = query.Where(e => e.Id < cursor);
+        var page = await query.OrderByDescending(e => e.Id).Take(51).ToListAsync();
+        var ids = page.Take(50).Select(e => e.Id).ToList();
+        var taken = (await db.RationaleEntries.AsNoTracking().Where(e => e.AmbienteId == environment && e.SourceEntryId != null && ids.Contains(e.SourceEntryId!.Value) && (e.Status == "proposta" || e.Status == "confermata"))
+            .GroupBy(e => e.SourceEntryId!.Value).Select(g => new { id = g.Key, count = g.Count() }).ToListAsync()).ToDictionary(g => g.id, g => g.count);
+        return Ok(new { entries = page.Take(50).Select(e => new { entry = EntryView(e), takenBy = taken.GetValueOrDefault(e.Id) }).ToList(), hasMore = page.Count > 50, matching, total = systems.Sum(g => g.count), systems });
+    }
+
     // Confirmed knowledge of OTHER initiatives about the same system, to be proposed — never applied silently.
     [HttpGet("related")]
     public async Task<IActionResult> Related([FromQuery] string? system, [FromQuery(Name = "goto")] string? exclude)
@@ -180,8 +230,9 @@ public class RationaleController : BaseController
         var key = (system ?? "").Trim().ToLowerInvariant();
         if (key.Length == 0) return Ok(new List<object>());
         var skip = Normalize(exclude);
-        var rows = await db.RationaleEntries.AsNoTracking().Where(e => e.AmbienteId == GetAmbienteId() && e.Status == "confermata" && e.SystemKey == key && e.Goto != skip)
-            .OrderByDescending(e => e.DecidedAt).Take(MaxRelated).ToListAsync();
+        // Quello che un'altra iniziativa ha CONFERMATO e CONDIVISO (non tutto cio' che e' confermato: la condivisione e' una scelta), piu' la conoscenza storica importata.
+        var rows = await db.RationaleEntries.AsNoTracking().Where(e => e.AmbienteId == GetAmbienteId() && e.Status == "confermata" && e.SystemKey == key && e.Goto != skip && (e.Shared || e.SourceFile != null))
+            .OrderByDescending(e => e.Shared).ThenByDescending(e => e.DecidedAt).Take(MaxRelated).ToListAsync();
         return Ok(rows.Select(EntryView).ToList());
     }
 

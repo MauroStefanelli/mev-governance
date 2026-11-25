@@ -20,10 +20,11 @@ import { saveAndClose } from "../configuratore/saveAndClose";
 import SaveProgress from "../configuratore/SaveProgress";
 import ReviewProgress from "../configuratore/ReviewProgress";
 import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configuratore/reviewPlan";
+import { initiativeCode, mergeById } from "../configuratore/rationaleKnowledge";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
 import CollaborationPanel from "../configuratore/CollaborationPanel";
 import { useSettled, useStableCallback } from "../configuratore/developmentCollaboration";
-import { developmentRequest } from "../services/mevService";
+import { developmentRequest, rationaleRequest } from "../services/mevService";
 import { newProjectPreparation } from "../configuratore/projectPackage";
 import { importedGapSuggestions } from "../configuratore/developmentActivityModel";
 import ConfiguratorManual from "../configuratore/ConfiguratorManual";
@@ -134,7 +135,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [detailReviewBusy, setDetailReviewBusy] = useState(false);
   const detailReviewJob = useRef(0);
   // La finestra del cervello: aperta solo quando la verifica parte da qui (non quando parte da sola dopo l'import dell'Excel).
-  const [reviewWindow, setReviewWindow] = useState({ open: false, phase: 'running', done: 0, total: 0, rows: [], error: '', resumed: false, alreadyDone: 0, failedRows: [] });
+  const [reviewWindow, setReviewWindow] = useState({ open: false, phase: 'running', done: 0, total: 0, rows: [], error: '', resumed: false, alreadyDone: 0, failedRows: [], intervention: null });
   useEffect(() => () => { detailReviewJob.current++; }, []);
   useEffect(() => { detailReviewJob.current++; setDetailReviewBusy(false); }, [ambienteId]);
   const [aiBusy, setAiBusy] = useState(false);
@@ -658,11 +659,27 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
 
   // ── Step 1: import Excel ──
+  // Razionali scritti o condivisi dalla riga d'offerta. Il servizio e' lo stesso del pannello «Razionali e vincoli»: la voce nasce confermata per questa iniziativa e, solo se lo
+  // si sceglie, si condivide con le altre. L'elenco `rationale` si aggiorna: la firma delle righe cambia e queste risultano «da aggiornare».
+  const addRationaleFromRow = async (kind, text, interventionId) => {
+    const code = initiativeCode(initiative);
+    if (!code) throw new Error('Indica il codice GOTO dell’iniziativa: i razionali si salvano per iniziativa.');
+    const saved = await rationaleRequest('entries', { goto: code, kind, text, interventionId: interventionId || null, system: initiative.system });
+    setRationale(previous => mergeById(previous, [saved]));
+    toast('Razionale salvato. Rifai la verifica: l’AI lo leggerà.');
+  };
+  const shareRationaleFromRow = async (entry, shared) => {
+    const saved = await rationaleRequest(`entries/${entry.id}/${shared ? 'share' : 'unshare'}`, {});
+    setRationale(previous => mergeById(previous, [saved]));
+    toast(shared ? 'Condiviso: lo trovi nella Conoscenza storica AI e le altre iniziative dello stesso sistema potranno riprenderlo.' : 'Non più condiviso con le altre iniziative.');
+  };
+
   // La verifica AI righe per righe. Premuto di nuovo, RIPARTE dalle righe non ancora verificate (o il cui contenuto e' cambiato) invece di rifare tutto;
   // `force` rifa' tutte le righe. Se un gruppo fallisce lo si riprova, poi riga per riga: una riga che non riesce non butta via le altre.
-  const runDetailReview = async (reviewItems = items, reviewCatalog = catalog, reviewInterventions = importedInterventions, reviewLot = lot, withWindow = false, force = false) => {
+  const runDetailReview = async (reviewItems = items, reviewCatalog = catalog, reviewInterventions = importedInterventions, reviewLot = lot, withWindow = false, force = false, onlyIntervention = null) => {
     const job = ++detailReviewJob.current;
-    const rows = reviewItems.filter(item => item.imported).map((item, index) => detailReviewInput(item, reviewCatalog, reviewInterventions, selectedContractId, reviewLot, index));
+    // `onlyIntervention`: la verifica di UN intervento (le sue righe); le altre non si toccano e la finestra mostra solo quelle.
+    const rows = reviewItems.filter(item => item.imported && (onlyIntervention == null || String(item.interventionId) === String(onlyIntervention))).map((item, index) => detailReviewInput(item, reviewCatalog, reviewInterventions, selectedContractId, reviewLot, index, entriesForIntervention(rationale, item.interventionId)));
     if (!rows.length) return;
     const known = detailReviewsRef.current;
     const plan = planReview(rows, known, detailReviewSignature, { force: force || !withWindow });
@@ -673,11 +690,12 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     if (force && withWindow && todo.length) setDetailReviews(previous => { const next = { ...previous }; todo.forEach(input => { delete next[input.rowId]; }); return next; });
     // Le righe come le mostra la finestra: chi sono (intervento, attivita', voce di catalogo) e, man mano, il giudizio dell'AI. Quelle gia' verificate partono col loro giudizio.
     const windowRows = rows.map(input => ({ rowId: input.rowId, interventionId: input.intervention?.id || '', activity: input.detail?.description || input.intervention?.activity || input.intervention?.title || '', catalogName: input.catalogEntry?.name || '', review: reviewIsCurrent(known[input.rowId], input, detailReviewSignature) && !force && withWindow ? known[input.rowId] : null }));
-    if (withWindow) setReviewWindow({ open: true, phase: todo.length ? 'running' : 'done', done: already, total, rows: windowRows, error: '', resumed: plan.resumed, alreadyDone: already, failedRows: [] });
+    if (withWindow) setReviewWindow({ open: true, phase: todo.length ? 'running' : 'done', done: already, total, rows: windowRows, error: '', resumed: plan.resumed, alreadyDone: already, failedRows: [], intervention: onlyIntervention });
     if (!todo.length) { return; }
     setDetailReviewBusy(true);
     const showResults = (results, done) => { if (withWindow) setReviewWindow(previous => ({ ...previous, done, rows: previous.rows.map(row => { const found = results.find(r => r.rowId === row.rowId); return found ? { ...row, review: found } : row; }) })); };
     const ask = async batch => {
+      // I razionali sono gia' dentro ogni riga (e quindi nella sua firma): si mandano cosi' come sono, in forma per l'AI.
       const withKnowledge = batch.map(input => ({ ...input, confirmedRationale: knowledgeForAi(entriesForIntervention(rationale, input.intervention?.id)) }));
       const response = await reviewOfferDetails({ contractId: selectedContractId, contractName: activeContract?.name || '', lot: reviewLot, rows: withKnowledge });
       return parseDetailReviews(response, batch);
@@ -1992,7 +2010,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
            {closing.phase === 'saving' ? "Salvataggio…" : "Salva e Chiudi"}
          </button>
          <ReviewProgress open={reviewWindow.open} phase={reviewWindow.phase} done={reviewWindow.done} total={reviewWindow.total} entries={reviewWindow.rows} error={reviewWindow.error} resumed={reviewWindow.resumed} alreadyDone={reviewWindow.alreadyDone} failedRows={reviewWindow.failedRows}
-           onResume={() => runDetailReview(items, catalog, importedInterventions, lot, true, false)} onRestart={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)}
+           onResume={() => runDetailReview(items, catalog, importedInterventions, lot, true, false, reviewWindow.intervention)} onRestart={() => runDetailReview(items, catalog, importedInterventions, lot, true, true, reviewWindow.intervention)}
            onClose={() => setReviewWindow(previous => ({ ...previous, open: false }))}
            onStop={() => { detailReviewJob.current++; setDetailReviewBusy(false); setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: 'Hai interrotto la verifica.' })); }} />
          <SaveProgress phase={closing.phase} step={closing.step} message={closing.message} onDismiss={() => setClosing({ phase: 'idle', step: '', message: '' })} title="Salvataggio dell’iniziativa in corso" />
@@ -2432,7 +2450,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             facts={knowledgeFacts({ rationale, libraryFacts, solutionProgress, importedInterventions, mappingCount, tow5Total })}>
             <KnowledgeOverview initiative={initiative} rationale={rationale} solution={solutionProgress} interventions={importedInterventions} mappingCount={mappingCount} tow5Total={tow5Total} library={libraryFacts} onOpen={openSection} />
            <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />
-           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} onReview={options => runDetailReview(items, catalog, importedInterventions, lot, true, !!options?.force)} onRestartReview={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} onReview={options => runDetailReview(items, catalog, importedInterventions, lot, true, !!options?.force)} onRestartReview={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)} rationale={rationale} onAddRationale={addRationaleFromRow} onShareRationale={shareRationaleFromRow} canEditRationale={canEditInitiative} onReviewIntervention={id => runDetailReview(items, catalog, importedInterventions, lot, true, false, id)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
            {importedInterventions.length > 0 && (
              <div style={styles.card}>
                <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
@@ -2866,7 +2884,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {step === 3 && (
         <div>
           <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />
-           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} onReview={options => runDetailReview(items, catalog, importedInterventions, lot, true, !!options?.force)} onRestartReview={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} onReview={options => runDetailReview(items, catalog, importedInterventions, lot, true, !!options?.force)} onRestartReview={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)} rationale={rationale} onAddRationale={addRationaleFromRow} onShareRationale={shareRationaleFromRow} canEditRationale={canEditInitiative} onReviewIntervention={id => runDetailReview(items, catalog, importedInterventions, lot, true, false, id)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

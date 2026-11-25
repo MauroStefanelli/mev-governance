@@ -11,6 +11,8 @@ export function launcherCopy(status, busy) {
   const { total, verified, remaining, outdated, failed, missing } = status;
   if (!total) return { tone: 'idle', headline: 'Nessuna riga da verificare', detail: 'Importa una Tabella di Offerta con il dettaglio delle attività.', action: '', hint: '' };
   if (status.state === 'complete') return { tone: 'ok', headline: `Tutte le ${total} righe sono verificate`, detail: 'Il giudizio di ogni riga è nella colonna «Verifica AI attività / catalogo».', action: 'Rifai la verifica', hint: 'Rifà tutte le righe con l’AI.', secondary: true };
+  // Tutte le righe avevano un giudizio ma i dati sono cambiati (per esempio un nuovo razionale): non e' la prima volta, e va detto.
+  if (status.state === 'none' && outdated === total) return { tone: 'partial', headline: `${total} ${total === 1 ? 'riga da aggiornare' : 'righe da aggiornare'}`, detail: 'Erano già verificate, ma i dati sono cambiati dopo (per esempio un nuovo razionale): l’AI deve rileggerle.', action: `Aggiorna ${total === 1 ? 'la riga' : `tutte le ${total} righe`}`, hint: 'Il giudizio precedente resta visibile finché non viene aggiornato.', secondary: false };
   if (status.state === 'none') return { tone: 'todo', headline: `${total} ${total === 1 ? 'riga da verificare' : 'righe da verificare'}`, detail: 'L’AI controlla che attività, tipo e complessità siano coerenti con la voce di catalogo.', action: 'Verifica con l’AI', hint: 'Ci vuole circa un minuto ogni 5 righe.' };
   const parts = [];
   if (outdated) parts.push(`${outdated} ${outdated === 1 ? 'modificata dopo la verifica' : 'modificate dopo la verifica'}`);

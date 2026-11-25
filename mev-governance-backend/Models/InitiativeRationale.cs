@@ -45,4 +45,10 @@ public class RationaleEntry
     [MaxLength(64)] public string? SourceSha { get; set; }
     public string? SourceAuthor { get; set; }
     public string? ImportedBy { get; set; }
+    // Condiviso con le altre iniziative: una scelta ESPLICITA di una persona, voce per voce. Una voce condivisa entra nella «Conoscenza storica AI» e le altre iniziative dello stesso
+    // sistema la vedono e possono riprenderla (sempre come proposta). Non e' mai automatico: un ragionamento giusto per una iniziativa puo' non esserlo per un'altra.
+    public bool Shared { get; set; }
+    public DateTime? SharedAt { get; set; }
+    [MaxLength(120)] public string? SharedBy { get; set; }
+    public string? SharedByFullName { get; set; }
 }

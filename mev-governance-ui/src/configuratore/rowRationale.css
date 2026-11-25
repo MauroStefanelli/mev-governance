@@ -1,0 +1,29 @@
+/* Razionali di una riga d'offerta: nella colonna «Verifica AI attività / catalogo». */
+.rr { margin-top: 12px; padding: 10px 12px; border: 1px solid #dbe5f3; border-radius: 12px; background: #f9fbff; font-size: 12.5px; color: #17314f; }
+.rr *, .rr *::before, .rr *::after { box-sizing: border-box; }
+.rr-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rr-head strong { font-size: 12.5px; }
+.rr-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #1a73e8; color: #fff; font-size: 11px; font-weight: 800; }
+.rr-empty { margin: 0 0 8px; color: #5d718a; font-size: 12px; }
+.rr-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.rr-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; padding: 7px 9px; border-radius: 9px; background: #fff; border: 1px solid #e4ecf6; }
+.rr-kind { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; background: #e8effa; color: #1b4a8a; white-space: nowrap; }
+.rr-kind-vincolo { background: #fff0d6; color: #7a4b00; } .rr-kind-decisione { background: #e8f6ef; color: #166534; }
+.rr-text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; } .rr-text em { color: #6b7c93; font-style: normal; font-size: 11.5px; }
+.rr-share, .rr-add { font: inherit; font-size: 12px; font-weight: 700; min-height: 36px; padding: 4px 11px; border-radius: 8px; border: 1px solid #b9c9de; background: #fff; color: #17314f; cursor: pointer; }
+.rr-share:hover:not(:disabled), .rr-add:hover:not(:disabled) { background: #eef4fc; border-color: #8fb0dc; }
+.rr-share.is-on { background: #e8f6ef; border-color: #bfe5cf; color: #166534; }
+.rr-share:disabled, .rr-add:disabled { opacity: .55; cursor: not-allowed; }
+.rr-shared-tag { font-size: 11px; font-weight: 700; color: #166534; background: #e8f6ef; padding: 2px 8px; border-radius: 999px; }
+.rr-add { border-style: dashed; color: #1b4a8a; }
+.rr-form { display: grid; gap: 8px; margin-top: 4px; padding: 10px; border-radius: 10px; background: #fff; border: 1px solid #cfe0fa; }
+.rr-row { display: flex; flex-wrap: wrap; gap: 8px; } .rr-row label { flex: 1 1 200px; }
+.rr-form label { display: grid; gap: 4px; font-size: 11.5px; font-weight: 700; color: #3a5070; }
+.rr-form select, .rr-form textarea { font: inherit; font-size: 12.5px; font-weight: 400; color: #17314f; padding: 7px 9px; border: 1px solid #b9c9de; border-radius: 8px; background: #fff; width: 100%; }
+.rr-form textarea { resize: vertical; line-height: 1.4; }
+.rr-form select:focus-visible, .rr-form textarea:focus-visible, .rr button:focus-visible { outline: 3px solid #75a7f7; outline-offset: 1px; }
+.rr-form small { color: #6b7c93; } .rr-bad { color: #b00020 !important; font-weight: 700; }
+.rr-error { margin: 4px 0 0; padding: 6px 9px; border-radius: 8px; background: #fdecec; color: #b00020; border: 1px solid #f3c2c9; overflow-wrap: anywhere; }
+.rr-actions { display: flex; gap: 8px; flex-wrap: wrap; } .rr-actions button { font: inherit; font-size: 12.5px; font-weight: 700; min-height: 34px; padding: 5px 14px; border-radius: 9px; border: 1px solid #b9c9de; background: #fff; cursor: pointer; }
+.rr-actions .rr-primary { background: #1a73e8; border-color: #1a73e8; color: #fff; } .rr-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.rr-note { margin: 0; font-size: 11.5px; color: #5d718a; }

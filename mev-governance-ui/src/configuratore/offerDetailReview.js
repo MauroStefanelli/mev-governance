@@ -1,7 +1,9 @@
 import { resolveCatalogEntry } from './catalogReconciliation';
 import { criteriaOf } from './catalogCriteria';
 
-export function detailReviewInput(item, catalog, interventions, contractId, lot, index) {
+// `rationale` = i razionali CONFERMATI che riguardano la riga (del suo intervento e generali). Entrano nel contenuto della riga e quindi nella sua firma: cambiare un razionale
+// rende «da aggiornare» le righe che lo usano. Senza argomento il comportamento e' quello di prima.
+export function detailReviewInput(item, catalog, interventions, contractId, lot, index, rationale) {
   const entry = resolveCatalogEntry(item, catalog);
   const intervention = interventions.find(i => String(i.id) === String(item.interventionId));
   return {
@@ -9,6 +11,7 @@ export function detailReviewInput(item, catalog, interventions, contractId, lot,
     contractId, lot: String(lot),
     intervention: { id: item.interventionId, title: intervention?.titolo || item.interventionTitle || '', description: intervention?.descrizione || '', activity: intervention?.attivita || '', requirements: intervention?.requisiti || '', system: intervention?.sistema || '' },
     detail: { component: item.detail?.componentApplication || '', technology: item.detail?.technology || '', unit: item.detail?.unitName || '', description: item.detail?.detailDescription || item.reason || '', excelCatalogId: item.original?.catalogId ?? item.id, type: item.type, complexity: item.complexity, quantity: item.qty },
+    ...(rationale && rationale.length ? { confirmedRationale: rationale.map(entry => ({ id: entry.id, kind: entry.kind, text: String(entry.text || '').trim(), interventionId: entry.interventionId || '' })) } : {}),
     catalogEntry: entry ? { id: entry.id, name: entry.nome, ambit: entry.ambito || '', description: entry.descrizione || '', criteria: criteriaOf(entry, lot) || {} } : null,
   };
 }

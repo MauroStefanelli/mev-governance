@@ -81,3 +81,6 @@
 .offer-association-preview dd { margin: 4px 0; white-space: pre-wrap; }
 .offer-association-warning { color: #935700; background: #fff5de; padding: 10px; border-radius: 6px; }
 .offer-association-purpose { background: #edf4ff; border-left: 3px solid #7da5d8; padding: 12px; border-radius: 7px; color: #395c85; }
+.offer-ai-redo { display: block; width: 100%; margin-top: 10px; font: inherit; font-size: 12.5px; font-weight: 700; min-height: 36px; padding: 6px 12px; border-radius: 9px; border: 1px solid #aebfd8; background: #fff; color: #17314f; cursor: pointer; }
+.offer-ai-redo:hover:not(:disabled) { background: #eef4fc; border-color: #8fb0dc; } .offer-ai-redo:disabled { opacity: .55; cursor: not-allowed; }
+.offer-ai-redo:focus-visible { outline: 3px solid #75a7f7; outline-offset: 2px; }

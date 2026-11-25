@@ -173,6 +173,8 @@ public class HistoryImportController : BaseController
         var files = await db.KnowledgeImportFiles.AsNoTracking().Where(f => f.AmbienteId == environment).ToListAsync();
         var pending = await db.RationaleEntries.AsNoTracking().CountAsync(e => e.AmbienteId == environment && e.Status == "proposta" && e.SourceFile != null);
         var confirmed = await db.RationaleEntries.AsNoTracking().CountAsync(e => e.AmbienteId == environment && e.Status == "confermata" && e.SourceFile != null);
-        return Ok(new { filesRead = files.Count, withProposals = files.Count(f => f.Proposals > 0), pending, confirmed, lastAt = files.Count == 0 ? (DateTime?)null : files.Max(f => f.At), canWork = CanWork });
+        var shared = await db.RationaleEntries.AsNoTracking().CountAsync(e => e.AmbienteId == environment && e.Shared && e.Status == "confermata");
+        var sharedInitiatives = await db.RationaleEntries.AsNoTracking().Where(e => e.AmbienteId == environment && e.Shared && e.Status == "confermata").Select(e => e.Goto).Distinct().CountAsync();
+        return Ok(new { filesRead = files.Count, withProposals = files.Count(f => f.Proposals > 0), pending, confirmed, shared, sharedInitiatives, lastAt = files.Count == 0 ? (DateTime?)null : files.Max(f => f.At), canWork = CanWork });
     }
 }

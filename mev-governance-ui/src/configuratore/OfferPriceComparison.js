@@ -4,9 +4,11 @@ import { reconcileCatalog, resolveCatalogEntry } from './catalogReconciliation';
 import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
 import ReviewLauncher from './ReviewLauncher';
 import { reviewStatus } from './reviewPlan';
+import { entriesForIntervention } from './rationaleKnowledge';
+import RowRationale from './RowRationale';
 import { euro } from '../utils';
 const money = value => value == null ? 'Non disponibile' : euro.format(value);
-export default function CatalogReconciliation({ items, catalog, contractName, lot, lotDescription, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, onReview, onRestartReview }) {
+export default function CatalogReconciliation({ items, catalog, contractName, lot, lotDescription, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, onReview, onRestartReview, rationale = [], onAddRationale, onShareRationale, onReviewIntervention, canEditRationale = true }) {
   const [choices, setChoices] = useState({});
   const [view, setView] = useState('interventions');
   const [showEconomics, setShowEconomics] = useState(false);
@@ -59,7 +61,7 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
     </details>}
     {onReview && (() => {
       // Lo stato della verifica si calcola dai giudizi delle righe d'offerta (le stesse che l'AI giudica): e' la fonte della scheda, della percentuale e del pulsante.
-      const inputs = items.filter(item => item.imported).map((item, index) => detailReviewInput(item, catalog, interventions, contractId, lot, index));
+      const inputs = items.filter(item => item.imported).map((item, index) => detailReviewInput(item, catalog, interventions, contractId, lot, index, entriesForIntervention(rationale, item.interventionId)));
       return <ReviewLauncher status={reviewStatus(inputs, reviews, detailReviewSignature)} busy={reviewBusy} onStart={options => onReview(options)} onRestart={() => (onRestartReview || onReview)({ force: true })} />;
     })()}
     <div className="offer-view-toolbar">
@@ -79,14 +81,14 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
       <colgroup>{[300, 180, 460, ...(showEconomics ? [140, 75, 120, 125, 130, 125] : []), 130].map((width,i) => <col key={i} style={{ width }} />)}</colgroup>
       <thead><tr>{['Intervento / attività', 'Voce catalogo', 'Verifica AI attività / catalogo', ...(showEconomics ? ['Tipo / complessità', 'Quantità', 'Prezzo Excel', 'Prezzo catalogo', 'Differenza unitaria', 'Prezzo in uso'] : []), 'Azione'].map((h, i) => <th key={h} scope="col" className={i === 2 ? 'offer-ai-heading' : undefined}>{h}</th>)}</tr></thead>
       <tbody>{group.lines.map(({ item, price, original, difference, index }) => {
-        const input = detailReviewInput(item, catalog, interventions, contractId, lot, index);
+        const input = detailReviewInput(item, catalog, interventions, contractId, lot, index, entriesForIntervention(rationale, item.interventionId));
         const review = reviews[input.rowId];
         const stale = review && review.signature !== detailReviewSignature(input);
         const labels = { coerente: 'Coerente secondo AI', da_verificare: 'Da verificare', non_coerente: 'Possibile incoerenza', error: 'Verifica non disponibile' };
         return <tr key={item.key ?? index} style={{ borderTop: '1px solid #e2e8f0' }}>
         <td style={{ padding: 8, minWidth: 230 }}><strong>{item.interventionId}</strong><div>{item.detail?.componentApplication}</div><div>{item.detail?.detailDescription || item.reason}</div></td>
         <td className="offer-price-code"><strong>{resolveCatalogEntry(item, catalog)?.nome || item.detail?.name || item.id}</strong><div className="offer-row-identity"><span>ID Excel {original?.catalogId ?? item.id}</span><span>ID Intervento {item.interventionId || 'Non indicato'}</span></div></td>
-        <td className="offer-ai-review"><div className="offer-ai-card">{review ? <><strong className={`offer-ai-status ${stale ? 'stale' : review.status}`}>{stale ? 'Da aggiornare: dati modificati dopo la verifica' : labels[review.status]}</strong><div className="offer-ai-reason">{review.reason}</div>{review.suggestion && <div className="offer-ai-suggestion"><b>Indicazione per l’analista</b><p>{review.suggestion}</p></div>}{review.evidence && <details><summary>Evidenze utilizzate</summary><p>{review.evidence}</p></details>}{review.model && <small>{review.model} · {new Date(review.reviewedAt).toLocaleString('it-IT')}</small>}</> : <div className="offer-ai-empty"><strong>{reviewBusy ? 'Analisi in corso' : 'Verifica da eseguire'}</strong><p>{reviewBusy ? 'L’esito di questa attività apparirà qui.' : 'Avvia la verifica AI per confrontare attività, voce e complessità.'}</p></div>}</div></td>
+        <td className="offer-ai-review"><div className="offer-ai-card">{review ? <><strong className={`offer-ai-status ${stale ? 'stale' : review.status}`}>{stale ? 'Da aggiornare: dati modificati dopo la verifica' : labels[review.status]}</strong><div className="offer-ai-reason">{review.reason}</div>{review.suggestion && <div className="offer-ai-suggestion"><b>Indicazione per l’analista</b><p>{review.suggestion}</p></div>}{review.evidence && <details><summary>Evidenze utilizzate</summary><p>{review.evidence}</p></details>}{review.model && <small>{review.model} · {new Date(review.reviewedAt).toLocaleString('it-IT')}</small>}</> : <div className="offer-ai-empty"><strong>{reviewBusy ? 'Analisi in corso' : 'Verifica da eseguire'}</strong><p>{reviewBusy ? 'L’esito di questa attività apparirà qui.' : 'Avvia la verifica AI per confrontare attività, voce e complessità.'}</p></div>}</div>{onAddRationale && <RowRationale entries={rationale} interventionId={item.interventionId} canEdit={canEditRationale} busy={reviewBusy} onAdd={(kind, text, interventionId) => onAddRationale(kind, text, interventionId)} onShare={onShareRationale} />}{onReviewIntervention && item.interventionId && <button type="button" className="offer-ai-redo" disabled={reviewBusy} onClick={() => onReviewIntervention(item.interventionId)}>Rifai la verifica dell’intervento {item.interventionId}</button>}</td>
         {showEconomics && <><td><span className="offer-type">{item.type}</span><div className="offer-complexity">{item.complexity}</div></td><td className="offer-price-number">{item.qty}</td>
         <td className="offer-price-number">{money(original?.unit)}</td><td className="offer-price-number">{money(price)}</td><td className="offer-price-number">{money(difference)}</td><td className="offer-price-number">{money(item.unit)}</td>
         </>}

@@ -27,6 +27,7 @@ beforeEach(() => {
     }
     if (path === 'entries') return entry(50, body.kind, 'confermata', body.text, { byAi: false, createdBy: 'io', createdByFullName: 'Io', decidedBy: 'io', decidedAt: new Date().toISOString() });
     if (path.endsWith('/decision')) { const id = Number(path.split('/')[1]); const base = server.entries.find(e => e.id === id); return { ...base, status: body.decision, text: body.text ?? base.text, decidedBy: 'io', decidedByFullName: 'Io', decidedAt: new Date().toISOString() }; }
+    if (path.endsWith('/share') || path.endsWith('/unshare')) { const id = Number(path.split('/')[1]); const base = server.entries.find(e => e.id === id); return { ...base, shared: path.endsWith('/share') }; }
     if (path.endsWith('/inherit')) { const id = Number(path.split('/')[1]); const base = server.related.find(e => e.id === id); return { ...base, id: 77, goto: 'goto-1', status: 'proposta', sourceEntryId: base.id, byAi: false }; }
     return {};
   });
@@ -477,4 +478,26 @@ describe('connection to a Poste environment', () => {
     render(<Harness />); fireEvent.click(await screen.findByRole('button', { name: /Collegamento a un ambiente Poste/ })); fireEvent.change(screen.getByLabelText('Database o servizio'), { target: { value: 'oracle://utente:Segreta99@db/NPSO' } });
     const alert = await screen.findByRole('alert'); expect(alert).toHaveTextContent('non scrivere credenziali'); expect(alert).not.toHaveTextContent('Segreta99');
   });
+});
+
+
+test('a confirmed voice written in the app can be SHARED with the other initiatives, and taken back', async () => {
+  server.entries = [entry(21, 'razionale', 'confermata', 'Il batch notturno gestisce i resi', { byAi: false, shared: false })];
+  render(<Harness />);
+  await openLists();
+  fireEvent.click(await screen.findByRole('tab', { name: /Confermate/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Condividi con le altre iniziative' }));
+  await waitFor(() => expect(server.calls.some(([path]) => path === 'entries/21/share')).toBe(true));
+  expect(await screen.findByText(/Condivisa: la trovi nella Conoscenza storica AI/)).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: /Condivisa con le altre iniziative · Ritira/ }));
+  await waitFor(() => expect(server.calls.some(([path]) => path === 'entries/21/unshare')).toBe(true));
+  expect(await screen.findByText('Non più condivisa con le altre iniziative.')).toBeInTheDocument();
+});
+test('a voice that came from the history import is NOT offered for sharing (it is already knowledge)', async () => {
+  server.entries = [entry(22, 'razionale', 'confermata', 'Da una nota importata', { byAi: false, sourceFile: 'projects/x/ilp-a.md' })];
+  render(<Harness />);
+  await openLists();
+  fireEvent.click(await screen.findByRole('tab', { name: /Confermate/ }));
+  await screen.findByText('Da una nota importata');
+  expect(screen.queryByRole('button', { name: /Condividi con le altre iniziative/ })).toBeNull();
 });

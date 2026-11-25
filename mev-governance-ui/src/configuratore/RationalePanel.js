@@ -121,6 +121,11 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
       if (decision === 'confermata') setTab('confirmed');
     } catch (e) { setError(e.message); }
   };
+  const share = async (entry, shared) => {
+    setError('');
+    try { const saved = await rationaleRequest(`entries/${entry.id}/${shared ? 'share' : 'unshare'}`, {}); apply(previous => mergeById(previous, [saved])); setNotice(shared ? 'Condivisa: la trovi nella Conoscenza storica AI e le altre iniziative dello stesso sistema potranno riprenderla.' : 'Non più condivisa con le altre iniziative.'); }
+    catch (e) { setError(e.message); }
+  };
   const addEntry = async event => {
     event.preventDefault();
     const check = validateText(adding.text, MAX_ENTRY);
@@ -165,13 +170,16 @@ export default function RationalePanel({ initiative, interventions = [], onKnowl
     <span className="rat-meta">{who(entry)} · {relativeTime(entry.createdAt)}{entry.sourceEntryId ? ' · ripresa da un’altra iniziativa' : ''}
       {entry.decidedAt ? ` · ${entry.status === 'confermata' ? 'confermata' : entry.status === 'revocata' ? 'revocata' : 'scartata'} da ${displayName({ fullName: entry.decidedByFullName, username: entry.decidedBy })}` : ''}</span>
     {actions === 'proposal' && <span className="rat-actions"><button type="button" className="rat-primary" onClick={() => decide(entry, 'confermata')}>Conferma</button><button type="button" onClick={() => decide(entry, 'scartata')}>Scarta</button></span>}
-    {actions === 'confirmed' && <span className="rat-actions"><button type="button" onClick={() => { if (window.confirm('Revocare questa voce? Non sarà più usata per offerta, sviluppo e altre iniziative.')) decide(entry, 'revocata'); }}>Revoca</button></span>}
+    {actions === 'confirmed' && <span className="rat-actions">{!entry.sourceFile && (entry.shared
+      ? <button type="button" className="rat-shared" title="Smetti di condividerla con le altre iniziative" onClick={() => share(entry, false)}>✓ Condivisa con le altre iniziative · Ritira</button>
+      : <button type="button" title="La rende disponibile nella Conoscenza storica AI e alle altre iniziative dello stesso sistema" onClick={() => share(entry, true)}>Condividi con le altre iniziative</button>)}
+      <button type="button" onClick={() => { if (window.confirm('Revocare questa voce? Non sarà più usata per offerta, sviluppo e altre iniziative.')) decide(entry, 'revocata'); }}>Revoca</button></span>}
   </li>;
 
   return <section className="rat" aria-label="Razionali e vincoli con l’AI">
     <header className="rat-head">
       <div><span className="rat-eyebrow">Conoscenza dell’iniziativa</span><h3>Razionali e vincoli con l’AI</h3>
-        <p>Racconta all’AI perché servono gli interventi e quali vincoli valgono. Ciò che confermi guida l’offerta, lo Sviluppo e le iniziative future sullo stesso sistema.</p></div>
+        <p>Racconta all’AI perché servono gli interventi e quali vincoli valgono. Ciò che confermi guida l’offerta e lo Sviluppo di questa iniziativa; con «Condividi con le altre iniziative» lo rendi disponibile anche per le iniziative future sullo stesso sistema.</p></div>
       <ul className="rat-counts" aria-label="Voci confermate">{KIND_ORDER.map(kind => <li key={kind}><b>{counts[kind]}</b>{KINDS[kind].plural}</li>)}</ul>
     </header>
     <ol className="rat-flow" aria-label="Come funziona"><li><b>1</b>Spiega all’AI</li><li><b>2</b>L’AI propone voci</li><li><b>3</b>Tu confermi</li><li><b>4</b>Le usano offerta e Sviluppo</li></ol>
