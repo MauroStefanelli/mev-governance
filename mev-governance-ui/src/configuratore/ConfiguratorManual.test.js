@@ -18,7 +18,7 @@ test('opens the manual, navigates its chapters and closes without leaving the in
   expect(screen.getByText(`Capitolo 1 di ${total}`)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Catalogo e verifica AI/ }));
   expect(screen.getByText(`Capitolo ${at('Catalogo e verifica AI')} di ${total}`)).toBeInTheDocument();
-  expect(screen.getByText(/coerenza AI delle righe/)).toBeInTheDocument();
+  expect(screen.getByText(/Dopo modifiche ai dati usati dal controllo, il risultato è marcato “Da aggiornare”\. Premi “Verifica \/ aggiorna coerenza AI delle righe”/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Dall’Excel al codice/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Storico delle iniziative/ }));
   expect(screen.getByText(`Capitolo ${at('Storico delle iniziative')} di ${total}`)).toBeInTheDocument();

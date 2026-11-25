@@ -19,6 +19,7 @@ import { knowledgeForAi, entriesForIntervention } from "../configuratore/rationa
 import { saveAndClose } from "../configuratore/saveAndClose";
 import SaveProgress from "../configuratore/SaveProgress";
 import ReviewProgress from "../configuratore/ReviewProgress";
+import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configuratore/reviewPlan";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
 import CollaborationPanel from "../configuratore/CollaborationPanel";
 import { useSettled, useStableCallback } from "../configuratore/developmentCollaboration";
@@ -117,7 +118,10 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [towPercentages, setTowPercentages] = useState({});
   const [priceMode] = useState("base");
   const [aiProposals, setAiProposals] = useState(null);
-  const [detailReviews, setDetailReviews] = useState({});
+  const [detailReviews, setDetailReviewsState] = useState({});
+  // I giudizi piu' recenti, sempre: «Riprendi» e «Verifica tutto da capo» sono funzioni create in un disegno precedente della pagina e leggerebbero i giudizi vecchi.
+  const detailReviewsRef = useRef({});
+  const setDetailReviews = update => setDetailReviewsState(previous => { const next = typeof update === 'function' ? update(previous) : update; detailReviewsRef.current = next; return next; });
   const [developmentPlans, setDevelopmentPlans] = useState({});
   const [rationale, setRationale] = useState([]); // confirmed + proposed entries of the open initiative
   const [openSections, setOpenSections] = useState(() => new Set(['dati']));
@@ -131,7 +135,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [detailReviewProgress, setDetailReviewProgress] = useState('');
   const detailReviewJob = useRef(0);
   // La finestra del cervello: aperta solo quando la verifica parte da qui (non quando parte da sola dopo l'import dell'Excel).
-  const [reviewWindow, setReviewWindow] = useState({ open: false, phase: 'running', done: 0, total: 0, rows: [], error: '' });
+  const [reviewWindow, setReviewWindow] = useState({ open: false, phase: 'running', done: 0, total: 0, rows: [], error: '', resumed: false, alreadyDone: 0, failedRows: [] });
   useEffect(() => () => { detailReviewJob.current++; }, []);
   useEffect(() => { detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress(''); }, [ambienteId]);
   const [aiBusy, setAiBusy] = useState(false);
@@ -655,40 +659,64 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
 
   // ── Step 1: import Excel ──
-  const runDetailReview = async (reviewItems = items, reviewCatalog = catalog, reviewInterventions = importedInterventions, reviewLot = lot, withWindow = false) => {
+  // La verifica AI righe per righe. Premuto di nuovo, RIPARTE dalle righe non ancora verificate (o il cui contenuto e' cambiato) invece di rifare tutto;
+  // `force` rifa' tutte le righe. Se un gruppo fallisce lo si riprova, poi riga per riga: una riga che non riesce non butta via le altre.
+  const runDetailReview = async (reviewItems = items, reviewCatalog = catalog, reviewInterventions = importedInterventions, reviewLot = lot, withWindow = false, force = false) => {
     const job = ++detailReviewJob.current;
     const rows = reviewItems.filter(item => item.imported).map((item, index) => detailReviewInput(item, reviewCatalog, reviewInterventions, selectedContractId, reviewLot, index));
     if (!rows.length) return;
-    setDetailReviewBusy(true); setDetailReviewProgress(`Verifica AI: 0 / ${rows.length} righe`);
-    // Le righe come le mostra la finestra: chi sono (intervento, attivita', voce di catalogo) e, man mano, il giudizio dell'AI.
-    const windowRows = rows.map(input => ({ rowId: input.rowId, interventionId: input.intervention?.id || '', activity: input.detail?.description || input.intervention?.activity || input.intervention?.title || '', catalogName: input.catalogEntry?.name || '', review: null }));
-    if (withWindow) setReviewWindow({ open: true, phase: 'running', done: 0, total: rows.length, rows: windowRows, error: '' });
+    const known = detailReviewsRef.current;
+    const plan = planReview(rows, known, detailReviewSignature, { force: force || !withWindow });
+    const todo = plan.todo;
+    const total = rows.length; const already = plan.alreadyDone;
+    // «Da capo»: i giudizi delle righe che si rifanno si tolgono SUBITO. Altrimenti restano «verificate» finche' l'AI non risponde e, se la verifica si interrompe, «Riprendi» le
+    // crederebbe a posto (le vecchie risposte non sarebbero mai state rifatte). Cosi' una riga e' verificata solo se lo e' davvero in QUESTA esecuzione.
+    if (force && withWindow && todo.length) setDetailReviews(previous => { const next = { ...previous }; todo.forEach(input => { delete next[input.rowId]; }); return next; });
+    // Le righe come le mostra la finestra: chi sono (intervento, attivita', voce di catalogo) e, man mano, il giudizio dell'AI. Quelle gia' verificate partono col loro giudizio.
+    const windowRows = rows.map(input => ({ rowId: input.rowId, interventionId: input.intervention?.id || '', activity: input.detail?.description || input.intervention?.activity || input.intervention?.title || '', catalogName: input.catalogEntry?.name || '', review: reviewIsCurrent(known[input.rowId], input, detailReviewSignature) && !force && withWindow ? known[input.rowId] : null }));
+    if (withWindow) setReviewWindow({ open: true, phase: todo.length ? 'running' : 'done', done: already, total, rows: windowRows, error: '', resumed: plan.resumed, alreadyDone: already, failedRows: [] });
+    if (!todo.length) { setDetailReviewProgress(`Verifica AI: ${total} / ${total} righe già verificate`); return; }
+    setDetailReviewBusy(true); setDetailReviewProgress(`Verifica AI: ${already} / ${total} righe`);
     const showResults = (results, done) => { if (withWindow) setReviewWindow(previous => ({ ...previous, done, rows: previous.rows.map(row => { const found = results.find(r => r.rowId === row.rowId); return found ? { ...row, review: found } : row; }) })); };
-    // Sequential bounded batches: each detail row has its own stable ID and result.
+    const ask = async batch => {
+      const withKnowledge = batch.map(input => ({ ...input, confirmedRationale: knowledgeForAi(entriesForIntervention(rationale, input.intervention?.id)) }));
+      const response = await reviewOfferDetails({ contractId: selectedContractId, contractName: activeContract?.name || '', lot: reviewLot, rows: withKnowledge });
+      return parseDetailReviews(response, batch);
+    };
+    const failedRows = []; let finished = already; let lastError = '';
     try {
-      for (let offset = 0; offset < rows.length; offset += 5) {
+      for (const batch of chunk(todo, 5)) {
         if (detailReviewJob.current !== job) return;
-        const batch = rows.slice(offset, offset + 5);
-        let results;
-        try {
-          const withKnowledge = batch.map(input => ({ ...input, confirmedRationale: knowledgeForAi(entriesForIntervention(rationale, input.intervention?.id)) }));
-          const response = await reviewOfferDetails({ contractId: selectedContractId, contractName: activeContract?.name || '', lot: reviewLot, rows: withKnowledge });
-          results = parseDetailReviews(response, batch);
-        } catch (e) {
-          results = batch.map(input => ({ rowId: input.rowId, signature: detailReviewSignature(input), status: 'error', reason: e.message }));
+        let results = null;
+        // 1) il gruppo; 2) se fallisce, di nuovo (un errore passeggero e' comune); 3) se ancora fallisce, riga per riga.
+        for (let attempt = 0; attempt < 2 && !results; attempt += 1) {
+          try { results = await ask(batch); } catch (e) { lastError = e.message; if (!isRetryable(e.message)) break; if (detailReviewJob.current !== job) return; }
+        }
+        if (!results && isRetryable(lastError) && batch.length > 1) {
+          const single = [];
+          for (const input of batch) {
+            if (detailReviewJob.current !== job) return;
+            try { single.push(...await ask([input])); } catch (e) { lastError = e.message; single.push({ rowId: input.rowId, signature: detailReviewSignature(input), status: 'error', reason: e.message }); }
+          }
+          results = single;
+        }
+        if (!results) {
+          // errore definitivo (es. chiave AI): inutile insistere sulle altre righe
           if (detailReviewJob.current === job) {
-            setDetailReviews(previous => ({ ...previous, ...Object.fromEntries(results.map(r => [r.rowId, r])) }));
-            setDetailReviewProgress(`Verifica interrotta: ${e.message}`);
-            if (withWindow) setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: e.message }));
+            const reason = lastError;
+            setDetailReviewProgress(`Verifica interrotta: ${reason}`);
+            if (withWindow) setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: reason }));
           }
           return;
         }
         if (detailReviewJob.current !== job) return;
+        results.filter(r => r.status === 'error').forEach(r => failedRows.push(r.rowId));
         setDetailReviews(previous => ({ ...previous, ...Object.fromEntries(results.map(r => [r.rowId, r])) }));
-        setDetailReviewProgress(`Verifica AI: ${Math.min(offset + 5, rows.length)} / ${rows.length} righe`);
-        showResults(results, Math.min(offset + 5, rows.length));
+        finished += batch.length;
+        setDetailReviewProgress(`Verifica AI: ${finished} / ${total} righe`);
+        showResults(results, finished);
       }
-      if (withWindow && detailReviewJob.current === job) setReviewWindow(previous => ({ ...previous, phase: 'done', done: rows.length }));
+      if (withWindow && detailReviewJob.current === job) { const allFailed = failedRows.length === todo.length && todo.length > 0; const reason = lastError; setReviewWindow(previous => ({ ...previous, phase: allFailed ? 'stopped' : 'done', done: total, failedRows, error: allFailed ? reason : '' })); }
     } finally { if (detailReviewJob.current === job) setDetailReviewBusy(false); }
   };
 
@@ -1966,7 +1994,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
            onClick={saveAndCloseWithProgress}>
            {closing.phase === 'saving' ? "Salvataggio…" : "Salva e Chiudi"}
          </button>
-         <ReviewProgress open={reviewWindow.open} phase={reviewWindow.phase} done={reviewWindow.done} total={reviewWindow.total} entries={reviewWindow.rows} error={reviewWindow.error}
+         <ReviewProgress open={reviewWindow.open} phase={reviewWindow.phase} done={reviewWindow.done} total={reviewWindow.total} entries={reviewWindow.rows} error={reviewWindow.error} resumed={reviewWindow.resumed} alreadyDone={reviewWindow.alreadyDone} failedRows={reviewWindow.failedRows}
+           onResume={() => runDetailReview(items, catalog, importedInterventions, lot, true, false)} onRestart={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)}
            onClose={() => setReviewWindow(previous => ({ ...previous, open: false }))}
            onStop={() => { detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress('Verifica interrotta dall’utente'); setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: 'Hai interrotto la verifica.' })); }} />
          <SaveProgress phase={closing.phase} step={closing.step} message={closing.message} onDismiss={() => setClosing({ phase: 'idle', step: '', message: '' })} title="Salvataggio dell’iniziativa in corso" />

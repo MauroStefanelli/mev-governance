@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import ReviewBrain from './ReviewBrain';
 import { percentDone, summarize, STATUS_LABEL, STATUS_TONE, STATUS_ORDER } from './reviewSummary';
+import { explainFailure } from './reviewPlan';
 import './reviewBrain.css';
 
 const PHASE = {
@@ -19,7 +20,7 @@ const VERDICT = {
 // La finestra della «Verifica AI delle righe»: mentre l'AI lavora mostra il cervello che si colora con la percentuale VERA (righe verificate su righe da verificare) e,
 // riga dopo riga, cosa sta emergendo; alla fine mostra i dati piu' importanti. Si chiude solo con «Chiudi» (o «Interrompi» mentre lavora): nulla si perde.
 // `entries` = una voce per riga { rowId, interventionId, activity, catalogName, review }.
-export default function ReviewProgress({ open, phase, done, total, entries, error, onClose, onStop }) {
+export default function ReviewProgress({ open, phase, done, total, entries, error, onClose, onStop, onResume, onRestart, resumed = false, alreadyDone = 0, failedRows = [] }) {
   const closeRef = useRef(null);
   useEffect(() => { if (open && phase !== 'running') closeRef.current?.focus(); }, [open, phase]);
   useEffect(() => {
@@ -42,15 +43,20 @@ export default function ReviewProgress({ open, phase, done, total, entries, erro
           <h2 id="rp-title">{meta.title}</h2>
           <p id="rp-status" role="status" aria-live="polite">
             {running && `${done} di ${total} righe verificate (${percent}%)`}
-            {phase === 'done' && `${live.reviewed} di ${live.total} righe verificate`}
+            {phase === 'done' && (live.counts.error > 0 ? `${live.total - live.counts.error - live.counts.waiting} di ${live.total} righe verificate · ${live.counts.error} non verificate` : `${live.reviewed} di ${live.total} righe verificate`)}
             {phase === 'stopped' && `${done} di ${total} righe verificate prima dell’interruzione`}
           </p>
           {running && <div className="rp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Avanzamento della verifica"><span style={{ width: `${percent}%` }} /></div>}
+          {running && resumed && <p className="rp-resume">Riprende da dove si era fermata: {alreadyDone} righe già verificate non vengono rifatte.</p>}
           {running && <p className="rp-hint">Ci vuole circa un minuto ogni 5 righe. Non chiudere la pagina: le righe verificate restano salvate man mano.</p>}
         </div>
       </header>
 
-      {phase === 'stopped' && <p role="alert" className="rp-error">{error || 'La verifica non è stata completata.'}<br /><span>Le righe già verificate sono state conservate. Puoi riprovare con «Verifica / aggiorna coerenza AI delle righe».</span></p>}
+      {phase === 'stopped' && (() => { const why = explainFailure(error); return <div role="alert" className="rp-error"><strong>{why.cause}</strong>
+        <p>{why.advice}</p>
+        {error && <small>Dettaglio tecnico: {error}</small>}
+        <p className="rp-keep">{done} di {total} righe sono già verificate e sono state conservate: «Riprendi» le salta e continua dalle altre {Math.max(0, total - done)}.</p></div>; })()}
+      {phase === 'done' && failedRows.length > 0 && <p role="alert" className="rp-error rp-error-soft"><strong>{failedRows.length} {failedRows.length === 1 ? 'riga non è stata verificata' : 'righe non sono state verificate'}</strong> dopo un nuovo tentativo. Le altre sono a posto. «Riprendi» riprova solo quelle.</p>}
 
       {(live.reviewed > 0 || !running) && <section className="rp-body" aria-label="Dati emersi dal ragionamento">
         {phase !== 'running' && <p className={`rp-verdict rp-v-${verdict.tone}`}><strong>{verdict.text}</strong></p>}
@@ -80,7 +86,10 @@ export default function ReviewProgress({ open, phase, done, total, entries, erro
 
       <footer className="rp-foot">
         {running ? <button type="button" className="rp-btn" onClick={onStop}>Interrompi la verifica</button>
-          : <button type="button" ref={closeRef} className="rp-btn rp-btn-primary" onClick={onClose}>Chiudi</button>}
+          : <>
+            {(phase === 'stopped' || (phase === 'done' && failedRows.length > 0)) && onResume && <button type="button" className="rp-btn rp-btn-primary" onClick={onResume}>Riprendi dalle righe non verificate</button>}
+            {(phase === 'stopped' || phase === 'done') && onRestart && <button type="button" className="rp-btn" onClick={onRestart}>Verifica tutto da capo</button>}
+            <button type="button" ref={closeRef} className={`rp-btn${phase === 'done' && !failedRows.length ? ' rp-btn-primary' : ''}`} onClick={onClose}>Chiudi</button></>}
         <p>Giudizio AI da confermare dall’analista. Non modifica interventi, complessità o prezzi.</p>
       </footer>
     </div>

@@ -51,17 +51,31 @@ beforeEach(() => {
   }));
 });
 const mount = () => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} />);
-const importAndGoToOffer = async (rows) => {
+// Importa l'Excel e porta al passo 3. La verifica che parte da sola dopo l'import viene fatta rispondere (`autoFinish`) oppure lasciata appesa
+// e poi interrotta, cosi' ogni test parte dalla situazione che vuole provare.
+const importAndGoToOffer = async (rows, { autoFinish = true } = {}) => {
   mount();
   const input = await waitFor(() => { const el = document.querySelector('input[type="file"][accept=".xlsx"]'); expect(el).toBeInTheDocument(); return el; });
   await act(async () => { fireEvent.change(input, { target: { files: [await file(rows)] } }); });
-  // l'import lancia da solo la verifica: la lasciamo finire, poi si passa al passo 3
   await waitFor(() => expect(gates.length).toBeGreaterThan(0));
-  while (gates.length) { const g = gates.shift(); await act(async () => { g.resolve(); }); }
+  if (autoFinish) { while (gates.length) { const g = gates.shift(); await act(async () => { g.resolve(); }); } }
   fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
-  return screen.findByRole('button', { name: 'Verifica / aggiorna coerenza AI delle righe' });
+  return screen.findByRole('button', { name: /Verifica \/ aggiorna coerenza AI delle righe|Verifica AI in corso/ });
+};
+// «Verifica tutto da capo» dalla finestra: parte dalla prima riga, come la prima volta.
+const startFull = async () => {
+  const button = await importAndGoToOffer(eightRows());
+  gates.length = 0; service.reviewOfferDetails.mockClear();
+  fireEvent.click(button);
+  await screen.findByRole('dialog');
+  expect(screen.getByRole('dialog')).toHaveTextContent('Verifica completata');       // le 8 righe sono gia' verificate: non c'e' nulla da rifare
+  fireEvent.click(screen.getByRole('button', { name: 'Verifica tutto da capo' }));
+  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('L’AI sta ragionando sulle righe'));
 };
 const eightRows = () => [...Array.from({ length: 7 }, (_, i) => detail(239, 1200, 'Medio', 'REALIZZAZIONE')), detail(242, 300, 'Medio', 'REALIZZAZIONE')].map((row, i) => { row[4] = `Attivita numero ${i + 1}`; return row; });
+
+const rowsN = n => Array.from({ length: n }, (_, i) => { const row = detail(i % 2 ? 242 : 239, 1200, 'Medio', 'REALIZZAZIONE'); row[4] = `Attivita numero ${i + 1}`; return row; });
+const dlg = () => screen.getByRole('dialog');
 
 test('the automatic review after the Excel import does NOT open the window', async () => {
   mount();
@@ -72,73 +86,146 @@ test('the automatic review after the Excel import does NOT open the window', asy
   while (gates.length) { const g = gates.shift(); await act(async () => { g.resolve(); }); }
 });
 
-test('the button opens the window; it shows the REAL progress batch by batch (5 rows at a time) and then the summary', async () => {
+test('when every row is already verified the button does NOT call the AI again: it says so', async () => {
   const button = await importAndGoToOffer(eightRows());
-  const rowIds = []; service.reviewOfferDetails.mockClear();
-  verdicts = {};
+  service.reviewOfferDetails.mockClear(); gates.length = 0;
   fireEvent.click(button);
-  const dialog = await screen.findByRole('dialog');
-  expect(dialog).toHaveTextContent('L’AI sta ragionando sulle righe');
-  expect(within(dialog).getByText('0 di 8 righe verificate (0%)')).toBeInTheDocument();
-  expect(within(dialog).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
-  expect(button).toBeDisabled();
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Verifica completata');
+  expect(dlg()).toHaveTextContent('8 di 8 righe verificate');
+  expect(service.reviewOfferDetails).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: 'Verifica tutto da capo' })).toBeInTheDocument();
+});
+
+test('the window shows the REAL progress batch by batch (5 rows at a time) and then the summary', async () => {
+  await startFull();
+  expect(within(dlg()).getByText('0 di 8 righe verificate (0%)')).toBeInTheDocument();
+  expect(within(dlg()).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
   await waitFor(() => expect(gates).toHaveLength(1));
   expect(gates[0].rows).toHaveLength(5);
-  gates[0].rows.forEach(r => rowIds.push(r.rowId));
   verdicts = { [gates[0].rows[1].rowId]: { status: 'non_coerente', reason: 'La complessità Medio non è coerente con il criterio «Più di 30 tabelle».', suggestion: 'Usare Complesso' }, [gates[0].rows[3].rowId]: { status: 'da_verificare', reason: 'Mancano i requisiti' } };
   await act(async () => { gates.shift().resolve(); });
-  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('5 di 8 righe verificate (63%)'));
-  expect(within(screen.getByRole('dialog')).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '63');
-  expect(screen.getByRole('dialog')).toHaveTextContent('Cosa sta emergendo');
-  expect(screen.getByRole('dialog')).toHaveTextContent('La complessità Medio non è coerente con il criterio «Più di 30 tabelle».');
-  expect(screen.getByRole('dialog')).toHaveTextContent('Cosa fare: Usare Complesso');
-  expect(screen.getByRole('dialog')).not.toHaveTextContent('Verifica completata');
+  await waitFor(() => expect(dlg()).toHaveTextContent('5 di 8 righe verificate (63%)'));
+  expect(within(dlg()).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '63');
+  expect(dlg()).toHaveTextContent('Cosa sta emergendo');
+  expect(dlg()).toHaveTextContent('La complessità Medio non è coerente con il criterio «Più di 30 tabelle».');
+  expect(dlg()).toHaveTextContent('Cosa fare: Usare Complesso');
   await waitFor(() => expect(gates).toHaveLength(1));
   expect(gates[0].rows).toHaveLength(3);
   await act(async () => { gates.shift().resolve(); });
-  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Verifica completata'));
-  const done = screen.getByRole('dialog');
-  expect(done).toHaveTextContent('8 di 8 righe verificate');
-  expect(done).toHaveTextContent('Ci sono righe con una possibile incoerenza.');
-  expect(within(done).getByRole('img', { name: 'Avanzamento della verifica: 100%' })).toBeInTheDocument();
-  expect(done).toHaveTextContent('gpt-test');
-  fireEvent.click(within(done).getByRole('button', { name: 'Chiudi' }));
+  await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+  expect(dlg()).toHaveTextContent('8 di 8 righe verificate');
+  expect(dlg()).toHaveTextContent('Ci sono righe con una possibile incoerenza.');
+  expect(dlg()).toHaveTextContent('gpt-test');
+  fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
   expect(screen.queryByRole('dialog')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Verifica / aggiorna coerenza AI delle righe' })).toBeEnabled();
-  expect(screen.getAllByText('Possibile incoerenza').length).toBeGreaterThan(0);      // il giudizio resta nella tabella, come prima
+  expect(screen.getAllByText('Possibile incoerenza').length).toBeGreaterThan(0);
 });
 
-test('Stop ends the work, keeps what was verified and the page stays usable', async () => {
-  const button = await importAndGoToOffer(eightRows());
-  fireEvent.click(button);
-  await screen.findByRole('dialog'); await waitFor(() => expect(gates).toHaveLength(1));
+test('Stop ends the work, keeps what was verified, says it was the user, and the window offers to resume', async () => {
+  await startFull();
+  await waitFor(() => expect(gates).toHaveLength(1));
+  await act(async () => { gates.shift().resolve(); });                       // il primo gruppo (5 righe) e' verificato
+  await waitFor(() => expect(dlg()).toHaveTextContent('5 di 8 righe verificate'));
+  await waitFor(() => expect(gates).toHaveLength(1));
   fireEvent.click(screen.getByRole('button', { name: 'Interrompi la verifica' }));
   const stopped = await screen.findByRole('alertdialog');
-  expect(stopped).toHaveTextContent('Verifica interrotta'); expect(stopped).toHaveTextContent('Hai interrotto la verifica.');
-  await act(async () => { gates.shift().resolve(); });      // la risposta in volo arriva dopo: non deve riaprire ne' cambiare nulla
-  expect(screen.getByRole('alertdialog')).toHaveTextContent('Verifica interrotta');
-  fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
-  expect(screen.queryByRole('alertdialog')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Verifica / aggiorna coerenza AI delle righe' })).toBeEnabled();
+  expect(stopped).toHaveTextContent('Verifica interrotta'); expect(stopped).toHaveTextContent('Hai premuto «Interrompi la verifica».');
+  expect(stopped).toHaveTextContent('5 di 8 righe sono già verificate'); expect(stopped).toHaveTextContent('continua dalle altre 3');
+  await act(async () => { gates.shift().resolve(); });                       // la risposta in volo arriva dopo: non cambia nulla
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('5 di 8 righe sono già verificate');
+  expect(within(stopped).getByRole('button', { name: 'Riprendi dalle righe non verificate' })).toBeInTheDocument();
 });
 
-test('a failure of the AI keeps the window open with the reason and what had been verified', async () => {
-  const button = await importAndGoToOffer(eightRows());
-  fireEvent.click(button);
-  await screen.findByRole('dialog'); await waitFor(() => expect(gates).toHaveLength(1));
-  await act(async () => { gates.shift().reject(new Error('Verifica AI non riuscita. Controlla la configurazione AI personale e riprova')); });
+test('RESUMING after a stop does NOT start from the beginning: it asks the AI only for the rows not verified yet', async () => {
+  await startFull();
+  await waitFor(() => expect(gates).toHaveLength(1));
+  const firstBatch = gates[0].rows.map(r => r.rowId);
+  await act(async () => { gates.shift().resolve(); });
+  await waitFor(() => expect(gates).toHaveLength(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Interrompi la verifica' }));
+  await screen.findByRole('alertdialog'); gates.length = 0; service.reviewOfferDetails.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: 'Riprendi dalle righe non verificate' }));
+  await waitFor(() => expect(dlg()).toHaveTextContent('L’AI sta ragionando sulle righe'));
+  expect(dlg()).toHaveTextContent('Riprende da dove si era fermata: 5 righe già verificate non vengono rifatte.');
+  expect(within(dlg()).getByText('5 di 8 righe verificate (63%)')).toBeInTheDocument();      // l'avanzamento riparte dal punto raggiunto, non da 0
+  await waitFor(() => expect(gates).toHaveLength(1));
+  const asked = gates[0].rows.map(r => r.rowId);
+  expect(asked).toHaveLength(3);
+  expect(asked.some(id => firstBatch.includes(id))).toBe(false);               // nessuna delle 5 righe gia' fatte e' stata rimandata all'AI
+  await act(async () => { gates.shift().resolve(); });
+  await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+  expect(dlg()).toHaveTextContent('8 di 8 righe verificate');
+  expect(service.reviewOfferDetails).toHaveBeenCalledTimes(1);
+});
+
+test('«Verifica tutto da capo» asks the AI for ALL the rows again', async () => {
+  await startFull();
+  await waitFor(() => expect(gates).toHaveLength(1));
+  expect(gates[0].rows).toHaveLength(5);
+  await act(async () => { gates.shift().resolve(); }); await waitFor(() => expect(gates).toHaveLength(1)); expect(gates[0].rows).toHaveLength(3);
+  await act(async () => { gates.shift().resolve(); });
+  await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+});
+
+test('a group that fails is tried again, and then row by row: one bad row does not lose the others', async () => {
+  await startFull();
+  await waitFor(() => expect(gates).toHaveLength(1));
+  const badRow = gates[0].rows[2].rowId;
+  await act(async () => { gates.shift().reject(new Error('Risposta AI incompleta: mancano le verifiche per riga.')); });      // 1° tentativo del gruppo
+  await waitFor(() => expect(gates).toHaveLength(1)); expect(gates[0].rows).toHaveLength(5);                                       // 2° tentativo: stesso gruppo
+  await act(async () => { gates.shift().reject(new Error('Risposta AI incompleta: mancano le verifiche per riga.')); });
+  for (let i = 0; i < 5; i += 1) {                                                                                                    // poi una riga alla volta
+    await waitFor(() => expect(gates).toHaveLength(1)); expect(gates[0].rows).toHaveLength(1);
+    const isBad = gates[0].rows[0].rowId === badRow;
+    await act(async () => { const g = gates.shift(); if (isBad) g.reject(new Error('Risposta AI incompleta: mancano le verifiche per riga.')); else g.resolve(); });
+  }
+  await waitFor(() => expect(gates).toHaveLength(1)); expect(gates[0].rows).toHaveLength(3);
+  await act(async () => { gates.shift().resolve(); });
+  await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+  expect(dlg()).toHaveTextContent('7 di 8 righe verificate · 1 non verificate');      // 7 verificate davvero, 1 no: non si dice «8 di 8»
+  expect(dlg()).not.toHaveTextContent('8 di 8 righe verificate');
+  expect(screen.getByRole('alert')).toHaveTextContent('1 riga non è stata verificata dopo un nuovo tentativo');
+  expect(within(dlg()).getByRole('button', { name: 'Riprendi dalle righe non verificate' })).toBeInTheDocument();
+});
+
+test('a definitive error (AI key) stops at once: it does not waste time trying the other groups, and says what to do', async () => {
+  await startFull();
+  await waitFor(() => expect(gates).toHaveLength(1));
+  await act(async () => { gates.shift().reject(new Error('Chiave AI non configurata o non valida. Vai su Profilo → API Key AI.')); });
   const failed = await screen.findByRole('alertdialog');
-  expect(failed).toHaveTextContent('Verifica interrotta'); expect(failed).toHaveTextContent('Verifica AI non riuscita. Controlla la configurazione AI personale e riprova');
-  expect(failed).toHaveTextContent('Le righe già verificate sono state conservate');
-  fireEvent.click(within(failed).getByRole('button', { name: 'Chiudi' }));
-  expect(screen.queryByRole('alertdialog')).toBeNull();
+  expect(failed).toHaveTextContent('Verifica interrotta');
+  expect(failed).toHaveTextContent('L’AI ha rifiutato l’accesso');
+  expect(failed).toHaveTextContent('API Key AI');
+  expect(failed).toHaveTextContent('Dettaglio tecnico: Chiave AI non configurata o non valida');
+  expect(gates).toHaveLength(0);                                                    // nessun secondo tentativo, nessuna riga singola
+  expect(service.reviewOfferDetails).toHaveBeenCalledTimes(1);
 });
 
-test('when every row is coherent it says so, and only then', async () => {
-  const button = await importAndGoToOffer(eightRows());
-  fireEvent.click(button); await waitFor(() => expect(gates).toHaveLength(1));
-  await act(async () => { gates.shift().resolve(); }); await waitFor(() => expect(gates).toHaveLength(1)); await act(async () => { gates.shift().resolve(); });
-  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Verifica completata'));
-  expect(screen.getByRole('dialog')).toHaveTextContent('Tutte le righe verificate sono coerenti con il catalogo.');
-  expect(screen.getByRole('dialog')).toHaveTextContent('Nessuna riga richiede un intervento');
+test('when the AI fails for every row the window stops with the reason (it does not claim completion)', async () => {
+  await startFull();
+  const fail = () => act(async () => { gates.shift().reject(new Error('Errore HTTP 502')); });
+  await waitFor(() => expect(gates).toHaveLength(1)); await fail(); await waitFor(() => expect(gates).toHaveLength(1)); await fail();      // gruppo da 5, due tentativi
+  for (let i = 0; i < 5; i += 1) { await waitFor(() => expect(gates).toHaveLength(1)); await fail(); }                                          // le 5 righe singole
+  await waitFor(() => expect(gates).toHaveLength(1)); await fail(); await waitFor(() => expect(gates).toHaveLength(1)); await fail();      // gruppo da 3, due tentativi
+  for (let i = 0; i < 3; i += 1) { await waitFor(() => expect(gates).toHaveLength(1)); await fail(); }
+  const stopped = await screen.findByRole('alertdialog');
+  expect(stopped).toHaveTextContent('Verifica interrotta'); expect(stopped).toHaveTextContent('non ha risposto in tempo');
+});
+
+test('RESUMING uses the judgements saved by the LAST run, not the ones the page had when the button was drawn (stale closure)', async () => {
+  await startFull();
+  await waitFor(() => expect(gates).toHaveLength(1));
+  await act(async () => { gates.shift().resolve(); });                       // 5 righe verificate in questa esecuzione
+  await waitFor(() => expect(dlg()).toHaveTextContent('5 di 8 righe verificate'));
+  await waitFor(() => expect(gates).toHaveLength(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Interrompi la verifica' }));
+  const stopped = await screen.findByRole('alertdialog');
+  // «Riprendi» e' la funzione disegnata quando la finestra e' apparsa (0 righe verificate): deve comunque vedere le 5 appena fatte
+  gates.length = 0; service.reviewOfferDetails.mockClear();
+  fireEvent.click(within(stopped).getByRole('button', { name: 'Riprendi dalle righe non verificate' }));
+  await waitFor(() => expect(gates).toHaveLength(1));
+  expect(gates[0].rows).toHaveLength(3);                                      // non 8: le 5 appena verificate non vengono rifatte
+  await act(async () => { gates.shift().resolve(); });
+  await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
+  expect(service.reviewOfferDetails).toHaveBeenCalledTimes(1);
 });

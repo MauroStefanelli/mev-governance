@@ -1,25 +1,27 @@
-/* Il cervello della «Verifica AI delle righe» e la finestra che lo contiene. */
-.rb { --rb-a: #2563eb; --rb-b: #7c3aed; --rb-c: #ec4899; position: relative; display: inline-block; flex: none; }
-.rb-ok { --rb-a: #0f9d58; --rb-b: #34c07a; --rb-c: #8fe3b5; }
-.rb-bad { --rb-a: #b45309; --rb-b: #ef6c3a; --rb-c: #f6a07a; }
-.rb svg { display: block; overflow: visible; }
-.rb-base { fill: #eef2fb; stroke: none; }
-.rb-outline { fill: none; stroke: #5b6fb8; stroke-width: 3; stroke-linejoin: round; }
-.rb-ok .rb-outline { stroke: #1d8a55; } .rb-bad .rb-outline { stroke: #b45309; }
-.rb-fold { fill: none; stroke: rgba(255, 255, 255, .75); stroke-width: 2.4; stroke-linecap: round; mix-blend-mode: normal; }
-.rb-level { transition: y .6s cubic-bezier(.25, .8, .25, 1), height .6s cubic-bezier(.25, .8, .25, 1); }
+/* Il cervello della «Verifica AI delle righe»: tessuto rosato (cervello) + tracce ciano e oro (elettronica). Il colore sale con la percentuale. */
+.rb { --rb-a: #0aa7c7; --rb-b: #35d0e8; --rb-c: #b9f3ff; --rb-t1: #f3c9c6; --rb-t2: #d99a9a; --rb-glow: #2fd3f0; --rb-trace: #f4b942; --rb-line: #8a4b5a; position: relative; display: inline-block; flex: none; }
+.rb-ok { --rb-a: #0f9d58; --rb-b: #3fd18a; --rb-c: #b8f5d4; --rb-glow: #36d28a; --rb-trace: #f4d35e; --rb-line: #3f7a5e; }
+.rb-bad { --rb-a: #c2410c; --rb-b: #f08a3c; --rb-c: #ffd2a8; --rb-glow: #ff9a4a; --rb-trace: #ffd166; --rb-line: #8a4326; }
+.rb svg { display: block; overflow: visible; filter: drop-shadow(0 6px 10px rgba(20, 40, 80, .28)); }
+.rb-tissue { stroke: none; }
+.rb-outline { fill: none; stroke: var(--rb-line); stroke-width: 2.6; stroke-linejoin: round; }
+.rb-sulcus { fill: none; stroke: rgba(111, 45, 70, .55); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.rb-lamella { stroke: rgba(111, 45, 70, .4); stroke-width: 1.6; }
+.rb-level { transition: y .6s cubic-bezier(.25, .8, .25, 1), height .6s cubic-bezier(.25, .8, .25, 1); opacity: .9; }
 .rb-wave { animation: rb-wave 3.2s linear infinite; }
 .rb-halo { transition: opacity .6s; }
-.rb-node { fill: #c9d3ee; transition: fill .4s, r .4s; }
-.rb-node.is-on { fill: #fff; stroke: var(--rb-b); stroke-width: 1.6; animation: rb-spark 1.8s ease-in-out infinite; }
-.rb-percent { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; padding-bottom: 6%; }
-.rb-percent strong { font-size: 30px; line-height: 1; color: #fff; text-shadow: 0 1px 6px rgba(20, 30, 80, .55), 0 0 2px rgba(20, 30, 80, .6); font-variant-numeric: tabular-nums; }
-.rb-percent span { display: inline; font-size: 15px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(20, 30, 80, .6); margin-left: 1px; }
-.rb-percent { display: flex; align-items: center; justify-content: center; gap: 0; }
-.rb.is-pulsing svg { animation: rb-breathe 2.4s ease-in-out infinite; transform-origin: 50% 55%; }
+.rb-trace { fill: none; stroke: rgba(70, 40, 60, .28); stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: miter; transition: stroke .4s; }
+.rb-trace.is-on { stroke: var(--rb-trace); stroke-width: 2; stroke-dasharray: 6 3; animation: rb-flow 1.4s linear infinite; filter: drop-shadow(0 0 2px var(--rb-trace)); }
+.rb-node { fill: rgba(70, 40, 60, .35); stroke: none; transition: fill .4s, r .4s; }
+.rb-node.is-on { fill: #fff; stroke: var(--rb-trace); stroke-width: 1.8; animation: rb-spark 1.8s ease-in-out infinite; filter: drop-shadow(0 0 3px var(--rb-trace)); }
+.rb-percent { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: none; padding-bottom: 4%; }
+.rb-percent strong { font-size: 30px; line-height: 1; color: #fff; text-shadow: 0 1px 8px rgba(10, 30, 70, .75), 0 0 3px rgba(10, 30, 70, .8); font-variant-numeric: tabular-nums; }
+.rb-percent span { font-size: 15px; font-weight: 800; color: #fff; text-shadow: 0 1px 5px rgba(10, 30, 70, .8); margin-left: 1px; }
+.rb.is-pulsing .rb-shape { animation: rb-breathe 2.4s ease-in-out infinite; transform-origin: 50% 55%; transform-box: fill-box; }
 @keyframes rb-wave { from { transform: translateX(0); } to { transform: translateX(-60px); } }
-@keyframes rb-spark { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
-@keyframes rb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes rb-flow { to { stroke-dashoffset: -18; } }
+@keyframes rb-spark { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+@keyframes rb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
 
 .rp-backdrop { position: fixed; inset: 0; z-index: 3100; display: grid; place-items: center; padding: 16px; background: rgba(14, 24, 56, .55); backdrop-filter: blur(3px); animation: rp-fade .2s ease-out; }
 .rp { --rp-ink: #17314f; --rp-muted: #5d718a; --rp-line: #dce5ef; width: min(760px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; background: #fff; border-radius: 22px; box-shadow: 0 24px 70px rgba(14, 24, 56, .4); color: var(--rp-ink); font-family: inherit; animation: rp-pop .26s ease-out; }
@@ -76,5 +78,9 @@
   .rp-rows li { grid-template-columns: 1fr; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rp-backdrop, .rp, .rp-stat, .rp-rows li { animation: none; } .rb-wave, .rb.is-pulsing svg, .rb-node.is-on { animation: none; } .rb-level, .rp-bar span, .rb-halo { transition: none; }
+  .rp-backdrop, .rp, .rp-stat, .rp-rows li { animation: none; } .rb-wave, .rb.is-pulsing .rb-shape, .rb-node.is-on, .rb-trace.is-on { animation: none; } .rb-level, .rp-bar span, .rb-halo { transition: none; }
 }
+
+.rp-resume { margin-top: 8px !important; padding: 6px 10px; border-radius: 8px; background: #e8f1ff; color: #1b4a8a !important; font-size: 13px !important; font-weight: 600; }
+.rp-error p { margin: 6px 0 0; font-size: 13px; } .rp-error small { display: block; margin-top: 6px; color: #7a3b3b; font-size: 11.5px; overflow-wrap: anywhere; } .rp-keep { padding-top: 6px; border-top: 1px solid #f0c5c5; font-weight: 600; }
+.rp-error-soft { background: #fff4d6; border-color: #f0d9a0; color: #7a4b00; }
