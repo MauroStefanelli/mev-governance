@@ -41,3 +41,22 @@ export function explainFailure(message) {
   if (/risposta ai incompleta|non valida|json|strutturat/.test(lower)) return { cause: 'L’AI ha risposto in un formato non utilizzabile.', advice: 'Premi «Riprendi»: le righe già verificate non vengono rifatte.', retry: true };
   return { cause: 'La verifica si è fermata per un errore.', advice: 'Premi «Riprendi»: parte dalle righe non ancora verificate.', retry: true };
 }
+
+// LO STATO DELLA VERIFICA, calcolato UNA volta sola dai giudizi delle righe. E' l'unica fonte per la percentuale, per il titolo della finestra e per il pulsante:
+// nessuna percentuale o «completata» viene piu' scritta a mano. Una riga e' «verificata» solo se ha un giudizio valido e i suoi dati non sono cambiati dopo
+// (stessa regola di planReview); «non verificata» se ha un errore; «da fare» se non ha nessun giudizio o i suoi dati sono cambiati.
+//   state: 'none' (niente verificato) | 'partial' (alcune verificate, altre no) | 'complete' (tutte verificate)
+export function reviewStatus(inputs, reviews, signatureOf) {
+  const all = inputs || [];
+  let verified = 0, failed = 0, outdated = 0, missing = 0;
+  for (const input of all) {
+    const review = reviews?.[input.rowId];
+    if (reviewIsCurrent(review, input, signatureOf)) verified += 1;
+    else if (review && VALID_STATUS.includes(review.status) && typeof review.reason === 'string' && review.reason.trim()) outdated += 1;   // giudizio valido ma dati cambiati
+    else if (review && review.status === 'error') failed += 1;
+    else missing += 1;
+  }
+  const total = all.length; const remaining = total - verified;
+  const state = total === 0 ? 'empty' : verified === 0 ? 'none' : remaining === 0 ? 'complete' : 'partial';
+  return { total, verified, failed, outdated, missing, remaining, state, percent: total ? Math.round((verified / total) * 100) : 0 };
+}

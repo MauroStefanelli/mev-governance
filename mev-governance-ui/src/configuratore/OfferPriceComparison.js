@@ -2,9 +2,11 @@ import "./offerPriceComparison.css";
 import React, { useState } from 'react';
 import { reconcileCatalog, resolveCatalogEntry } from './catalogReconciliation';
 import { detailReviewInput, detailReviewSignature } from './offerDetailReview';
+import ReviewLauncher from './ReviewLauncher';
+import { reviewStatus } from './reviewPlan';
 import { euro } from '../utils';
 const money = value => value == null ? 'Non disponibile' : euro.format(value);
-export default function CatalogReconciliation({ items, catalog, contractName, lot, lotDescription, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, reviewProgress, onReview }) {
+export default function CatalogReconciliation({ items, catalog, contractName, lot, lotDescription, builtin, onApply, onAssign, recovery, contractId, interventions = [], reviews = {}, reviewBusy, onReview, onRestartReview }) {
   const [choices, setChoices] = useState({});
   const [view, setView] = useState('interventions');
   const [showEconomics, setShowEconomics] = useState(false);
@@ -55,7 +57,11 @@ export default function CatalogReconciliation({ items, catalog, contractName, lo
         </div></section>;
       })}
     </details>}
-    {onReview && <div className="offer-review-toolbar"><button type="button" disabled={reviewBusy} onClick={onReview}>{reviewBusy ? 'Verifica AI in corso…' : 'Verifica / aggiorna coerenza AI delle righe'}</button><span role="status">{reviewProgress}</span><p>Giudizio AI sulla coerenza attività/catalogo, da confermare dall’analista. Non modifica interventi, complessità o prezzi.</p></div>}
+    {onReview && (() => {
+      // Lo stato della verifica si calcola dai giudizi delle righe d'offerta (le stesse che l'AI giudica): e' la fonte della scheda, della percentuale e del pulsante.
+      const inputs = items.filter(item => item.imported).map((item, index) => detailReviewInput(item, catalog, interventions, contractId, lot, index));
+      return <ReviewLauncher status={reviewStatus(inputs, reviews, detailReviewSignature)} busy={reviewBusy} onStart={options => onReview(options)} onRestart={() => (onRestartReview || onReview)({ force: true })} />;
+    })()}
     <div className="offer-view-toolbar">
       <div className="offer-view-switch" role="group" aria-label="Raggruppa confronto">
         <button type="button" aria-pressed={view === 'interventions'} onClick={() => setView('interventions')}>Interventi</button>

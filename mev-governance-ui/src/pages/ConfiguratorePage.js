@@ -132,12 +132,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const openSection = id => { setOpenSections(previous => new Set(previous).add(id)); requestAnimationFrame(() => { const target = document.getElementById(`sezione-${id}`); if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); };
   const [projectPreparation, setProjectPreparation] = useState(newProjectPreparation);
   const [detailReviewBusy, setDetailReviewBusy] = useState(false);
-  const [detailReviewProgress, setDetailReviewProgress] = useState('');
   const detailReviewJob = useRef(0);
   // La finestra del cervello: aperta solo quando la verifica parte da qui (non quando parte da sola dopo l'import dell'Excel).
   const [reviewWindow, setReviewWindow] = useState({ open: false, phase: 'running', done: 0, total: 0, rows: [], error: '', resumed: false, alreadyDone: 0, failedRows: [] });
   useEffect(() => () => { detailReviewJob.current++; }, []);
-  useEffect(() => { detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress(''); }, [ambienteId]);
+  useEffect(() => { detailReviewJob.current++; setDetailReviewBusy(false); }, [ambienteId]);
   const [aiBusy, setAiBusy] = useState(false);
   // Auto-approve AI proposals with high confidence
   const [autoApproveAi, setAutoApproveAi] = useState(false);
@@ -631,7 +630,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const resetInitiative = () => {
     setDevelopmentPlans({});
     setProjectPreparation(newProjectPreparation());
-    detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false); setDetailReviewProgress('');
+    detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false);
     setInitiative({ code: "", title: "", system: "", contractType: "", release: "", pmPoste: "", requirements: "", description: "" });
     setImportedInterventions([]);
     setItems([]);
@@ -675,8 +674,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     // Le righe come le mostra la finestra: chi sono (intervento, attivita', voce di catalogo) e, man mano, il giudizio dell'AI. Quelle gia' verificate partono col loro giudizio.
     const windowRows = rows.map(input => ({ rowId: input.rowId, interventionId: input.intervention?.id || '', activity: input.detail?.description || input.intervention?.activity || input.intervention?.title || '', catalogName: input.catalogEntry?.name || '', review: reviewIsCurrent(known[input.rowId], input, detailReviewSignature) && !force && withWindow ? known[input.rowId] : null }));
     if (withWindow) setReviewWindow({ open: true, phase: todo.length ? 'running' : 'done', done: already, total, rows: windowRows, error: '', resumed: plan.resumed, alreadyDone: already, failedRows: [] });
-    if (!todo.length) { setDetailReviewProgress(`Verifica AI: ${total} / ${total} righe già verificate`); return; }
-    setDetailReviewBusy(true); setDetailReviewProgress(`Verifica AI: ${already} / ${total} righe`);
+    if (!todo.length) { return; }
+    setDetailReviewBusy(true);
     const showResults = (results, done) => { if (withWindow) setReviewWindow(previous => ({ ...previous, done, rows: previous.rows.map(row => { const found = results.find(r => r.rowId === row.rowId); return found ? { ...row, review: found } : row; }) })); };
     const ask = async batch => {
       const withKnowledge = batch.map(input => ({ ...input, confirmedRationale: knowledgeForAi(entriesForIntervention(rationale, input.intervention?.id)) }));
@@ -704,7 +703,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
           // errore definitivo (es. chiave AI): inutile insistere sulle altre righe
           if (detailReviewJob.current === job) {
             const reason = lastError;
-            setDetailReviewProgress(`Verifica interrotta: ${reason}`);
             if (withWindow) setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: reason }));
           }
           return;
@@ -713,7 +711,6 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         results.filter(r => r.status === 'error').forEach(r => failedRows.push(r.rowId));
         setDetailReviews(previous => ({ ...previous, ...Object.fromEntries(results.map(r => [r.rowId, r])) }));
         finished += batch.length;
-        setDetailReviewProgress(`Verifica AI: ${finished} / ${total} righe`);
         showResults(results, finished);
       }
       if (withWindow && detailReviewJob.current === job) { const allFailed = failedRows.length === todo.length && todo.length > 0; const reason = lastError; setReviewWindow(previous => ({ ...previous, phase: allFailed ? 'stopped' : 'done', done: total, failedRows, error: allFailed ? reason : '' })); }
@@ -722,7 +719,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   const handleImportExcel = async (file) => {
     if (!file) return;
-    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress('');
+    detailReviewJob.current++; setDetailReviewBusy(false);
     setMappedLoading(true);
     try {
       let parsed = await parseInitiativeWorkbook(file, catalog);
@@ -1245,7 +1242,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
    const reworkInitiative = (record) => {
-    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress('');
+    detailReviewJob.current++; setDetailReviewBusy(false);
     const payload = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
     // NON cambiare selectedContractId: è usato per caricare gli applicativi (sempre "poste-tet-2025").
     // Il contract_id del record è solo per identificare l'iniziativa nel DB — già gestito da
@@ -1303,7 +1300,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setTow(snapshot.tow || {}); setTowPercentages(snapshot.towPercentages || {});
     setEconomyNotes(snapshot.economicNotes || ''); setSourceWorkbookName(snapshot.sourceWorkbookName || '');
     setAiProposals(snapshot.aiProposals || null);
-    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress(''); setDetailReviews(snapshot.detailReviews || {});
+    detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviews(snapshot.detailReviews || {});
     setSelectedAppIds(snapshot.selectedAppIds || []); setSelectedAppId(snapshot.selectedAppIds?.[0] || '');
     setTechProfile(null);
     return true;
@@ -1997,7 +1994,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
          <ReviewProgress open={reviewWindow.open} phase={reviewWindow.phase} done={reviewWindow.done} total={reviewWindow.total} entries={reviewWindow.rows} error={reviewWindow.error} resumed={reviewWindow.resumed} alreadyDone={reviewWindow.alreadyDone} failedRows={reviewWindow.failedRows}
            onResume={() => runDetailReview(items, catalog, importedInterventions, lot, true, false)} onRestart={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)}
            onClose={() => setReviewWindow(previous => ({ ...previous, open: false }))}
-           onStop={() => { detailReviewJob.current++; setDetailReviewBusy(false); setDetailReviewProgress('Verifica interrotta dall’utente'); setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: 'Hai interrotto la verifica.' })); }} />
+           onStop={() => { detailReviewJob.current++; setDetailReviewBusy(false); setReviewWindow(previous => ({ ...previous, phase: 'stopped', error: 'Hai interrotto la verifica.' })); }} />
          <SaveProgress phase={closing.phase} step={closing.step} message={closing.message} onDismiss={() => setClosing({ phase: 'idle', step: '', message: '' })} title="Salvataggio dell’iniziativa in corso" />
        </nav>
 
@@ -2435,7 +2432,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             facts={knowledgeFacts({ rationale, libraryFacts, solutionProgress, importedInterventions, mappingCount, tow5Total })}>
             <KnowledgeOverview initiative={initiative} rationale={rationale} solution={solutionProgress} interventions={importedInterventions} mappingCount={mappingCount} tow5Total={tow5Total} library={libraryFacts} onOpen={openSection} />
            <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />
-           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview(items, catalog, importedInterventions, lot, true)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} onReview={options => runDetailReview(items, catalog, importedInterventions, lot, true, !!options?.force)} onRestartReview={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
            {importedInterventions.length > 0 && (
              <div style={styles.card}>
                <strong>{importedInterventions.length} interventi, {mappingCount} valorizzazioni di catalogo, TOW .5 {euro.format(tow5Total)}.</strong>
@@ -2869,7 +2866,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {step === 3 && (
         <div>
           <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />
-           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} reviewProgress={detailReviewProgress} onReview={() => runDetailReview(items, catalog, importedInterventions, lot, true)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
+           <CatalogReconciliation items={items} catalog={catalog} contractName={activeContract?.name || builtinContract.name} lotDescription={activeLot?.name} contractId={selectedContractId} interventions={importedInterventions} reviews={detailReviews} reviewBusy={detailReviewBusy} onReview={options => runDetailReview(items, catalog, importedInterventions, lot, true, !!options?.force)} onRestartReview={() => runDetailReview(items, catalog, importedInterventions, lot, true, true)} lot={lot} builtin={isBuiltin} recovery={activeLot?.catalogPriceRecovery} onAssign={assignCatalog} onApply={(key, unit) => updateItem(key, { unit })} />
           <InitiativeBanner />
           <div style={{ ...styles.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>

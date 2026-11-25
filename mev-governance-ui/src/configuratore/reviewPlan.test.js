@@ -46,3 +46,23 @@ describe('which errors are worth a new try', () => {
   test.each([['Risposta AI incompleta: mancano le verifiche per riga.', true], ['Verifica AI non riuscita. Controlla la configurazione AI personale e riprova', true], ['Errore HTTP 502', true], ['network error', true]])('%s -> retry %s', (m, r) => expect(isRetryable(m)).toBe(r));
   test.each([['Chiave AI non configurata o non valida', false], ['Errore HTTP 401', false], ['Errore HTTP 403', false], ['Unauthorized', false]])('%s -> NO retry', m => expect(isRetryable(m)).toBe(false));
 });
+
+describe('the status of the verification, from the judgements only', () => {
+  const { reviewStatus } = require('./reviewPlan');
+  const rows = Array.from({ length: 45 }, (_, i) => input(String(i)));
+  const verified = n => Object.fromEntries(rows.slice(0, n).map(r => [r.rowId, done(r)]));
+  test('15 of 45 verified is 33% and PARTIAL, never complete', () => expect(reviewStatus(rows, verified(15), sig)).toMatchObject({ total: 45, verified: 15, remaining: 30, state: 'partial', percent: 33 }));
+  test('nothing verified: none, 0%', () => expect(reviewStatus(rows, {}, sig)).toMatchObject({ verified: 0, state: 'none', percent: 0 }));
+  test('all verified: complete, 100%', () => expect(reviewStatus(rows, verified(45), sig)).toMatchObject({ verified: 45, remaining: 0, state: 'complete', percent: 100 }));
+  test('100% only when EVERY row is verified: 44 of 45 rounds to 98%, not 100%', () => expect(reviewStatus(rows, verified(44), sig)).toMatchObject({ percent: 98, state: 'partial' }));
+  test('a row with an error is NOT verified and is counted as failed; a row never judged is missing', () => {
+    const r = { ...verified(10), '10': { ...done(rows[10]), status: 'error' } };
+    expect(reviewStatus(rows, r, sig)).toMatchObject({ verified: 10, failed: 1, missing: 34, remaining: 35 });
+  });
+  test('a judgement whose data changed afterwards is OUTDATED, not verified', () => {
+    const r = { ...verified(3), '1': done({ ...rows[1], detail: { quantity: 99 } }) };
+    expect(reviewStatus(rows, r, sig)).toMatchObject({ verified: 2, outdated: 1, remaining: 43, state: 'partial' });
+  });
+  test('the numbers always add up', () => { const s = reviewStatus(rows, { ...verified(7), '8': { ...done(rows[8]), status: 'error' } }, sig); expect(s.verified + s.failed + s.outdated + s.missing).toBe(45); });
+  test('no rows: empty', () => { expect(reviewStatus([], {}, sig)).toMatchObject({ state: 'empty', percent: 0 }); expect(reviewStatus(undefined, undefined, sig).state).toBe('empty'); });
+});

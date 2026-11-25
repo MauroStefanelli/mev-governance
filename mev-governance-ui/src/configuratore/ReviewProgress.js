@@ -21,6 +21,7 @@ const VERDICT = {
 // riga dopo riga, cosa sta emergendo; alla fine mostra i dati piu' importanti. Si chiude solo con «Chiudi» (o «Interrompi» mentre lavora): nulla si perde.
 // `entries` = una voce per riga { rowId, interventionId, activity, catalogName, review }.
 export default function ReviewProgress({ open, phase, done, total, entries, error, onClose, onStop, onResume, onRestart, resumed = false, alreadyDone = 0, failedRows = [] }) {
+  // La verita' sull'avanzamento sono le righe: quante hanno davvero un giudizio valido. «done» e «phase» sono solo il racconto del lavoro in corso.
   const closeRef = useRef(null);
   useEffect(() => { if (open && phase !== 'running') closeRef.current?.focus(); }, [open, phase]);
   useEffect(() => {
@@ -29,10 +30,16 @@ export default function ReviewProgress({ open, phase, done, total, entries, erro
     document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
   }, [open, phase, onClose]);
   if (!open) return null;
-  const meta = PHASE[phase] || PHASE.running;
-  const percent = phase === 'done' ? 100 : percentDone(done, total);
+  const meta0 = PHASE[phase] || PHASE.running;
   const live = summarize(entries);
+  const verifiedRows = live.total - live.counts.error - live.counts.waiting;      // righe con un giudizio valido (coerente / da verificare / non coerente)
+  const missing = live.total - verifiedRows;                                        // righe senza giudizio valido: da fare o non riuscite
+  const complete = live.total > 0 && missing === 0;
+  // In corso si mostra il lavoro svolto; a lavoro finito o fermo SOLO le righe davvero verificate: mai 100% se ne manca anche una.
+  const percent = phase === 'running' ? percentDone(done, total) : percentDone(verifiedRows, live.total);
   const running = phase === 'running';
+  const incomplete = !running && !complete;
+  const meta = incomplete ? { title: phase === 'stopped' ? 'Verifica interrotta' : 'Verifica incompleta', tone: 'bad' } : !running ? PHASE.done : meta0;
   const verdict = VERDICT[live.verdict] || VERDICT.empty;
   const arrived = (entries || []).filter(entry => entry.review);
   return <div className="rp-backdrop">
@@ -43,8 +50,7 @@ export default function ReviewProgress({ open, phase, done, total, entries, erro
           <h2 id="rp-title">{meta.title}</h2>
           <p id="rp-status" role="status" aria-live="polite">
             {running && `${done} di ${total} righe verificate (${percent}%)`}
-            {phase === 'done' && (live.counts.error > 0 ? `${live.total - live.counts.error - live.counts.waiting} di ${live.total} righe verificate · ${live.counts.error} non verificate` : `${live.reviewed} di ${live.total} righe verificate`)}
-            {phase === 'stopped' && `${done} di ${total} righe verificate prima dell’interruzione`}
+            {!running && `${verifiedRows} di ${live.total} righe verificate (${percent}%)${missing ? ` · ${missing} ${missing === 1 ? 'riga ancora da verificare' : 'righe ancora da verificare'}` : ''}`}
           </p>
           {running && <div className="rp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Avanzamento della verifica"><span style={{ width: `${percent}%` }} /></div>}
           {running && resumed && <p className="rp-resume">Riprende da dove si era fermata: {alreadyDone} righe già verificate non vengono rifatte.</p>}
@@ -52,11 +58,12 @@ export default function ReviewProgress({ open, phase, done, total, entries, erro
         </div>
       </header>
 
-      {phase === 'stopped' && (() => { const why = explainFailure(error); return <div role="alert" className="rp-error"><strong>{why.cause}</strong>
+      {phase === 'stopped' && incomplete && (() => { const why = explainFailure(error); return <div role="alert" className="rp-error"><strong>{why.cause}</strong>
         <p>{why.advice}</p>
         {error && <small>Dettaglio tecnico: {error}</small>}
-        <p className="rp-keep">{done} di {total} righe sono già verificate e sono state conservate: «Riprendi» le salta e continua dalle altre {Math.max(0, total - done)}.</p></div>; })()}
-      {phase === 'done' && failedRows.length > 0 && <p role="alert" className="rp-error rp-error-soft"><strong>{failedRows.length} {failedRows.length === 1 ? 'riga non è stata verificata' : 'righe non sono state verificate'}</strong> dopo un nuovo tentativo. Le altre sono a posto. «Riprendi» riprova solo quelle.</p>}
+        <p className="rp-keep">{verifiedRows} di {live.total} righe sono già verificate e sono state conservate: «Riprendi» le salta e continua dalle altre {missing}.</p></div>; })()}
+      {phase === 'done' && incomplete && <p role="alert" className="rp-error rp-error-soft"><strong>La verifica non è completa: {missing} {missing === 1 ? 'riga non è stata verificata' : 'righe non sono state verificate'}.</strong> Premi «Riprendi dalle righe non verificate»: le altre non vengono rifatte.</p>}
+      {false && failedRows.length > 0 && <p role="alert" className="rp-error rp-error-soft"><strong>{failedRows.length} {failedRows.length === 1 ? 'riga non è stata verificata' : 'righe non sono state verificate'}</strong> dopo un nuovo tentativo. Le altre sono a posto. «Riprendi» riprova solo quelle.</p>}
 
       {(live.reviewed > 0 || !running) && <section className="rp-body" aria-label="Dati emersi dal ragionamento">
         {phase !== 'running' && <p className={`rp-verdict rp-v-${verdict.tone}`}><strong>{verdict.text}</strong></p>}
@@ -80,16 +87,16 @@ export default function ReviewProgress({ open, phase, done, total, entries, erro
               <p>{row.reason}</p>
               {row.suggestion && <p className="rp-suggest"><b>Cosa fare:</b> {row.suggestion}</p>}</div></li>)}</ul>
           {live.toCheck > live.attention.length && <p className="rp-more">…e altre {live.toCheck - live.attention.length} righe: le trovi tutte nella colonna «Verifica AI attività / catalogo».</p>}</div>}
-        {!running && arrived.length > 0 && live.toCheck === 0 && live.counts.error === 0 && <p className="rp-note">Nessuna riga richiede un intervento. Il giudizio resta un supporto da confermare dall’analista.</p>}
+        {!running && complete && arrived.length > 0 && live.toCheck === 0 && <p className="rp-note">Nessuna riga richiede un intervento. Il giudizio resta un supporto da confermare dall’analista.</p>}
         {live.models.length > 0 && !running && <p className="rp-model">Modello: {live.models.join(', ')}</p>}
       </section>}
 
       <footer className="rp-foot">
         {running ? <button type="button" className="rp-btn" onClick={onStop}>Interrompi la verifica</button>
           : <>
-            {(phase === 'stopped' || (phase === 'done' && failedRows.length > 0)) && onResume && <button type="button" className="rp-btn rp-btn-primary" onClick={onResume}>Riprendi dalle righe non verificate</button>}
-            {(phase === 'stopped' || phase === 'done') && onRestart && <button type="button" className="rp-btn" onClick={onRestart}>Verifica tutto da capo</button>}
-            <button type="button" ref={closeRef} className={`rp-btn${phase === 'done' && !failedRows.length ? ' rp-btn-primary' : ''}`} onClick={onClose}>Chiudi</button></>}
+            {incomplete && onResume && <button type="button" className="rp-btn rp-btn-primary" onClick={onResume}>{`Riprendi: verifica le ${missing} ${missing === 1 ? 'riga mancante' : 'righe mancanti'}`}</button>}
+            {live.total > 0 && onRestart && <button type="button" className="rp-btn" onClick={onRestart}>Verifica tutto da capo</button>}
+            <button type="button" ref={closeRef} className={`rp-btn${complete ? ' rp-btn-primary' : ''}`} onClick={onClose}>Chiudi</button></>}
         <p>Giudizio AI da confermare dall’analista. Non modifica interventi, complessità o prezzi.</p>
       </footer>
     </div>

@@ -83,7 +83,7 @@ describe('when it is done', () => {
   test('it says it is completed, gives the verdict and the counts', () => {
     render(<ReviewProgress {...done} />);
     expect(screen.getByRole('dialog')).toHaveTextContent('Verifica completata');
-    expect(screen.getByText('4 di 4 righe verificate')).toBeInTheDocument();
+    expect(screen.getByText('4 di 4 righe verificate (100%)')).toBeInTheDocument();
     expect(screen.getByText('Ci sono righe con una possibile incoerenza.')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Avanzamento della verifica: 100%' })).toBeInTheDocument();
     expect(screen.getByText(/50% delle righe verificate è coerente con il catalogo · 2 interventi con righe da controllare/)).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('when it stops', () => {
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('Il servizio AI non ha risposto in tempo'); expect(alert).toHaveTextContent('Dettaglio tecnico: Errore HTTP 502');
     expect(alert).toHaveTextContent('2 di 3 righe sono già verificate e sono state conservate'); expect(alert).toHaveTextContent('continua dalle altre 1');
-    expect(screen.getByText('2 di 3 righe verificate prima dell’interruzione')).toBeInTheDocument();
+    expect(screen.getByText('2 di 3 righe verificate (67%) · 1 riga ancora da verificare')).toBeInTheDocument();      // la percentuale e' delle righe davvero verificate
   });
   test.each([
     ['Hai interrotto la verifica.', 'Hai premuto «Interrompi la verifica»'], ['Chiave AI non configurata o non valida', 'ha rifiutato l’accesso'], ['Errore HTTP 429', 'limite di richieste'],
@@ -130,7 +130,7 @@ describe('when it stops', () => {
   test('it offers «Riprendi», «Verifica tutto da capo» and «Chiudi»; each calls its own handler', () => {
     const onResume = jest.fn(), onRestart = jest.fn(), onClose = jest.fn();
     stopped('Errore HTTP 502', { onResume, onRestart, onClose });
-    fireEvent.click(screen.getByRole('button', { name: 'Riprendi dalle righe non verificate' })); fireEvent.click(screen.getByRole('button', { name: 'Verifica tutto da capo' })); fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Riprendi: verifica le 1 riga mancante' })); fireEvent.click(screen.getByRole('button', { name: 'Verifica tutto da capo' })); fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
     expect([onResume, onRestart, onClose].map(f => f.mock.calls.length)).toEqual([1, 1, 1]);
   });
   test('a key problem tells where to fix it, and the advice does not promise a fix by retrying', () => {
@@ -145,13 +145,38 @@ describe('when it resumes and when some rows could not be verified', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '33');
   });
   test('a first run does not claim to be a resume', () => { render(<ReviewProgress {...base} done={0} />); expect(screen.queryByText(/Riprende da dove si era fermata/)).toBeNull(); });
-  test('done with some rows not verified: it says so, does not claim «tutte», and offers to retry only those', () => {
+  test('done with a row NOT verified: it is «Verifica incompleta», never 100%, never «tutte coerenti», and «Riprendi» appears with the missing rows', () => {
     const entries = [entry('1', 'coerente'), entry('2', 'error', { reason: 'Risposta AI incompleta' })];
     render(<ReviewProgress {...base} phase="done" done={2} total={2} entries={entries} failedRows={['2']} onResume={jest.fn()} onRestart={jest.fn()} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('1 riga non è stata verificata dopo un nuovo tentativo');
-    expect(screen.getByText('1 di 2 righe verificate · 1 non verificate')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Verifica incompleta'); expect(screen.getByRole('dialog')).not.toHaveTextContent('Verifica completata');
+    expect(screen.getByRole('img', { name: 'Avanzamento della verifica: 50%' })).toBeInTheDocument();
+    expect(screen.getByText('1 di 2 righe verificate (50%) · 1 riga ancora da verificare')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('La verifica non è completa: 1 riga non è stata verificata');
     expect(screen.queryByText('Tutte le righe verificate sono coerenti con il catalogo.')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Riprendi dalle righe non verificate' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Riprendi: verifica le 1 riga mancante' })).toBeInTheDocument();
+  });
+  test('«phase done» is NOT trusted: with a row still waiting the window says «incompleta» even if the caller says it is done', () => {
+    render(<ReviewProgress {...base} phase="done" done={3} total={3} entries={[entry('1', 'coerente'), entry('2', 'coerente'), entry('3', null)]} onResume={jest.fn()} onRestart={jest.fn()} />);
+    expect(screen.getByRole('dialog')).toHaveTextContent('Verifica incompleta'); expect(screen.getByRole('img', { name: 'Avanzamento della verifica: 67%' })).toBeInTheDocument();
+    expect(screen.getByText(/2 di 3 righe verificate \(67%\) · 1 riga ancora da verificare/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Riprendi: verifica le 1 riga mancante' })).toBeInTheDocument();
+  });
+  test('every row verified so far is coherent but some are missing: it does NOT say «Tutte le righe verificate sono coerenti», it says the verification is not complete', () => {
+    render(<ReviewProgress {...base} phase="done" done={3} total={3} entries={[entry('1', 'coerente'), entry('2', 'coerente'), entry('3', null)]} onResume={jest.fn()} onRestart={jest.fn()} />);
+    expect(screen.queryByText('Tutte le righe verificate sono coerenti con il catalogo.')).toBeNull();
+    expect(screen.getByText('Alcune righe non sono state ancora verificate.')).toBeInTheDocument();      // il verdetto parla delle righe mancanti, non di «coerenza» generale
+    expect(screen.queryByText(/Nessuna riga richiede un intervento/)).toBeNull();
+  });
+  test('«phase stopped» is NOT trusted either: if every row has a valid judgement it is complete and offers no «Riprendi»', () => {
+    render(<ReviewProgress {...base} phase="stopped" done={2} total={2} error="x" entries={[entry('1', 'coerente'), entry('2', 'da_verificare')]} onResume={jest.fn()} onRestart={jest.fn()} />);
+    const window_ = document.querySelector('[role=dialog],[role=alertdialog]');
+    expect(window_).toHaveTextContent('Verifica completata'); expect(window_).not.toHaveTextContent('Verifica interrotta'); expect(screen.queryByRole('button', { name: /Riprendi/ })).toBeNull();
+    expect(screen.queryByText(/Dettaglio tecnico/)).toBeNull();      // nessun errore da mostrare: non manca nulla
+    expect(screen.getByRole('img', { name: 'Avanzamento della verifica: 100%' })).toBeInTheDocument();
+  });
+  test('every row with a valid judgement and nothing missing: 100% and completed', () => {
+    render(<ReviewProgress {...base} phase="done" done={2} total={2} entries={[entry('1', 'coerente'), entry('2', 'non_coerente')]} onResume={jest.fn()} onRestart={jest.fn()} />);
+    expect(screen.getByRole('img', { name: 'Avanzamento della verifica: 100%' })).toBeInTheDocument(); expect(screen.getByRole('dialog')).toHaveTextContent('Verifica completata');
   });
   test('a clean completion offers «Verifica tutto da capo» but not «Riprendi»', () => {
     render(<ReviewProgress {...base} phase="done" done={2} total={2} entries={[entry('1', 'coerente'), entry('2', 'coerente')]} onResume={jest.fn()} onRestart={jest.fn()} />);
@@ -163,8 +188,9 @@ test('closed: nothing is rendered', () => { const { container } = render(<Review
 describe('the real wiring in the Configuratore', () => {
   const fs = require('fs'); const path = require('path');
   const page = fs.readFileSync(path.join(__dirname, '..', 'pages', 'ConfiguratorePage.js'), 'utf8');
-  test('both «Verifica / aggiorna coerenza AI delle righe» buttons open the window (the automatic review after the Excel import does not)', () => {
-    expect(page.match(/onReview=\{\(\) => runDetailReview\(items, catalog, importedInterventions, lot, true\)\}/g)).toHaveLength(2);
+  test('both verification cards (passo 1 and passo 3) open the window (the automatic review after the Excel import does not)', () => {
+    expect(page.match(/onReview=\{options => runDetailReview\(items, catalog, importedInterventions, lot, true, !!options\?\.force\)\}/g)).toHaveLength(2);
+    expect(page.match(/onRestartReview=\{\(\) => runDetailReview\(items, catalog, importedInterventions, lot, true, true\)\}/g)).toHaveLength(2);
     expect(page).toMatch(/void runDetailReview\(parsed\.items, importLot \? effectiveCatalog\(importLot\) : catalog, parsed\.interventions, parsed\.lot \|\| lot\)/);
   });
   test('the window gets the REAL progress, the rows and the reason of a failure', () => {
