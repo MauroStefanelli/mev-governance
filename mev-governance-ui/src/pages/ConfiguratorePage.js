@@ -761,8 +761,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       setDevelopmentPlans({});
       setProjectPreparation(newProjectPreparation());
       setDetailReviews({});
-      // Start only after successful import; technical review never blocks import.
-      void runDetailReview(parsed.items, importLot ? effectiveCatalog(importLot) : catalog, parsed.interventions, parsed.lot || lot);
+      // La verifica AI NON parte da sola: chiama l'AI con la chiave dell'utente, quindi si avvia solo dal pulsante «Verifica con l'AI» (scheda «Verifica AI delle righe»).
       setSuggestions([]);
       setSourceWorkbookName(parsed.fileName);
       const importedInitiative = { ...initiative, code: parsed.code || initiative.code,

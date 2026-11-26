@@ -38,7 +38,21 @@ beforeEach(() => {
 });
 const mount = () => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} />);
 const importEstimator = async (file) => { mount(); const input = await screen.findByLabelText('Importa da Estimatore Catalogo'); await act(async () => { fireEvent.change(input, { target: { files: [file] } }); }); };
-const drain = async () => { await waitFor(() => expect(gates.length).toBeGreaterThan(0)); while (gates.length) await act(async () => { gates.shift().resolve(); }); };
+// L'import NON avvia la verifica AI: si aspetta che l'import sia finito e si controlla che l'AI non sia stata chiamata.
+const drain = async () => { await waitFor(() => expect(screen.getByLabelText('Codice GOTO')).toHaveValue('999001')); await act(async () => { await new Promise(r => setTimeout(r, 30)); }); expect(gates).toHaveLength(0); };
+// La verifica la chiede l'utente dal passo Offerta; l'AI risponde a tutti i gruppi e si chiude il riepilogo.
+const verifyFromOffer = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
+  const region = await screen.findByRole('region', { name: 'Verifica AI delle righe' });
+  fireEvent.click(within(region).getByRole('button', { name: 'Verifica con l’AI' }));
+  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
+  const first = gates[0];
+  while (/sta ragionando/.test(document.querySelector('[role=dialog]')?.textContent || '')) {
+    if (gates.length) await act(async () => { gates.shift().resolve(); }); else await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+  }
+  const closeSummary = screen.queryByRole('button', { name: 'Chiudi' }); if (closeSummary) fireEvent.click(closeSummary);
+  return first;
+};
 
 test('«Importa da Estimatore Catalogo» fills the initiative from INIZIATIVA, shows the report with the hours, and the Excel import button is still there', async () => {
   await importEstimator(await estimatorWorkbook({ interventions: [A, B], details: D, placeholders: 20 }));
@@ -52,14 +66,15 @@ test('«Importa da Estimatore Catalogo» fills the initiative from INIZIATIVA, s
   await drain();
 });
 
-test('the activities arrive in the Offerta step exactly as an Offer Table import would give them, and the AI verification runs on them', async () => {
+test('the activities arrive in the Offerta step exactly as an Offer Table import would give them; the AI verification runs on them only when asked', async () => {
   await importEstimator(await estimatorWorkbook({ interventions: [A, B], details: D, placeholders: 5 }));
-  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
-  expect(gates[0].rows).toHaveLength(3);                                                    // le 3 attivita', e nessun segnaposto
-  expect(gates[0].rows.map(r => r.intervention.id).sort()).toEqual(['abc-001', 'abc-001', 'abc-002']);
-  expect(gates[0].rows.map(r => r.detail.type + '/' + r.detail.complexity).sort()).toEqual(['MODIFICA/Medio', 'MODIFICA/Semplice', 'REALIZZAZIONE/Complesso']);
-  while (gates.length) await act(async () => { gates.shift().resolve(); });
+  await drain();
   fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
+  expect(await screen.findByRole('region', { name: 'Verifica AI delle righe' })).toHaveTextContent('3 righe da verificare');       // non verificate da sole
+  const first = await verifyFromOffer();
+  expect(first.rows).toHaveLength(3);                                                          // le 3 attivita', e nessun segnaposto
+  expect(first.rows.map(r => r.intervention.id).sort()).toEqual(['abc-001', 'abc-001', 'abc-002']);
+  expect(first.rows.map(r => r.detail.type + '/' + r.detail.complexity).sort()).toEqual(['MODIFICA/Medio', 'MODIFICA/Semplice', 'REALIZZAZIONE/Complesso']);
   expect(await screen.findByRole('region', { name: 'Verifica AI delle righe' })).toHaveTextContent('Tutte le 3 righe sono verificate');
 });
 
@@ -106,11 +121,9 @@ test('the import reads the file with the OFFERED catalog of the lot when there i
     offeredCatalog: [{ id: 239, prezzi: { REALIZZAZIONE: { Semplice: 450, Medio: 600, Complesso: 2025 }, MODIFICA: { Semplice: 60, Medio: 180, Complesso: 300 } } }] }] }]);
   // il file ha le righe SENZA prezzo: allora il prezzo viene dal catalogo, e deve essere quello OFFERTO (60), non quello di gara (120)
   await importEstimator(await estimatorWorkbook({ interventions: [A], details: [{ ...D[0], price: undefined }] }));
-  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
-  expect(gates[0].rows[0].catalogEntry.id).toBe(239);
-  while (gates.length) await act(async () => { gates.shift().resolve(); });
-  fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
-  await screen.findByRole('region', { name: 'Verifica AI delle righe' });
+  await drain();
+  const first = await verifyFromOffer();
+  expect(first.rows[0].catalogEntry.id).toBe(239);
   fireEvent.click(await screen.findByRole('button', { name: /4\. Revisione/ }));
   await waitFor(() => expect(service.upsertConfiguratoreRecord).toHaveBeenCalled());
   const saved = service.upsertConfiguratoreRecord.mock.calls.at(-1)[0].payload;

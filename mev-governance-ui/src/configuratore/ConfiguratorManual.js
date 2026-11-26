@@ -33,7 +33,7 @@ const chapters = [
     ['«Inserisci una descrizione più dettagliata».', 'L’analisi dal testo richiede almeno 20 caratteri non vuoti tra titolo, sistema e descrizione.'],
     ['«Il lotto del file non è disponibile nel contratto selezionato».', 'Il file Excel è di un lotto diverso: cambia contratto o lotto in «Risorse e configurazione» prima di importare.'],
     ['«Excel importato, ma revisione non salvata».', 'I dati restano nella pagina: salva una revisione dal workspace dopo aver controllato lo storico.'],
-  ], note: 'L’importazione salva da sola una revisione e avvia in background la verifica AI delle righe. Il segno ✓ del passo 1 compare quando c’è (GOTO o titolo) e un sistema.' },
+  ], note: 'L’importazione salva da sola una revisione, ma NON avvia la verifica AI delle righe: la fai partire tu da «Verifica con l’AI» (passo 3 «Offerta»), perché usa la tua chiave AI. Il segno ✓ del passo 1 compare quando c’è (GOTO o titolo) e un sistema.' },
   { title: 'Passo 2 · Interventi', subtitle: 'Scegliere le voci di catalogo e il parere AI', intro: 'Il passo Interventi decide cosa entra nell’offerta. L’app mette in fila le voci importate dall’Excel e le possibili integrazioni del catalogo; tu scegli, regoli tipo, complessità e quantità, e puoi chiedere un secondo parere all’AI. Nulla viene aggiunto all’offerta finché non premi «Vai all’offerta».', steps: [
     'In alto il riquadro «Supporto AI alla valutazione» riassume quante valorizzazioni sono già previste nell’Excel e quante integrazioni si possono valutare, oppure quante componenti candidate ci sono nel Catalogo del lotto.',
     'Premi «Secondo parere AI» (poi «Aggiorna parere AI») per ottenere proposte e un riepilogo. Può richiedere 1–2 minuti: non chiudere la pagina. Il riepilogo si legge in «Leggi il riepilogo AI».',
@@ -256,7 +256,7 @@ const chapters = [
     'Il riepilogo identifica interventi, attività, sistema e requisiti. DettaglioInterventi contiene le singole componenti, voce catalogo, tipo, complessità, quantità e prezzi.',
     'L’importazione crea una revisione con nome del file e snapshot dei dati. Una nuova importazione sullo stesso GOTO aggiunge una revisione senza riscrivere analisi e decisioni già salvate.',
     'In “Mostra dettaglio importato” apri un ID_INTERVENTO per consultarne le componenti. Il totale nell’intestazione somma quantità × prezzo in uso delle componenti; un prezzo assente rende il totale non disponibile.',
-  ], note: 'La verifica AI parte dopo l’importazione. Un errore AI non annulla i dati importati. Se il salvataggio della revisione fallisce, viene segnalato: salva dal workspace dopo aver controllato lo storico.' },
+  ], note: 'La verifica AI non parte con l’importazione: la avvii tu dalla scheda «Verifica AI delle righe». Un errore AI non annulla i dati importati. Se il salvataggio della revisione fallisce, viene segnalato: salva dal workspace dopo aver controllato lo storico.' },
   { title: 'Catalogo e verifica AI', subtitle: 'Validare attività e importi, una riga alla volta', steps: [
     'In “Confronto Excel e Voci Catalogo” scegli la vista Interventi oppure Voce catalogo. Apri il gruppo e poi l’intervento o la voce per vedere le attività associate.',
     'La verifica AI è subito dopo Voce catalogo: leggi esito, motivazione, indicazione ed evidenze. “Coerente secondo AI” è un parere, non un’approvazione umana o una certificazione del codice.',

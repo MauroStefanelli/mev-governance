@@ -51,15 +51,24 @@ beforeEach(() => {
   }));
 });
 const mount = () => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} />);
-// Importa l'Excel e porta al passo 3. La verifica che parte da sola dopo l'import viene fatta rispondere (`autoFinish`) oppure lasciata appesa,
-// cosi' ogni test parte dalla situazione che vuole provare.
-const importAndGoToOffer = async (rows, { autoFinish = true } = {}) => {
+// Importa l'Excel e porta al passo 3. L'import NON chiama l'AI: se il test vuole le righe gia' verificate (`verified`, il default) preme «Verifica con l'AI»,
+// fa rispondere l'AI a tutti i gruppi e chiude la finestra del riepilogo; con `verified: false` si resta con la scheda «da verificare».
+const importAndGoToOffer = async (rows, { verified = true } = {}) => {
   mount();
   const input = await waitFor(() => { const el = document.querySelector('input[type="file"][accept=".xlsx"]'); expect(el).toBeInTheDocument(); return el; });
   await act(async () => { fireEvent.change(input, { target: { files: [await file(rows)] } }); });
-  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
-  if (autoFinish) { while (gates.length) { const g = gates.shift(); await act(async () => { g.resolve(); }); } }
+  await waitFor(() => expect(screen.getByLabelText('Codice GOTO')).toHaveValue('145480'));
   fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
+  const region = await screen.findByRole('region', { name: 'Verifica AI delle righe' });
+  if (verified) {
+    fireEvent.click(within(region).getByRole('button', { name: 'Verifica con l’AI' }));
+    await waitFor(() => expect(gates.length).toBeGreaterThan(0));
+    while (document.querySelector('[role=dialog]') && /sta ragionando/.test(document.querySelector('[role=dialog]').textContent)) {
+      if (gates.length) await act(async () => { gates.shift().resolve(); }); else await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    }
+    const closer = document.querySelector('[role=dialog] button[aria-label="Chiudi"], [role=dialog] button');
+    const done = screen.queryByRole('button', { name: 'Chiudi' }); if (done) fireEvent.click(done); else if (closer) fireEvent.click(closer);
+  }
   return screen.findByRole('region', { name: 'Verifica AI delle righe' });
 };
 const card = () => screen.getByRole('region', { name: 'Verifica AI delle righe' });
@@ -83,13 +92,12 @@ const stopAfterFirstBatch = async () => {
   return screen.findByRole('alertdialog');
 };
 
-test('the automatic review after the Excel import does NOT open the window', async () => {
-  mount();
-  const input = await waitFor(() => { const el = document.querySelector('input[type="file"][accept=".xlsx"]'); expect(el).toBeInTheDocument(); return el; });
-  await act(async () => { fireEvent.change(input, { target: { files: [await file(eightRows())] } }); });
-  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
-  expect(screen.queryByRole('dialog')).toBeNull();
-  while (gates.length) { const g = gates.shift(); await act(async () => { g.resolve(); }); }
+test('the Excel import does NOT start the AI by itself: no call, no window, and the card offers «Verifica con l’AI»', async () => {
+  await importAndGoToOffer(eightRows(), { verified: false });
+  await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+  expect(service.reviewOfferDetails).not.toHaveBeenCalled(); expect(gates).toHaveLength(0); expect(screen.queryByRole('dialog')).toBeNull();
+  expect(card()).toHaveTextContent('8 righe da verificare'); expect(within(card()).getByRole('button', { name: 'Verifica con l’AI' })).toBeInTheDocument();
+  expect(within(card()).queryByText(/sono verificate/)).toBeNull();
 });
 
 describe('the card of the verification tells the truth about the rows', () => {
@@ -100,10 +108,12 @@ describe('the card of the verification tells the truth about the rows', () => {
     expect(within(card()).getByRole('button', { name: 'Rifai la verifica' })).toBeInTheDocument();
     expect(within(card()).queryByRole('button', { name: /Riprendi/ })).toBeNull();
   });
-  test('nothing verified yet (the automatic review after the import did not answer): «Verifica con l’AI», «8 righe da verificare», 0%', async () => {
-    await importAndGoToOffer(eightRows(), { autoFinish: false });
-    fireEvent.click(screen.getByRole('button', { name: /Interrompi|Verifica in corso/ }));
-    expect(card()).toBeInTheDocument();
+  test('nothing verified yet (the import does not start the AI): «Verifica con l’AI», «8 righe da verificare», 0%', async () => {
+    await importAndGoToOffer(eightRows(), { verified: false });
+    expect(card()).toHaveTextContent('8 righe da verificare');
+    expect(within(card()).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+    expect(within(card()).getByRole('button', { name: 'Verifica con l’AI' })).toBeInTheDocument();
+    expect(within(card()).queryByRole('button', { name: /Riprendi|Rifai/ })).toBeNull();
   });
   test('after a stop it says «5 di 8 righe verificate» and the button becomes «Riprendi la verifica (3 righe)»', async () => {
     const stopped = await stopAfterFirstBatch();
@@ -273,10 +283,15 @@ const goToOfferWithTwo = async () => {
   mount();
   const input = await waitFor(() => { const el = document.querySelector('input[type="file"][accept=".xlsx"]'); expect(el).toBeInTheDocument(); return el; });
   await act(async () => { fireEvent.change(input, { target: { files: [await twoFile()] } }); });
-  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
-  while (gates.length) { await act(async () => { gates.shift().resolve(); }); }
+  await waitFor(() => expect(screen.getByLabelText('Codice GOTO')).toHaveValue('145480'));
   fireEvent.click(await screen.findByRole('button', { name: /3\. Offerta/ }));
-  await screen.findByRole('region', { name: 'Verifica AI delle righe' });
+  const region = await screen.findByRole('region', { name: 'Verifica AI delle righe' });
+  fireEvent.click(within(region).getByRole('button', { name: 'Verifica con l’AI' }));          // l'import non la fa: la chiede l'utente
+  await waitFor(() => expect(gates.length).toBeGreaterThan(0));
+  while (/sta ragionando/.test(document.querySelector('[role=dialog]')?.textContent || '')) {
+    if (gates.length) await act(async () => { gates.shift().resolve(); }); else await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+  }
+  const closeSummary = screen.queryByRole('button', { name: 'Chiudi' }); if (closeSummary) fireEvent.click(closeSummary);
   gates.length = 0; service.reviewOfferDetails.mockClear();
 };
 const openAllGroups = () => document.querySelectorAll('details.offer-activity-group').forEach(d => { d.open = true; });

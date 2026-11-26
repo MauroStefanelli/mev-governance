@@ -188,10 +188,12 @@ test('closed: nothing is rendered', () => { const { container } = render(<Review
 describe('the real wiring in the Configuratore', () => {
   const fs = require('fs'); const path = require('path');
   const page = fs.readFileSync(path.join(__dirname, '..', 'pages', 'ConfiguratorePage.js'), 'utf8');
-  test('both verification cards (passo 1 and passo 3) open the window (the automatic review after the Excel import does not)', () => {
+  test('both verification cards (passo 1 and passo 3) open the window, and the Excel import does NOT start the review by itself', () => {
     expect(page.match(/onReview=\{options => runDetailReview\(items, catalog, importedInterventions, lot, true, !!options\?\.force\)\}/g)).toHaveLength(2);
     expect(page.match(/onRestartReview=\{\(\) => runDetailReview\(items, catalog, importedInterventions, lot, true, true\)\}/g)).toHaveLength(2);
-    expect(page).toMatch(/void runDetailReview\(parsed\.items, importLot \? effectiveCatalog\(importLot\) : catalog, parsed\.interventions, parsed\.lot \|\| lot\)/);
+    expect(page).not.toMatch(/void runDetailReview\(/);                                          // nessuna verifica lanciata da sola
+    const importer = page.slice(page.indexOf('const handleImportExcel'), page.indexOf('// ── Step 2: gap analysis'));
+    expect(importer).not.toMatch(/runDetailReview/);
   });
   test('the window gets the REAL progress, the rows and the reason of a failure', () => {
     expect(page).toMatch(/<ReviewProgress open=\{reviewWindow\.open\} phase=\{reviewWindow\.phase\} done=\{reviewWindow\.done\} total=\{reviewWindow\.total\} entries=\{reviewWindow\.rows\} error=\{reviewWindow\.error\} resumed=\{reviewWindow\.resumed\} alreadyDone=\{reviewWindow\.alreadyDone\} failedRows=\{reviewWindow\.failedRows\}/);
