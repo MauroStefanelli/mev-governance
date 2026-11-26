@@ -136,3 +136,7 @@
 .offer-template-upload { display: block; font-size: 12px; font-weight: 600; color: #496078; margin: 8px 0; }
 .offer-template-upload input, .offer-template details input { display: block; margin-top: 6px; max-width: 100%; }
 .offer-template details { border-top: 1px solid #e0e8f2; margin-top: 10px; padding: 10px 0 0; }
+.imported-intervention-hours { margin: 2px 0 0 !important; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: #475569; }
+.imported-intervention-hours b { color: #1b4a8a; }
+.imported-intervention-hours span { padding: 1px 8px; border-radius: 999px; background: #eef4fc; } .imported-intervention-hours span.is-zero { opacity: .5; }
+.imported-intervention-hours strong { font-variant-numeric: tabular-nums; } .imported-intervention-hours .imported-intervention-hours-total { background: #e1ecfb; font-weight: 700; }

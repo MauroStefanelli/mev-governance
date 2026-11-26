@@ -378,10 +378,14 @@ export const downloadBlob = (name, blob) => {
 //           interventions, items } senza toccare il DOM.
 // ============================================================
 
-export async function parseInitiativeWorkbook(file, catalog) {
+// `options.sheetName`: il foglio che contiene gli interventi. Senza, e' il primo foglio (la Tabella di Offerta). L'Estimatore Catalogo ha come primo foglio «COSTI INTERNI» (nascosto,
+// con gli interventi di un'altra iniziativa): per lui gli interventi sono in «INIZIATIVA» (vedi estimatorImport.js).
+export async function parseInitiativeWorkbook(file, catalog, options = {}) {
   const sourceWorkbookData = await file.arrayBuffer();
   const sheets = await readWorkbookSheets(sourceWorkbookData);
-  const rows = sheets[0].rows;
+  const mainSheet = options.sheetName ? sheets.find((s) => excelHeader(s.name) === excelHeader(options.sheetName)) : sheets[0];
+  if (!mainSheet) throw new Error(`Non trovo il foglio «${options.sheetName}».`);
+  const rows = mainSheet.rows;
   const detailSheet = sheets.find((s) => excelHeader(s.name) === "dettagliointerventi");
   const meta = String(rows[0]?.[0] || "");
   const headAt = rows.findIndex((r) => r.some((v) => ["idintervento", "id_intervento"].includes(excelHeader(v))));
@@ -494,8 +498,9 @@ export async function parseInitiativeWorkbook(file, catalog) {
   if (!interventions.length) throw new Error("Nessun intervento trovato");
   if (!importedItems.length) throw new Error("Quantità di catalogo non riconosciute");
 
-  const code = meta.match(/Codice:\s*([^\n\r]+)/i)?.[1]?.trim() || "";
-  const title = meta.match(/Titolo:\s*([^\n\r]+)/i)?.[1]?.trim() || "";
+  // Codice e titolo si fermano a fine riga: con «Codice:» VUOTO il vecchio `\s*` attraversava l'a capo e prendeva la riga del titolo come codice («Titolo: Bonifica SGT»).
+  const code = meta.match(/Codice:[ \t]*([^\n\r]*)/i)?.[1]?.trim() || "";
+  const title = meta.match(/Titolo:[ \t]*([^\n\r]*)/i)?.[1]?.trim() || "";
   const systems = [...new Set(interventions.map((x) => x.sistema).filter(Boolean))];
   const requirements = [...new Set(interventions.map((x) => x.requisiti).filter(Boolean))];
 

@@ -1,0 +1,18 @@
+/* Riepilogo dell'import dall'Estimatore Catalogo. */
+.eir { margin: 0 0 14px; padding: 16px 18px; border: 1px solid #bcd3f5; border-radius: 14px; background: linear-gradient(135deg, #f4f8ff 0%, #fff 70%); color: #17314f; font-size: 13px; }
+.eir *, .eir *::before, .eir *::after { box-sizing: border-box; }
+.eir-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.eir-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #1a73e8; }
+.eir h4 { margin: 0; font-size: 16px; overflow-wrap: anywhere; } .eir-file { margin: 3px 0 0; color: #5d718a; font-size: 12px; overflow-wrap: anywhere; }
+.eir-close { flex: none; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; font-size: 16px; cursor: pointer; color: #5d718a; } .eir-close:hover { background: #e8effa; } .eir-close:focus-visible { outline: 3px solid #75a7f7; }
+.eir-numbers { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.eir-numbers li { padding: 9px 12px; border-radius: 11px; background: #fff; border: 1px solid #dbe5f3; } .eir-numbers li.is-zero { opacity: .55; }
+.eir-numbers strong { display: block; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; } .eir-numbers span { font-size: 11.5px; color: #5d718a; }
+.eir-hours { margin-top: 12px; } .eir-hours h5 { margin: 0 0 6px; font-size: 13px; } .eir-hours h5 small { font-weight: 500; color: #5d718a; }
+.eir-hours ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.eir-hours li { display: flex; flex-direction: column; min-width: 96px; padding: 8px 12px; border-radius: 10px; background: #fff; border: 1px solid #dbe5f3; } .eir-hours li.is-zero { opacity: .55; }
+.eir-hours li span { font-size: 11px; font-weight: 700; color: #5d718a; text-transform: uppercase; letter-spacing: .04em; } .eir-hours li strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.eir-hours .eir-total { background: #e8f1ff; border-color: #bcd3f5; }
+.eir-rate, .eir-none { margin: 8px 0 0; font-size: 12px; color: #5d718a; }
+.eir-warnings { margin: 12px 0 0; padding: 10px 14px 10px 28px; border-radius: 10px; background: #fff4d6; border: 1px solid #f0d9a0; color: #7a4b00; overflow-wrap: anywhere; } .eir-warnings li { margin: 3px 0; }
+.eir-skipped { margin-top: 10px; } .eir-skipped summary { cursor: pointer; font-weight: 700; color: #1b4a8a; } .eir-skipped p { margin: 6px 0; color: #475569; overflow-wrap: anywhere; }

@@ -20,6 +20,8 @@ import { saveAndClose } from "../configuratore/saveAndClose";
 import SaveProgress from "../configuratore/SaveProgress";
 import ReviewProgress from "../configuratore/ReviewProgress";
 import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configuratore/reviewPlan";
+import { parseEstimatorWorkbook } from "../configuratore/estimatorImport";
+import EstimatorImportReport from "../configuratore/EstimatorImportReport";
 import { initiativeCode, mergeById } from "../configuratore/rationaleKnowledge";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
 import CollaborationPanel from "../configuratore/CollaborationPanel";
@@ -167,6 +169,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [towImpattoSrc, setTowImpattoSrc] = useState("");
   const [economyNotes, setEconomyNotes] = useState("");
   const [sourceWorkbookName, setSourceWorkbookName] = useState("");
+  const [estimatorReport, setEstimatorReport] = useState(null);
   const [mappedLoading, setMappedLoading] = useState(false);
   const [expandedOfferGroups, setExpandedOfferGroups] = useState(new Set()); // gruppi aperti in step 3
 
@@ -735,16 +738,19 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     } finally { if (detailReviewJob.current === job) setDetailReviewBusy(false); }
   };
 
-  const handleImportExcel = async (file) => {
+  // `kind`: «offer» = Importa Tabella di Offerta; «estimator» = Importa da Estimatore Catalogo. Dopo la lettura il percorso e' lo STESSO (lotto, catalogo, verifica AI, revisione, integrazioni).
+  const handleImportExcel = async (file, kind = 'offer') => {
     if (!file) return;
+    setEstimatorReport(null);
     detailReviewJob.current++; setDetailReviewBusy(false);
     setMappedLoading(true);
     try {
-      let parsed = await parseInitiativeWorkbook(file, catalog);
+      const read = (target) => (kind === 'estimator' ? parseEstimatorWorkbook(file, target) : parseInitiativeWorkbook(file, target));
+      let parsed = await read(catalog);
       const importContract = allContracts.find(c => c.contractId === selectedContractId);
       const importLot = importContract?.lots?.find(l => l.active !== false && String(l.lotId) === parsed.lot);
       if (parsed.lot && !importLot) throw new Error("Il lotto del file non è disponibile nel contratto selezionato");
-      if (importLot) parsed = await parseInitiativeWorkbook(file, effectiveCatalog(importLot));
+      if (importLot) parsed = await read(effectiveCatalog(importLot));
       if (parsed.lot && allContracts.find((c) => c.contractId === selectedContractId)?.lots?.some((l) => l.active !== false && String(l.lotId) === parsed.lot)) {
         setLot(parsed.lot);
       }
@@ -772,7 +778,8 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       } catch (e) {
         setImportHistoryError(`Excel importato, ma revisione non salvata: ${e.message} I dati importati restano nella pagina. Salva una revisione dal workspace dopo aver verificato lo storico.`);
       }
-      toast(`${parsed.interventions.length} interventi e ${parsed.items.length} dettagli importati; verifico possibili integrazioni`);
+      if (kind === 'estimator' && parsed.estimator) setEstimatorReport({ fileName: parsed.fileName, code: parsed.code, title: parsed.title, ...parsed.estimator });
+      toast(`${parsed.interventions.length} interventi e ${parsed.items.length} dettagli importati${kind === 'estimator' ? ' dall’Estimatore Catalogo' : ''}; verifico possibili integrazioni`);
       runGapAnalysis(parsed.interventions, importLot ? effectiveCatalog(importLot) : catalog);
     } catch (err) {
       toast("Importazione non riuscita: " + err.message);
@@ -2103,12 +2110,20 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
             <div ref={initiativeFieldsRef} style={{ ...styles.card, marginTop: 12, scrollMarginTop: 20 }}>
               <div className="init-card-head">
                 <h3 style={{ margin: 0 }}>Dati iniziativa</h3>
-                <label className={`init-import${mappedLoading ? ' is-busy' : ''}`} title="Carica il workbook dell’iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi) per compilare i dati e gli interventi">
-                  {mappedLoading ? 'Elaborazione in corso…' : 'Importa Tabella di Offerta'}
-                  <input type="file" accept=".xlsx" hidden disabled={mappedLoading} aria-label="Importa Tabella di Offerta"
-                    onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0]); e.target.value = ""; }} />
-                </label>
+                <span className="init-imports">
+                  <label className={`init-import${mappedLoading ? ' is-busy' : ''}`} title="Carica il workbook dell’iniziativa (foglio con ID_INTERVENTO + foglio DettaglioInterventi) per compilare i dati e gli interventi">
+                    {mappedLoading ? 'Elaborazione in corso…' : 'Importa Tabella di Offerta'}
+                    <input type="file" accept=".xlsx" hidden disabled={mappedLoading} aria-label="Importa Tabella di Offerta"
+                      onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0], 'offer'); e.target.value = ""; }} />
+                  </label>
+                  <label className={`init-import init-import-estimator${mappedLoading ? ' is-busy' : ''}`} title="Carica un Estimatore Catalogo (fogli INIZIATIVA e DettaglioInterventi): importa interventi, attività e anche le ore uomo per fase">
+                    {mappedLoading ? 'Elaborazione in corso…' : 'Importa da Estimatore Catalogo'}
+                    <input type="file" accept=".xlsx" hidden disabled={mappedLoading} aria-label="Importa da Estimatore Catalogo"
+                      onChange={(e) => { if (e.target.files[0]) handleImportExcel(e.target.files[0], 'estimator'); e.target.value = ""; }} />
+                  </label>
+                </span>
               </div>
+              {estimatorReport && <EstimatorImportReport report={estimatorReport} onClose={() => setEstimatorReport(null)} />}
               <div style={styles.grid2}>
                 <label style={styles.label}>Codice GOTO
                   <input style={styles.input} value={initiative.code} onChange={(e) => setInitiative((i) => ({ ...i, code: e.target.value }))} />

@@ -136,7 +136,13 @@ describe('Dati iniziativa: import button and PM Poste', () => {
     expect(dataRow).toContainElement(button);
     expect(button).toHaveClass('init-import');
     expect(button.compareDocumentPosition(sectionButtons()[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeFalsy();
-    expect(document.querySelectorAll('input[type="file"][accept=".xlsx"]')).toHaveLength(1);
+    // due modi di importare, accanto: la Tabella di Offerta (come prima) e l'Estimatore Catalogo
+    expect(document.querySelectorAll('input[type="file"][accept=".xlsx"]')).toHaveLength(2);
+    const estimator = screen.getByText('Importa da Estimatore Catalogo').closest('label');
+    expect(dataRow).toContainElement(estimator);
+    expect(estimator).toHaveClass('init-import');
+    expect(button.nextElementSibling).toBe(estimator);
+    expect(screen.getByLabelText('Importa da Estimatore Catalogo')).toHaveAttribute('accept', '.xlsx');
   });
 
   test('the import button is still usable when the card is reopened, and the file input accepts only xlsx', async () => {

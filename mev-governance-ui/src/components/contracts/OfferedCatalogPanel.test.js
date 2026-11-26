@@ -125,7 +125,8 @@ const src = f => fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
 test('the Configuratore, Sviluppo and the lot of the contract all read the EFFECTIVE catalog (offered when present)', () => {
   expect(src('pages/ConfiguratorePage.js')).toMatch(/const catalog = useMemo\(\(\) => effectiveCatalog\(activeLot\), \[activeLot\]\)/);
   expect(src('pages/ConfiguratorePage.js')).toMatch(/offeredCatalog: l\.offeredCatalog \|\| \[\]/);
-  expect(src('pages/ConfiguratorePage.js')).toMatch(/parseInitiativeWorkbook\(file, effectiveCatalog\(importLot\)\)/);
+  // l'import (Tabella di Offerta ed Estimatore Catalogo) rilegge il file con il catalogo EFFETTIVO del lotto: quello offerto, se c'e'
+  expect(src('pages/ConfiguratorePage.js')).toMatch(/if \(importLot\) parsed = await read\(effectiveCatalog\(importLot\)\)/);
   expect(src('configuratore/developmentRecord.js')).toMatch(/return effectiveCatalog\(lot\)/);
   const offeredLot = { lotId: '2', active: true, catalog: lotto2, offeredCatalog: [{ id: 236, prezzi: { REALIZZAZIONE: { Semplice: 1, Medio: 2, Complesso: 3 }, MODIFICA: { Semplice: 4, Medio: 5, Complesso: 6 } } }] };
   const withOffered = catalogFor([{ contractId: 'c', lots: [offeredLot] }], null, { contractId: 'c', lot: '2' }).find(e => e.id === 236);
