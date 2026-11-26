@@ -47,6 +47,17 @@ public class ConfiguratoreController : ControllerBase
         return CanAccessRecords() || User.IsInRole("Client");
     }
 
+    // La chiave del record di sviluppo, identica a quella del frontend (developmentRecordKey): `contratto|lotto|development|<identita'>` con l'identita' in minuscolo
+    // e codificata come encodeURIComponent di JavaScript (che lascia ! * \' ( ) non codificati, a differenza di Uri.EscapeDataString).
+    public static string DevelopmentKey(string contract, string lot, string identity)
+    {
+        var encoded = Uri.EscapeDataString((identity ?? "").Trim().ToLowerInvariant()).Replace("%21", "!").Replace("%2A", "*").Replace("%27", "'").Replace("%28", "(").Replace("%29", ")");
+        return $"{contract}|{lot}|development|{encoded}";
+    }
+
+    // Eliminare un'iniziativa salvata: chi puo' modificarla (Admin, Developer, SuperAdmin), non Manager o Bid Manager.
+    private bool CanDeleteInitiatives() => User.IsInRole("SuperAdmin") || User.IsInRole("Developer") || User.IsInRole("Admin");
+
     private bool CanAccessGare() => User.IsInRole("SuperAdmin") || User.IsInRole("Bid Manager");
 
     private static readonly string[] ValidEntities =
@@ -750,6 +761,10 @@ public class ConfiguratoreController : ControllerBase
 
     // ============================================================
     // DELETE /api/configuratore/records/{id}
+    // Una valutazione di iniziativa (initiative_evaluation) puo' essere eliminata solo da Admin, Developer e SuperAdmin. Con lei se ne va anche lo SVILUPPO
+    // salvato (entity_type implementation_plan), che e' un record a parte: senza questo resterebbe orfano nel database. Tutto in una transazione: o spariscono
+    // entrambi o nessuno. Se resta un'altra valutazione della stessa iniziativa (stesso contratto, lotto e GOTO/titolo) lo sviluppo, che e' di quell'iniziativa e non
+    // di una singola offerta, NON viene toccato. Revisioni condivise, razionali, documenti e conoscenza storica restano (servono alle iniziative simili).
     // ============================================================
     [HttpDelete("records/{id}")]
     public async Task<IActionResult> DeleteRecord(string id)
@@ -759,17 +774,57 @@ public class ConfiguratoreController : ControllerBase
             return BadRequest("Id non valido");
 
         var (sch, cs) = GetDbTarget();
-        var sql = $@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid AND (""entity_type"" <> 'gara' OR @canGare)";
-
         try
         {
             await using var conn = new NpgsqlConnection(cs);
             await conn.OpenAsync();
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("id", gid);
-            cmd.Parameters.AddWithValue("canGare", CanAccessGare());
-            var affected = await cmd.ExecuteNonQueryAsync();
-            return Ok(new { deleted = affected > 0 });
+            await using var tx = await conn.BeginTransactionAsync();
+
+            string? entity = null, contract = null, lot = null, recordKey = null, identity = null;
+            await using (var find = new NpgsqlCommand($@"SELECT ""entity_type"", ""contract_id"", ""lot_id"", ""record_key"",
+                    lower(btrim(coalesce(nullif(""payload""->'initiative'->>'code', ''), ""payload""->'initiative'->>'title', ''))) AS identity
+                FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid", conn, tx))
+            {
+                find.Parameters.AddWithValue("id", gid);
+                await using var reader = await find.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    entity = reader.GetString(0); contract = reader.IsDBNull(1) ? "" : reader.GetString(1); lot = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                    recordKey = reader.GetString(3); identity = reader.IsDBNull(4) ? "" : reader.GetString(4);
+                }
+            }
+            if (entity == null) return Ok(new { deleted = false, developmentDeleted = 0 });
+            if (entity == "gara" && !CanAccessGare()) return Ok(new { deleted = false, developmentDeleted = 0 });
+            if (entity == "initiative_evaluation" && !CanDeleteInitiatives()) return Forbid();
+
+            int removed;
+            await using (var del = new NpgsqlCommand($@"DELETE FROM ""{sch}"".""PC_DataRecords"" WHERE id = @id::uuid", conn, tx))
+            { del.Parameters.AddWithValue("id", gid); removed = await del.ExecuteNonQueryAsync(); }
+
+            var developmentDeleted = 0;
+            if (removed > 0 && entity == "initiative_evaluation")
+            {
+                long others = 0;
+                if (!string.IsNullOrEmpty(identity))
+                    await using (var count = new NpgsqlCommand($@"SELECT count(*) FROM ""{sch}"".""PC_DataRecords""
+                        WHERE ""entity_type"" = 'initiative_evaluation' AND coalesce(""contract_id"", '') = @cid AND coalesce(""lot_id"", '') = @lid
+                          AND lower(btrim(coalesce(nullif(""payload""->'initiative'->>'code', ''), ""payload""->'initiative'->>'title', ''))) = @identity", conn, tx))
+                    {
+                        count.Parameters.AddWithValue("cid", contract ?? ""); count.Parameters.AddWithValue("lid", lot ?? ""); count.Parameters.AddWithValue("identity", identity);
+                        others = Convert.ToInt64(await count.ExecuteScalarAsync());
+                    }
+                if (others == 0)
+                    await using (var plan = new NpgsqlCommand($@"DELETE FROM ""{sch}"".""PC_DataRecords""
+                        WHERE ""entity_type"" = 'implementation_plan' AND coalesce(""contract_id"", '') = @cid AND coalesce(""lot_id"", '') = @lid
+                          AND (""record_key"" = @dk OR ""payload""->>'initiativeRecordKey' = @rk)", conn, tx))
+                    {
+                        plan.Parameters.AddWithValue("cid", contract ?? ""); plan.Parameters.AddWithValue("lid", lot ?? "");
+                        plan.Parameters.AddWithValue("dk", DevelopmentKey(contract ?? "", lot ?? "", identity ?? "")); plan.Parameters.AddWithValue("rk", recordKey ?? "~~nessuna-chiave~~");
+                        developmentDeleted = await plan.ExecuteNonQueryAsync();
+                    }
+            }
+            await tx.CommitAsync();
+            return Ok(new { deleted = removed > 0, developmentDeleted });
         }
         catch (Exception ex)
         {

@@ -619,3 +619,58 @@ describe('who else works on the same GOTO, and the chat', () => {
     expect(service.developmentRequest.mock.calls.filter(([path]) => path === 'presence').length).toBe(first);
   });
 });
+
+describe('deleting a saved initiative from the archive of the Configuratore', () => {
+  const record = { Id: 'rec-1', record_key: 'C1|2|initiative|goto-9', entity_type: 'initiative_evaluation', contract_id: 'C1', lot_id: '2', title: 'GOTO-9 · Invio',
+    payload: JSON.stringify({ version: 6, lot: '2', initiative: { code: 'GOTO-9', title: 'Invio', system: 'NPSO' }, items: [], importedInterventions: [] }) };
+  const mountAs = roles => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role={roles[0]} roles={roles} />);
+  const openArchive = async roles => { mountAs(roles); await waitFor(() => expect(sectionButtons()).toHaveLength(7)); fireEvent.click(await screen.findByRole('button', { name: /Archivio iniziative/ })); await screen.findByRole('button', { name: 'Seleziona iniziativa GOTO-9 Invio' }); };
+  const trash = () => screen.queryByRole('button', { name: 'Elimina iniziativa GOTO-9' });
+  let confirmSpy;
+  beforeEach(() => {
+    confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    service.getConfiguratoreRecords.mockImplementation(async params => ({ records: params.entity_type === 'initiative_evaluation' ? [record] : [] }));
+    service.deleteConfiguratoreRecord.mockReset().mockResolvedValue({ deleted: true, developmentDeleted: 1 });
+  });
+  afterEach(() => confirmSpy.mockRestore());
+
+  test.each([['Developer'], ['Admin'], ['SuperAdmin']])('a %s sees the delete button', async role => { await openArchive([role]); expect(trash()).toBeInTheDocument(); });
+  test.each([['Manager'], ['Bid Manager'], ['Client'], ['Editor']])('a %s does NOT see it', async role => { await openArchive([role]); expect(trash()).toBeNull(); });
+  test('it asks with the window that says what disappears and what stays — not with the browser confirm — and deletes nothing yet', async () => {
+    await openArchive(['Developer']); fireEvent.click(trash());
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('GOTO-9'); expect(dialog).toHaveTextContent('lo sviluppo salvato'); expect(dialog).toHaveTextContent('Resta');
+    expect(confirmSpy).not.toHaveBeenCalled(); expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' })); expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled();
+  });
+  test('it does not open the initiative when the delete button is pressed', async () => {
+    await openArchive(['Developer']); fireEvent.click(trash()); await screen.findByRole('alertdialog');
+    expect(screen.getByLabelText('Codice GOTO')).toHaveValue('');
+  });
+  test('confirming deletes THAT record, closes the window, reloads the archive and says so', async () => {
+    await openArchive(['Developer']); fireEvent.click(trash());
+    service.getConfiguratoreRecords.mockImplementation(async () => ({ records: [] }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    await waitFor(() => expect(service.deleteConfiguratoreRecord).toHaveBeenCalledWith('rec-1'));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    await waitFor(() => expect(document.body).toHaveTextContent('Iniziativa eliminata'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Seleziona iniziativa GOTO-9 Invio' })).toBeNull());
+  });
+  test('an initiative a colleague already deleted: the window says so (no false «eliminata») and the archive is reloaded', async () => {
+    service.deleteConfiguratoreRecord.mockResolvedValue({ deleted: false, developmentDeleted: 0 });
+    await openArchive(['Developer']); fireEvent.click(trash());
+    const loads = service.getConfiguratoreRecords.mock.calls.length;
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('non risulta più salvata');
+    expect(document.body).not.toHaveTextContent('Iniziativa eliminata');
+    await waitFor(() => expect(service.getConfiguratoreRecords.mock.calls.length).toBeGreaterThan(loads));
+  });
+  test('a failed deletion keeps the window open with the reason, and the initiative stays listed', async () => {
+    service.deleteConfiguratoreRecord.mockRejectedValue(new Error('Errore eliminazione record configuratore'));
+    await openArchive(['Developer']); fireEvent.click(trash());
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Errore eliminazione record configuratore');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Seleziona iniziativa GOTO-9 Invio' })).toBeInTheDocument();
+  });
+});

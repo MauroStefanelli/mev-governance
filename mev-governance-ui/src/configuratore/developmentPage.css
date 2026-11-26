@@ -144,3 +144,9 @@
 .dev-knowledge-list li.dev-know-vincolo, .dev-know-vincolo-row { border-left-color: #c9822b; } .dev-knowledge-list li.dev-know-decisione { border-left-color: #1f8f5a; }
 .dev-know-kind { display: inline-block; margin-right: 8px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .7px; color: #3d5878; } .dev-know-kind.dev-know-vincolo, .dev-know-vincolo .dev-know-kind { color: #8a5200; } .dev-know-kind.dev-know-decisione, .dev-know-decisione .dev-know-kind { color: #14704a; }
 .dev-know { background: #fffaf0; border: 1px solid #f0dcb0; border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; } .dev-know ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+
+/* Elenco: la riga si apre col suo pulsante, l'eliminazione e' un pulsante a parte accanto (un pulsante dentro un pulsante non e' valido). */
+.dev-list-item { display: flex; gap: 8px; align-items: stretch; }
+.dev-list-item .dev-list-row { flex: 1; min-width: 0; }
+.dev-list-delete { flex: none; width: 48px; min-height: 48px; border-radius: 12px; border: 1px solid #f0c5c5; background: #fff; color: #b3261e; font-size: 16px; cursor: pointer; }
+.dev-list-delete:hover { background: #fdecec; border-color: #e39a9a; }

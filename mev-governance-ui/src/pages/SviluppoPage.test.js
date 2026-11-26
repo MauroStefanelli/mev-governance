@@ -8,7 +8,7 @@ import * as service from '../services/mevService';
 
 jest.mock('../services/mevService', () => ({
   getConfiguratoreRecords: jest.fn(), getConfiguratoreContracts: jest.fn(), upsertConfiguratoreRecord: jest.fn(), getSharedApplications: jest.fn(),
-  analyzeDevelopmentWithAi: jest.fn(), prepareActivityDevelopment: jest.fn(), generateActivityCode: jest.fn(), developmentRequest: jest.fn(),
+  analyzeDevelopmentWithAi: jest.fn(), prepareActivityDevelopment: jest.fn(), generateActivityCode: jest.fn(), developmentRequest: jest.fn(), deleteConfiguratoreRecord: jest.fn(),
 }));
 const evaluation = { initiative: { code: 'GOTO1', title: 'Invio prenotazione', system: 'NPSO' }, lot: '2', contractId: 'C1',
   items: [{ sourceRowId: 'detail-1', interventionId: 'I1', reason: 'Prima attività' }, { sourceRowId: 'detail-2', interventionId: 'I1', reason: 'Seconda attività' }] };
@@ -217,4 +217,63 @@ test('a source folder chosen once is still there when Sviluppo is opened again: 
   await openFirst();
   expect(await screen.findByText(/2 file selezionati/)).toBeInTheDocument(); expect(screen.getByRole('checkbox', { name: /npso/ })).toBeChecked();
   expect(screen.getByRole('button', { name: 'Aggiungi o aggiorna una cartella' })).toBeInTheDocument();
+});
+
+describe('deleting a saved initiative from «Sviluppo iniziative»', () => {
+  const mount = (roles = ['Developer']) => render(<SviluppoPage ambienteId={1} codiceContratto="C1" role={roles[0]} roles={roles} />);
+  const deleteButton = () => screen.queryByRole('button', { name: 'Elimina iniziativa GOTO1' });
+  beforeEach(() => { offer.Id = 'abc-1'; service.deleteConfiguratoreRecord.mockResolvedValue({ deleted: true, developmentDeleted: 1 }); });
+  afterEach(() => { delete offer.Id; });
+
+  test.each([['Developer'], ['Admin'], ['SuperAdmin']])('a %s sees the delete button on every initiative of the list', async role => {
+    mount([role]); await screen.findByText('Invio prenotazione'); expect(deleteButton()).toBeInTheDocument();
+  });
+  test.each([['Manager'], ['Bid Manager'], ['Client'], ['Editor']])('a %s does NOT see it', async role => {
+    mount([role]); await screen.findByText('Invio prenotazione'); expect(deleteButton()).toBeNull();
+  });
+  test('the button is NOT inside the row button (a button inside a button is invalid and would open the initiative)', async () => {
+    mount(); await screen.findByText('Invio prenotazione');
+    expect(deleteButton().closest('button.dev-list-row')).toBeNull();
+    fireEvent.click(deleteButton()); expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Percorso di sviluppo')).toBeNull();                 // non ha aperto l'iniziativa
+  });
+  test('pressing it asks first, says what disappears and what stays, and deletes NOTHING yet', async () => {
+    mount(); await screen.findByText('Invio prenotazione'); fireEvent.click(deleteButton());
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Eliminare questa iniziativa?'); expect(dialog).toHaveTextContent('GOTO1'); expect(dialog).toHaveTextContent('Invio prenotazione');
+    expect(dialog).toHaveTextContent('Sparisce'); expect(dialog).toHaveTextContent('lo sviluppo salvato'); expect(dialog).toHaveTextContent('Resta'); expect(dialog).toHaveTextContent('L’operazione non si può annullare');
+    expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled();
+  });
+  test('«Annulla» (and Escape) close it without deleting; the initiative is still in the list', async () => {
+    mount(); await screen.findByText('Invio prenotazione');
+    fireEvent.click(deleteButton()); fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Annulla' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    fireEvent.click(deleteButton()); fireEvent.keyDown(document, { key: 'Escape' }); expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled(); expect(screen.getByText('Invio prenotazione')).toBeInTheDocument();
+  });
+  test('«Elimina definitivamente» deletes THAT record and the list is reloaded', async () => {
+    mount(); await screen.findByText('Invio prenotazione'); fireEvent.click(deleteButton());
+    const calls = service.getConfiguratoreRecords.mock.calls.length;
+    service.getConfiguratoreRecords.mockImplementation(async params => ({ records: params.entity_type === 'initiative_evaluation' ? [] : [] }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    await waitFor(() => expect(service.deleteConfiguratoreRecord).toHaveBeenCalledWith('abc-1'));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Invio prenotazione')).toBeNull());
+    expect(service.getConfiguratoreRecords.mock.calls.length).toBeGreaterThan(calls);
+    expect(screen.getByText(/Nessuna iniziativa valutata/)).toBeInTheDocument();
+  });
+  test('when the server refuses, the window stays open with the reason and the initiative is NOT removed from the list', async () => {
+    service.deleteConfiguratoreRecord.mockRejectedValue(new Error('Errore eliminazione record configuratore'));
+    mount(); await screen.findByText('Invio prenotazione'); fireEvent.click(deleteButton());
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Errore eliminazione record configuratore');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument(); expect(screen.getByText('Invio prenotazione')).toBeInTheDocument();
+    expect(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' })).not.toBeDisabled();       // si puo' riprovare
+  });
+  test('an initiative already deleted by a colleague says so and the list is refreshed', async () => {
+    service.deleteConfiguratoreRecord.mockResolvedValue({ deleted: false, developmentDeleted: 0 });
+    mount(); await screen.findByText('Invio prenotazione'); fireEvent.click(deleteButton());
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    await waitFor(() => expect(service.getConfiguratoreRecords.mock.calls.length).toBeGreaterThan(2));
+  });
 });

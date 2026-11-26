@@ -955,7 +955,7 @@ function App() {
         {page === "superadmin"        && (hasRole("SuperAdmin") || (role === "Client" && clientPages?.includes("superadmin"))) && <SuperAdminPage />}
         {page === "catalogoofferto"   && hasRole("Admin", "SuperAdmin") && <OfferedCatalogPage />}
         {page === "configuratore"     && canViewApp("configuratore")     && hasRole("SuperAdmin", "Developer") && <ConfiguratorePage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} onNavigate={setPage} />}
-        {page === "sviluppo"          && canViewApp("sviluppo")          && hasRole("SuperAdmin", "Developer") && <SviluppoPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} />}
+        {page === "sviluppo"          && canViewApp("sviluppo")          && hasRole("SuperAdmin", "Developer") && <SviluppoPage onUnauthorized={handleUnauthorized} ambienteId={ambienteId} codiceContratto={ambienteAttivo?.codiceContratto || ""} role={role} roles={roles} />}
         {page === "gara"              && canViewApp("gara")              && hasRole("Bid Manager", "SuperAdmin") && <GarePage onUnauthorized={handleUnauthorized} />}
         {/* Accesso negato */}
         {page !== "home" && !["admin","dbconfig","superadmin","catalogoofferto"].includes(page) && !canViewApp(page) && (

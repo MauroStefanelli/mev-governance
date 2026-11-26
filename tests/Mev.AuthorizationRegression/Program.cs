@@ -34,6 +34,7 @@ await ClientContractRoleRegression.Run(db, Check);
 await MevEndpointsRegression.Run(Check);
 await MevMandatoryRegression.Run(db, Check);
 await OfferedCatalogRegression.Run(db, Check);
+await InitiativeDeleteRegression.Run(db, Check);
 await MevExportRegression.Run(db, Check);
 StartupSqlRegression.Run(Check);
 if (args.Contains("--workspace-only")) { Console.WriteLine($"Workspace checks passed: {checks}"); return; }

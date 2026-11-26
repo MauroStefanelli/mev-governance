@@ -23,6 +23,7 @@ import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configurator
 import { parseEstimatorWorkbook } from "../configuratore/estimatorImport";
 import { towOverrides as buildTowOverrides, qtyKey, roundUp, autoTowRow, AUTO, MANUAL } from "../configuratore/towModel";
 import TowReview from "../configuratore/TowReview";
+import DeleteInitiativeDialog, { initiativeLabel } from "../configuratore/DeleteInitiativeDialog";
 import EstimatorImportReport from "../configuratore/EstimatorImportReport";
 import { initiativeCode, mergeById } from "../configuratore/rationaleKnowledge";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
@@ -1283,15 +1284,17 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     return () => { alive = false; };
   }, [ambienteId]);
 
-  const deleteArchiveRecord = async (id) => {
-    if (!window.confirm("Eliminare definitivamente questa iniziativa memorizzata?")) return;
-    try {
-      await deleteConfiguratoreRecord(id);
-      loadArchive();
-      toast("Iniziativa eliminata");
-    } catch (error) {
-      toast("Eliminazione non riuscita: " + error.message);
-    }
+  // Eliminare un'iniziativa salvata: finestra di conferma (dice cosa sparisce e cosa resta); con la valutazione se ne va anche lo sviluppo salvato.
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const askDeleteArchiveRecord = (record) => {
+    const evaluation = typeof record.payload === "string" ? safeParse(record.payload) : record.payload || {};
+    setDeleteTarget({ id: record.Id || record.id, ...initiativeLabel(record, evaluation) });
+  };
+  const deleteArchiveRecord = async () => {
+    const result = await deleteConfiguratoreRecord(deleteTarget.id);                       // se fallisce la finestra resta aperta e mostra il motivo
+    if (result && result.deleted === false) { loadArchive(); throw new Error("L’iniziativa non risulta più salvata: ho aggiornato l’elenco."); }
+    setDeleteTarget(null); loadArchive();
+    toast("Iniziativa eliminata");
   };
 
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
@@ -2021,7 +2024,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                      {isCurrentlyEditing && <span className="tow-active-tag">Iniziativa attiva</span>}
-                     <button aria-label={`Elimina iniziativa ${ini.code || ini.title || rec.title}`} style={{ ...btnStyles.danger, fontSize: 12, padding: "10px 12px" }} onClick={e => { e.stopPropagation(); deleteArchiveRecord(rec.Id || rec.id); }}>✕</button>
+                     {canEditInitiative && <button aria-label={`Elimina iniziativa ${ini.code || ini.title || rec.title}`} style={{ ...btnStyles.danger, fontSize: 12, padding: "10px 12px" }} onClick={e => { e.stopPropagation(); askDeleteArchiveRecord(rec); }}>✕</button>}
                   </div>
                 </div>
               );
@@ -3265,6 +3268,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </div>
         )}
 
+      {deleteTarget && <DeleteInitiativeDialog initiative={deleteTarget} onConfirm={deleteArchiveRecord} onCancel={() => setDeleteTarget(null)} />}
       {toastMsg && (
         <div role="status" aria-live="polite" style={styles.toast}>
           {toastMsg}

@@ -11,7 +11,8 @@ import { computeJourney, developmentSummary, hasCode } from '../configuratore/de
 import { approvedInterventions, buildCodeChangeRequest, implementationMarkdown, developmentDocumentMarkdown, downloadBlob, repositorySummary } from '../configuratore/developmentPackages';
 import { saveAndClose } from '../configuratore/saveAndClose';
 import { KINDS, KIND_ORDER, countByKind, confirmedEntries } from '../configuratore/rationaleKnowledge';
-import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi, developmentRequest } from '../services/mevService';
+import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi, developmentRequest, deleteConfiguratoreRecord } from '../services/mevService';
+import DeleteInitiativeDialog, { canDeleteInitiatives, initiativeLabel } from '../configuratore/DeleteInitiativeDialog';
 import { APP_DATA, appNorm, sourceFileAllowed, ignoredSourcePath } from '../configuratore/configuratoreCore';
 import useSourceLibrary from '../configuratore/useSourceLibrary';
 import SourceLibraryPanel from '../configuratore/SourceLibraryPanel';
@@ -21,7 +22,10 @@ import '../configuratore/developmentPage.css';
 const stamp = value => value ? new Date(value).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 const unauthorized = error => { try { const status = JSON.parse(error.message).status; return status === 401 || status === 403; } catch { return false; } };
 
-export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContratto }) {
+export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContratto, role, roles }) {
+  const myRoles = roles && roles.length ? roles : role ? [role] : [];
+  const mayDelete = canDeleteInitiatives(myRoles);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [list, setList] = useState([]);
   const [summaries, setSummaries] = useState({});
   const [activity, setActivity] = useState({});
@@ -150,7 +154,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
       <div className="dev-list">
         {rows.map(({ record, evaluation }) => {
           const summary = summaries[record.record_key]; const count = (evaluation.items || []).length;
-          return <button type="button" className="dev-list-row" key={record.record_key || record.Id} disabled={busy === 'open'} onClick={() => open(record)}>
+          return <div className="dev-list-item" key={record.record_key || record.Id}><button type="button" className="dev-list-row" disabled={busy === 'open'} onClick={() => open(record)}>
             <span className="dev-list-id">{evaluation.initiative?.code || 'Senza GOTO'}</span>
             <span className="dev-list-main"><strong>{evaluation.initiative?.title || record.title}</strong>
               <small>{evaluation.initiative?.system || 'Sistema non indicato'} · {count} attività · valutata il {stamp(record.updated_at)}</small></span>
@@ -163,10 +167,18 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
               return <><small className="dev-list-worked">{line.worked}</small>
                 {line.online.length > 0 && <span className="dev-list-online" title={line.online.map(displayName).join(', ')}><span className="dev-live-dot" aria-hidden="true" />{line.online.length === 1 ? `${displayName(line.online[0])} è collegato` : `${line.online.length} collegati ora`}</span>}</>; })()}</span>
             <span className="dev-list-go" aria-hidden="true">›</span>
-          </button>;
+          </button>
+          {mayDelete && <button type="button" className="dev-list-delete" aria-label={`Elimina iniziativa ${evaluation.initiative?.code || evaluation.initiative?.title || record.title}`} title="Elimina l’iniziativa salvata"
+            onClick={() => setDeleteTarget({ id: record.Id || record.id, ...initiativeLabel(record, evaluation) })}>✕</button>}
+          </div>;
         })}
       </div>
     </section>
+    {deleteTarget && <DeleteInitiativeDialog initiative={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={async () => {
+      const result = await deleteConfiguratoreRecord(deleteTarget.id);
+      if (result && result.deleted === false) { setDeleteTarget(null); await refresh(); throw new Error('L’iniziativa non risultava più salvata: ho aggiornato l’elenco.'); }
+      setDeleteTarget(null); setMessage(''); await refresh();
+    }} />}
   </div>;
 
   const generated = activities.filter(a => hasCode(plans[a.key])).length;
