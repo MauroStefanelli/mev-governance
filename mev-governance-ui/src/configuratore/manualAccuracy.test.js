@@ -12,7 +12,11 @@ import { FIGURE_IDS } from './manualFigures';
 // so every quoted label must still be found in the source of the app. When someone renames a button, this test says which manual to update.
 const SRC = path.resolve(__dirname, '..');
 const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : /\.js$/.test(e.name) && !/\.test\.js$/.test(e.name) && !/pageManuals\.js$|ConfiguratorManual\.js$|manualFigures\.js$/.test(e.name) ? [path.join(dir, e.name)] : []);
-const CODE = walk(SRC).map(f => fs.readFileSync(f, 'utf8')).join('\n');
+// Server messages the manual quotes (for example «Interventi duplicati, dettagli non associati…») live in the C# backend: they are checked there too.
+const BACKEND = path.resolve(SRC, '..', '..', 'mev-governance-backend');
+const walkCs = dir => fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (/^(bin|obj|Migrations)$/.test(e.name) ? [] : walkCs(path.join(dir, e.name))) : /\.cs$/.test(e.name) ? [path.join(dir, e.name)] : []) : [];
+const BACKEND_CODE = ['Controllers', 'Services', 'Models'].flatMap(d => walkCs(path.join(BACKEND, d))).map(f => fs.readFileSync(f, 'utf8')).join('\n');
+const CODE = walk(SRC).map(f => fs.readFileSync(f, 'utf8')).join('\n') + '\n' + BACKEND_CODE;
 const norm = t => t.replace(/&apos;|&#39;|[’‘]/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ');
 const CODE_N = norm(CODE);
 
@@ -176,5 +180,97 @@ describe('rendering', () => {
   test('a chapter naming an unknown figure shows no figure instead of breaking', () => {
     const { Figure } = require('./manualFigures'); const { container } = render(<Figure figure={{ id: 'nope', title: 't', caption: 'c', alt: 'a' }} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+// ---- The chapter «Lavorare senza Excel» and the manual of Sviluppo make claims about WHAT THE APP DOES that a rename would not reveal.
+// Each claim below is checked against the real behaviour, so that when the app changes this test says which sentence of the manual is now false.
+describe('the work without Excel: what the manual says the app does is true', () => {
+  const noExcel = configuratorChapters.find(c => c.title.startsWith('Lavorare senza Excel'));
+  const all = norm([noExcel.intro, ...noExcel.steps, noExcel.note].join(' '));
+  const page = fs.readFileSync(path.join(SRC, 'pages/ConfiguratorePage.js'), 'utf8');
+  const sviluppo = fs.readFileSync(path.join(SRC, 'pages/SviluppoPage.js'), 'utf8');
+  const solutionPanel = fs.readFileSync(path.join(SRC, 'configuratore/SolutionPanel.js'), 'utf8');
+
+  test('the chapter exists, comes right after the introduction and walks through seven stages in order', () => {
+    const titles = configuratorChapters.map(c => c.title); expect(titles.indexOf(noExcel.title)).toBe(1);
+    const stages = noExcel.steps.filter(step => /^TAPPA \d/.test(step)).map(step => Number(step.match(/^TAPPA (\d)/)[1])); expect(stages).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+  test('the introduction says the AI never decides: the team confirms (the essence of the work)', () => {
+    expect(all).toContain('decide sempre il team'); expect(all).toContain(norm('finché una persona non lo conferma'));
+  });
+  test('«Sistema / applicazione» cannot be typed without Excel: it is read only and filled by «+ Aggiungi applicativo…» (as the manual says)', () => {
+    expect(all).toContain('NON si scrive a mano'); expect(page).toMatch(/readOnly[\s\S]{0,120}Valorizzato dal file Excel importato|Valorizzato dal file Excel importato/); expect(page).toContain('+ Aggiungi applicativo…');
+  });
+  test('the interventions proposed by the AI and confirmed in «Soluzione» do NOT feed the offer or Sviluppo: the manual warns about it, and it is still true', () => {
+    expect(all).toContain(norm('NON entrano da soli nell’offerta'));
+    // Sviluppo builds its activities only from the rows of the saved offer...
+    expect(sviluppo).toMatch(/developmentActivities\(loaded\.evaluation\.items/);
+    // ...and the proposed interventions live only in the solution panel and its store.
+    ['pages/ConfiguratorePage.js', 'pages/SviluppoPage.js', 'configuratore/developmentRecord.js', 'configuratore/developmentPackages.js'].forEach(file => {
+      const text = fs.readFileSync(path.join(SRC, file), 'utf8'); expect(text).not.toMatch(/solution\.proposed|mergeInterventions|loadSolution/);
+    });
+    expect(solutionPanel).toContain('mergeInterventions');
+  });
+  test('«Analizza e suggerisci» without Excel is local (no AI call) and asks for at least 20 useful characters', () => {
+    expect(all).toContain(norm('senza chiamare l’AI')); expect(all).toContain('almeno 20 caratteri');
+    const analyze = page.slice(page.indexOf('const analyze = async'), page.indexOf('// ── AI: secondo parere'));            // only the function «Analizza e suggerisci» runs, not the AI second opinion that follows
+    expect(analyze).not.toMatch(/analyzeInitiativeWithAi|analyzeWithAi|fetch\(/); expect(analyze).toMatch(/\.length < 20|replace\(\/\\s\/g, ""\)\.length < 20/);
+  });
+  test('without Excel the comparison and the row verification do not exist (they need imported rows) — and the manual says so', () => {
+    expect(all).toContain(norm('mancano il «Confronto prezzi Excel e catalogo» e la «Verifica AI delle righe»'));
+    expect(fs.readFileSync(path.join(SRC, 'configuratore/OfferPriceComparison.js'), 'utf8')).toMatch(/if \(!result\.lines\.length\) return null/);
+    expect(fs.readFileSync(path.join(SRC, 'configuratore/catalogReconciliation.js'), 'utf8')).toMatch(/filter\(it => it\.imported\)/);
+  });
+  test('the limits quoted for the documents are the real ones', () => {
+    const model = fs.readFileSync(path.join(SRC, 'configuratore/libraryModel.js'), 'utf8'); const controller = fs.readFileSync(path.join(BACKEND, 'Controllers/DocumentLibraryController.cs'), 'utf8');
+    expect(model).toMatch(/MAX_FILE = 10 \* 1024 \* 1024/); expect(all).toContain('fino a 10 MB'); expect(controller).toMatch(/MaxDocumentsPerInitiative = 300/); expect(all).toContain('300 per iniziativa');
+    expect(controller).toMatch(/MaxQuestion = 2000/); expect(all).toContain('massimo 2.000 caratteri');
+  });
+  test('the limits quoted for the proposed interventions are the real ones (12 per request, 30 in all)', () => {
+    expect(fs.readFileSync(path.join(BACKEND, 'Services/InterventionProposals.cs'), 'utf8')).toMatch(/MaxInterventions = 12/);
+    expect(fs.readFileSync(path.join(SRC, 'configuratore/proposedInterventions.js'), 'utf8')).toMatch(/MAX_PROPOSED = 30/); expect(all).toContain('12 interventi per volta (30 in tutto)');
+  });
+  test('the size of a rationale (600 characters) and of the solution fields (6.000) are the real ones', () => {
+    expect(fs.readFileSync(path.join(SRC, 'configuratore/rationaleKnowledge.js'), 'utf8')).toMatch(/MAX_ENTRY = 600/); expect(all).toContain('600 caratteri');
+    expect(fs.readFileSync(path.join(SRC, 'configuratore/solutionModel.js'), 'utf8')).toMatch(/MAX_FIELD = 6000/); expect(all).toContain('6.000 caratteri');
+  });
+  test('the export of the Excel rejects a row without an intervention, as the manual warns', () => {
+    expect(all).toContain('Interventi duplicati, dettagli non associati o importi non validi.');
+    expect(fs.readFileSync(path.join(BACKEND, 'Services/OfferWorkbookExporter.cs'), 'utf8')).toMatch(/Interventi duplicati, dettagli non associati o importi non validi/);
+  });
+  test('moving to step 4 saves by itself and «Salva e vai a Sviluppo →» exists (stage 7)', () => {
+    expect(page).toMatch(/persistInitiativeEvaluation\(false\)/); expect(all).toContain(norm('la valutazione si salva da sola')); expect(page).toContain('Salva e vai a Sviluppo →');
+  });
+});
+
+describe('Sviluppo manual: the claims about the app are true', () => {
+  const text = norm(developmentChapters.flatMap(c => [c.intro, ...(c.steps || []).map(s => typeof s === 'string' ? s : s.text), c.note, ...(c.warnings ? c.warnings.flat() : []), ...(c.fields ? c.fields.rows.flat() : [])]).filter(Boolean).join(' '));
+  const sviluppo = fs.readFileSync(path.join(SRC, 'pages/SviluppoPage.js'), 'utf8');
+  test('there is a chapter about the requirements and one about the common problems', () => {
+    const titles = developmentChapters.map(c => c.title); expect(titles).toContain('Prima di cominciare: cosa serve'); expect(titles).toContain('Problemi frequenti e rimedi');
+    expect(titles.indexOf('Prima di cominciare: cosa serve')).toBeLessThan(titles.indexOf('L’elenco delle iniziative')); expect(titles[titles.length - 1]).toBe('Problemi frequenti e rimedi');
+  });
+  test('the manual warns that Sviluppo needs the rows of the offer, and that is how the activities are built', () => {
+    expect(text).toContain('0 attività'); expect(sviluppo).toMatch(/developmentActivities\(loaded\.evaluation\.items/);
+  });
+  test('the old wrong claims are gone: 60 files, «proposed/ (i file nuovi)», the worker, the folder lost at every reload', () => {
+    ['fino a 60 file', 'proposed/ (i file nuovi)', 'worker automatico', 'si perde a ogni ricarica'].forEach(wrong => expect(text).not.toContain(wrong));
+  });
+  test('the real limits of the AI reading are the ones quoted: 8 excerpts of about 80 lines, files up to 500 KB, 6.000 files read', () => {
+    const context = fs.readFileSync(path.join(SRC, 'configuratore/activitySourceContext.js'), 'utf8'); expect(context).toMatch(/MAX_SENT = 8/); expect(text).toContain('otto estratti');
+    expect(fs.readFileSync(path.join(SRC, 'configuratore/sourceLibrary.js'), 'utf8')).toMatch(/MAX_FILE_BYTES = 500000/); expect(text).toContain('500 KB');
+  });
+  test('the code generation accepts from 1 to 12 files of at most 60.000 characters, as quoted', () => {
+    const validation = fs.readFileSync(path.join(BACKEND, 'Services/CodeArtifactValidation.cs'), 'utf8'); expect(validation).toMatch(/da 1 a 12 file/); expect(validation).toMatch(/60000|60_000/); expect(text).toContain('da 1 a 12 file'); expect(text).toContain('60.000 caratteri');
+  });
+  test('the app does not warn when the browser tab is closed (the manual says so): there is no beforeunload', () => {
+    expect(sviluppo).not.toMatch(/beforeunload/); expect(text).toContain(norm('non avvisa alla chiusura della scheda del browser'));
+  });
+  test('«Salva e chiudi» saves even without changes, as the manual says', () => {
+    expect(sviluppo).toMatch(/saveAndClose/); expect(text).toContain('salva sempre');
+  });
+  test('the four most useful warnings for the AI errors quote real server messages', () => {
+    expect(BACKEND_CODE).toMatch(/Chiave AI non configurata o non valida/); expect(text).toContain('Chiave AI non configurata o non valida');
   });
 });
