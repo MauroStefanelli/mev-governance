@@ -85,10 +85,18 @@ public static class OfferWorkbookExporter
         summary.Cell(totals, 8).Value = "TOTALE TOW";
         summary.Cell("A2").Value = $"Interventi Iniziativa\nCodice: {request.Code}\nTitolo: {request.Title}";
         // Clear all example detail data, including rows outside the resized table.
-        detail.Range(2, 1, Math.Max(table.RangeAddress.LastAddress.RowNumber, request.Details.Count + 2), 13).Clear(XLClearOptions.Contents);
+        var exampleLastRow = table.RangeAddress.LastAddress.RowNumber;
+        detail.Range(2, 1, Math.Max(exampleLastRow, request.Details.Count + 2), 13).Clear(XLClearOptions.Contents);
         table.ShowTotalsRow = false;
         table.Resize(detail.Range(1, 1, request.Details.Count + 1, 13));
         table.ShowTotalsRow = true;
+        // The model carries ~300 example rows with their own formatting (grey cells in F and G) and the example data validation. Past the end of the resized table
+        // (its totals row included) nothing of that must remain: only the rows the interventions need.
+        var tableEnd = table.RangeAddress.LastAddress.RowNumber;
+        if (exampleLastRow > tableEnd)
+        {
+            detail.Range(tableEnd + 1, 1, exampleLastRow + 50, 13).Clear(XLClearOptions.All);
+        }
         for (var index = 0; index < request.Details.Count; index++)
         {
             var d = request.Details[index]; var row = index + 2;
@@ -100,7 +108,13 @@ public static class OfferWorkbookExporter
         table.Field("ID Intervento").TotalsRowLabel = "Totale";
         table.Field("Prezzo Unitario").TotalsRowFunction = XLTotalsRowFunction.Sum;
         table.Field("Prezzo Totale").TotalsRowFunction = XLTotalsRowFunction.Sum;
-        detail.Range(2, 9, request.Details.Count + 1, 9).CreateDataValidation().List("\"REALIZZAZIONE,MODIFICA\"");
+        // The model has its own list for "Tipo Intervento" (I2:I316, one validation). Reuse it, narrowed to exactly the detail rows (never the totals row): a validation
+        // left with no range would be written with an empty sqref, which Excel reports as a damaged file.
+        var typeRange = detail.Range(2, 9, request.Details.Count + 1, 9);
+        var validation = detail.DataValidations.FirstOrDefault();
+        if (validation == null) validation = typeRange.CreateDataValidation();
+        else { validation.ClearRanges(); validation.AddRange(typeRange); }
+        validation.List("\"REALIZZAZIONE,MODIFICA\"");
         for (var index = 0; index < request.Interventions.Count; index++)
         {
             var i = request.Interventions[index]; var row = index + 6;

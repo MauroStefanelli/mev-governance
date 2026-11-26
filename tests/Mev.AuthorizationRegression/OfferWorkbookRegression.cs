@@ -65,6 +65,13 @@ public static class OfferWorkbookRegression
             using var actualBook = new XLWorkbook(new MemoryStream(actual));
             check(actualBook.Worksheet("GOTO-TEST").Cell("J10").GetValue<decimal>() == 275, "Real template summary reconciles with detail and TOW prices");
             check(actualBook.Worksheet("DettaglioInterventi").Tables.Single().DataRange.RowCount() == 2, "Real template resizes to current details");
+            // Sotto la tabella NON deve restare nulla del modello: ne' valori ne' formattazione (le righe grigie in F e G dell'esempio).
+            var realDetail = actualBook.Worksheet("DettaglioInterventi"); var realLast = realDetail.Tables.Single().RangeAddress.LastAddress.RowNumber;
+            var leftovers = realDetail.Range(realLast + 1, 1, realLast + 400, 13).Cells().Count(c => !c.IsEmpty() || c.Style.Fill.PatternType != XLFillPatternValues.None);
+            check(leftovers == 0, $"Real template: no formatted or filled rows are left below the detail table ({leftovers} cells)");
+            var validationOutside = realDetail.DataValidations.SelectMany(v => v.Ranges).Count(r => r.RangeAddress.LastAddress.RowNumber > realLast - 1 || r.RangeAddress.FirstAddress.RowNumber < 2);
+            check(validationOutside == 0, $"Real template: the Tipo Intervento list covers only the detail rows, not the totals row ({validationOutside} ranges outside)");
+            check((realDetail.LastRowUsed()?.RowNumber() ?? 0) <= realLast, $"Real template: detail sheet ends with the table (last used row {realDetail.LastRowUsed()?.RowNumber()}, table ends {realLast})");
         }
         request.TowPrices.Clear(); template.Position = 0;
         try { OfferWorkbookExporter.Generate(template, request); check(false, "Missing price should block export"); }
