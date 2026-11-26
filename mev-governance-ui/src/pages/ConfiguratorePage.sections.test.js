@@ -674,3 +674,64 @@ describe('deleting a saved initiative from the archive of the Configuratore', ()
     expect(screen.getByRole('alertdialog')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Seleziona iniziativa GOTO-9 Invio' })).toBeInTheDocument();
   });
 });
+
+describe('deleting an initiative from «Analisi condivise e revisioni» (where an imported initiative lives)', () => {
+  const revision = { id: 7, goto: '146023', version: 2, author: 'io', createdAt: '2026-01-02T10:00:00Z', reason: 'x', payload: JSON.stringify({ title: 'Invio prenotazione', system: 'NPSO', decisions: [], estimate: {} }) };
+  const offer = { Id: 'rec-1', record_key: 'C1|2|initiative|146023', entity_type: 'initiative_evaluation', contract_id: 'C1', lot_id: '2', title: 'x', payload: JSON.stringify({ initiative: { code: '146023', title: 'Invio prenotazione' }, items: [], version: 1 }) };
+  const other = { Id: 'rec-2', record_key: 'C1|2|initiative|999', entity_type: 'initiative_evaluation', contract_id: 'C1', lot_id: '2', title: 'y', payload: JSON.stringify({ initiative: { code: '999', title: 'Altra' }, items: [], version: 1 }) };
+  const mountAs = roles => render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role={roles[0]} roles={roles} />);
+  const openArchive = async roles => { mountAs(roles); await waitFor(() => expect(sectionButtons()).toHaveLength(7)); fireEvent.click(await screen.findByRole('button', { name: /Archivio iniziative/ })); await screen.findByText('Analisi condivise e revisioni'); };
+  const sharedTrash = () => document.querySelector('.workspace-library-item [aria-label="Elimina iniziativa 146023"]');
+  let rows;
+  beforeEach(() => {
+    rows = [revision];
+    service.workspaceRequest.mockReset().mockImplementation(async path => (String(path).startsWith('related') ? [] : String(path) === '' ? rows : []));
+    service.getConfiguratoreRecords.mockReset().mockImplementation(async params => ({ records: params.entity_type === 'initiative_evaluation' ? [offer, other] : [] }));
+    service.deleteWorkspace.mockReset().mockResolvedValue({ deleted: 2 });
+    service.deleteConfiguratoreRecord.mockReset().mockResolvedValue({ deleted: true, developmentDeleted: 1 });
+  });
+
+  test.each([['Admin'], ['Developer'], ['SuperAdmin']])('a %s sees the ✕ on the shared analysis', async role => { await openArchive([role]); expect(sharedTrash()).not.toBeNull(); });
+  test.each([['Manager'], ['Bid Manager'], ['Client'], ['Editor']])('a %s does NOT', async role => { await openArchive([role]); expect(sharedTrash()).toBeNull(); });
+  test('the ✕ is not inside the row button, and pressing it does not open the analysis', async () => {
+    await openArchive(['Developer']);
+    expect(sharedTrash().closest('button.workspace-library-row')).toBeNull();
+    fireEvent.click(sharedTrash()); const dialog = await screen.findByRole('alertdialog');
+    expect(screen.getByLabelText('Codice GOTO')).toHaveValue('');
+    expect(dialog).toHaveTextContent('146023'); expect(dialog).toHaveTextContent('tutte le revisioni condivise'); expect(dialog).toHaveTextContent('l’offerta salvata con lo stesso GOTO'); expect(dialog).toHaveTextContent('solo un SuperAdmin');
+    expect(service.deleteWorkspace).not.toHaveBeenCalled();
+  });
+  test('confirming deletes the shared revisions AND the saved offer of THAT GOTO only (not the other initiative), then reloads both lists', async () => {
+    await openArchive(['Developer']); fireEvent.click(sharedTrash());
+    rows = []; service.getConfiguratoreRecords.mockImplementation(async () => ({ records: [other] }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    await waitFor(() => expect(service.deleteWorkspace).toHaveBeenCalledWith('146023'));
+    await waitFor(() => expect(service.deleteConfiguratoreRecord).toHaveBeenCalledTimes(1)); expect(service.deleteConfiguratoreRecord).toHaveBeenCalledWith('rec-1');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    await waitFor(() => expect(document.body).toHaveTextContent('Iniziativa eliminata'));
+    await waitFor(() => expect(screen.queryByText('Invio prenotazione')).toBeNull());
+  });
+  test('when the analysis is refused (approved), NOTHING is deleted — not even the saved offer — and the reason is shown', async () => {
+    service.deleteWorkspace.mockRejectedValue(new Error('Questa analisi ha una revisione approvata: le può eliminare solo un SuperAdmin.'));
+    await openArchive(['Admin']); fireEvent.click(sharedTrash());
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('solo un SuperAdmin');
+    expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled(); expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+  });
+  test('when the saved offer fails after the analysis went, it says exactly that and retrying does not fail on the analysis already gone', async () => {
+    service.deleteConfiguratoreRecord.mockRejectedValueOnce(new Error('Errore eliminazione record configuratore'));
+    await openArchive(['Developer']); fireEvent.click(sharedTrash());
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Le revisioni condivise sono state eliminate, ma l’offerta salvata no');
+    service.deleteWorkspace.mockResolvedValue({ deleted: 0 });
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull()); expect(service.deleteConfiguratoreRecord).toHaveBeenCalledTimes(2);
+  });
+  test('an analysis with no saved offer says only the revisions go', async () => {
+    service.getConfiguratoreRecords.mockImplementation(async () => ({ records: [other] }));
+    await openArchive(['Developer']); fireEvent.click(sharedTrash());
+    const dialog = await screen.findByRole('alertdialog'); expect(dialog).not.toHaveTextContent('con lo stesso GOTO');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina definitivamente' }));
+    await waitFor(() => expect(service.deleteWorkspace).toHaveBeenCalledWith('146023')); expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled();
+  });
+});

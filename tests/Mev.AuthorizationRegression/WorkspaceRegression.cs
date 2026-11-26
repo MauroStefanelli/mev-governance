@@ -119,4 +119,43 @@ public static class WorkspaceRegression
         check(await Conversation("Bid Manager").Ask("GOTO-1", new("Impatto?", 2)) is ForbidResult, "Supervisor cannot send analyst AI requests");
         check(await Conversation("Admin").Ask("GOTO-1", new("Impatto?", 1)) is ConflictObjectResult, "Stale AI requests blocked before invoking provider");
     }
+
+    // Eliminare un'iniziativa dalle «Analisi condivise»: tutte le revisioni di UN GOTO, nel SUO ambiente, con le regole sulle decisioni approvate.
+    public static async Task RunDelete(AppDbContext db, Action<bool, string> check)
+    {
+        InitiativeWorkspaceController As(string role, int environment = 1) => new(db) {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(new[] {
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "anna"), new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, role), new System.Security.Claims.Claim("ambienteId", environment.ToString()) }, "test")) } } };
+        static int Deleted(IActionResult result) => System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(((OkObjectResult)result).Value)).RootElement.GetProperty("deleted").GetInt32();
+        var plain = new WorkspaceState { Title = "Da eliminare", System = "NPSO" };
+        var admin = As("Admin");
+        await admin.Save("DEL-1", new() { ExpectedVersion = 0, Reason = "v1", State = plain }); await admin.Save("DEL-1", new() { ExpectedVersion = 1, Reason = "v2", State = plain });
+        await admin.Save("DEL-KEEP", new() { ExpectedVersion = 0, Reason = "v1", State = plain });
+        await As("Admin", 2).Save("DEL-1", new() { ExpectedVersion = 0, Reason = "altro ambiente", State = plain });
+        int Count(string code, int environment = 1) => db.InitiativeRevisions.Count(r => r.AmbienteId == environment && r.Goto == code);
+
+        check(await As("Client").DeleteInitiative("DEL-1") is ForbidResult, "analysis delete: a Client cannot");
+        check(await As("Bid Manager").DeleteInitiative("DEL-1") is ForbidResult, "analysis delete: a Bid Manager (read only) cannot");
+        check(await As("Manager").DeleteInitiative("DEL-1") is ForbidResult, "analysis delete: a Manager cannot");
+        check(await As("Admin", 0).DeleteInitiative("DEL-1") is ForbidResult, "analysis delete: it needs an environment");
+        check(Count("DEL-1") == 2, "analysis delete: after the refusals nothing was removed");
+        check(Deleted(await As("Developer").DeleteInitiative("DEL-1")) == 2, "analysis delete: a Developer removes BOTH revisions of the GOTO");
+        check(Count("DEL-1") == 0 && Count("DEL-KEEP") == 1 && Count("DEL-1", 2) == 1, "analysis delete: other GOTO and the SAME GOTO in another environment are untouched");
+        check(Deleted(await admin.DeleteInitiative("DEL-1")) == 0, "analysis delete: deleting again is harmless (0)");
+        check(await admin.DeleteInitiative("") is BadRequestObjectResult, "analysis delete: an empty GOTO is a 400");
+
+        // una revisione APPROVATA e' una decisione tracciata: la elimina solo il SuperAdmin
+        var withDecision = new WorkspaceState { Title = "Con decisione", System = "NPSO", Decisions = new() { new() { Id = "d1", Text = "Usare API", Source = "req.md:1", Approve = true } } };
+        await admin.Save("DEL-APP", new() { ExpectedVersion = 0, Reason = "con decisione", State = withDecision });
+        check(await admin.DeleteInitiative("DEL-APP") is ObjectResult refused && refused.StatusCode == 403 && Count("DEL-APP") == 1, "analysis delete: an Admin cannot delete an analysis with approved decisions (403, nothing removed)");
+        check(await As("Developer").DeleteInitiative("DEL-APP") is ObjectResult, "analysis delete: nor a Developer");
+        check(Deleted(await As("SuperAdmin").DeleteInitiative("DEL-APP")) == 1 && Count("DEL-APP") == 0, "analysis delete: a SuperAdmin can delete it");
+        await admin.Save("DEL-FINAL", new() { ExpectedVersion = 0, Reason = "v1", State = plain });
+        await As("Bid Manager").Save("DEL-FINAL", new() { ExpectedVersion = 1, Reason = "approvata", State = plain, Approve = true });
+        check(await admin.DeleteInitiative("DEL-FINAL") is ObjectResult && Count("DEL-FINAL") == 2, "analysis delete: an approved revision is protected from an Admin too");
+        check(Deleted(await As("SuperAdmin").DeleteInitiative("DEL-FINAL")) == 2, "analysis delete: and removed by a SuperAdmin");
+        db.InitiativeRevisions.Add(new InitiativeRevision { AmbienteId = 1, Goto = "DEL-BAD", Version = 1, Author = "x", Reason = "r", CreatedAt = DateTime.UtcNow, Payload = "non json" });
+        db.SaveChanges();
+        check(await admin.DeleteInitiative("DEL-BAD") is ObjectResult && Count("DEL-BAD") == 1, "analysis delete: an unreadable payload is not deleted blindly");
+    }
 }

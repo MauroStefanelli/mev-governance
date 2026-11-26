@@ -12,7 +12,7 @@ export const initiativeLabel = (record, evaluation) => {
 
 // Finestra di conferma: dice quale iniziativa si elimina, cosa sparisce e cosa resta. Non elimina nulla finche' non si preme «Elimina»; se l'eliminazione
 // fallisce resta aperta e mostra il motivo (l'iniziativa e' ancora li').
-export default function DeleteInitiativeDialog({ initiative, onConfirm, onCancel }) {
+export default function DeleteInitiativeDialog({ initiative, onConfirm, onCancel, removes, keeps }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const cancelRef = useRef(null);
@@ -31,8 +31,8 @@ export default function DeleteInitiativeDialog({ initiative, onConfirm, onCancel
       <h2 id="di-title">Eliminare questa iniziativa?</h2>
       <p className="di-name"><b>{initiative.code || 'Senza GOTO'}</b> · {initiative.title}</p>
       <div id="di-text" className="di-text">
-        <p><b>Sparisce</b>: la valutazione salvata (interventi, prezzi, TOW) e lo sviluppo salvato di questa iniziativa (schede, progetto, consegna).</p>
-        <p><b>Resta</b>: le revisioni condivise, i razionali, i documenti e la conoscenza storica, che servono alle iniziative simili.</p>
+        <p><b>Sparisce</b>: {removes || 'la valutazione salvata (interventi, prezzi, TOW) e lo sviluppo salvato di questa iniziativa (schede, progetto, consegna).'}</p>
+        <p><b>Resta</b>: {keeps || 'le revisioni condivise, i razionali, i documenti e la conoscenza storica, che servono alle iniziative simili.'}</p>
         <p className="di-warn">L’operazione non si può annullare.</p>
       </div>
       {error && <p role="alert" className="di-error">{error}</p>}

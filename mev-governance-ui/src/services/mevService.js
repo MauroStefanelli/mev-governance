@@ -162,6 +162,18 @@ export async function workspaceRequest(path, body) {
   return response.json();
 }
 
+// Elimina tutte le revisioni condivise di un GOTO (l'«analisi condivisa»). Se una e' approvata solo un SuperAdmin puo': il motivo arriva nel messaggio.
+export async function deleteWorkspace(code) {
+  const response = await fetchWithRefresh(`${API_BASE_URL}/api/configuratore/workspaces/${encodeURIComponent(code)}`, { method: 'DELETE', headers: authHeaders() });
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(details.message || `Eliminazione dell’analisi non riuscita (errore ${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
 export async function workspaceDocument(code, { file, id, remove = false } = {}) {
   const form = file ? new FormData() : null;
   if (file) form.append('file', file);

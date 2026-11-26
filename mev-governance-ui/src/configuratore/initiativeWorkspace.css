@@ -140,3 +140,9 @@
 .imported-intervention-hours b { color: #1b4a8a; }
 .imported-intervention-hours span { padding: 1px 8px; border-radius: 999px; background: #eef4fc; } .imported-intervention-hours span.is-zero { opacity: .5; }
 .imported-intervention-hours strong { font-variant-numeric: tabular-nums; } .imported-intervention-hours .imported-intervention-hours-total { background: #e1ecfb; font-weight: 700; }
+
+/* «Analisi condivise»: la riga si apre col suo pulsante, l'eliminazione e' un pulsante a parte accanto (un pulsante dentro un pulsante non e' valido). */
+.workspace-library-item { display: flex; gap: 8px; align-items: stretch; }
+.workspace-library-item .workspace-library-row { flex: 1; min-width: 0; }
+.workspace-library-delete { flex: none; width: 48px; min-height: 48px; margin: 6px 0; border-radius: 12px; border: 1px solid #f0c5c5; background: #fff; color: #b3261e; font-size: 16px; cursor: pointer; }
+.workspace-library-delete:hover { background: #fdecec; border-color: #e39a9a; }

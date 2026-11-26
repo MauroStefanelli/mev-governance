@@ -119,6 +119,32 @@ public class InitiativeWorkspaceController : BaseController
         return Ok(await Scope.Where(r => r.Goto == code).OrderByDescending(r => r.Version).ToListAsync());
     }
 
+    // Elimina TUTTE le revisioni condivise di un GOTO (l'iniziativa importata vive qui, non tra le «offerte salvate»). Una revisione approvata e' una decisione tracciata
+    // (le decisioni approvate non si riscrivono): la puo' eliminare solo un SuperAdmin. Documenti, razionali e conoscenza storica NON si toccano.
+    [HttpDelete("{code}")]
+    public async Task<IActionResult> DeleteInitiative(string code)
+    {
+        if (!CanWork || GetAmbienteId() <= 0) return Forbid();
+        if (string.IsNullOrWhiteSpace(code) || code.Length > 120) return BadRequest(new { message = "GOTO non valido." });
+        var revisions = await db.InitiativeRevisions.Where(r => r.AmbienteId == GetAmbienteId() && r.Goto == code).ToListAsync();
+        if (revisions.Count == 0) return Ok(new { deleted = 0 });
+        if (!User.IsInRole("SuperAdmin") && revisions.Any(IsApproved))
+            return StatusCode(403, new { message = "Questa analisi ha una revisione approvata o decisioni approvate: sono tracciate e le può eliminare solo un SuperAdmin." });
+        db.InitiativeRevisions.RemoveRange(revisions);
+        await db.SaveChangesAsync();
+        return Ok(new { deleted = revisions.Count });
+    }
+
+    private static bool IsApproved(InitiativeRevision revision)
+    {
+        try
+        {
+            var state = JsonSerializer.Deserialize<WorkspaceState>(revision.Payload, JsonOptions);
+            return state != null && (state.ApprovedAt != null || state.Status == "Approvata" || (state.Decisions?.Any(d => d.ApprovedAt != null) ?? false));
+        }
+        catch (JsonException) { return true; }          // un payload illeggibile non si cancella alla cieca
+    }
+
     [HttpGet("related")]
     public async Task<IActionResult> Related([FromQuery] string? system, [FromQuery] string? family, [FromQuery] string? exclude)
     {

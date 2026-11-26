@@ -42,7 +42,7 @@ import { activeContractLot } from "../configuratore/activeContractLot";
 import { detailReviewInput, detailReviewSignature, parseDetailReviews } from "../configuratore/offerDetailReview";
 import { reviewOfferDetails } from "../services/mevService";
 import { getConsumoTow } from "../services/mevService";
-import { workspaceRequest } from "../services/mevService";
+import { workspaceRequest, deleteWorkspace } from "../services/mevService";
 import "../configuratore/initiativeWorkspace.css";
 import { catalogEntryInScope, initiativeScopeText } from "../configuratore/suggestionScope";
 import CatalogReconciliation from "../configuratore/OfferPriceComparison";
@@ -1297,6 +1297,28 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     toast("Iniziativa eliminata");
   };
 
+  // Dalla riga di «Analisi condivise e revisioni»: si elimina l'INIZIATIVA intera (revisioni condivise + offerta salvata + sviluppo). Prima l'analisi, che e' quella che puo'
+  // essere rifiutata (revisione approvata): se viene rifiutata non sparisce nulla. Poi le offerte salvate dello stesso GOTO; se questo secondo passo fallisce l'analisi e' gia'
+  // andata e si puo' riprovare (l'analisi gia' eliminata non e' un errore).
+  const sameGoto = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  const offersOfGoto = (goto) => archiveRecords.filter(rec => {
+    const payload = typeof rec.payload === "string" ? safeParse(rec.payload) : rec.payload || {};
+    return sameGoto(payload.initiative?.code, goto);
+  });
+  const askDeleteWorkspace = (revision) => {
+    const state = safeParse(revision.payload);
+    setDeleteTarget({ kind: 'workspace', code: revision.goto, title: state.title || revision.goto, offers: offersOfGoto(revision.goto).map(rec => rec.Id || rec.id) });
+  };
+  const deleteWorkspaceInitiative = async () => {
+    await deleteWorkspace(deleteTarget.code);
+    for (const id of deleteTarget.offers) {
+      try { await deleteConfiguratoreRecord(id); }
+      catch (error) { refreshWorkspaceArchive(); loadArchive(); throw new Error(`Le revisioni condivise sono state eliminate, ma l’offerta salvata no (${error.message}). Premi di nuovo «Elimina definitivamente» per riprovare.`); }
+    }
+    setDeleteTarget(null); refreshWorkspaceArchive(); loadArchive();
+    toast("Iniziativa eliminata");
+  };
+
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
    const reworkInitiative = (record) => {
@@ -1987,10 +2009,13 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         {showArchive && <div className="workspace-library">
           <h4 className="initiative-library-section-title">Analisi condivise e revisioni <span>{workspaceRecords.length}</span></h4>
           {!workspaceRecords.length && <p>Nessuna analisi condivisa salvata in questo ambiente.</p>}
-          {workspaceRecords.map(r => <button type="button" className="workspace-library-row" key={r.id} onClick={() => openWorkspace(r)}>
-            <span className="initiative-card-code">{r.goto}</span><strong className="initiative-card-title">{JSON.parse(r.payload).title}</strong>
-            <span className="initiative-card-meta"><span className="initiative-revision-pill">Revisione {r.version}</span>{r.author} · {new Date(r.createdAt).toLocaleString('it-IT')}</span>
-          </button>)}
+          {workspaceRecords.map(r => <div className="workspace-library-item" key={r.id}>
+            <button type="button" className="workspace-library-row" onClick={() => openWorkspace(r)}>
+              <span className="initiative-card-code">{r.goto}</span><strong className="initiative-card-title">{JSON.parse(r.payload).title}</strong>
+              <span className="initiative-card-meta"><span className="initiative-revision-pill">Revisione {r.version}</span>{r.author} · {new Date(r.createdAt).toLocaleString('it-IT')}</span>
+            </button>
+            {canEditInitiative && <button type="button" className="workspace-library-delete" aria-label={`Elimina iniziativa ${r.goto}`} title="Elimina l’iniziativa" onClick={() => askDeleteWorkspace(r)}>✕</button>}
+          </div>)}
         </div>}
         {showArchive && archiveRecords.length > 0 && (
           <div className="initiative-saved-offers"><h4 className="initiative-library-section-title">Offerte salvate <span>{archiveRecords.length}</span></h4>
@@ -3268,7 +3293,12 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </div>
         )}
 
-      {deleteTarget && <DeleteInitiativeDialog initiative={deleteTarget} onConfirm={deleteArchiveRecord} onCancel={() => setDeleteTarget(null)} />}
+      {deleteTarget && (deleteTarget.kind === 'workspace'
+        ? <DeleteInitiativeDialog initiative={{ code: deleteTarget.code, title: deleteTarget.title }} onConfirm={deleteWorkspaceInitiative} onCancel={() => setDeleteTarget(null)}
+            removes={`tutte le revisioni condivise di questa analisi${deleteTarget.offers.length ? `, ${deleteTarget.offers.length === 1 ? 'l’offerta salvata' : `le ${deleteTarget.offers.length} offerte salvate`} con lo stesso GOTO e il relativo sviluppo salvato` : ''}.`}
+            keeps="i razionali, i documenti allegati e la conoscenza storica, che servono alle iniziative simili. Un’analisi con decisioni o revisioni approvate la può eliminare solo un SuperAdmin."
+          />
+        : <DeleteInitiativeDialog initiative={deleteTarget} onConfirm={deleteArchiveRecord} onCancel={() => setDeleteTarget(null)} />)}
       {toastMsg && (
         <div role="status" aria-live="polite" style={styles.toast}>
           {toastMsg}

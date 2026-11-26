@@ -20,6 +20,7 @@ var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<str
 using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite("Data Source=:memory:").Options, config);
 db.Database.OpenConnection(); db.Database.EnsureCreated();
 await WorkspaceRegression.Run(db, Check);
+await WorkspaceRegression.RunDelete(db, Check);
 await DevelopmentCollaborationRegression.Run(db, Check);
 await RationaleRegression.Run(db, Check);
 await InterventionProposalsRegression.Run(db, Check);
