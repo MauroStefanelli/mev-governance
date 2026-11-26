@@ -3150,7 +3150,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       )}
 
       {/* STEP 4: REVISIONE */}
-      {step === 4 && <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} priceError={towPriceResolution.error} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} canManage={canEditInitiative} />}
       {step === 4 && (
         <div>
           <InitiativeBanner />
@@ -3176,9 +3175,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
               </label>
             </div>
           </div>
-
-          <TowReview lot={lot} computed={calculationFromPercent.autoTow} prices={towPricesMap} tow={tow} readOnly={!canEditInitiative}
-            onChange={changeTowQuantity} onRoundAll={roundAllTow} onResetAuto={resetTowQuantity} />
 
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>Dettaglio righe</h3>
@@ -3236,6 +3232,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
               });
             })()}
           </div>
+
+          <TowReview lot={lot} computed={calculationFromPercent.autoTow} prices={towPricesMap} tow={tow} readOnly={!canEditInitiative}
+            onChange={changeTowQuantity} onRoundAll={roundAllTow} onResetAuto={resetTowQuantity} />
+
+          <OfferWorkbookExport key={`${initiative.code}:${lot}`} initiative={initiative} items={items} interventions={importedInterventions} catalog={catalog} lot={lot} prices={{ ...towPricesMap, [`TOW0${lot}.2`]: towPricesMap[`TOW0${lot}.2`] || tow[`TOW0${lot}.2_price`] || 0 }} priceError={towPriceResolution.error} discount={discount} contingency={contingency} percentages={towPercentages?.[initiativeContractId]?.[lot]} multiplier={calculation.towMultiplier} tow={tow} canManage={canEditInitiative} />
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button style={btnStyles.primary} onClick={() => persistInitiativeEvaluation()}>Salva valutazione</button>

@@ -152,3 +152,44 @@ test('with the % of impact at 0 the TOW calculated show 0 and say why, instead o
   fireEvent.change(within(card(box, 'TOW02.1')).getByLabelText('TOW previsti TOW02.1'), { target: { value: '0.5' } });
   expect(card(box, 'TOW02.1')).not.toHaveTextContent('Importo a zero');
 });
+
+describe('the order and the closed sections of the Revisione', () => {
+  const before = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const MODEL = 'Il modello Excel è lo stesso per ogni iniziativa del lotto 2';
+  const FORMULAS = 'TOW .1, .3 e .4 sono calcolate dal valore di catalogo di ogni intervento';
+  const exportBox = () => screen.getByRole('region', { name: 'Generazione Tabella di offerta' });
+
+  test('the sequence is: Dettaglio righe, then TOW (previsti e importi), then Tabella di offerta · Excel HLD, then the save buttons', async () => {
+    const tows = await toRevision();
+    const detail = screen.getByText('Dettaglio righe'); const excel = exportBox(); const save = screen.getByRole('button', { name: 'Salva valutazione' });
+    expect(before(detail, tows)).toBe(true); expect(before(tows, excel)).toBe(true); expect(before(excel, save)).toBe(true);
+    expect(before(screen.getByText('Revisione offerta'), detail)).toBe(true);                    // il riepilogo con totali e note resta in cima
+    expect(within(tows).getByText('TOW previsti e importi')).toBeInTheDocument(); expect(tows).toHaveTextContent('TOW · Lotto 2');
+  });
+  test('«Tabella di offerta · Excel HLD» is closed; clicking it shows «Modello Excel del lotto 2» and «Genera Tabella di offerta XLSX», both closed too', async () => {
+    await toRevision(); const box = exportBox();
+    const outer = within(box).getByText('Tabella di offerta · Excel HLD').closest('details'); expect(outer.open).toBe(false);
+    const subs = [...box.querySelectorAll('details.oe-sub')]; expect(subs.map(d => d.querySelector('summary').textContent)).toEqual(['Modello Excel del lotto 2', 'Genera Tabella di offerta XLSX']);
+    subs.forEach(d => expect(d.open).toBe(false));
+    fireEvent.click(within(box).getByText('Tabella di offerta · Excel HLD')); outer.open = true;      // jsdom non apre da solo il <details>
+    expect(outer.open).toBe(true); subs.forEach(d => expect(d.open).toBe(false));                       // aprire il primo non apre i due dentro
+    subs[1].open = true; expect(subs[0].open).toBe(false);
+  });
+  test('the two descriptions are NOT in the page until the little button is pressed, and disappear when pressed again', async () => {
+    await toRevision(); const box = exportBox();
+    expect(box).not.toHaveTextContent(MODEL); expect(box).not.toHaveTextContent(FORMULAS);
+    const modelButton = within(box).getByRole('button', { name: /Come funziona il modello/ }); expect(modelButton).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(modelButton);
+    expect(box).toHaveTextContent(MODEL + ': si carica una volta e ogni Tabella di offerta parte da quello. I dati dell’esempio saranno sostituiti; listino e prezzi di dettaglio provengono dal catalogo selezionato. TOW .5 sarà collegata al dettaglio tramite formula.');
+    expect(box).not.toHaveTextContent(FORMULAS);                                                          // l'altra resta chiusa
+    expect(within(box).getByRole('button', { name: /Nascondi la spiegazione/ })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(within(box).getByRole('button', { name: /Nascondi la spiegazione/ })); expect(box).not.toHaveTextContent(MODEL);
+    fireEvent.click(within(box).getByRole('button', { name: /Come sono calcolate le TOW/ }));
+    expect(box).toHaveTextContent(FORMULAS + ', con moltiplicatore e percentuali della stima contrattuale. Le quantità equivalenti derivano dall’importo diviso per il prezzo unitario. TOW .2 usa la quantità già inserita in Offerta.');
+  });
+  test('the generate button and the model controls still exist and work as before (the export is not broken by the layout)', async () => {
+    await toRevision(); const box = exportBox();
+    expect(within(box).getByRole('button', { name: 'Genera Tabella di offerta XLSX' })).toBeInTheDocument();
+    expect(within(box).getByLabelText('Modello Excel del lotto')).toBeInTheDocument();
+  });
+});

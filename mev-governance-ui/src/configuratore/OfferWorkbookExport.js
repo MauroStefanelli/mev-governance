@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { euro } from '../utils';
 import { resolveCatalogEntry, catalogUnitPrice } from './catalogReconciliation';
 import { chosenQuantity } from './towModel';
+import './offerExport.css';
 import { exportOfferWorkbook, offerTemplateStatus, uploadOfferTemplate, downloadOfferTemplate, restoreOfferTemplate } from '../services/mevService';
 
 export function offerWorkbookDetails(items, catalog) {
@@ -81,34 +82,55 @@ export default function OfferWorkbookExport({ initiative, items, interventions, 
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const current = saved.current;
-  return <section className="initiative-workspace" aria-label="Generazione Tabella di offerta">
-    <h3>Tabella di offerta · Excel HLD</h3>
-    <p>Il modello Excel è lo stesso per ogni iniziativa del lotto {lot}: si carica una volta e ogni Tabella di offerta parte da quello. I dati dell’esempio saranno sostituiti; listino e prezzi di dettaglio provengono dal catalogo selezionato. TOW .5 sarà collegata al dettaglio tramite formula.</p>
-    <div className="offer-template" aria-label="Modello Excel del lotto">
-      <strong>Modello Excel del lotto {lot}</strong>
-      {saved.loading && <p>Controllo il modello salvato…</p>}
-      {!saved.loading && saved.error && <p role="alert">Modello non disponibile: {saved.error}</p>}
-      {!saved.loading && !saved.error && (current
-        ? <p className="offer-template-current">{describeTemplate(current)}</p>
-        : <p className="offer-template-current">Nessun modello salvato per questo lotto.{canManage ? ' Caricalo qui sotto: serve una volta sola.' : ' Chiedi a un Admin o a uno sviluppatore di caricarlo, oppure scegli un file solo per questa esportazione.'}</p>)}
-      {canManage && <label className="offer-template-upload">{current ? 'Aggiorna il modello (nuova versione)' : 'Carica il modello originale'}<input type="file" accept=".xlsx" disabled={busy} onChange={upload} /></label>}
-      {current && <button type="button" disabled={busy} onClick={() => download()}>Scarica il modello</button>}
-      {saved.previous.length > 0 && <details><summary>Versioni precedenti ({saved.previous.length})</summary>
-        {saved.previous.map(model => <p key={model.Version}>{describeTemplate(model)}
-          <button type="button" disabled={busy} onClick={() => download(model.Version)}>Scarica</button>
-          {canManage && <button type="button" disabled={busy} onClick={() => restore(model.Version)}>Rimetti in uso</button>}</p>)}</details>}
-      <details><summary>Usa un file diverso solo per questa esportazione</summary>
-        <label>File Excel (non viene salvato)<input type="file" accept=".xlsx" onChange={e => setTemplate(e.target.files?.[0] || null)} /></label>
-        {template && <p>Per questa esportazione userò «{template.name}» al posto del modello salvato.</p>}</details>
-    </div>
-    {notice && <p role="status">{notice}</p>}
-    <p>TOW .1, .3 e .4 sono calcolate dal valore di catalogo di ogni intervento, con moltiplicatore e percentuali della stima contrattuale. Le quantità equivalenti derivano dall’importo diviso per il prezzo unitario. TOW .2 usa la quantità già inserita in Offerta.</p>
-    <div>{[1, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>TOW 0{lot}.{n}: {percentages?.[n] ?? 'non configurata'}%</span>)}</div>
-    <div>{[1, 2, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>Prezzo TOW 0{lot}.{n}: {prices[`TOW0${lot}.${n}`] > 0 ? euro.format(prices[`TOW0${lot}.${n}`]) : 'non disponibile'}</span>)}</div>
-    {priceError && <p role="alert">{priceError}</p>}
-    {[1, 3, 4].some(n => !(prices[`TOW0${lot}.${n}`] > 0)) && <p>Le percentuali di impatto non sono prezzi unitari. Verifica il listino TOW del lotto in Archivio Contrattuale e il Tipo contratto nei dati iniziativa. Il listino dell’esempio Excel non viene utilizzato.</p>}
-    {rows.map(i => <p key={i.id}><strong>{i.id}</strong> · {i.titolo}</p>)}
-    {error && <p role="alert">{error}</p>}
-    <button type="button" disabled={!ready || !items.length || !initiative.code || busy} onClick={generate}>{busy ? 'Generazione…' : 'Genera Tabella di offerta XLSX'}</button>
+  // Tutto chiuso all'inizio: si apre cio' che serve. Gli errori restano sempre visibili (un avviso nascosto in una sezione chiusa non lo vedrebbe nessuno).
+  return <section className="initiative-workspace offer-export" aria-label="Generazione Tabella di offerta">
+    <details className="oe-box">
+      <summary className="oe-title"><h3>Tabella di offerta · Excel HLD</h3></summary>
+      <div className="oe-body">
+        <details className="oe-sub">
+          <summary>Modello Excel del lotto {lot}</summary>
+          <div className="offer-template" aria-label="Modello Excel del lotto">
+            <InfoHint label="Come funziona il modello" id="oe-hint-model">Il modello Excel è lo stesso per ogni iniziativa del lotto {lot}: si carica una volta e ogni Tabella di offerta parte da quello. I dati dell’esempio saranno sostituiti; listino e prezzi di dettaglio provengono dal catalogo selezionato. TOW .5 sarà collegata al dettaglio tramite formula.</InfoHint>
+            {saved.loading && <p>Controllo il modello salvato…</p>}
+            {!saved.loading && saved.error && <p role="alert">Modello non disponibile: {saved.error}</p>}
+            {!saved.loading && !saved.error && (current
+              ? <p className="offer-template-current">{describeTemplate(current)}</p>
+              : <p className="offer-template-current">Nessun modello salvato per questo lotto.{canManage ? ' Caricalo qui sotto: serve una volta sola.' : ' Chiedi a un Admin o a uno sviluppatore di caricarlo, oppure scegli un file solo per questa esportazione.'}</p>)}
+            {canManage && <label className="offer-template-upload">{current ? 'Aggiorna il modello (nuova versione)' : 'Carica il modello originale'}<input type="file" accept=".xlsx" disabled={busy} onChange={upload} /></label>}
+            {current && <button type="button" disabled={busy} onClick={() => download()}>Scarica il modello</button>}
+            {saved.previous.length > 0 && <details><summary>Versioni precedenti ({saved.previous.length})</summary>
+              {saved.previous.map(model => <p key={model.Version}>{describeTemplate(model)}
+                <button type="button" disabled={busy} onClick={() => download(model.Version)}>Scarica</button>
+                {canManage && <button type="button" disabled={busy} onClick={() => restore(model.Version)}>Rimetti in uso</button>}</p>)}</details>}
+            <details><summary>Usa un file diverso solo per questa esportazione</summary>
+              <label>File Excel (non viene salvato)<input type="file" accept=".xlsx" onChange={e => setTemplate(e.target.files?.[0] || null)} /></label>
+              {template && <p>Per questa esportazione userò «{template.name}» al posto del modello salvato.</p>}</details>
+          </div>
+        </details>
+        {notice && <p role="status">{notice}</p>}
+        {priceError && <p role="alert">{priceError}</p>}
+        {error && <p role="alert">{error}</p>}
+        <details className="oe-sub">
+          <summary>Genera Tabella di offerta XLSX</summary>
+          <div className="oe-generate">
+            <InfoHint label="Come sono calcolate le TOW" id="oe-hint-tow">TOW .1, .3 e .4 sono calcolate dal valore di catalogo di ogni intervento, con moltiplicatore e percentuali della stima contrattuale. Le quantità equivalenti derivano dall’importo diviso per il prezzo unitario. TOW .2 usa la quantità già inserita in Offerta.</InfoHint>
+            <div>{[1, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>TOW 0{lot}.{n}: {percentages?.[n] ?? 'non configurata'}%</span>)}</div>
+            <div>{[1, 2, 3, 4].map(n => <span key={n} className="workspace-version" style={{ display: 'inline-block', margin: 4 }}>Prezzo TOW 0{lot}.{n}: {prices[`TOW0${lot}.${n}`] > 0 ? euro.format(prices[`TOW0${lot}.${n}`]) : 'non disponibile'}</span>)}</div>
+            {[1, 3, 4].some(n => !(prices[`TOW0${lot}.${n}`] > 0)) && <p>Le percentuali di impatto non sono prezzi unitari. Verifica il listino TOW del lotto in Archivio Contrattuale e il Tipo contratto nei dati iniziativa. Il listino dell’esempio Excel non viene utilizzato.</p>}
+            {rows.map(i => <p key={i.id}><strong>{i.id}</strong> · {i.titolo}</p>)}
+            <button type="button" disabled={!ready || !items.length || !initiative.code || busy} onClick={generate}>{busy ? 'Generazione…' : 'Genera Tabella di offerta XLSX'}</button>
+          </div>
+        </details>
+      </div>
+    </details>
   </section>;
+}
+
+// Un tastino «i» che mostra o nasconde una spiegazione. Chiuso all'inizio; il testo resta nella pagina solo quando e' aperto.
+export function InfoHint({ label, id, children }) {
+  const [open, setOpen] = useState(false);
+  return <div className="oe-hint">
+    <button type="button" className="oe-hint-button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}><span aria-hidden="true">i</span> {open ? 'Nascondi la spiegazione' : label}</button>
+    {open && <p id={id} className="oe-hint-text">{children}</p>}
+  </div>;
 }

@@ -1,0 +1,15 @@
+/* Tabella di offerta · Excel HLD: tutto chiuso all'inizio, si apre cio' che serve. */
+.offer-export .oe-box { border: 1px solid #d7e1ee; border-radius: 12px; background: #fff; }
+.offer-export .oe-title { cursor: pointer; padding: 12px 16px; list-style: none; display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.offer-export .oe-title::-webkit-details-marker { display: none; }
+.offer-export .oe-title::before { content: '▸'; color: #1f5fa6; font-size: 14px; transition: transform .15s; }
+.offer-export .oe-box[open] > .oe-title::before { transform: rotate(90deg); }
+.offer-export .oe-title h3 { margin: 0; font-size: 16px; color: #102a47; }
+.offer-export .oe-body { padding: 4px 16px 16px; display: grid; gap: 10px; }
+.offer-export .oe-sub { border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.offer-export .oe-sub > summary { cursor: pointer; padding: 10px 14px; font-weight: 700; color: #102a47; min-height: 44px; display: flex; align-items: center; }
+.offer-export .oe-sub > .offer-template, .offer-export .oe-sub > .oe-generate { padding: 4px 14px 14px; display: grid; gap: 8px; }
+.offer-export .oe-hint-button { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1px solid #b9cde6; background: #eef5fd; color: #1f5fa6; font-size: 13px; font-weight: 600; cursor: pointer; }
+.offer-export .oe-hint-button span { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #1f5fa6; color: #fff; font: italic 700 12px Georgia, serif; }
+.offer-export .oe-hint-text { margin: 8px 0 0; padding: 10px 12px; border-left: 3px solid #1f5fa6; background: #f2f7fd; border-radius: 0 8px 8px 0; color: #24405f; font-size: 13px; line-height: 1.5; }
+.offer-export .oe-generate > button, .offer-export .offer-template > button { min-height: 40px; padding: 8px 16px; cursor: pointer; }
