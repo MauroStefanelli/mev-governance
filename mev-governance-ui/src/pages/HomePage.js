@@ -195,7 +195,7 @@ const PAGE_DEFS = [
     description: "Strumento per costruire e analizzare offerte contrattuali con AI.",
     accent: "#0ea5e9",
     accentDark: "#0284c7",
-    roles: ["SuperAdmin","Developer"],
+    roles: ["SuperAdmin","Developer","Admin"],
     clientPage: null,
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -210,7 +210,7 @@ const PAGE_DEFS = [
     description: "Schede per attività, proposte AI, progetto di avvio e richiesta di modifica codice.",
     accent: "#10b981",
     accentDark: "#059669",
-    roles: ["SuperAdmin","Developer"],
+    roles: ["SuperAdmin","Developer","Admin"],
     clientPage: null,
     icon: (
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
