@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { euro } from '../utils';
 import { resolveCatalogEntry, catalogUnitPrice } from './catalogReconciliation';
+import { chosenQuantity } from './towModel';
 import { exportOfferWorkbook, offerTemplateStatus, uploadOfferTemplate, downloadOfferTemplate, restoreOfferTemplate } from '../services/mevService';
 
 export function offerWorkbookDetails(items, catalog) {
@@ -20,6 +21,13 @@ export function offerTowQuantities(details, id, { lot, prices, percentages, mult
   const subtotal = details.filter(d => d.interventionId === String(id)).reduce((s, d) => s + d.quantity * d.unitPrice, 0);
   const quantities = {};
   for (const n of [1, 3, 4]) {
+    // Una quantita' scelta in Revisione («TOW previsti») sostituisce il calcolo dalla %: si ripartisce sugli interventi in proporzione al loro peso, come il TOW .2.
+    const chosen = chosenQuantity(tow, `TOW0${lot}.${n}`);
+    if (chosen != null) {
+      if (chosen > 0 && total <= 0) throw new Error(`Impossibile ripartire TOW 0${lot}.${n} con totale catalogo nullo.`);
+      quantities[n] = total > 0 ? chosen * subtotal / total : 0;
+      continue;
+    }
     const percent = percentages?.[n];
     if (percent == null || !Number.isFinite(Number(percent)) || Number(percent) < 0 || Number(percent) > 100)
       throw new Error(`Percentuale contrattuale TOW 0${lot}.${n} mancante o non valida: configurala in Offerta.`);

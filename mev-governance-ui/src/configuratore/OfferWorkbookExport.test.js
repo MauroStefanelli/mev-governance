@@ -126,3 +126,18 @@ describe('the Excel model of the Offer Table is saved once per lot', () => {
     expect(await screen.findByText('Nessun modello salvato per il lotto 2')).toBeInTheDocument();
   });
 });
+
+test('a quantity chosen in Revisione (TOW previsti) is what the Excel exports, split between the interventions by weight; the others still follow the %', () => {
+  const details = [{ interventionId: 'I1', quantity: 2, unitPrice: 100 }, { interventionId: 'I2', quantity: 1, unitPrice: 100 }];
+  const context = { lot: '2', percentages: { 1: 16, 3: 13, 4: 6 }, multiplier: 1, prices: { 'TOW02.1': 10, 'TOW02.3': 20, 'TOW02.4': 30 }, tow: { 'TOW02.1_qty': 1.45 } };
+  const first = offerTowQuantities(details, 'I1', context); const second = offerTowQuantities(details, 'I2', context);
+  expect(first[1] + second[1]).toBeCloseTo(1.45, 9); expect(first[1]).toBeCloseTo(1.45 * 2 / 3, 9);      // TOW .1: la quantita' scelta
+  expect(first[3]).toBeCloseTo(200 * 0.13 / 20, 9); expect(first[4]).toBeCloseTo(200 * 0.06 / 30, 9);      // .3 e .4: ancora dalla %
+});
+test('a chosen quantity of 0 exports 0, and it does not need the contractual % or a price', () => {
+  const details = [{ interventionId: 'I1', quantity: 1, unitPrice: 100 }];
+  expect(offerTowQuantities(details, 'I1', { lot: '2', percentages: { 3: 0, 4: 0 }, prices: { 'TOW02.3': 20, 'TOW02.4': 30 }, tow: { 'TOW02.1_qty': 0 } })[1]).toBe(0);
+});
+test('a chosen quantity with an empty catalog total cannot be split and says so', () => {
+  expect(() => offerTowQuantities([], 'I1', { lot: '2', percentages: { 3: 0, 4: 0 }, prices: { 'TOW02.3': 20, 'TOW02.4': 30 }, tow: { 'TOW02.1_qty': 2 } })).toThrow('Impossibile ripartire');
+});

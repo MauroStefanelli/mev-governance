@@ -287,7 +287,9 @@ export function defaultPrice(it, { catalog, priceMode, builtin }) {
 
 export const itemPrice = (it, ctx) => it.unit ?? defaultPrice(it, ctx);
 
-export function calc({ items, lot, contractId, archiveContractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin }) {
+// `towOverrides`: gli euro dei TOW .1/.3/.4 per cui l'utente ha SCELTO una quantita' (quantita' x prezzo unitario): sostituiscono il calcolo da % di impatto. Senza override
+// il risultato e' esattamente quello di sempre.
+export function calc({ items, lot, contractId, archiveContractId, tow5Share = 65, towPercentages, tow, discount, contingency, catalog, priceMode, builtin, towOverrides = {} }) {
   const ctx = { catalog, priceMode, builtin };
   const cat = items.reduce((a, it) => a + itemPrice(it, ctx) * it.qty, 0);
   // Formula TOW automatici (TOW02.1, 02.3, 02.4):
@@ -301,7 +303,10 @@ export function calc({ items, lot, contractId, archiveContractId, tow5Share = 65
   const prefix = `TOW0${lot}.`;
   const pct = towPercentages?.[contractId]?.[lot] || { 1: 0, 3: 0, 4: 0 };
   const autoTow = {};
-  ["1", "3", "4"].forEach((n) => { autoTow[prefix + n] = allocationBase * (Number(pct[n]) || 0) / 100; });
+  ["1", "3", "4"].forEach((n) => {
+    const key = prefix + n;
+    autoTow[key] = Object.prototype.hasOwnProperty.call(towOverrides, key) ? Number(towOverrides[key]) || 0 : allocationBase * (Number(pct[n]) || 0) / 100;
+  });
   const autoTotal = Object.values(autoTow).reduce((a, v) => a + v, 0);
   const manualTotal = ["2", "6"].reduce((a, n) => {
     const k = prefix + n;

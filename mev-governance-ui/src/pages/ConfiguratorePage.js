@@ -21,6 +21,8 @@ import SaveProgress from "../configuratore/SaveProgress";
 import ReviewProgress from "../configuratore/ReviewProgress";
 import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configuratore/reviewPlan";
 import { parseEstimatorWorkbook } from "../configuratore/estimatorImport";
+import { towOverrides as buildTowOverrides, qtyKey, roundUp, autoTowRow, AUTO, MANUAL } from "../configuratore/towModel";
+import TowReview from "../configuratore/TowReview";
 import EstimatorImportReport from "../configuratore/EstimatorImportReport";
 import { initiativeCode, mergeById } from "../configuratore/rationaleKnowledge";
 import { saveInitiativeSnapshot } from "../configuratore/saveInitiativeSnapshot";
@@ -1190,7 +1192,34 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
   const removeItem = (key) => setItems((prev) => prev.filter((it) => it.key !== key));
 
+  // ── TOW previsti (Revisione) ──
+  // Una quantita' scelta per TOW .1/.3/.4 si salva in `tow` (chiave «<TOW>_qty») e sostituisce il calcolo dalla %; per .2/.6 la quantita' e' `tow[<TOW>]` come sempre.
+  const changeTowQuantity = (key, value) => setTow((previous) => {
+    const next = { ...previous }; const n = key.split(".").pop();
+    if (MANUAL.includes(n)) { next[key] = value == null ? 0 : value; return next; }
+    if (value == null) delete next[qtyKey(key)]; else next[qtyKey(key)] = value;
+    return next;
+  });
+  const resetTowQuantity = (key) => setTow((previous) => { const next = { ...previous }; AUTO.forEach((n) => { const k = `TOW0${lot}.${n}`; if (key == null || key === k) delete next[qtyKey(k)]; }); return next; });
+  // «Arrotonda tutti per eccesso»: ogni quantita' (calcolata o scelta) sale al multiplo di 0,05; da quel momento e' una quantita' scelta.
+  const roundAllTow = () => setTow((previous) => {
+    const next = { ...previous };
+    AUTO.forEach((n) => {
+      const k = `TOW0${lot}.${n}`; const price = towPricesMap[k];
+      const row = autoTowRow({ key: k, computedAmount: calculationFromPercent.autoTow[k] || 0, unitPrice: price, tow: previous });
+      if (row.quantity != null && price > 0) next[qtyKey(k)] = roundUp(row.quantity);
+    });
+    MANUAL.forEach((n) => { const k = `TOW0${lot}.${n}`; if (Number(previous[k]) > 0) next[k] = roundUp(previous[k]); });
+    return next;
+  });
+
   // ── Calcolo ──
+  // Gli stessi euro che darebbe il calcolo dalla SOLA % di impatto (senza le quantita' scelte in Revisione): servono a mostrare quanto una quantita' scelta si discosta.
+  const calculationFromPercent = useMemo(
+    () => calc({ items: items.map((it) => ({ ...it, unit: it.unit ?? defaultPrice(it, { catalog, priceMode, builtin: isBuiltin }) })), lot, contractId: initiativeContractId, archiveContractId: selectedContractId,
+      tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, builtin: isBuiltin }),
+    [items, lot, initiativeContractId, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const calculation = useMemo(
     () =>
       calc({
@@ -1209,8 +1238,10 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
         catalog,
         priceMode,
         builtin: isBuiltin,
+        // TOW .1/.3/.4 con una quantita' scelta dall'utente (Revisione): gli euro sono quantita' x prezzo unitario
+        towOverrides: buildTowOverrides({ tow, lot, prices: towPricesMap }),
       }),
-    [items, lot, initiativeContractId, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract] // eslint-disable-line react-hooks/exhaustive-deps
+    [items, lot, initiativeContractId, selectedContractId, tow5Share, towPercentages, tow, discount, contingency, catalog, priceMode, activeContract, towPricesMap] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const mappingCount = useMemo(() => importedInterventions.reduce((n, x) => n + (x.mappings?.length || 0), 0), [importedInterventions]);
@@ -3146,6 +3177,9 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
               </label>
             </div>
           </div>
+
+          <TowReview lot={lot} computed={calculationFromPercent.autoTow} prices={towPricesMap} tow={tow} readOnly={!canEditInitiative}
+            onChange={changeTowQuantity} onRoundAll={roundAllTow} onResetAuto={resetTowQuantity} />
 
           <div style={styles.card}>
             <h3 style={{ margin: "0 0 10px" }}>Dettaglio righe</h3>
