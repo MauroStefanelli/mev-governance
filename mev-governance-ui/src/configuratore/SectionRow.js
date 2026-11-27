@@ -17,7 +17,7 @@ export default function SectionRow({ number, title, facts = [], status, tone = '
         {status && <span className={`secrow-status secrow-status-${tone}`}>{status}</span>}
         <span className="secrow-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
       </button>
-      {help && <HelpHint topic={help} label={title} align="end" className="secrow-help" />}
+      {help && <HelpHint topic={help} label={title} className="secrow-help" />}
     </h3>
     <div id={bodyId} className="secrow-body" hidden={!open} role="region" aria-label={`${title} — contenuto`}>
       {(open || keepMounted) ? children : null}

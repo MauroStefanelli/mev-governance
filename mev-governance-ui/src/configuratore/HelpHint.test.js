@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import HelpHint, { openManualAt } from './HelpHint';
+import HelpHint, { openManualAt, placePanel } from './HelpHint';
 import { HELP } from './helpTopics';
 import ConfiguratorManual from './ConfiguratorManual';
 
@@ -80,5 +80,51 @@ describe('what the help says is true: every label it quotes is a real label of t
   });
   test('every topic is short enough to read at a glance: a lead, 3 to 4 steps, nothing longer than a few lines', () => {
     Object.entries(HELP).forEach(([key, t]) => { expect(t.lead.length).toBeLessThanOrEqual(190); expect(t.steps.length).toBeGreaterThanOrEqual(3); expect(t.steps.length).toBeLessThanOrEqual(4); t.steps.forEach(step => expect(step.length).toBeLessThanOrEqual(190)); if (t.tip) expect(t.tip.length).toBeLessThanOrEqual(190); });
+  });
+});
+
+
+// ---- WHERE the panel goes: the row of a section has overflow: hidden, so a panel drawn inside it was cut off. The panel is now drawn on <body> and placed with window coordinates.
+describe('the panel is never cut off', () => {
+  test('it is drawn on <body>, outside the row of the section (whose overflow: hidden used to cut it)', () => {
+    const { container } = render(<div style={{ overflow: 'hidden' }}><HelpHint topic={topic} label="a" /></div>);
+    fireEvent.click(screen.getByRole('button', { name: /Come si usa/ })); const panel = screen.getByRole('dialog');
+    expect(container.contains(panel)).toBe(false); expect(panel.parentElement).toBe(document.body);
+  });
+  test('the same inside the real section row: the panel is not a child of the row', async () => {
+    const SectionRow = require('./SectionRow').default;
+    const { container } = render(<SectionRow help={HELP.soluzione} number="4" id="s" title="Soluzione" open={false} onToggle={() => {}} facts={[]}><div /></SectionRow>);
+    fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Soluzione' })); expect(container.contains(screen.getByRole('dialog'))).toBe(false);
+  });
+  test('closing removes it from the page (nothing is left on <body>)', () => {
+    render(<HelpHint topic={topic} label="a" />); fireEvent.click(screen.getByRole('button', { name: /Come si usa/ })); fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.querySelectorAll('.hh-panel')).toHaveLength(0);
+  });
+  const view = (width, height) => ({ width, height });
+  const anchor = (left, top) => ({ left, top, bottom: top + 32, width: 32 });
+  test('desktop: under the button when there is room', () => {
+    const place = placePanel(anchor(1190, 100), 400, view(1280, 800)); expect(place).toMatchObject({ mode: 'popover', below: true }); expect(place.top).toBe(100 + 32 + 10);
+  });
+  test('desktop: above the button when there is no room below but there is above', () => {
+    const place = placePanel(anchor(1190, 700), 400, view(1280, 800)); expect(place.below).toBe(false); expect(place.top + place.maxHeight).toBeLessThanOrEqual(700 - 10 + 1);
+  });
+  test('desktop: with little room everywhere it takes the larger side and scrolls inside, never beyond the screen', () => {
+    const place = placePanel(anchor(1190, 150), 600, view(1280, 433)); expect(place.top).toBeGreaterThanOrEqual(12); expect(place.top + place.maxHeight).toBeLessThanOrEqual(433 - 12 + 1); expect(place.maxHeight).toBeLessThan(600);
+  });
+  test('desktop: always inside the width of the window, even for a button on the far right or far left', () => {
+    [0, 5, 400, 1250, 1279].forEach(left => { const place = placePanel(anchor(left, 100), 300, view(1280, 800)); expect(place.left).toBeGreaterThanOrEqual(12); expect(place.left + place.width).toBeLessThanOrEqual(1280 - 12); });
+  });
+  test('a narrow window shrinks the panel instead of cutting it', () => {
+    const place = placePanel(anchor(700, 100), 300, view(761, 800)); expect(place.width).toBeLessThanOrEqual(761 - 24); expect(place.left + place.width).toBeLessThanOrEqual(761 - 12);
+  });
+  test('phone: a sheet anchored to the bottom, never taller than 80% of the screen', () => {
+    const place = placePanel(anchor(300, 100), 900, view(390, 800)); expect(place).toMatchObject({ mode: 'sheet', left: 12, bottom: 12 }); expect(place.maxHeight).toBe(640); expect(place.width).toBe(390 - 24);
+  });
+  test('the arrow points at the button and stays inside the panel', () => {
+    const place = placePanel(anchor(1190, 100), 300, view(1280, 800)); expect(place.arrow).toBeGreaterThanOrEqual(14); expect(place.arrow).toBeLessThanOrEqual(place.width - 30);
+  });
+  test('the button to the manual is outside the scrolling part, so it stays visible when the text scrolls', () => {
+    render(<HelpHint topic={topic} label="a" />); fireEvent.click(screen.getByRole('button', { name: /Come si usa/ }));
+    const more = screen.getByRole('button', { name: 'Apri il capitolo completo del manuale →' }); expect(more.closest('.hh-scroll')).toBeNull(); expect(screen.getByText(topic.lead).closest('.hh-scroll')).not.toBeNull();
   });
 });
