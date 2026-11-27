@@ -1,0 +1,27 @@
+/* Il tasto «?» di aiuto contestuale: un cerchio blu accanto al titolo di una macro funzionalita', con un riquadro breve. */
+.hh { position: relative; display: inline-flex; align-items: center; vertical-align: middle; flex: 0 0 auto; }
+.hh-button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #1f5fbf; cursor: pointer; line-height: 0; transition: transform .12s, color .12s; }
+.hh-button:hover { color: #174a96; transform: scale(1.1); } .hh-button[aria-expanded="true"] { color: #174a96; }
+.hh-button:focus-visible { outline: 3px solid #75a7f7; outline-offset: 1px; }
+.hh-button svg { display: block; filter: drop-shadow(0 1px 1px #1f5fbf30); }
+.hh-panel { position: absolute; z-index: 60; top: calc(100% + 8px); width: min(380px, calc(100vw - 32px)); box-sizing: border-box; padding: 14px 16px 14px; border: 1px solid #9db9de; border-radius: 14px; background: #fff; color: #17314f;
+  box-shadow: 0 14px 40px #17314f38; font-size: 13.5px; line-height: 1.5; text-align: left; font-weight: 400; letter-spacing: 0; text-transform: none; cursor: default; }
+.hh-panel::before { content: ''; position: absolute; top: -7px; width: 12px; height: 12px; background: #fff; border-left: 1px solid #9db9de; border-top: 1px solid #9db9de; transform: rotate(45deg); }
+.hh-start { left: -8px; } .hh-start::before { left: 16px; }
+.hh-end { right: -8px; } .hh-end::before { right: 16px; }
+.hh-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; } .hh-head strong { font-size: 14.5px; color: #174a96; }
+.hh-close { flex: none; width: 32px; height: 32px; margin: -6px -8px 0 0; border: 0; border-radius: 8px; background: transparent; color: #5d718a; font-size: 15px; cursor: pointer; } .hh-close:hover { background: #eef3fa; }
+.hh-close:focus-visible { outline: 3px solid #75a7f7; }
+.hh-lead { margin: 0 0 8px; color: #33475f; }
+.hh-steps { margin: 0 0 8px; padding-left: 20px; display: grid; gap: 5px; } .hh-steps li::marker { color: #1f5fbf; font-weight: 700; }
+.hh-tip { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: #fff4dc; border: 1px solid #f0d9a0; color: #7a4b00; font-size: 12.5px; }
+.hh-more { display: block; width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid #b9cde6; border-radius: 10px; background: #f2f7fd; color: #1b4f9a; font-weight: 700; font-size: 13px; cursor: pointer; text-align: center; }
+.hh-more:hover { background: #e6f0fc; } .hh-more:focus-visible { outline: 3px solid #75a7f7; }
+/* Sul telefono il riquadro e' un foglio ancorato in basso, con l'altezza del suo contenuto (al massimo 80% dello schermo) e scorrimento se serve. */
+@media (max-width: 760px) {
+  .hh-button { width: 44px; height: 44px; }
+  .hh-panel { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; height: auto; max-height: 80vh; max-height: 80dvh; overflow-y: auto; overscroll-behavior: contain; z-index: 3200; }
+  .hh-panel::before { display: none; }
+  .hh-close { width: 44px; height: 44px; } .hh-more { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .hh-button { transition: none; } }

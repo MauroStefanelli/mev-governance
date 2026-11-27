@@ -1,0 +1,84 @@
+import React from 'react';
+import fs from 'fs';
+import path from 'path';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import HelpHint, { openManualAt } from './HelpHint';
+import { HELP } from './helpTopics';
+import ConfiguratorManual from './ConfiguratorManual';
+
+const topic = HELP.datiIniziativa;
+const norm = t => t.replace(/&apos;|&#39;|[’‘]/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ');
+
+describe('the «?» button', () => {
+  test('is a labelled button that is closed at first, and opens a short panel with what to do here', () => {
+    render(<HelpHint topic={topic} label="Dati iniziativa" />);
+    const button = screen.getByRole('button', { name: 'Come si usa: Dati iniziativa' }); expect(button).toHaveAttribute('aria-expanded', 'false'); expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(button); const panel = screen.getByRole('dialog', { name: 'Come si usa: Dati iniziativa' });
+    expect(button).toHaveAttribute('aria-expanded', 'true'); expect(panel).toHaveTextContent(topic.title); expect(panel).toHaveTextContent(topic.lead);
+    topic.steps.forEach(step => expect(panel).toHaveTextContent(step)); expect(within(panel).getAllByRole('listitem')).toHaveLength(topic.steps.length);
+  });
+  test('shows the warning when the topic has one, and nothing when it has none', () => {
+    const { unmount } = render(<HelpHint topic={HELP.datiIniziativa} label="x" />); fireEvent.click(screen.getByRole('button')); expect(screen.getByRole('dialog')).toHaveTextContent('Attenzione:'); unmount();
+    render(<HelpHint topic={HELP.stepOfferta} label="y" />); fireEvent.click(screen.getByRole('button')); expect(screen.getByRole('dialog')).not.toHaveTextContent('Attenzione:');
+  });
+  test('the button again, «Chiudi l’aiuto», Escape and a click outside all close it; Escape gives the focus back to the «?»', () => {
+    render(<div><HelpHint topic={topic} label="a" /><p>fuori</p></div>); const button = screen.getByRole('button', { name: /Come si usa/ });
+    fireEvent.click(button); fireEvent.click(button); expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(button); fireEvent.click(screen.getByRole('button', { name: 'Chiudi l’aiuto' })); expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(button); fireEvent.keyDown(document, { key: 'Escape' }); expect(screen.queryByRole('dialog')).toBeNull(); expect(button).toHaveFocus();
+    fireEvent.click(button); fireEvent.mouseDown(screen.getByText('fuori')); expect(screen.queryByRole('dialog')).toBeNull();
+  });
+  test('a click inside the panel does not close it, and does not reach the row it sits next to', () => {
+    const onRow = jest.fn(); render(<div onClick={onRow}><HelpHint topic={topic} label="a" /></div>);
+    fireEvent.click(screen.getByRole('button', { name: /Come si usa/ })); fireEvent.click(screen.getByText(topic.lead)); expect(screen.getByRole('dialog')).toBeInTheDocument(); expect(onRow).not.toHaveBeenCalled();
+  });
+  test('the focus moves into the panel when it opens (keyboard users are not lost)', () => {
+    render(<HelpHint topic={topic} label="a" />); fireEvent.click(screen.getByRole('button', { name: /Come si usa/ })); expect(screen.getByRole('button', { name: 'Chiudi l’aiuto' })).toHaveFocus();
+  });
+  test('only one panel is open at a time: opening another closes the first (a click outside the first)', () => {
+    render(<div><HelpHint topic={HELP.datiIniziativa} label="Dati iniziativa" /><HelpHint topic={HELP.soluzione} label="Soluzione" /></div>);
+    fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Dati iniziativa' })); fireEvent.mouseDown(screen.getByRole('button', { name: 'Come si usa: Soluzione' })); fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Soluzione' }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1); expect(screen.getByRole('dialog')).toHaveTextContent('Soluzione');
+  });
+  test('renders nothing without a topic (a missing key never breaks the page)', () => { const { container } = render(<HelpHint topic={undefined} label="x" />); expect(container).toBeEmptyDOMElement(); });
+});
+
+describe('«Apri il capitolo completo del manuale»', () => {
+  beforeAll(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); }; });      // jsdom has no <dialog> modal
+  test('opens the manual on that chapter, not on the first one', () => {
+    render(<><HelpHint topic={HELP.soluzione} label="Soluzione" /><ConfiguratorManual /></>);
+    expect(screen.queryByRole('dialog', { name: /Configuratore Iniziative/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Soluzione' })); fireEvent.click(screen.getByRole('button', { name: 'Apri il capitolo completo del manuale →' }));
+    const manual = document.querySelector('dialog.tow-manual'); expect(manual).toBeTruthy(); expect(within(manual).getByRole('heading', { level: 3 })).toHaveTextContent('Soluzione: interventi e file per Visual Studio Code');
+    expect(screen.queryByRole('dialog', { name: 'Come si usa: Soluzione' })).toBeNull();                     // the little panel is closed
+  });
+  test('every chapter a topic points to exists in the manual of the Configuratore (so the link never lands nowhere)', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'ConfiguratorManual.js'), 'utf8'); const titles = [...source.matchAll(/\{ title: '([^']+)'/g)].map(m => m[1]);
+    const missing = Object.entries(HELP).filter(([key, t]) => t.chapter && !key.startsWith('dev') && !titles.some(title => title === t.chapter || title.startsWith(t.chapter))).map(([key, t]) => `${key} → ${t.chapter}`);
+    expect(missing).toEqual([]);
+  });
+  test('every chapter a topic of Sviluppo points to exists in the manual of Sviluppo', () => {
+    const { PAGE_MANUALS } = require('../components/help/pageManuals'); const titles = PAGE_MANUALS.sviluppo.chapters.map(c => c.title);
+    const missing = Object.entries(HELP).filter(([key, t]) => t.chapter && key.startsWith('dev') && !titles.some(title => title === t.chapter || title.startsWith(t.chapter))).map(([key, t]) => `${key} → ${t.chapter}`);
+    expect(missing).toEqual([]);
+  });
+  test('a request for a chapter that does not exist opens nothing', () => {
+    render(<ConfiguratorManual />); act(() => openManualAt('Capitolo che non esiste')); expect(document.querySelector('dialog.tow-manual')).toBeNull();
+  });
+});
+
+describe('what the help says is true: every label it quotes is a real label of the app', () => {
+  const SRC = path.resolve(__dirname, '..');
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : /\.js$/.test(e.name) && !/\.test\.js$/.test(e.name) && !/helpTopics\.js$|pageManuals\.js$|ConfiguratorManual\.js$|manualFigures\.js$/.test(e.name) ? [path.join(dir, e.name)] : []);
+  const CODE = norm(walk(SRC).map(file => fs.readFileSync(file, 'utf8')).join('\n'));
+  const COMPOSED = new Set(['Come si usa', 'Aiuto']);
+  const quoted = t => [...[t.lead, ...t.steps, t.tip || ''].join(' ').matchAll(/«([^»]+)»/g)].map(m => m[1].trim());
+  test.each(Object.entries(HELP))('«%s»: each quoted label exists in the code of the app', (key, t) => {
+    const missing = quoted(t).filter(label => label.length > 2 && !/\d/.test(label) && !COMPOSED.has(label) && !CODE.includes(norm(label).replace(/ ?…$/, '').replace(/\.$/, '')));
+    expect(missing).toEqual([]);
+  });
+  test('every topic is short enough to read at a glance: a lead, 3 to 4 steps, nothing longer than a few lines', () => {
+    Object.entries(HELP).forEach(([key, t]) => { expect(t.lead.length).toBeLessThanOrEqual(190); expect(t.steps.length).toBeGreaterThanOrEqual(3); expect(t.steps.length).toBeLessThanOrEqual(4); t.steps.forEach(step => expect(step.length).toBeLessThanOrEqual(190)); if (t.tip) expect(t.tip.length).toBeLessThanOrEqual(190); });
+  });
+});

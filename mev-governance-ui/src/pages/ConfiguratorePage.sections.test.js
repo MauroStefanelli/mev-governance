@@ -735,3 +735,36 @@ describe('deleting an initiative from «Analisi condivise e revisioni» (where a
     await waitFor(() => expect(service.deleteWorkspace).toHaveBeenCalledWith('146023')); expect(service.deleteConfiguratoreRecord).not.toHaveBeenCalled();
   });
 });
+
+describe('the «?» help buttons next to each macro function of the Configuratore', () => {
+  const LABELS = ['Dati iniziativa', 'Workspace documentale', 'Razionali e vincoli con l’AI', 'Soluzione', 'Analisi condivisa', 'Codice sorgente', 'Conoscenza dell’Iniziativa'];
+  const help = name => screen.getByRole('button', { name: `Come si usa: ${name}` });
+  beforeEach(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); }; mount(); });
+  test('each of the seven sections has its own «?», named after the section', async () => {
+    await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+    LABELS.forEach(name => expect(help(name)).toBeInTheDocument());
+  });
+  test('the «?» is NOT inside the button that opens the section (a button inside a button is invalid) and pressing it does not open or close the section', async () => {
+    await waitFor(() => expect(sectionButtons()).toHaveLength(7));
+    const row = screen.getByRole('region', { name: 'Workspace documentale' }); const toggle = row.querySelector('.secrow-toggle');
+    expect(help('Workspace documentale').closest('.secrow-toggle')).toBeNull(); expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(help('Workspace documentale')); expect(toggle).toHaveAttribute('aria-expanded', 'false');                  // the help opened, the section did not
+    expect(screen.getByRole('dialog', { name: 'Come si usa: Workspace documentale' })).toHaveTextContent('Trascina i file in');
+  });
+  test('«Dati iniziativa» explains what to do right there, with the real labels, and points to the right chapter', async () => {
+    await waitFor(() => expect(sectionButtons()).toHaveLength(7)); fireEvent.click(help('Dati iniziativa'));
+    const panel = screen.getByRole('dialog', { name: 'Come si usa: Dati iniziativa' });
+    ['Codice GOTO', '+ Aggiungi applicativo…', 'Analizza e suggerisci'].forEach(label => expect(panel).toHaveTextContent(label));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Apri il capitolo completo del manuale →' }));
+    expect(document.querySelector('dialog.tow-manual h3')).toHaveTextContent('Passo 1 · Dati dell’iniziativa');
+  });
+  test('every step has a «?» next to its title, and it changes with the step', async () => {
+    await waitFor(() => expect(sectionButtons()).toHaveLength(7)); expect(help('Passo 1 · Iniziativa')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: 'G1' } }); fireEvent.click(screen.getByRole('button', { name: /2\. Interventi/ }));
+    expect(help('Passo 2 · Interventi')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Come si usa: Passo 1 · Iniziativa' })).toBeNull();
+  });
+  test('the help panel can be closed with Escape and does not leave the page stuck', async () => {
+    await waitFor(() => expect(sectionButtons()).toHaveLength(7)); fireEvent.click(help('Soluzione')); expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' }); expect(screen.queryByRole('dialog', { name: 'Come si usa: Soluzione' })).toBeNull(); expect(help('Soluzione')).toHaveFocus();
+  });
+});

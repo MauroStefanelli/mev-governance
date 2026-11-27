@@ -13,6 +13,8 @@ import { saveAndClose } from '../configuratore/saveAndClose';
 import { KINDS, KIND_ORDER, countByKind, confirmedEntries } from '../configuratore/rationaleKnowledge';
 import { getConfiguratoreRecords, getConfiguratoreContracts, analyzeDevelopmentWithAi, developmentRequest, deleteConfiguratoreRecord } from '../services/mevService';
 import DeleteInitiativeDialog, { canDeleteInitiatives, initiativeLabel } from '../configuratore/DeleteInitiativeDialog';
+import HelpHint from '../configuratore/HelpHint';
+import { HELP } from '../configuratore/helpTopics';
 import { APP_DATA, appNorm, sourceFileAllowed, ignoredSourcePath } from '../configuratore/configuratoreCore';
 import useSourceLibrary from '../configuratore/useSourceLibrary';
 import SourceLibraryPanel from '../configuratore/SourceLibraryPanel';
@@ -144,7 +146,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     </header>
     {error && <p role="alert" className="development-alert">{error}</p>}
     <section className="dev-card" aria-label="Iniziative da sviluppare">
-      <div className="dev-card-head"><h3>Iniziative valutate <span>{rows.length}</span></h3>
+      <div className="dev-card-head"><h3>Iniziative valutate <span>{rows.length}</span> <HelpHint topic={HELP.devElenco} label="Iniziative valutate" /></h3>
         <div className="dev-card-tools"><label className="dev-sr-only" htmlFor="dev-search">Cerca per GOTO, titolo o sistema</label>
           <input id="dev-search" className="development-search" placeholder="Cerca per GOTO, titolo o sistema" value={search} onChange={e => setSearch(e.target.value)} />
           <button type="button" className="dev-btn" onClick={refresh} disabled={loadingList}>↻ Aggiorna</button></div></div>

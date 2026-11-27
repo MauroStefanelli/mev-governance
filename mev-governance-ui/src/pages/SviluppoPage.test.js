@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import SviluppoPage from './SviluppoPage';
+import PageManual from '../components/help/PageManual';
 import { IDBFactory } from 'fake-indexeddb';
 import { resetSourceLibrary } from '../configuratore/sourceLibrary';
 import * as service from '../services/mevService';
@@ -275,5 +276,36 @@ describe('deleting a saved initiative from «Sviluppo iniziative»', () => {
     mount(); await screen.findByText('Invio prenotazione'); fireEvent.click(deleteButton());
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Elimina definitivamente' }));
     await waitFor(() => expect(service.getConfiguratoreRecords.mock.calls.length).toBeGreaterThan(2));
+  });
+});
+
+describe('the «?» help buttons of «Sviluppo iniziative»', () => {
+  beforeEach(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); }; });
+  test('the list has its «?», and opening it explains what to do with real labels', async () => {
+    render(<SviluppoPage ambienteId={1} codiceContratto="C1" />); await screen.findByText('Invio prenotazione');
+    fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Iniziative valutate' })); const panel = screen.getByRole('dialog', { name: 'Come si usa: Iniziative valutate' });
+    expect(panel).toHaveTextContent('Cerca per GOTO, titolo o sistema'); expect(panel).toHaveTextContent('«0 attività»'.replace(/[«»]/g, '')); expect(panel).toHaveTextContent('la prima volta si apre «Fonti»');
+  });
+  test('inside an initiative the «?» is the one of the PHASE you are in, and it changes when you change phase', async () => {
+    await openFirst();
+    expect(screen.getByRole('button', { name: 'Come si usa: Fase Fonti' })).toBeInTheDocument();
+    fireEvent.click(within(bar()).getByRole('button', { name: /Schede/ })); expect(screen.getByRole('button', { name: 'Come si usa: Fase Schede' })).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Come si usa: Fase Fonti' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Fase Schede' })); expect(screen.getByRole('dialog')).toHaveTextContent('Prepara scheda con AI');
+  });
+  test('each of the six phases has ITS OWN help (different text), and its link opens the chapter of that phase of the manual of Sviluppo', async () => {
+    // In the app the manual of Sviluppo lives in the top bar (App.js), next to the page: the test mounts both, as the app does.
+    render(<><PageManual page="sviluppo" role="Developer" roles={['Developer']} /><SviluppoPage ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} /></>);
+    fireEvent.click(await screen.findByText('Invio prenotazione')); await screen.findByLabelText('Percorso di sviluppo'); const seen = new Set();
+    for (const [phase, chapter, mustSay] of [['Fonti', 'Fase 1', 'Seleziona cartella sorgenti'], ['Schede', 'Fase 2', 'Prepara scheda con AI'], ['Progetto', 'Fase 3', 'Genera progetto di avvio ZIP'], ['Codice', 'Fase 4', 'Genera codice / workflow per questa attività'], ['Consegna', 'Fase 5', 'Genera ZIP richiesta modifica codice'], ['Verifica', 'Fase 6', 'Evidenze di verifica']]) {
+      fireEvent.click(within(bar()).getByRole('button', { name: new RegExp(phase) })); fireEvent.click(screen.getByRole('button', { name: `Come si usa: Fase ${phase}` }));
+      const panel = screen.getByRole('dialog', { name: `Come si usa: Fase ${phase}` }); expect(panel).toHaveTextContent(mustSay); seen.add(panel.textContent);
+      fireEvent.click(within(panel).getByRole('button', { name: 'Apri il capitolo completo del manuale →' }));
+      expect(document.querySelector('dialog.tow-manual h3').textContent).toMatch(new RegExp(`^${chapter}`)); fireEvent.click(screen.getByRole('button', { name: 'Chiudi manuale' }));
+    }
+    expect(seen.size).toBe(6);
+  });
+  test('the «?» of the list does not open the initiative (it is not inside the row)', async () => {
+    render(<SviluppoPage ambienteId={1} codiceContratto="C1" />); await screen.findByText('Invio prenotazione');
+    fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Iniziative valutate' })); expect(screen.queryByLabelText('Percorso di sviluppo')).toBeNull();
   });
 });

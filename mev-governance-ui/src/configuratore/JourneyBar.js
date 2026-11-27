@@ -1,6 +1,10 @@
 import React from 'react';
+import HelpHint from './HelpHint';
+import { HELP } from './helpTopics';
 
 const STATUS_LABEL = { complete: 'Completa', partial: 'In corso', empty: 'Da fare', waiting: 'In attesa' };
+// Il «?» accanto alla fase: cosa fare QUI, nella fase in cui sei.
+const PHASE_HELP = { fonti: 'devFonti', schede: 'devSchede', progetto: 'devProgetto', codice: 'devCodice', consegna: 'devConsegna', verifica: 'devVerifica' };
 
 export default function JourneyBar({ journey, current, onSelect, showGuide, onToggleGuide }) {
   const active = journey.phases.find(phase => phase.id === current);
@@ -32,7 +36,8 @@ export default function JourneyBar({ journey, current, onSelect, showGuide, onTo
         </button>
       </li>)}
     </ol>
-    <button type="button" className="dev-guide-toggle" aria-expanded={showGuide} onClick={onToggleGuide}>{showGuide ? 'Nascondi' : 'Mostra'} le regole della fase «{active.label}»</button>
+    <div className="dev-guide-row"><button type="button" className="dev-guide-toggle" aria-expanded={showGuide} onClick={onToggleGuide}>{showGuide ? 'Nascondi' : 'Mostra'} le regole della fase «{active.label}»</button>
+      {HELP[PHASE_HELP[active.id]] && <HelpHint topic={HELP[PHASE_HELP[active.id]]} label={`Fase ${active.label}`} />}</div>
     {showGuide && <div className="dev-guide" role="region" aria-label={`Regole della fase ${active.label}`}>
       <p className="dev-guide-purpose">{active.purpose}</p>
       <div className="dev-guide-cols">

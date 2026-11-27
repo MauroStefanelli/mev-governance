@@ -1,6 +1,9 @@
 .secrow { background: #fff; border: 1px solid #d9e3ef; border-radius: 14px; box-shadow: 0 2px 10px #24466e08; color: #17314f; overflow: hidden; }
 .secrow.is-open { border-color: #9db9de; box-shadow: 0 6px 20px #24466e12; }
-.secrow-head { margin: 0; font: inherit; }
+.secrow-head { margin: 0; font: inherit; position: relative; }
+.secrow-head .secrow-help { position: absolute; top: 12px; right: 44px; z-index: 2; }
+@media (max-width: 760px) { .secrow-head .secrow-help { top: 6px; right: 40px; } }
+.secrow-head:has(.secrow-help) .secrow-toggle { padding-right: 84px; }
 .secrow-toggle { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 16px; min-height: 56px; border: 0; border-radius: 0; background: #fff; color: inherit; font: inherit; cursor: pointer; }
 .secrow-toggle:hover { background: #f5f9ff; } .secrow.is-open .secrow-toggle { background: #f4f8ff; border-bottom: 1px solid #d9e3ef; }
 .secrow-toggle:focus-visible { outline: 3px solid #75a7f7; outline-offset: -3px; }

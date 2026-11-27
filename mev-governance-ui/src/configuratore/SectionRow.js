@@ -1,10 +1,11 @@
 import React, { useId } from 'react';
 import './sectionRow.css';
+import HelpHint from './HelpHint';
 
 // A collapsible section whose closed row already tells the most important things: title, an optional status
 // and a few facts. Opening it shows the content. The content is NOT mounted while closed unless keepMounted is set,
 // so heavy sections do not load until the user asks for them; sections that hold work in progress stay mounted.
-export default function SectionRow({ number, title, facts = [], status, tone = 'neutral', open, onToggle, keepMounted = false, children, id }) {
+export default function SectionRow({ number, title, facts = [], status, tone = 'neutral', open, onToggle, keepMounted = false, children, id, help }) {
   const uid = useId();
   const bodyId = `${uid}-body`;
   return <section className={`secrow secrow-${tone}${open ? ' is-open' : ''}`} id={id} aria-label={title}>
@@ -16,6 +17,7 @@ export default function SectionRow({ number, title, facts = [], status, tone = '
         {status && <span className={`secrow-status secrow-status-${tone}`}>{status}</span>}
         <span className="secrow-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
       </button>
+      {help && <HelpHint topic={help} label={title} align="end" className="secrow-help" />}
     </h3>
     <div id={bodyId} className="secrow-body" hidden={!open} role="region" aria-label={`${title} — contenuto`}>
       {(open || keepMounted) ? children : null}

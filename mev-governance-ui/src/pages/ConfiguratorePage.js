@@ -23,6 +23,8 @@ import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configurator
 import { parseEstimatorWorkbook } from "../configuratore/estimatorImport";
 import { towOverrides as buildTowOverrides, qtyKey, roundUp, autoTowRow, AUTO, MANUAL } from "../configuratore/towModel";
 import TowReview from "../configuratore/TowReview";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 import { syncItems, describeChange } from "../configuratore/proposedToOffer";
 import DeleteInitiativeDialog, { initiativeLabel } from "../configuratore/DeleteInitiativeDialog";
 import EstimatorImportReport from "../configuratore/EstimatorImportReport";
@@ -2137,7 +2139,8 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         {selectedTowPriceSource && <p>Fonte prezzi: {selectedTowPriceSource.name} · Lotto {lot}</p>}
       </section>}
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px" }}>{STEPS[step - 1]}</h2>
+        <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 6 }}>{STEPS[step - 1]}
+          <HelpHint topic={[HELP.stepIniziativa, HELP.stepInterventi, HELP.stepOfferta, HELP.stepRevisione][step - 1]} label={`Passo ${step} · ${STEPS[step - 1]}`} /></h2>
         <p style={styles.hint}>{[
           "Definisci il contesto dell'iniziativa e collega i dati del cliente.",
           "Valuta gli interventi e integra le proposte del catalogo.",
@@ -2195,7 +2198,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
       {step === 1 && (
         <div className="init-sections">
           {/* 1 · Dati iniziativa */}
-          <SectionRow number="1" id="sezione-dati" title="Dati iniziativa" open={isOpen('dati')} onToggle={() => toggleSection('dati')} keepMounted
+          <SectionRow help={HELP.datiIniziativa} number="1" id="sezione-dati" title="Dati iniziativa" open={isOpen('dati')} onToggle={() => toggleSection('dati')} keepMounted
             facts={[initiative.code && `GOTO ${initiative.code}`, initiative.title, initiative.system && `Sistema ${initiative.system}`, initiative.pmPoste && `PM ${initiative.pmPoste}`, importedInterventions.length > 0 && `${importedInterventions.length} interventi`, selectedAppIds.length > 0 && `${selectedAppIds.length} applicativi`]}
             status={initiative.code || initiative.title ? undefined : 'Da compilare'} tone={initiative.code || initiative.title ? 'neutral' : 'warn'}>
             <div ref={initiativeFieldsRef} style={{ ...styles.card, marginTop: 12, scrollMarginTop: 20 }}>
@@ -2408,25 +2411,25 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </SectionRow>
 
           {/* 2 · Workspace documentale */}
-          <SectionRow number="2" id="sezione-documenti" title="Workspace documentale" open={isOpen('documenti')} onToggle={() => toggleSection('documenti')} keepMounted={hasInitiative}
+          <SectionRow help={HELP.workspaceDocumentale} number="2" id="sezione-documenti" title="Workspace documentale" open={isOpen('documenti')} onToggle={() => toggleSection('documenti')} keepMounted={hasInitiative}
             facts={hasInitiative ? [libraryFacts] : ['Apri o crea un’iniziativa per usarlo']} status={hasInitiative ? undefined : 'Bloccato'} tone={hasInitiative ? 'neutral' : 'lock'}>
             <LibraryPanel initiative={initiative} canEdit={canEditInitiative} onSummary={setLibraryFacts} />
           </SectionRow>
 
           {/* 3 · Razionali e vincoli con l'AI */}
-          <SectionRow number="3" id="sezione-razionali" title="Razionali e vincoli con l’AI" open={isOpen('razionali')} onToggle={() => toggleSection('razionali')} keepMounted={hasInitiative}
+          <SectionRow help={HELP.razionali} number="3" id="sezione-razionali" title="Razionali e vincoli con l’AI" open={isOpen('razionali')} onToggle={() => toggleSection('razionali')} keepMounted={hasInitiative}
             facts={hasInitiative ? rationaleFacts(rationale) : ['Apri o crea un’iniziativa per usarlo']} status={hasInitiative ? undefined : 'Bloccato'} tone={hasInitiative ? 'neutral' : 'lock'}>
             <RationalePanel initiative={initiative} interventions={importedInterventions} onKnowledge={setRationale} applications={applicationBriefs(applications, selectedAppIds)} />
           </SectionRow>
 
           {/* 4 · Soluzione */}
-          <SectionRow number="4" id="sezione-soluzione" title="Soluzione" open={isOpen('soluzione')} onToggle={() => toggleSection('soluzione')} keepMounted={hasInitiative}
+          <SectionRow help={HELP.soluzione} number="4" id="sezione-soluzione" title="Soluzione" open={isOpen('soluzione')} onToggle={() => toggleSection('soluzione')} keepMounted={hasInitiative}
             facts={hasInitiative ? solutionFacts(solutionProgress) : ['Apri o crea un’iniziativa per usarla']} status={!hasInitiative ? 'Bloccata' : solutionProgress.dirty ? 'Non salvata' : undefined} tone={!hasInitiative ? 'lock' : solutionProgress.dirty ? 'warn' : 'neutral'}>
             <SolutionPanel initiative={initiative} contractId={initiativeContractId} lot={lot} interventions={importedInterventions} onProposals={onProposalsLoaded} onProposalsEdit={onProposalsEdited} offerNote={offerNote} knowledge={rationale} applications={applicationContextFor(initiative.system, applications, lot)} catalog={catalog} applicationBriefs={applicationBriefs(applications, selectedAppIds)} canEdit={canEditInitiative} author={currentUserName} onProgress={setSolutionProgress} />
           </SectionRow>
 
           {/* 5 · Analisi condivisa */}
-          <SectionRow number="5" id="sezione-analisi" title="Analisi condivisa" open={isOpen('analisi')} onToggle={() => toggleSection('analisi')} keepMounted={hasInitiative}
+          <SectionRow help={HELP.analisiCondivisa} number="5" id="sezione-analisi" title="Analisi condivisa" open={isOpen('analisi')} onToggle={() => toggleSection('analisi')} keepMounted={hasInitiative}
             facts={hasInitiative ? analysisFacts(workspaceContext) : ['Inserisci il codice GOTO per usarla']} status={hasInitiative ? undefined : 'Bloccata'} tone={hasInitiative ? 'neutral' : 'lock'}>
           {importHistoryError && <p role="alert">{importHistoryError}</p>}
           <InitiativeWorkspace key={`${ambienteId}:${editingRecordKey || 'new'}:${workspaceReload}`} initiative={initiative} roles={myRoles} onContextChange={setWorkspaceContext}
@@ -2435,7 +2438,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </SectionRow>
 
           {/* 6 · Codice sorgente */}
-          <SectionRow number="6" id="sezione-codice" title="Codice sorgente" open={isOpen('codice')} onToggle={() => toggleSection('codice')} keepMounted
+          <SectionRow help={HELP.codiceSorgente} number="6" id="sezione-codice" title="Codice sorgente" open={isOpen('codice')} onToggle={() => toggleSection('codice')} keepMounted
             facts={sourceFacts(selectedAppIds, applications, techProfile)}>
             {/* ── Codice sorgente: una riga per app selezionata ── */}
             <div style={{ ...styles.card, background: "#eef5ff", borderColor: "#cbdcf5", borderLeft: "4px solid #1a73e8" }}>
@@ -2552,7 +2555,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           </SectionRow>
 
           {/* 7 · Conoscenza dell'iniziativa */}
-          <SectionRow number="7" id="sezione-conoscenza" title="Conoscenza dell’Iniziativa" open={isOpen('conoscenza')} onToggle={() => toggleSection('conoscenza')} keepMounted
+          <SectionRow help={HELP.conoscenza} number="7" id="sezione-conoscenza" title="Conoscenza dell’Iniziativa" open={isOpen('conoscenza')} onToggle={() => toggleSection('conoscenza')} keepMounted
             facts={knowledgeFacts({ rationale, libraryFacts, solutionProgress, importedInterventions, mappingCount, tow5Total })}>
             <KnowledgeOverview initiative={initiative} rationale={rationale} solution={solutionProgress} interventions={importedInterventions} mappingCount={mappingCount} tow5Total={tow5Total} library={libraryFacts} onOpen={openSection} />
            <RealignOfferedPrices items={items} lot={activeLot} onApply={next => { setItems(next); toast("Prezzi offerti applicati: salva la valutazione per renderli definitivi."); }} />

@@ -45,7 +45,7 @@ const open = async () => {
   await waitFor(() => expect(screen.getByLabelText('Codice GOTO')).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '777001' } });
   fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'Servizio invio' } });
-  const row = await screen.findByRole('region', { name: 'Soluzione' }); fireEvent.click(within(row).getByRole('button', { name: /Soluzione/ }));
+  const row = await screen.findByRole('region', { name: 'Soluzione' }); fireEvent.click(within(row).getAllByRole('button').find(button => button.classList.contains('secrow-toggle')));
   return screen.findByRole('region', { name: 'Interventi proposti dall’AI' });
 };
 const goToOffer = async () => { fireEvent.click(screen.getByRole('button', { name: /3\. Offerta/ })); await screen.findByText('Totale catalogo', { exact: false }); };
@@ -68,7 +68,7 @@ test('confirming a proposed intervention puts its catalogue rows in the offer, g
 
 const proposals = () => screen.getByRole('region', { name: 'Interventi proposti dall’AI' });
 const confirmIt = async () => { fireEvent.click(within(proposals()).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent(/voc[ei] (è|sono) entrat[ae] nell’offerta/)); };
-const goToSolution = async () => { fireEvent.click(screen.getByRole('button', { name: /1\. Iniziativa/ })); await waitFor(() => expect(screen.getByRole('region', { name: 'Soluzione' })).toBeInTheDocument()); const head = within(screen.getByRole('region', { name: 'Soluzione' })).getByRole('button', { name: /Soluzione/ }); if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); };
+const goToSolution = async () => { fireEvent.click(screen.getByRole('button', { name: /1\. Iniziativa/ })); await waitFor(() => expect(screen.getByRole('region', { name: 'Soluzione' })).toBeInTheDocument()); const head = within(screen.getByRole('region', { name: 'Soluzione' })).getAllByRole('button').find(button => button.classList.contains('secrow-toggle')); if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); };
 const expandOffer = async () => { await goToOffer(); fireEvent.click(screen.getByRole('button', { name: 'Espandi tutti' })); await waitFor(() => expect(document.querySelector('tbody')).toBeTruthy()); };
 const saved = () => service.upsertConfiguratoreRecord.mock.calls.map(call => call[0]).filter(body => body.entity_type === 'initiative_evaluation').at(-1);
 
