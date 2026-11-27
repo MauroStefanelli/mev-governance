@@ -285,11 +285,21 @@ test('changing a confirmed intervention puts it back to be confirmed again', asy
   fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' })); await screen.findByRole('button', { name: /P-1/ });
   expect(screen.queryByRole('article', { name: 'Intervento proposto P-1' })).not.toBeInTheDocument();
 });
-test('what the team confirmed is saved with the solution, and the unsaved state is shown until then', async () => {
-  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
-  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' })); expect(await screen.findByText('Modifiche non salvate')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Salva soluzione' })); await waitFor(() => expect(saveSolution).toHaveBeenCalledTimes(1));
+test('confirming an intervention saves the solution by itself and tells the offer; the answer of the server is what the offer follows', async () => {
+  const onProposalsEdit = jest.fn();
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} onProposalsEdit={onProposalsEdit} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' }));
+  await waitFor(() => expect(saveSolution).toHaveBeenCalledTimes(1));
   const sent = saveSolution.mock.calls[0][0].solution; expect(sent.proposed.map(item => [item.id, item.status])).toEqual([['P-1', 'confermato'], ['P-2', 'proposto']]);
+  await waitFor(() => expect(onProposalsEdit).toHaveBeenCalledTimes(1)); expect(onProposalsEdit.mock.calls[0][0].map(item => [item.id, item.status])).toEqual([['P-1', 'confermato'], ['P-2', 'proposto']]);
+  expect(screen.queryByText('Modifiche non salvate')).not.toBeInTheDocument();
+});
+test('when the automatic save fails the offer is NOT told, the page says so, and the confirmation stays in the page to retry', async () => {
+  const onProposalsEdit = jest.fn(); saveSolution.mockRejectedValueOnce(new Error('Un collega ha salvato la soluzione dopo la tua apertura.'));
+  proposeInterventions.mockResolvedValue(aiAnswer()); render(<SolutionPanel {...noTable} onProposalsEdit={onProposalsEdit} />); await screen.findByRole('region', { name: 'Interventi proposti dall’AI' }); fireEvent.click(generateButton());
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Intervento proposto P-1' })).getByRole('button', { name: 'Conferma l’intervento' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Intervento non portato nell’offerta'); expect(screen.getByRole('alert')).toHaveTextContent('Un collega ha salvato la soluzione');
+  expect(onProposalsEdit).not.toHaveBeenCalled(); expect(screen.getByText('Modifiche non salvate')).toBeInTheDocument();
 });
 test('proposals saved by a colleague are there when the page opens', async () => {
   loadSolution.mockResolvedValue({ solution: { entries: {}, summary: '', proposed: [{ id: 'P-4', title: 'Di Lucia', description: '', activity: '', system: '', requirements: '', rationaleIds: [], components: [], status: 'confermato', byAi: true, mappings: [{ catalogId: 236, name: 'Realizzazione Single Page Application', ambit: 'Frontend', type: 'MODIFICA', complexity: 'Medio', qty: 1, unit: 840, component: '', technology: '', why: '' }] }] }, revision: 3, exists: true });

@@ -55,3 +55,11 @@
 .sol-prop-rejected summary { cursor: pointer; font-size: 12.5px; color: #8a5200; }
 .sol-prop-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .sol-prop-actions button { min-height: 36px; }
 @media (max-width: 700px) { .sol-proposed { padding: 10px; } }
+
+/* Interventi confermati: restano visibili, con le loro voci gia' nell'offerta, e si possono rimettere in revisione. */
+.sol-prop-confirmed { border: 1px solid #bfe3cf; background: #f2fbf6; border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
+.sol-prop-confirmed > button { justify-self: start; min-height: 40px; padding: 6px 12px; border-radius: 8px; border: 1px solid #9fd1b6; background: #fff; color: #16794a; font-weight: 700; cursor: pointer; }
+.sol-prop-confirmed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sol-prop-confirmed li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid #d4ecdd; border-radius: 8px; font-size: 13px; }
+.sol-prop-confirmed li button { margin-left: auto; min-height: 40px; padding: 6px 12px; border-radius: 8px; border: 1px solid #b9cde6; background: #fff; color: #174ea6; font-weight: 600; cursor: pointer; }
+.sol-offer-note { margin: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid #b9cde6; background: #eef5fd; color: #174ea6; font-size: 13px; }

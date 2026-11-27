@@ -82,7 +82,7 @@ describe('readability', () => {
     chapters.forEach(c => expect(c.steps.length).toBeLessThanOrEqual(14));
   });
   test('the chapters about the recent functions say what the user does and what can go wrong: an introduction and a «Se qualcosa non va» box', () => {
-    ['Razionali e vincoli con l’AI', 'Chattare bene con l’AI', 'Sorgenti, cartelle e applicativi', 'Soluzione: interventi e file per Visual Studio Code', 'Aggiornare l’app: Render e NAS'].forEach(title => {
+    ['Razionali e vincoli con l’AI', 'Chattare bene con l’AI', 'Sorgenti, cartelle e applicativi', 'Soluzione: interventi e file per Visual Studio Code', 'Aggiornare l’app su Render'].forEach(title => {
       const chapter = configuratorChapters.find(c => c.title === title); expect(chapter).toBeTruthy(); expect(chapter.intro.length).toBeGreaterThan(200); expect(chapter.warnings.length).toBeGreaterThanOrEqual(3);
     });
   });
@@ -92,7 +92,7 @@ describe('readability', () => {
     'Sorgenti, cartelle e applicativi': ['Sorgenti e dati per la domanda', 'Aggiungi o aggiorna una cartella', 'Tieni entrambe', 'Cerca nel codice', 'Cosa chiedere', 'File inviati all’AI nell’ultima domanda', 'Sistema / applicazione', 'Incolla dati (es. risultato di una query)'],
     'Soluzione: interventi e file per Visual Studio Code': ['Proponi gli interventi con l’AI', 'Su cosa concentrarsi', 'Conferma l’intervento', 'Aggiungi una voce del catalogo', 'Mostra gli scartati', 'Prima di cominciare', 'Checklist per chi sviluppa', 'Scarica MD per Visual Studio Code', 'Salva soluzione'],
     'Razionali e vincoli con l’AI': ['Nascondi la cronologia', 'Mostra la cronologia', 'Conoscenza dell’iniziativa', 'Riprendi in questa iniziativa', 'Aggiungi una voce a mano'],
-    'Aggiornare l’app: Render e NAS': ['Ricrea', 'Aggiorna', 'Manual Deploy', 'Applications', 'Images'],
+    'Aggiornare l’app su Render': ['Manual Deploy', 'mev-governance-backend-dev', 'mev-governance-frontend-dev'],
     'Revisioni e collaborazione': ['Collaborazione sull’iniziativa', 'colleghi collegati', 'Aggiorna storico senza perdere la bozza', 'Salva e Chiudi'],
     'Offerta ed export HLD': ['Modello Excel del lotto', 'Carica il modello originale', 'Aggiorna il modello (nuova versione)', 'Scarica il modello', 'Versioni precedenti', 'Rimetti in uso', 'Usa un file diverso solo per questa esportazione'],
   };
@@ -202,15 +202,14 @@ describe('the work without Excel: what the manual says the app does is true', ()
   test('«Sistema / applicazione» cannot be typed without Excel: it is read only and filled by «+ Aggiungi applicativo…» (as the manual says)', () => {
     expect(all).toContain('NON si scrive a mano'); expect(page).toMatch(/readOnly[\s\S]{0,120}Valorizzato dal file Excel importato|Valorizzato dal file Excel importato/); expect(page).toContain('+ Aggiungi applicativo…');
   });
-  test('the interventions proposed by the AI and confirmed in «Soluzione» do NOT feed the offer or Sviluppo: the manual warns about it, and it is still true', () => {
-    expect(all).toContain(norm('NON entrano da soli nell’offerta'));
-    // Sviluppo builds its activities only from the rows of the saved offer...
+  test('the interventions proposed by the AI and confirmed in «Soluzione» DO enter the offer by themselves (the manual says so): the page wires the Solution to the offer', () => {
+    expect(all).toContain(norm('entrano da soli nell’offerta')); expect(all).toContain(norm('2 voci sono entrate nell’offerta'));
+    expect(page).toMatch(/import \{ syncItems, describeChange \} from "..\/configuratore\/proposedToOffer"/); expect(page).toMatch(/onProposals=\{onProposalsLoaded\} onProposalsEdit=\{onProposalsEdited\}/);
+    expect(page).toMatch(/voci sono entrate|voce è entrata/); expect(solutionPanel).toMatch(/onProposalsEdit\?\.\(proposed\)/);
+    // the message the manual quotes is the one the page really writes, and the failure message too
+    expect(page).toContain('nell’offerta'); expect(solutionPanel).toContain('Intervento non portato nell’offerta');
+    // Sviluppo still builds its activities only from the rows of the saved offer: that is why the rows must enter the offer
     expect(sviluppo).toMatch(/developmentActivities\(loaded\.evaluation\.items/);
-    // ...and the proposed interventions live only in the solution panel and its store.
-    ['pages/ConfiguratorePage.js', 'pages/SviluppoPage.js', 'configuratore/developmentRecord.js', 'configuratore/developmentPackages.js'].forEach(file => {
-      const text = fs.readFileSync(path.join(SRC, file), 'utf8'); expect(text).not.toMatch(/solution\.proposed|mergeInterventions|loadSolution/);
-    });
-    expect(solutionPanel).toContain('mergeInterventions');
   });
   test('«Analizza e suggerisci» without Excel is local (no AI call) and asks for at least 20 useful characters', () => {
     expect(all).toContain(norm('senza chiamare l’AI')); expect(all).toContain('almeno 20 caratteri');

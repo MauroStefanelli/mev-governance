@@ -16,7 +16,7 @@ const catalogForServer = catalog => (catalog || []).filter(entry => Number.isFin
 
 // The interventions of an initiative that has no Offer Table (or that needs more than the table has): the AI proposes them from the confirmed rationale and the chosen applications, each tied to rows of the
 // catalogue of Poste; the team reads, changes and confirms one by one. Only the confirmed ones become interventions of the solution. Nothing here is applied without a person.
-export default function InterventionProposalsPanel({ initiative, lot, catalog = [], applications = [], knowledge = [], proposed = [], importedTitles = [], onChange, canEdit = true }) {
+export default function InterventionProposalsPanel({ initiative, lot, catalog = [], applications = [], knowledge = [], proposed = [], importedTitles = [], onChange, canEdit = true, offerNote = '' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -28,6 +28,8 @@ export default function InterventionProposalsPanel({ initiative, lot, catalog = 
   const confirmedKnowledge = useMemo(() => (knowledge || []).filter(entry => entry.status === 'confermata'), [knowledge]);
   const number = counts(proposed);
   const open = proposed.filter(item => item.status === STATUS.PROPOSED);
+  const confirmedList = proposed.filter(item => item.status === STATUS.CONFIRMED);
+  const [showConfirmed, setShowConfirmed] = useState(true);
   const discarded = proposed.filter(item => item.status === STATUS.DISCARDED);
   const lacksRationale = confirmedKnowledge.length === 0;
   const lacksCatalog = !catalog.length;
@@ -66,6 +68,7 @@ export default function InterventionProposalsPanel({ initiative, lot, catalog = 
     </div>}
     {canEdit && lacksRationale && <p className="sol-hint" role="status">Per proporre gli interventi serve almeno una voce <b>confermata</b> in «Razionali e vincoli con l’AI»: senza, l’AI non ha da cosa partire.</p>}
     {canEdit && !lacksRationale && lacksCatalog && <p className="sol-hint" role="status">Il catalogo interventi del lotto non è disponibile: scegli il contratto e il lotto nel passo «Offerta», poi riprova.</p>}
+    {offerNote && <p className="sol-offer-note" role="status">{offerNote}</p>}
     {full && <p className="sol-hint" role="status">Hai raggiunto il limite di {MAX_PROPOSED} interventi proposti: conferma o scarta quelli che hai.</p>}
     {error && <p className="sol-error" role="alert">{error}</p>}
     {notice && <p className="sol-notice" role="status">{notice}</p>}
@@ -103,6 +106,11 @@ export default function InterventionProposalsPanel({ initiative, lot, catalog = 
           {cannot && <small>{item.mappings.length ? 'Serve un titolo.' : 'Serve almeno una voce di catalogo.'}</small>}</div>}
       </article>; })}
 
+    {confirmedList.length > 0 && <div className="sol-prop-confirmed" aria-label="Interventi confermati">
+      <button type="button" aria-expanded={showConfirmed} onClick={() => setShowConfirmed(value => !value)}>{showConfirmed ? 'Nascondi i confermati' : 'Mostra i confermati'} ({confirmedList.length})</button>
+      {showConfirmed && <ul>{confirmedList.map(item => <li key={item.id}><span className="sol-id">{item.id}</span> <b>{item.title}</b>
+        <small> · {item.mappings.length} {item.mappings.length === 1 ? 'voce' : 'voci'} di catalogo, già nell’offerta</small>
+        {canEdit && <button type="button" onClick={() => update(item.id, restore)}>Rimetti in revisione</button>}</li>)}</ul>}</div>}
     {discarded.length > 0 && <div className="sol-prop-discarded"><button type="button" aria-expanded={showDiscarded} onClick={() => setShowDiscarded(value => !value)}>{showDiscarded ? 'Nascondi gli scartati' : 'Mostra gli scartati'} ({discarded.length})</button>
       {showDiscarded && <ul>{discarded.map(item => <li key={item.id}><span className="sol-id">{item.id}</span> {item.title} {canEdit && <button type="button" onClick={() => update(item.id, restore)}>Ripristina</button>}</li>)}</ul>}</div>}
   </section>;

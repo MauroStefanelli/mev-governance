@@ -14,7 +14,7 @@ const download = (name, text) => {
 
 // The proposed solution of each intervention: read-only context from the offer and the confirmed rationale,
 // editable text written by the team, shared and saved on the server, exportable as Markdown for Visual Studio Code.
-export default function SolutionPanel({ initiative, contractId, lot, interventions = [], knowledge = [], applications = [], catalog = [], applicationBriefs = [], canEdit = true, author = '', onProgress }) {
+export default function SolutionPanel({ initiative, contractId, lot, interventions = [], knowledge = [], applications = [], catalog = [], applicationBriefs = [], canEdit = true, author = '', onProgress, onProposals, onProposalsEdit, offerNote = '' }) {
   const code = String(initiative?.code || initiative?.title || '').trim();
   const [solution, setSolution] = useState({ entries: {}, summary: '', proposed: [] });
   const [saved, setSaved] = useState({ entries: {}, summary: '', proposed: [] });
@@ -46,6 +46,12 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
   const counts = rationaleCounts(knowledge);
   const dirty = JSON.stringify({ e: solution.entries, s: solution.summary || '', p: solution.proposed || [] }) !== JSON.stringify({ e: saved.entries, s: saved.summary || '', p: saved.proposed || [] });
   const proposedCounts = proposedStats(solution.proposed);
+  // L'offerta deve sapere quali interventi sono confermati: sempre (anche al caricamento della soluzione, solo per AGGIUNGERE) e, alla modifica fatta da una persona, per aggiungere e togliere.
+  const fromPerson = useRef(false);
+  useEffect(() => {
+    if (fromPerson.current) { fromPerson.current = false; return; }          // una persona ha appena cambiato un intervento: lo comunica changeProposed, con il messaggio
+    onProposals?.({ code, proposed: solution.proposed || [] });
+  }, [code, solution.proposed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { onProgress?.({ ...progress, dirty, revision, proposed: proposedCounts }); }, [progress.total, progress.filled, progress.orphans, dirty, revision, proposedCounts.proposed, proposedCounts.confirmed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const edit = (id, key, value) => { setSolution(previous => withField(previous, id, key, value)); setNotice(''); };
@@ -60,6 +66,29 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
       setSolution(next); setSaved(next); setRevision(result.revision);
       setNotice(`Soluzione salvata e confermata dal server (revisione ${result.revision}).`);
     } catch (e) { if (alive.current) setError(e.message); } finally { if (alive.current) setSaving(false); }
+  };
+  // Una conferma, uno scarto o un ripristino cambiano cio' che entra nell'offerta: la Soluzione si salva SUBITO, cosi' le due cose non possono dire cose diverse. Se il salvataggio
+  // non riesce l'offerta NON cambia e la pagina lo dice (la modifica resta in pagina e si puo' riprovare con «Salva soluzione»).
+  const confirmedView = list => JSON.stringify((list || []).filter(item => item.status === 'confermato').map(item => [item.id, item.mappings]));
+  const changeProposed = async proposed => {
+    const before = solution.proposed || [];
+    const next = { ...solution, proposed };
+    fromPerson.current = true; setSolution(next); setNotice('');
+    // Cambia cio' che entra nell'offerta solo se cambia l'insieme degli interventi CONFERMATI (conferma, scarto di un confermato, rimessa in revisione, modifica di uno confermato).
+    // Una proposta nuova dell'AI, o la modifica di una proposta ancora aperta, non tocca l'offerta: niente salvataggio automatico, niente avviso.
+    if (confirmedView(proposed) === confirmedView(before)) return;
+    if (!canEdit) return;
+    setSaving(true); setError('');
+    try {
+      const result = await saveSolution({ contractId, lot, initiative, solution: next, revision, author });
+      if (!alive.current) return;
+      const stamped = { ...next, updatedBy: result.updatedBy, updatedAt: result.updatedAt };
+      fromPerson.current = true; setSolution(stamped); setSaved(stamped); setRevision(result.revision);
+      onProposalsEdit?.(proposed);
+      setNotice(`Soluzione salvata (revisione ${result.revision}).`);
+    } catch (e) {
+      if (alive.current) setError(`Intervento non portato nell’offerta: la soluzione non è stata salvata. ${e.message}`);
+    } finally { if (alive.current) setSaving(false); }
   };
   const reload = async () => {
     if (dirty && !window.confirm('Ricaricare la soluzione salvata? Le modifiche non salvate di questa pagina andranno perse.')) return;
@@ -89,7 +118,7 @@ export default function SolutionPanel({ initiative, contractId, lot, interventio
       {noInterventions && !loading && <p className="sol-empty">Non ci sono ancora interventi. Puoi importare la Tabella di Offerta (pulsante «Importa Tabella di Offerta» in alto) oppure farti proporre gli interventi dall’AI qui sotto, a partire dai razionali confermati: non serve la Tabella.</p>}
 
       {!idle && !loading && <InterventionProposalsPanel initiative={initiative} lot={lot} catalog={catalog} applications={applicationBriefs} knowledge={knowledge} proposed={solution.proposed || []}
-        importedTitles={(interventions || []).map(item => item.titolo || item.title)} canEdit={canEdit} onChange={proposed => { setSolution(previous => ({ ...previous, proposed })); setNotice(''); }} />}
+        importedTitles={(interventions || []).map(item => item.titolo || item.title)} canEdit={canEdit} onChange={changeProposed} offerNote={offerNote} />}
       {!!rows.length && <>
         {(counts.confirmed > 0 || counts.toConfirm > 0) && <div className="sol-feed" role="status" aria-label="Informazioni dei Razionali e vincoli usate dalla soluzione">
           <b>Dai Razionali e vincoli:</b> {counts.confirmed} confermati ({counts.byKind.vincolo} vincoli · {counts.byKind.decisione} decisioni · {counts.byKind.razionale} razionali)

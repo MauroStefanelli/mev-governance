@@ -23,6 +23,7 @@ import { planReview, reviewIsCurrent, chunk, isRetryable } from "../configurator
 import { parseEstimatorWorkbook } from "../configuratore/estimatorImport";
 import { towOverrides as buildTowOverrides, qtyKey, roundUp, autoTowRow, AUTO, MANUAL } from "../configuratore/towModel";
 import TowReview from "../configuratore/TowReview";
+import { syncItems, describeChange } from "../configuratore/proposedToOffer";
 import DeleteInitiativeDialog, { initiativeLabel } from "../configuratore/DeleteInitiativeDialog";
 import EstimatorImportReport from "../configuratore/EstimatorImportReport";
 import { initiativeCode, mergeById } from "../configuratore/rationaleKnowledge";
@@ -640,7 +641,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false);
     setInitiative({ code: "", title: "", system: "", contractType: "", release: "", pmPoste: "", requirements: "", description: "" });
     setImportedInterventions([]);
-    setItems([]);
+    setItems([]); setOfferRemoved([]); setOfferNote('');
     setSuggestions([]);
     setTow({});
     // Azzera solo i valori del contratto/lotto corrente, così il useEffect li ripopola dai dati contratto
@@ -1190,7 +1191,11 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     setItems(prev => prev.map(it => String(it.original?.catalogId) === String(originalId) ? { ...it, id: entry.id, catalogAssociation: { originalId, catalogId: entry.id, contractId: selectedContractId, lot } } : it));
     setImportedInterventions(prev => prev.map(iv => ({ ...iv, mappings: iv.mappings.map(m => String(m.original?.catalogId) === String(originalId) ? { ...m, catalogId: entry.id, name: entry.nome } : m) })));
   };
-  const removeItem = (key) => setItems((prev) => prev.filter((it) => it.key !== key));
+  const removeItem = (key) => {
+    const gone = items.find((it) => it.key === key);
+    if (gone?.proposedLine) setOfferRemoved([...offerRemovedRef.current, gone.proposedLine]);     // tolta a mano: non rientra da sola finche' l'intervento la vuole
+    setItems((prev) => prev.filter((it) => it.key !== key));
+  };
 
   // ── TOW previsti (Revisione) ──
   // Una quantita' scelta per TOW .1/.3/.4 si salva in `tow` (chiave «<TOW>_qty») e sostituisce il calcolo dalla %; per .2/.6 la quantita' e' `tow[<TOW>]` come sempre.
@@ -1320,6 +1325,34 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   };
 
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
+
+  // ── Interventi proposti dall'AI e confermati → voci dell'offerta ──
+  // La Soluzione dice quali interventi sono confermati; l'offerta (items) deve avere le loro voci di catalogo. `proposalsRef` tiene l'ultimo elenco; `offerRemoved` le righe che una persona
+  // ha tolto a mano dall'offerta (non rientrano da sole finche' l'intervento le vuole).
+  const proposalsRef = useRef({ code: '', proposed: [] });
+  const [offerNote, setOfferNote] = useState('');
+  const offerRemovedRef = useRef([]);
+  const setOfferRemoved = (list) => { offerRemovedRef.current = list; };
+  const itemsRef = useRef([]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  const applyProposalsToOffer = (proposed, { additiveOnly = false, say = true } = {}) => {
+    const current = itemsRef.current;
+    const options = { exclusions: offerRemovedRef.current, additiveOnly };
+    const change = describeChange(current, proposed, options);
+    if (!change.added && !change.removed) return;
+    const next = syncItems(current, proposed, options); itemsRef.current = next; setItems(next);
+    if (say) {
+      const parts = [];
+      if (change.added) parts.push(`${change.added} ${change.added === 1 ? 'voce è entrata' : 'voci sono entrate'} nell’offerta`);
+      if (change.removed) parts.push(`${change.removed} ${change.removed === 1 ? 'voce è uscita' : 'voci sono uscite'} dall’offerta`);
+      const text = `${parts.join(' e ')}. Controlla i prezzi nel passo 3 «Offerta» e salva la valutazione.`;
+      setOfferNote(text); toast(text);
+    }
+  };
+  // Cambia la soluzione (anche al caricamento): le voci mancanti si AGGIUNGONO sempre; non si toglie nulla da uno stato appena letto.
+  const onProposalsLoaded = ({ code, proposed }) => { proposalsRef.current = { code, proposed }; applyProposalsToOffer(proposed, { additiveOnly: true, say: false }); };
+  // Una persona conferma, scarta, ripristina o modifica un intervento: l'offerta segue, aggiungendo e togliendo.
+  const onProposalsEdited = (proposed) => { proposalsRef.current = { ...proposalsRef.current, proposed }; applyProposalsToOffer(proposed); };
 
    const reworkInitiative = (record) => {
     detailReviewJob.current++; setDetailReviewBusy(false);
@@ -2389,7 +2422,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
           {/* 4 · Soluzione */}
           <SectionRow number="4" id="sezione-soluzione" title="Soluzione" open={isOpen('soluzione')} onToggle={() => toggleSection('soluzione')} keepMounted={hasInitiative}
             facts={hasInitiative ? solutionFacts(solutionProgress) : ['Apri o crea un’iniziativa per usarla']} status={!hasInitiative ? 'Bloccata' : solutionProgress.dirty ? 'Non salvata' : undefined} tone={!hasInitiative ? 'lock' : solutionProgress.dirty ? 'warn' : 'neutral'}>
-            <SolutionPanel initiative={initiative} contractId={initiativeContractId} lot={lot} interventions={importedInterventions} knowledge={rationale} applications={applicationContextFor(initiative.system, applications, lot)} catalog={catalog} applicationBriefs={applicationBriefs(applications, selectedAppIds)} canEdit={canEditInitiative} author={currentUserName} onProgress={setSolutionProgress} />
+            <SolutionPanel initiative={initiative} contractId={initiativeContractId} lot={lot} interventions={importedInterventions} onProposals={onProposalsLoaded} onProposalsEdit={onProposalsEdited} offerNote={offerNote} knowledge={rationale} applications={applicationContextFor(initiative.system, applications, lot)} catalog={catalog} applicationBriefs={applicationBriefs(applications, selectedAppIds)} canEdit={canEditInitiative} author={currentUserName} onProgress={setSolutionProgress} />
           </SectionRow>
 
           {/* 5 · Analisi condivisa */}
