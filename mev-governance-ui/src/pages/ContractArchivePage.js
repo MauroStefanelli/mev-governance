@@ -17,6 +17,8 @@ import { CONTRACT_SUMMARIES } from '../configuratore/contractSummaries';
 
 import { euro } from '../utils';
 import OfferedCatalogPanel from '../components/contracts/OfferedCatalogPanel';
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 // ── Stili allineati a ConfiguratorePage ───────────────────────────────────
 const S = {
@@ -890,7 +892,7 @@ export default function ContractArchivePage({ ambienti = [], allUsers = [] }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
           <p style={S.eyebrow}>Archivio contrattuale</p>
-          <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px,3vw,30px)', letterSpacing: '-0.7px', fontWeight: 750 }}>Contratti e accessi</h1>
+          <h1 style={{ margin: '6px 0 0', fontSize: 'clamp(22px,3vw,30px)', letterSpacing: '-0.7px', fontWeight: 750, display: 'flex', alignItems: 'center', gap: 8 }}>Contratti e accessi<HelpHint topic={HELP.archivio} label="Contratti e accessi" /></h1>
           <p style={{ margin: '4px 0 0', color: '#52657d', fontSize: 13 }}>
             Ogni contratto, i suoi lotti e le persone che possono accedervi. Tutto in un unico spazio.
           </p>

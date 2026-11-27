@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import CapgeminiLogo from "../components/CapgeminiLogo";
 import PageManual from "../components/help/PageManual";
 
 // Nomi femminili italiani comuni per determinare il genere dal nome
@@ -412,7 +413,9 @@ export default function HomePage({
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: "clamp(32px,5vw,56px)" }}>
 
           {/* Logo + titolo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+            <CapgeminiLogo variant="home" height={48} dark={isDark} />
+            <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: T.footerBorder, minHeight: 40 }} />
             <img src="/logo_poste.svg" alt="Poste Italiane" style={{ height: 44, width: "auto", filter: isDark ? "brightness(0) invert(1) opacity(0.9)" : "none" }} />
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.5px", color: T.titleColor, lineHeight: 1.2 }}>

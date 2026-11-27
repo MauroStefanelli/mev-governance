@@ -4,6 +4,7 @@ import { resolveRelease } from "./release";
 import MevPage from "./pages/MevPage";
 import MevCapPage from "./pages/MevCapPage";
 import LoginPage from "./pages/LoginPage";
+import CapgeminiLogo from "./components/CapgeminiLogo";
 import AdminPage from "./pages/AdminPage";
 import DbConfigPage from "./pages/DbConfigPage";
 import ChartPage from "./pages/ChartPage";
@@ -559,13 +560,18 @@ function App() {
 
       {/* ── BARRA HOME (visibile su tutte le pagine tranne home) ── */}
       {page !== "home" && (
-        <div style={{
+        <div className="app-topbar" style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           gap: 12, padding: "0 clamp(12px,3vw,28px)", height: 48,
           background: "linear-gradient(135deg, #0a1628 0%, #0f2347 100%)",
           position: "sticky", top: 0, zIndex: 100,
           boxShadow: "0 1px 8px rgba(0,0,0,0.25)",
         }}>
+          {/* Logo Capgemini Italia, prima del tasto Home */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", paddingRight: 12, borderRight: "1px solid rgba(255,255,255,0.18)", height: 32 }}>
+            <CapgeminiLogo variant="bar" height={32} />
+          </span>
           {/* Tasto Home */}
           <button
             onClick={() => setPage("home")}
@@ -588,9 +594,10 @@ function App() {
             </svg>
             Home
           </button>
+          </div>
 
           {/* Centro: logo + titolo + badge versione + ambiente */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
+          <div className="app-topbar-center" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center", minWidth: 0 }}>
             <img
               src="/logo_poste.svg"
               alt="Poste Italiane"
@@ -623,7 +630,7 @@ function App() {
           </div>
 
           {/* Destra: utente + profilo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="app-topbar-right" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {page !== 'configuratore' && <HeaderManual page={page} role={role} roles={roles} />}
             {lastAlign && (
               <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, display: "none" /* nascosto su mobile */ }}>

@@ -6,6 +6,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
 } from "recharts";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 
 const TH = (align = "left") => ({
@@ -454,7 +456,7 @@ function ConsumoTowSection({ towRows, ambienteId }) {
           fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(59,130,246,0.4)",
         }}>📊</div>
         <div>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Monitoraggio contratto</div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 6 }}>Monitoraggio contratto<HelpHint topic={HELP.contratti} label="Monitoraggio contratto" /></div>
           <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "1px" }}>Monitoraggio consumi per tipo di contratto</div>
         </div>
 

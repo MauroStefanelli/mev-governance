@@ -417,6 +417,8 @@ export function homeManualChapters(pageIds) {
   return [chapter('Orientarsi nell’app', 'Scegli la sezione in base all’attività', [
     'Seleziona prima il contratto/ambiente nella Home: le pagine operative mostreranno i dati del contesto attivo.',
     'Apri una funzione dalla relativa scheda. In ogni sezione trovi il pulsante Manuale d’uso per le istruzioni specifiche.',
+    'Nelle pagine, accanto al titolo di una funzione, c’è un cerchio blu con un «?»: premilo e si apre un riquadro breve che dice cosa fare proprio lì. «Apri il capitolo completo del manuale →» ti porta al capitolo di quella pagina. Si chiude con la ✕, con Esc o cliccando fuori. Nelle operazioni che non si annullano il riquadro lo scrive.',
+    'In alto, in ogni pagina, il logo Capgemini sta prima del tasto «Home». Il tasto «Home» riporta alla pagina iniziale.',
     'Se una funzione non compare, verifica i permessi con l’amministratore. La guida non modifica le abilitazioni.',
   ]), ...pageIds.filter(id => PAGE_MANUALS[id]).map(id => chapter(PAGE_MANUALS[id].title, 'In breve', [PAGE_MANUALS[id].summary]))];
 }

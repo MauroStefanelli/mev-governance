@@ -1,9 +1,10 @@
 import React, { Children, cloneElement, useLayoutEffect, useRef, useState } from "react";
+import HelpHint from "../../configuratore/HelpHint";
 
 export const pageStyle = { padding: "24px clamp(12px, 2vw, 28px) 40px", background: "#f4f7fc", fontFamily: "system-ui, -apple-system, sans-serif", color: "#243247", minWidth: 0 };
 export const toolbarStyle = { display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap", padding: 12, background: "#fff", border: "1px solid #dde5f0", borderRadius: 10 };
-export function PageHeading({ title }) {
-  return <header style={{ marginBottom: 22 }}><div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#526581", marginBottom: 6 }}>GOVERNANCE · PORTAFOGLIO ATTIVITÀ</div><h1 style={{ margin: "0 0 8px", fontSize: 28, letterSpacing: -.7 }}>{title}</h1><p style={{ margin: 0, color: "#526581", fontSize: 14 }}>Importi, ordini e subforniture. Una vista condivisa per seguire ogni attività.</p></header>;
+export function PageHeading({ title, help }) {
+  return <header style={{ marginBottom: 22 }}><div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#526581", marginBottom: 6 }}>GOVERNANCE · PORTAFOGLIO ATTIVITÀ</div><h1 style={{ margin: "0 0 8px", fontSize: 28, letterSpacing: -.7, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{title}{help && <HelpHint topic={help} label={title} />}</h1><p style={{ margin: 0, color: "#526581", fontSize: 14 }}>Importi, ordini e subforniture. Una vista condivisa per seguire ogni attività.</p></header>;
 }
 // «Da Ordinare» = Totale Fornitura - Totale ODA. Arrotondato ai millesimi (quanto si mostra) per non far comparire «-0,000» o «0,000» da errori di virgola mobile.
 export const toOrder = (supply, oda) => (Math.round(((Number(supply) || 0) - (Number(oda) || 0)) * 1000) / 1000) + 0; // «+ 0» trasforma -0 in 0

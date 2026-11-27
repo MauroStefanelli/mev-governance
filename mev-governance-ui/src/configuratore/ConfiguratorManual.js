@@ -357,6 +357,7 @@ export function UserManual({ chapters, title, subtitle, triggerLabel = 'Manuale 
     const onOpen = event => {
       const wanted = String(event.detail?.chapterTitle || '').trim().toLowerCase(); if (!wanted) return;
       const index = chapters.findIndex(entry => entry.title.toLowerCase() === wanted) >= 0 ? chapters.findIndex(entry => entry.title.toLowerCase() === wanted) : chapters.findIndex(entry => entry.title.toLowerCase().startsWith(wanted));
+      // Si apre SOLO il manuale che ha quel capitolo: nella pagina ce n'e' piu' d'uno in ascolto e non devono aprirsi tutti insieme.
       if (index < 0) return;
       setChapter(index); setOpen(true);
     };

@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { fmtItIT } from '../utils';
 import * as XLSX from "xlsx";
 import { getTeam, createTeamMember, updateTeamMember, deleteTeamMember, importTeam } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtEuro = (v) => {
@@ -368,7 +370,7 @@ export default function TeamPage({ onUnauthorized, ambienteId }) {
 
       {/* ── Page header ── */}
       <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px" }}>Gestione Team</h1>
+        <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 8 }}>Gestione Team<HelpHint topic={HELP.team} label="Gestione Team" /></h1>
         <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#94a3b8" }}>
           {rows.length} risorse totali · {attivi.length} attive · {destaffati.length} destaffate
         </p>

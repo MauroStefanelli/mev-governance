@@ -53,15 +53,20 @@ describe('«Apri il capitolo completo del manuale»', () => {
     const manual = document.querySelector('dialog.tow-manual'); expect(manual).toBeTruthy(); expect(within(manual).getByRole('heading', { level: 3 })).toHaveTextContent('Soluzione: interventi e file per Visual Studio Code');
     expect(screen.queryByRole('dialog', { name: 'Come si usa: Soluzione' })).toBeNull();                     // the little panel is closed
   });
-  test('every chapter a topic points to exists in the manual of the Configuratore (so the link never lands nowhere)', () => {
-    const source = fs.readFileSync(path.join(__dirname, 'ConfiguratorManual.js'), 'utf8'); const titles = [...source.matchAll(/\{ title: '([^']+)'/g)].map(m => m[1]);
-    const missing = Object.entries(HELP).filter(([key, t]) => t.chapter && !key.startsWith('dev') && !titles.some(title => title === t.chapter || title.startsWith(t.chapter))).map(([key, t]) => `${key} → ${t.chapter}`);
+  // Which manual each topic belongs to: the Configuratore, Sviluppo, or the manual of the page itself (the page the «?» is on).
+  const MANUAL = { devElenco: 'sviluppo', devFonti: 'sviluppo', devSchede: 'sviluppo', devProgetto: 'sviluppo', devConsegna: 'sviluppo', devCodice: 'sviluppo', devVerifica: 'sviluppo',
+    mevPagina: 'mev', mevAllineamento: 'mev', mevcapPagina: 'mevcap', grafici: 'chart', team: 'team', report: 'reportavanzamenti', contratti: 'contratti', consumoTow: 'consumotow', tools: 'tools',
+    archivio: 'superadmin', catalogoOfferto: 'catalogoofferto', gare: 'gara', admin: 'admin', dbconfig: 'dbconfig' };
+  const titlesOf = key => {
+    const which = MANUAL[key]; if (!which) { const source = fs.readFileSync(path.join(__dirname, 'ConfiguratorManual.js'), 'utf8'); return [...source.matchAll(/\{ title: '([^']+)'/g)].map(m => m[1]); }
+    return require('../components/help/pageManuals').PAGE_MANUALS[which].chapters.map(c => c.title);
+  };
+  test('every topic points to a chapter that EXISTS in the manual of its own page (so the link never lands nowhere)', () => {
+    const missing = Object.entries(HELP).filter(([key, t]) => t.chapter && !titlesOf(key).some(title => title === t.chapter || title.startsWith(t.chapter))).map(([key, t]) => `${key} → ${t.chapter}`);
     expect(missing).toEqual([]);
   });
-  test('every chapter a topic of Sviluppo points to exists in the manual of Sviluppo', () => {
-    const { PAGE_MANUALS } = require('../components/help/pageManuals'); const titles = PAGE_MANUALS.sviluppo.chapters.map(c => c.title);
-    const missing = Object.entries(HELP).filter(([key, t]) => t.chapter && key.startsWith('dev') && !titles.some(title => title === t.chapter || title.startsWith(t.chapter))).map(([key, t]) => `${key} → ${t.chapter}`);
-    expect(missing).toEqual([]);
+  test('every topic of another page has a manual that belongs to it (a topic is never left pointing at the Configuratore by mistake)', () => {
+    const { PAGE_MANUALS } = require('../components/help/pageManuals'); Object.entries(MANUAL).forEach(([key, page]) => { expect(HELP[key]).toBeTruthy(); expect(PAGE_MANUALS[page]).toBeTruthy(); });
   });
   test('a request for a chapter that does not exist opens nothing', () => {
     render(<ConfiguratorManual />); act(() => openManualAt('Capitolo che non esiste')); expect(document.querySelector('dialog.tow-manual')).toBeNull();

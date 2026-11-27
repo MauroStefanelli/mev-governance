@@ -9,6 +9,7 @@ import {
 import { fmtItIT } from "../utils";
 import { NewContrattoFiglioModal } from "./ConsumoTowAdminPage";
 import { resolveMandataryAndPartners } from "../utils/mevCompanies";
+import { HELP } from "../configuratore/helpTopics";
 
 const FILTERS_STORAGE_KEY = "mevPageFilters";
 
@@ -1589,7 +1590,7 @@ function MevCapPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAlig
   // ── Render principale ─────────────────────────────────────────────────────
   return (
     <div style={pageStyle}>
-      <PageHeading title="MEV-CAP · Gestione attività" />
+      <PageHeading title="MEV-CAP · Gestione attività" help={HELP.mevcapPagina} />
 
       {/* Toolbar */}
       <div style={toolbarStyle}>

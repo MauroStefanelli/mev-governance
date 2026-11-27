@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getDbConfig, setDbConfig, testDbConnection, restartBackend, getAppSettings, setAppSettings, resetData } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 const fieldStyle = {
   display: "flex", flexDirection: "column", gap: "4px"
@@ -439,6 +441,9 @@ export default function DbConfigPage() {
       maxWidth: "640px", margin: "40px auto", background: "#fff",
       borderRadius: "12px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden"
     }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, padding: "6px 10px 0", fontSize: 12, color: "#64748b" }}>
+        <span>Come si usa questa pagina</span><HelpHint topic={HELP.dbconfig} label="Configurazione app e database" />
+      </div>
       {/* Tab bar */}
       <div style={{ display: "flex", borderBottom: "2px solid #e2e8f0" }}>
         {tabs.map(t => (

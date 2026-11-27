@@ -22,6 +22,8 @@ import {
   getAppRolePermissions,
   putAppRolePermissions,
 } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 
 const roleColors = {
@@ -409,7 +411,7 @@ function AdminPage({ currentRole, currentUserId, onThemeChange }) {
       <header className="mev-admin-hero">
         <div>
           <div className="mev-admin-eyebrow"><span /> AMMINISTRAZIONE</div>
-          <h3>Gestione Utenti e Funzioni</h3>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>Gestione Utenti e Funzioni<span style={{ background: "#fff", borderRadius: "50%", display: "inline-flex", lineHeight: 0 }}><HelpHint topic={HELP.admin} label="Gestione Utenti e Funzioni" /></span></h3>
           <p>Persone, ruoli, accessi e permessi applicativi.</p>
         </div>
         <div className="mev-admin-hero-icon" aria-hidden="true">

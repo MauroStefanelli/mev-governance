@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { getConsumoTow } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 const TABS = [
   { id: "release", label: "Release" },
@@ -209,7 +211,7 @@ export default function ChartPage({ rows = [], ambienteId }) {
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.8px", color: "#718097", marginBottom: 10 }}>MEV / ANALISI ECONOMICA</div>
-            <h1 style={{ fontSize: 30, letterSpacing: "-0.8px", margin: "0 0 8px", fontWeight: 700 }}>Grafici</h1>
+            <h1 style={{ fontSize: 30, letterSpacing: "-0.8px", margin: "0 0 8px", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>Grafici<HelpHint topic={HELP.grafici} label="Grafici" /></h1>
             <p style={{ ...muted, margin: 0 }}>Una vista d&apos;insieme su forniture, ordini e fatturazione.</p>
           </div>
           <span style={{ padding: "8px 12px", background: "#FFFFFF", border: "1px solid #E3E8EF", borderRadius: 8, fontSize: 12, color: "#68758A" }}>{count.format(filteredRows.length)} MEV nel perimetro</span>

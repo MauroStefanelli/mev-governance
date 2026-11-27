@@ -7,6 +7,8 @@ import {
 } from "../services/mevService";
 import { fmtItIT } from "../utils";
 import { resolveMandataryAndPartners } from "../utils/mevCompanies";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 // ── Helpers RTI (stessa logica di MevCapPage) ─────────────────────────────────
 const resolveCapMandanti = (capVal, ietVal, rtiRows = []) => resolveMandataryAndPartners(capVal, ietVal, rtiRows);
@@ -367,10 +369,11 @@ function MevPage({ onUnauthorized, onRowsChange, onFilteredRowsChange, onAligned
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={pageStyle}>
-      <PageHeading title="MEV · Quadro economico" />
+      <PageHeading title="MEV · Quadro economico" help={HELP.mevPagina} />
 
       {/* ── Toolbar ── */}
       <div style={toolbarStyle}>
+        {["Admin", "SuperAdmin"].includes(role) && <HelpHint topic={HELP.mevAllineamento} label="Carica Excel e Allinea Dati" />}
         {["Admin", "SuperAdmin"].includes(role) && (
           <>
             <button

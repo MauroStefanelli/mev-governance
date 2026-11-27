@@ -36,3 +36,16 @@
     transform: rotate(360deg);
   }
 }
+
+/* Barra in alto: sui telefoni la zona centrale cede spazio invece di far scorrere la pagina in orizzontale. Si toglie il meno utile e si tiene il resto:
+   il logo Capgemini, il tasto Home, il titolo, la versione e il manuale restano; vanno via il logo del cliente (e' nella Home), il contratto e il nome. */
+.app-topbar { box-sizing: border-box; max-width: 100vw; }
+.app-topbar-center { overflow: hidden; }
+.app-topbar-center > span { white-space: nowrap; }
+@media (max-width: 760px) {
+  .app-topbar { gap: 8px !important; }
+  .app-topbar-center { justify-content: flex-start !important; gap: 8px !important; }
+  .app-topbar-center > img, .app-topbar-center > span:nth-of-type(3) { display: none; }       /* logo del cliente e contratto */
+  .app-topbar-right > span { display: none; }                                                  /* nome utente (e' nel profilo) */
+}
+@media (max-width: 480px) { .app-topbar-center > span:nth-of-type(2) { display: none; } }      /* anche la versione, sui telefoni piu' piccoli */

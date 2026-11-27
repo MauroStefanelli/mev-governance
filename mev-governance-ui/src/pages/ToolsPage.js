@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import JSZip from "jszip";
 import { fmtItIT } from "../utils";
 import { tryRefreshToken, updateOrdineConsegna } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 const API_BASE_URL = (window._env_ && window._env_.REACT_APP_API_URL) || process.env.REACT_APP_API_URL || "";
 
@@ -783,8 +785,8 @@ export default function ToolsPage({ onUnauthorized }) {
       {/* ── Titolo ── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
         <div>
-          <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a" }}>
-            Ordini di Consegna e Verbali di Avanzamento
+          <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a", display: "flex", alignItems: "center", gap: 6 }}>
+            Ordini di Consegna e Verbali di Avanzamento<HelpHint topic={HELP.tools} label="Ordini di Consegna e Verbali di Avanzamento" />
           </div>
         </div>
         {items.length > 0 && (

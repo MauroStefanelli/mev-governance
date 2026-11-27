@@ -8,6 +8,8 @@ import { updateLotto, updateAttachment, lottoProgress, requisitoTesto, itemKey }
 import GaraSections from "../components/gare/GaraSections";
 import { lottiConBaseAsta, salvaBasiImportate, numeroLotto } from "../components/gare/lottoAmounts";
 import { getGare, putGara, deleteGara, analizzaCapitolatoGara, analizzaProposteGara, analizzaOffertaExcel } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 const AMBER        = "#f59e0b";
 const AMBER_DARK   = "#b45309";
@@ -120,7 +122,7 @@ function ListaGare({ gare, onApri, onNuova, onDelete, onModifica }) {
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🏆</div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>Risposte di Gara</h1>
+              <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#fff", lineHeight: 1.1, display: "flex", alignItems: "center", gap: 8 }}>Risposte di Gara<span style={{ background: "#fff", borderRadius: "50%", display: "inline-flex", lineHeight: 0 }}><HelpHint topic={HELP.gare} label="Risposte di Gara" /></span></h1>
               <p style={{ margin: "4px 0 0", fontSize: 13, color: "rgba(255,255,255,0.72)" }}>Gestisci le tue gare, carica i documenti e ottieni supporto AI</p>
             </div>
           </div>

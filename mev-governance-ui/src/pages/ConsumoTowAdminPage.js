@@ -7,6 +7,8 @@ import { getConsumoTow, updateConsumoTow, createConsumoTow, createConsumoTowFigl
   resetMevAndConsumoTow, getOrdiniConsegna, recalcConsumoTow,
   getReleaseSchedules, upsertReleaseSchedule, deleteConfiguratoreRecord,
 } from "../services/mevService";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 const CONTRATTI_ORDER_KEY = "consumo-tow-contratti-order";
 // ── Pianificazione Release ────────────────────────────────────────────────────
@@ -1590,7 +1592,7 @@ export default function ConsumoTowAdminPage({ onUnauthorized, ambienteId }) {
       <div style={{ marginBottom: "24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Gestione Contratto</div>
-          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Monitoraggio</h2>
+          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px", display: "flex", alignItems: "center", gap: 6 }}>Monitoraggio<HelpHint topic={HELP.consumoTow} label="Gestione Contratto · Monitoraggio" /></h2>
           <p style={{ margin: "5px 0 0", fontSize: "13px", color: "#64748b" }}>Clicca su un contratto per visualizzare il dettaglio dei TOW</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexShrink: 0 }}>

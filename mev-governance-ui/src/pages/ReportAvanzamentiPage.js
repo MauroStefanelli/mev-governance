@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import "./reportAvanzamenti.css";
 import { getMevList, getReleaseSchedules, upsertReleaseSchedule, deleteReleaseSchedule, renameReleaseSchedule, getReleaseProgress, putReleaseProgress, getRtiSocieta, deleteAllReleaseProgress } from "../services/mevService";
 import { resolveMandataryAndPartners } from "../utils/mevCompanies";
+import HelpHint from "../configuratore/HelpHint";
+import { HELP } from "../configuratore/helpTopics";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -795,8 +797,8 @@ export default function ReportAvanzamentiPage({ onUnauthorized, ambienteId, role
       {/* ── Intestazione ── */}
       <div className="ra-hero">
         <span className="ra-eyebrow">GOVERNANCE / RELEASE MANAGEMENT</span>
-        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: C.head, letterSpacing: "-0.4px" }}>
-          Report Avanzamenti Attività
+        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 800, color: C.head, letterSpacing: "-0.4px", display: "flex", alignItems: "center", gap: 6 }}>
+          Report Avanzamenti Attività<HelpHint topic={HELP.report} label="Report Avanzamenti Attività" />
         </h1>
         <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>
           Ogni release, una visione chiara. Monitora le attività e accompagna il lavoro fino al rilascio.
