@@ -295,8 +295,12 @@ const goToOfferWithTwo = async () => {
   gates.length = 0; service.reviewOfferDetails.mockClear();
 };
 const openAllGroups = () => document.querySelectorAll('details.offer-activity-group').forEach(d => { d.open = true; });
+// Le righe sono un elenco: un click apre la finestra con il dettaglio (e con i razionali e «Rifai la verifica dell'intervento»). `openRow(n)` apre la n-esima riga mostrata.
+const openRow = (index = 0) => { openAllGroups(); const rows = [...document.querySelectorAll('button.rrl-row')]; fireEvent.click(rows[index]); return screen.getByRole('dialog', { name: /./ }); };
+const closeRow = () => fireEvent.click(screen.getByRole('button', { name: 'Chiudi il dettaglio' }));
+const rowOf = intervention => [...document.querySelectorAll('button.rrl-row')].findIndex(button => button.getAttribute('aria-label').includes(intervention));
 const addRationaleOnFirstRow = async (text, interventionLabel) => {
-  openAllGroups();
+  openRow(0);
   const forms = await screen.findAllByRole('button', { name: '+ Aggiungi un razionale' });
   fireEvent.click(forms[0]);
   fireEvent.change(screen.getByLabelText('Ragionamento'), { target: { value: text } });
@@ -306,10 +310,12 @@ const addRationaleOnFirstRow = async (text, interventionLabel) => {
 describe('rationales from the column «Verifica AI attività / catalogo»', () => {
   test('every verified row shows the rationale area and the button to redo ITS intervention', async () => {
     await goToOfferWithTwo();
-    openAllGroups();
-    expect((await screen.findAllByText('Razionali che l’AI legge per questa riga')).length).toBe(8);
-    expect(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' }).length).toBe(5);
-    expect(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' }).length).toBe(3);
+    openAllGroups(); expect(document.querySelectorAll('button.rrl-row')).toHaveLength(8);                // 8 righe nell'elenco, una per attivita'
+    for (let index = 0; index < 8; index += 1) {                                                         // ognuna, aperta, mostra i razionali e il pulsante dell'intervento SUO
+      openRow(index); expect(screen.getByText('Razionali che l’AI legge per questa riga')).toBeInTheDocument();
+      const label = document.querySelectorAll('button.rrl-row')[index].getAttribute('aria-label').includes('MNPRES-001') ? 'MNPRES-001' : 'MNPRES-002';
+      expect(screen.getByRole('button', { name: `Rifai la verifica dell’intervento ${label}` })).toBeInTheDocument(); closeRow();
+    }
   });
 
   test('writing a rationale saves it (confirmed) on the server for the right intervention, and the rows of THAT intervention become «to update», the others do not', async () => {
@@ -321,7 +327,7 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));          // le 5 righe dell'intervento A sono da rifare, le 3 di B no
     expect(card()).toHaveTextContent('Mancano 5: 5 modificate dopo la verifica');
     expect(within(card()).getByRole('button', { name: 'Aggiorna le 5 righe modificate' })).toBeInTheDocument();
-    expect(screen.getAllByText('Da aggiornare: dati modificati dopo la verifica').length).toBe(5);
+    closeRow(); openAllGroups(); expect(document.querySelectorAll('.rrl-badge-stale')).toHaveLength(5);                              // 5 righe segnate «Da aggiornare» nell'elenco
     expect(service.reviewOfferDetails).not.toHaveBeenCalled();                                 // salvare un razionale NON chiama l'AI da solo
   });
 
@@ -330,8 +336,8 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await addRationaleOnFirstRow('Ragionamento A.');
     await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));         // A e' da aggiornare, B e' a posto
     gates.length = 0; service.reviewOfferDetails.mockClear();
-    openAllGroups();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' })[0]);
+    closeRow(); openAllGroups(); openRow(rowOf('MNPRES-002'));
+    fireEvent.click(screen.getByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' }));
     await waitFor(() => expect(dialogOrAlert()).toHaveTextContent('3 di 3 righe verificate (100%)'));      // la finestra parla delle 3 righe di B
     expect(service.reviewOfferDetails).not.toHaveBeenCalled();                                  // B e' gia' verificata: l'AI non viene richiamata
     fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
@@ -342,8 +348,8 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await addRationaleOnFirstRow('Ragionamento A.');
     await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));
     gates.length = 0; service.reviewOfferDetails.mockClear();
-    openAllGroups();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' })[0]);
+    closeRow(); openAllGroups(); openRow(rowOf('MNPRES-002'));
+    fireEvent.click(screen.getByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-002' }));
     await waitFor(() => expect(dialogOrAlert()).toHaveTextContent('3 di 3 righe verificate (100%)'));
     fireEvent.click(within(dlg()).getByRole('button', { name: 'Verifica tutto da capo' }));
     await waitFor(() => expect(gates).toHaveLength(1));
@@ -358,7 +364,7 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await addRationaleOnFirstRow('Il campo si aggiunge a una pagina che esiste già.');
     await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));
     gates.length = 0; service.reviewOfferDetails.mockClear();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' })[0]);
+    closeRow(); openAllGroups(); openRow(rowOf('MNPRES-001')); fireEvent.click(screen.getByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' }));
     await waitFor(() => expect(gates).toHaveLength(1));
     expect(gates[0].rows).toHaveLength(5);                                                      // solo le 5 righe di A: le 3 di B non vengono rimandate
     expect(gates[0].rows.every(r => r.intervention.id === 'MNPRES-001')).toBe(true);
@@ -376,7 +382,7 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await addRationaleOnFirstRow('Ragionamento A.');
     await waitFor(() => expect(card()).toHaveTextContent('3 di 8 righe verificate'));
     gates.length = 0; service.reviewOfferDetails.mockClear();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' })[0]);
+    closeRow(); openAllGroups(); openRow(rowOf('MNPRES-001')); fireEvent.click(screen.getByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' }));
     await waitFor(() => expect(gates).toHaveLength(1)); await act(async () => { gates.shift().resolve(); });
     await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata'));
     fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
@@ -386,7 +392,7 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
 
   test('«Aggiorna le N righe modificate» (all interventions) redoes only the changed rows, in one go', async () => {
     await goToOfferWithTwo();
-    await addRationaleOnFirstRow('Ragionamento A.');
+    await addRationaleOnFirstRow('Ragionamento A.'); closeRow();                                         // il dettaglio della riga e' una finestra: si chiude per tornare alla scheda
     await waitFor(() => expect(within(card()).getByRole('button', { name: 'Aggiorna le 5 righe modificate' })).toBeInTheDocument());
     gates.length = 0; service.reviewOfferDetails.mockClear();
     fireEvent.click(within(card()).getByRole('button', { name: 'Aggiorna le 5 righe modificate' }));
@@ -396,7 +402,7 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
   });
 
   test('a rationale for the WHOLE initiative makes every row «to update»', async () => {
-    await goToOfferWithTwo(); openAllGroups();
+    await goToOfferWithTwo(); openRow(0);
     fireEvent.click((await screen.findAllByRole('button', { name: '+ Aggiungi un razionale' }))[0]);
     fireEvent.change(screen.getByLabelText('Vale per'), { target: { value: 'iniziativa' } });
     fireEvent.change(screen.getByLabelText('Ragionamento'), { target: { value: 'Vale per tutto il lotto.' } });
@@ -406,7 +412,7 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await waitFor(() => expect(card()).toHaveTextContent('8 righe da aggiornare'));
     expect(card()).toHaveTextContent('Erano già verificate, ma i dati sono cambiati');
     expect(within(card()).getByRole('button', { name: 'Aggiorna tutte le 8 righe' })).toBeInTheDocument();
-    expect(screen.getAllByText('Da aggiornare: dati modificati dopo la verifica').length).toBe(8);
+    closeRow(); openAllGroups(); expect(document.querySelectorAll('.rrl-badge-stale')).toHaveLength(8);
   });
 
   test('sharing a rationale calls the server, shows it as shared, and does NOT make the rows «to update»', async () => {
@@ -414,10 +420,10 @@ describe('rationales from the column «Verifica AI attività / catalogo»', () =
     await addRationaleOnFirstRow('Da riusare su altre iniziative.');
     await waitFor(() => expect(saved).toHaveLength(1));
     // dopo il salvataggio le righe di A sono da aggiornare: le rifacciamo, cosi' si vede che la condivisione non cambia nulla
-    gates.length = 0; fireEvent.click(screen.getAllByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' })[0]);
+    gates.length = 0; closeRow(); openAllGroups(); openRow(rowOf('MNPRES-001')); fireEvent.click(screen.getByRole('button', { name: 'Rifai la verifica dell’intervento MNPRES-001' }));
     await waitFor(() => expect(gates).toHaveLength(1)); await act(async () => { gates.shift().resolve(); });
     await waitFor(() => expect(dlg()).toHaveTextContent('Verifica completata')); fireEvent.click(within(dlg()).getByRole('button', { name: 'Chiudi' }));
-    openAllGroups();
+    openRow(rowOf('MNPRES-001'));
     await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'Condividi con le altre iniziative' })[0]); });
     await waitFor(() => expect(service.rationaleRequest).toHaveBeenCalledWith('entries/100/share', {}));
     expect(saved[0].shared).toBe(true);
