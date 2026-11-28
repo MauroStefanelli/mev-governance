@@ -63,7 +63,7 @@ export default function LibraryPanel({ initiative, canEdit = true, onSummary }) 
 
   // The closed row of the section shows these facts without opening it.
   useEffect(() => {
-    onSummary?.(code ? libraryFactsText({ documents: data.documents.length, memory: data.documents.filter(d => d.isMemory).length, searchable: data.documents.filter(isSearchable).length }) : '');
+    onSummary?.(code ? libraryFactsText({ documents: data.documents.length, memory: data.documents.filter(d => d.isMemory).length, searchable: data.documents.filter(isSearchable).length }) : '', code ? data.documents.length : 0);
   }, [code, data.documents, onSummary]);
 
   const upload = async (fileList, ocrNames = []) => {

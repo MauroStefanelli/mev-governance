@@ -309,3 +309,40 @@ describe('the «?» help buttons of «Sviluppo iniziative»', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Come si usa: Iniziative valutate' })); expect(screen.queryByLabelText('Percorso di sviluppo')).toBeNull();
   });
 });
+
+// ---- Percorso passo dopo passo (workflow grafico) ----
+const wfButton = () => screen.getByRole('button', { name: /Percorso passo dopo passo/ });
+const wfDialog = () => screen.getByRole('dialog');
+describe('Sviluppo: percorso passo dopo passo', () => {
+  test('the list has the button too: it shows the steps in order, without «go» buttons, because no initiative is open yet', async () => {
+    render(<SviluppoPage ambienteId={1} codiceContratto="C1" />); await screen.findByText('Invio prenotazione');
+    fireEvent.click(wfButton()); expect(within(wfDialog()).getAllByRole('listitem')).toHaveLength(8); expect(within(wfDialog()).queryByRole('button', { name: /Vai qui|Apri questo passo|Rivedi/ })).toBeNull();
+  });
+  test('inside an initiative the button says which step is next, and it is the same as the phase bar says (sources first)', async () => {
+    await openFirst(); expect(wfButton()).toHaveTextContent('Prossimo:'); fireEvent.click(wfButton());
+    const current = wfDialog().querySelector('[aria-current="step"]'); expect(current).toHaveTextContent('Collega i sorgenti'); expect(wfDialog()).toHaveTextContent('Apri l’iniziativa');
+  });
+  test('«Vai qui» on the next step moves to the right phase and closes the dialog', async () => {
+    await openFirst(); goToSheets(); expect(screen.getByRole('region', { name: 'Fase: Schede' })).toBeInTheDocument();
+    fireEvent.click(wfButton()); fireEvent.click(within(wfDialog()).getByRole('button', { name: 'Vai qui →' }));
+    expect(screen.queryByRole('dialog')).toBeNull(); expect(screen.getByRole('region', { name: 'Fase: Fonti' })).toBeInTheDocument();
+  });
+  test('the save step only becomes «the next» when the cards are defined, and then the delivery step stops waiting once it is saved', async () => {
+    await openFirst(); goToSheets(); fireEvent.click(screen.getByText('Attività 1'));
+    fireEvent.change(screen.getAllByLabelText('Soluzione tecnica')[0], { target: { value: 'x' } });
+    fireEvent.click(wfButton()); expect(wfDialog().querySelector('[aria-current="step"]')).not.toHaveTextContent('Salva lo sviluppo'); expect(wfDialog()).toHaveTextContent('salva prima lo sviluppo'); fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByText('Salva sviluppo')); await waitFor(() => expect(screen.queryByText('Modifiche non salvate')).toBeNull());
+    fireEvent.click(wfButton()); expect(wfDialog()).not.toHaveTextContent('salva prima lo sviluppo');
+  });
+  test('after a save, a NEW edit takes the «saved» away again: the delivery waits for the save once more', async () => {
+    await openFirst(); goToSheets(); fireEvent.click(screen.getByText('Attività 1'));
+    fireEvent.change(screen.getAllByLabelText('Soluzione tecnica')[0], { target: { value: 'x' } }); fireEvent.click(screen.getByText('Salva sviluppo')); await waitFor(() => expect(screen.queryByText('Modifiche non salvate')).toBeNull());
+    fireEvent.click(wfButton()); expect(wfDialog()).not.toHaveTextContent('salva prima lo sviluppo'); fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.change(screen.getAllByLabelText('Soluzione tecnica')[0], { target: { value: 'xy' } }); expect(screen.getByText('Modifiche non salvate')).toBeInTheDocument();
+    fireEvent.click(wfButton()); expect(wfDialog()).toHaveTextContent('salva prima lo sviluppo'); expect(within(wfDialog()).getAllByText('Salva lo sviluppo')[0].closest('li')).toHaveTextContent('modifiche da salvare');
+  });
+  test('«Salva lo sviluppo» does not change phase: it brings the person to the save button', async () => {
+    await openFirst(); goToSheets(); fireEvent.click(wfButton()); const scroll = jest.fn(); window.HTMLElement.prototype.scrollIntoView = scroll;
+    fireEvent.click(within(wfDialog()).getAllByText('Salva lo sviluppo')[0].closest('li').querySelector('.wf-go')); expect(screen.getByRole('region', { name: 'Fase: Schede' })).toBeInTheDocument(); await waitFor(() => expect(scroll).toHaveBeenCalled()); expect(screen.getByText('Salva sviluppo')).toBeDisabled();   // niente da salvare: si scorre soltanto, senza focus su un tasto spento
+  });
+});

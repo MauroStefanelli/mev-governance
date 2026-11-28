@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DevelopmentActivities from '../configuratore/ActivityDevelopmentPanel';
 import ProjectPreparationPanel from '../configuratore/ProjectPreparationPanel';
 import JourneyBar from '../configuratore/JourneyBar';
+import WorkflowButton from '../configuratore/WorkflowButton';
+import { developmentFlow } from '../configuratore/workflowModel';
 import CollaborationPanel from '../configuratore/CollaborationPanel';
 import { indexSummaries, initiativeKey, activityLine, displayName } from '../configuratore/developmentCollaboration';
 import { developmentActivities } from '../configuratore/developmentActivityModel';
@@ -101,6 +103,15 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
   const journey = useMemo(() => loaded ? computeJourney({ activities, plans, preparation, delivery, applications: linkedApplications, files, techProfile,
     approvedCount: approved.length, dirty, revision: loaded.revision }) : null, [loaded, activities, plans, preparation, delivery, linkedApplications, files, techProfile, approved, dirty]);
 
+  // Il percorso passo dopo passo usa lo STESSO calcolo della barra delle fasi: i due non possono dire cose diverse.
+  const workflow = useMemo(() => developmentFlow(journey, { activities: activities.length, saved: !!loaded && !dirty && !!loaded.revision, opened: !!loaded }), [journey, activities.length, loaded, dirty]);
+  const listFlow = useMemo(() => developmentFlow(null, { activities: 0, saved: false, opened: false }), []);
+  const goToWorkflowStep = target => {
+    const to = target.go || {};
+    if (to.phase) { setPhase(to.phase); window.scrollTo?.({ top: 0, behavior: 'smooth' }); }
+    else requestAnimationFrame(() => { const group = document.querySelector('.dev-head-actions'); group?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }); const button = group?.querySelector('.dev-btn-primary'); if (button && !button.disabled) button.focus(); });   // disattivato = niente da salvare: si scorre soltanto
+  };
+
   const save = async () => {
     setBusy('save'); setError(''); setMessage('');
     try {
@@ -147,7 +158,8 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
     {error && <p role="alert" className="development-alert">{error}</p>}
     <section className="dev-card" aria-label="Iniziative da sviluppare">
       <div className="dev-card-head"><h3>Iniziative valutate <span>{rows.length}</span> <HelpHint topic={HELP.devElenco} label="Iniziative valutate" /></h3>
-        <div className="dev-card-tools"><label className="dev-sr-only" htmlFor="dev-search">Cerca per GOTO, titolo o sistema</label>
+        <div className="dev-card-tools"><WorkflowButton label="Percorso passo dopo passo" flow={listFlow} title="Come portare un’iniziativa allo sviluppo" subtitle="I passi, nell’ordine. Apri un’iniziativa dall’elenco per vedere a che punto è." canGo={false} />
+          <label className="dev-sr-only" htmlFor="dev-search">Cerca per GOTO, titolo o sistema</label>
           <input id="dev-search" className="development-search" placeholder="Cerca per GOTO, titolo o sistema" value={search} onChange={e => setSearch(e.target.value)} />
           <button type="button" className="dev-btn" onClick={refresh} disabled={loadingList}>↻ Aggiorna</button></div></div>
       {listError && <p role="alert" className="development-alert">{listError}</p>}
@@ -251,6 +263,7 @@ export default function SviluppoPage({ onUnauthorized, ambienteId, codiceContrat
         <h2>{heading.code} · {heading.title}</h2>
         <div className="dev-chips"><span>{heading.system || 'Sistema non indicato'}</span><span>Contratto {loaded.contractId}</span><span>Lotto {loaded.lot}</span><span>{activities.length} attività</span></div></div>
       <div className="dev-head-actions">
+        <WorkflowButton label="Percorso passo dopo passo" flow={workflow} title="Come portare l’iniziativa allo sviluppo" subtitle="Dai sorgenti alla consegna e alle evidenze. Lo stato di ogni passo viene dai dati di questa iniziativa." onGo={goToWorkflowStep} />
         {dirty && <span className="development-dirty" role="status">Modifiche non salvate</span>}
         <button type="button" className="dev-btn dev-btn-primary" onClick={save} disabled={!!busy || !dirty}>{busy === 'save' ? 'Salvataggio…' : 'Salva sviluppo'}</button>
         <button type="button" className="dev-btn" onClick={() => saveAndClose(save, close)} disabled={!!busy}>Salva e chiudi</button>

@@ -40,8 +40,8 @@ beforeEach(() => {
   service.developmentRequest.mockReset().mockImplementation(async path => (path === 'presence' ? { users: [], messages: [], lastWorked: null } : { messages: [], hasMore: false }));
 });
 
-const open = async () => {
-  render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} onNavigate={() => {}} />);
+const open = async (onNavigate = () => {}) => {
+  render(<ConfiguratorePage onUnauthorized={() => {}} ambienteId={1} codiceContratto="C1" role="Developer" roles={['Developer']} onNavigate={onNavigate} />);
   await waitFor(() => expect(screen.getByLabelText('Codice GOTO')).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText('Codice GOTO'), { target: { value: '777001' } });
   fireEvent.change(screen.getByLabelText('Titolo', { selector: 'input' }), { target: { value: 'Servizio invio' } });
@@ -183,4 +183,54 @@ describe('the rules of the synchronisation, on their own', () => {
     const rows = rowsOf('confermato'); rows[0].qty = 5;
     expect(summary(rows, [entry('confermato')])).toEqual({ confirmed: 1, lines: 2, inOffer: 2, handEdited: 1 });
   });
+});
+
+// ---- Percorso passo dopo passo, con i dati veri della pagina ----
+const pathButton = () => screen.getByRole('button', { name: /Percorso passo dopo passo/ });
+const pathStep = id => { fireEvent.click(pathButton()); const item = [...document.querySelectorAll('.wf-step')].find(li => li.textContent.includes(id)); const info = { cls: item.className, text: item.textContent, next: !!item.querySelector('[aria-current]') || item.getAttribute('aria-current') === 'step' }; fireEvent.keyDown(document, { key: 'Escape' }); return info; };
+describe('percorso passo dopo passo con i dati della pagina', () => {
+  test('confirming the intervention completes «Fatti proporre gli interventi», the offer step waits until the offer is LOOKED AT, then «Salva» is the next one', async () => {
+    const panel = await open();
+    expect(pathStep('Fatti proporre gli interventi').cls).not.toContain('wf-done');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent('2 voci sono entrate nell’offerta'));
+    expect(pathStep('Fatti proporre gli interventi').cls).toContain('wf-done');
+    expect(pathStep('Controlla l’offerta').cls).not.toContain('wf-done');                  // ci sono voci, ma nessuno l'ha ancora guardata
+    await goToOffer();
+    expect(pathStep('Controlla l’offerta').cls).toContain('wf-done');
+  });
+  test('«Vai qui» on the offer step opens the step 3 of the page', async () => {
+    const panel = await open(); fireEvent.click(within(panel).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent('2 voci sono entrate nell’offerta'));
+    fireEvent.click(pathButton()); const item = [...document.querySelectorAll('.wf-step')].find(li => li.textContent.includes('Controlla l’offerta')); fireEvent.click(item.querySelector('.wf-go'));
+    await screen.findByText('Totale catalogo', { exact: false }); expect(pathStep('Controlla l’offerta').cls).toContain('wf-done');
+  });
+  test('«Salvata» only while nothing has changed since the save: a new edit brings «modifiche non salvate» back', async () => {
+    // come il server: la scrittura della revisione restituisce lo stato scritto, con le stesse schede
+    service.workspaceRequest.mockReset().mockImplementation(async (path, body) => (body ? { version: 1, payload: JSON.stringify(body.state) } : []));
+    const panel = await open(); fireEvent.click(within(panel).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent('2 voci sono entrate nell’offerta'));
+    await goToOffer(); expect(pathStep('Salva la valutazione').cls).not.toContain('wf-done');
+    fireEvent.click(screen.getByRole('button', { name: /4\. Revisione/ })); fireEvent.click(await screen.findByRole('button', { name: 'Salva valutazione' }));
+    await waitFor(() => expect(saved()).toBeTruthy()); await waitFor(() => expect(pathStep('Salva la valutazione').cls).toContain('wf-done'));
+    fireEvent.click(screen.getByRole('button', { name: /1\. Iniziativa/ })); fireEvent.change(screen.getAllByLabelText('Titolo', { selector: 'input' })[0], { target: { value: 'Servizio invio v2' } });
+    expect(pathStep('Salva la valutazione').text).toContain('modifiche non salvate'); expect(pathStep('Salva la valutazione').cls).not.toContain('wf-done');
+  });
+});
+
+test('the solution step counts the interventions that exist and how many are described, from the solution panel itself', async () => {
+  const panel = await open(); expect(pathStep('Descrivi la soluzione').text).toContain('nessun intervento da descrivere');
+  fireEvent.click(within(panel).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent('2 voci sono entrate nell’offerta'));
+  const info = pathStep('Descrivi la soluzione'); expect(info.text).toContain('0 di 1 descritti'); expect(info.cls).not.toContain('wf-done');
+});
+test('«Passa a Sviluppo» saves first and only then leaves the page: with the save done it goes to Sviluppo', async () => {
+  service.workspaceRequest.mockReset().mockImplementation(async (path, body) => (body ? { version: 1, payload: JSON.stringify(body.state) } : []));
+  const onNavigate = jest.fn(); const panel = await open(onNavigate); fireEvent.click(within(panel).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent('2 voci sono entrate nell’offerta'));
+  fireEvent.click(pathButton()); const item = [...document.querySelectorAll('.wf-step')].find(li => li.textContent.includes('Passa a Sviluppo')); expect(item.querySelector('.wf-go')).toBeTruthy(); fireEvent.keyDown(document, { key: 'Escape' });
+  expect(onNavigate).not.toHaveBeenCalled();                                   // non si parte da soli aprendo il percorso
+  fireEvent.click(pathButton()); fireEvent.click([...document.querySelectorAll('.wf-step')].find(li => li.textContent.includes('Passa a Sviluppo')).querySelector('.wf-go'));
+  await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('sviluppo')); expect(saved()).toBeTruthy();
+});
+test('if the save fails the page does NOT go to Sviluppo (the work would be lost)', async () => {
+  const onNavigate = jest.fn(); const panel = await open(onNavigate); fireEvent.click(within(panel).getByRole('button', { name: 'Conferma l’intervento' })); await waitFor(() => expect(document.body).toHaveTextContent('2 voci sono entrate nell’offerta'));
+  service.upsertConfiguratoreRecord.mockImplementation(async body => { if (body.entity_type === 'initiative_evaluation') throw new Error('rete'); return { ...body, payload: JSON.stringify(body.payload) }; });
+  fireEvent.click(pathButton()); fireEvent.click([...document.querySelectorAll('.wf-step')].find(li => li.textContent.includes('Passa a Sviluppo')).querySelector('.wf-go'));
+  await waitFor(() => expect(document.body).toHaveTextContent('Salvataggio non riuscito')); expect(onNavigate).not.toHaveBeenCalled();
 });

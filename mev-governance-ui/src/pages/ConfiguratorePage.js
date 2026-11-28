@@ -24,6 +24,8 @@ import { parseEstimatorWorkbook } from "../configuratore/estimatorImport";
 import { towOverrides as buildTowOverrides, qtyKey, roundUp, autoTowRow, AUTO, MANUAL } from "../configuratore/towModel";
 import TowReview from "../configuratore/TowReview";
 import HelpHint from "../configuratore/HelpHint";
+import WorkflowButton from "../configuratore/WorkflowButton";
+import { configuratorFlow } from "../configuratore/workflowModel";
 import { HELP } from "../configuratore/helpTopics";
 import { syncItems, describeChange } from "../configuratore/proposedToOffer";
 import DeleteInitiativeDialog, { initiativeLabel } from "../configuratore/DeleteInitiativeDialog";
@@ -134,7 +136,9 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
   const [developmentPlans, setDevelopmentPlans] = useState({});
   const [rationale, setRationale] = useState([]); // confirmed + proposed entries of the open initiative
   const [openSections, setOpenSections] = useState(() => new Set(['dati']));
-  const [libraryFacts, setLibraryFacts] = useState('');
+  const [libraryFacts, setLibraryFactsText] = useState('');
+  const [documentCount, setDocumentCount] = useState(0);
+  const setLibraryFacts = (text, count = 0) => { setLibraryFactsText(text); setDocumentCount(count); };
   const [solutionProgress, setSolutionProgress] = useState({ total: 0, filled: 0, orphans: 0, dirty: false, revision: 0 });
   const isOpen = id => openSections.has(id);
   const toggleSection = id => setOpenSections(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -600,6 +604,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
       const isUpdate = !!editingRecordKey;
       if (showMessage) toast(isUpdate ? "Valutazione aggiornata con successo" : "Valutazione salvata e resa disponibile alle stime future");
       setEditingRecordKey(recordKey); // keep updating the exact reopened archive record
+      setLastSavedSignature(currentSignatureRef.current);
       // Chi ha salvato per ultimo su questo GOTO: lo vedono anche i colleghi in Sviluppo iniziative.
       // Un errore qui non e' un errore di salvataggio: il salvataggio e' gia' riuscito.
       try { if (String(initiative.code || '').trim()) Promise.resolve(developmentRequest('worked', { goto: String(initiative.code).trim() })).catch(() => {}); } catch { /* il segnale 'ultimo lavoro' e' accessorio */ }
@@ -643,7 +648,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     detailReviewJob.current++; setDetailReviews({}); setDetailReviewBusy(false);
     setInitiative({ code: "", title: "", system: "", contractType: "", release: "", pmPoste: "", requirements: "", description: "" });
     setImportedInterventions([]);
-    setItems([]); setOfferRemoved([]); setOfferNote('');
+    setItems([]); setOfferRemoved([]); setOfferNote(''); setLastSavedSignature('');
     setSuggestions([]);
     setTow({});
     // Azzera solo i valori del contratto/lotto corrente, così il useEffect li ripopola dai dati contratto
@@ -1328,6 +1333,35 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
 
   const [editingRecordKey, setEditingRecordKey] = useState(null); // chiave del record aperto per modifica
 
+  // ── Percorso passo dopo passo: lo stato di ogni step viene dai dati veri della pagina ──
+  const [offerVisitedFor, setOfferVisitedFor] = useState('');
+  const identityKey = String(initiative.code || initiative.title || '').trim().toLowerCase();
+  useEffect(() => { if (step === 3 && identityKey) setOfferVisitedFor(identityKey); }, [step, identityKey]);
+  // La valutazione e' «salvata e senza modifiche» se la firma dei dati che il salvataggio scrive e' uguale a quella dell'ultimo salvataggio riuscito (o dell'apertura di una valutazione salvata).
+  const [lastSavedSignature, setLastSavedSignature] = useState('');
+  const currentSignature = useMemo(() => JSON.stringify([initiative, items, tow, discount, contingency, economyNotes, selectedAppIds, importedInterventions]), [initiative, items, tow, discount, contingency, economyNotes, selectedAppIds, importedInterventions]);
+  const currentSignatureRef = useRef(''); useEffect(() => { currentSignatureRef.current = currentSignature; }, [currentSignature]);
+  const [reopenedKey, setReopenedKey] = useState(null);
+  useEffect(() => { if (reopenedKey) { setLastSavedSignature(currentSignatureRef.current); setReopenedKey(null); } }, [reopenedKey]);       // riaperta dall'archivio: i dati caricati sono quelli salvati
+  const [handedOff] = useState(false);
+  const workflow = useMemo(() => configuratorFlow({
+    code: initiative.code, title: initiative.title, systemChosen: !!(String(initiative.system || '').trim() || selectedAppIds.length),
+    documents: documentCount, confirmedRationales: (rationale || []).filter(entry => entry.status === 'confermata').length, proposedPending: (rationale || []).filter(entry => entry.status === 'proposta').length,
+    interventionsConfirmed: solutionProgress.proposed?.confirmed || 0, interventionsProposed: solutionProgress.proposed?.proposed || 0, catalogReady: catalog.length > 0,
+    solutionFilled: solutionProgress.filled || 0, solutionTotal: solutionProgress.total || 0,
+    offerItems: items.length, offerTotal: items.length ? euro.format(calculation.total) : '', offerVisited: offerVisitedFor === identityKey && !!identityKey,
+    saved: !!editingRecordKey && !!lastSavedSignature && lastSavedSignature === currentSignature, hasChanges: !!editingRecordKey && lastSavedSignature !== currentSignature, handedOff,
+  }), [initiative.code, initiative.title, initiative.system, selectedAppIds, documentCount, rationale, solutionProgress, catalog.length, items.length, calculation.total, offerVisitedFor, identityKey, editingRecordKey, lastSavedSignature, currentSignature, handedOff]);
+  const goToWorkflowStep = target => {
+    const to = target.go || {};
+    if (to.step) setStep(to.step);
+    if (to.section) { setStep(1); setTimeout(() => openSection(to.section), 60); }
+    else window.scrollTo?.({ top: 0, behavior: 'smooth' });
+    if (to.step === 4) persistInitiativeEvaluation(false);
+    if (target.id === 'handoff' && onNavigate) persistInitiativeEvaluation(false).then(ok => { if (ok) onNavigate('sviluppo'); });
+  };
+
+
   // ── Interventi proposti dall'AI e confermati → voci dell'offerta ──
   // La Soluzione dice quali interventi sono confermati; l'offerta (items) deve avere le loro voci di catalogo. `proposalsRef` tiene l'ultimo elenco; `offerRemoved` le righe che una persona
   // ha tolto a mano dall'offerta (non rientrano da sole finche' l'intervento le vuole).
@@ -1390,6 +1424,7 @@ export default function ConfiguratorePage({ onUnauthorized, ambienteId, codiceCo
     }
     // Memorizza la chiave del record esistente per sovrascrivere al salvataggio
     setEditingRecordKey(record.record_key || null);
+    setReopenedKey(record.record_key || null);                 // dopo il prossimo disegno la firma attuale diventa quella «salvata»
     setStep(1);
     toast(`Valutazione "${record.title}" riaperta — modifica e premi "Salva valutazione" per aggiornarla`);
     setShowArchive(false);
@@ -2139,6 +2174,11 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido con questa struttura (nessun 
         {selectedTowPriceSource && <p>Fonte prezzi: {selectedTowPriceSource.name} · Lotto {lot}</p>}
       </section>}
       <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <WorkflowButton label="Percorso passo dopo passo" flow={workflow} title="Come preparare un’iniziativa senza Excel"
+            subtitle="Dall’iniziativa vuota all’offerta e ai dati per Sviluppo. Lo stato di ogni passo viene dai tuoi dati." onGo={goToWorkflowStep} canGo={canEditInitiative}
+            footer="Se hai la Tabella di Offerta o l’Estimatore di Poste, importali dal passo 1 e salta i passi sui razionali e sugli interventi." />
+        </div>
         <h2 style={{ margin: 0, color: "#102a47", fontSize: 23, letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 6 }}>{STEPS[step - 1]}
           <HelpHint topic={[HELP.stepIniziativa, HELP.stepInterventi, HELP.stepOfferta, HELP.stepRevisione][step - 1]} label={`Passo ${step} · ${STEPS[step - 1]}`} /></h2>
         <p style={styles.hint}>{[
